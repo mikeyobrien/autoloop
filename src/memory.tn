@@ -221,7 +221,7 @@ defmodule LoopMemory do
 
   defp append_memory_entry(path, content) do
     System.ensure_dir(Path.dirname(path))
-    System.write_text(path, read_if_exists(path) <> content)
+    System.run("printf '%s' " <> shell_quote(content) <> " >> " <> shell_quote(path))
   end
 
   defp next_id(path, prefix) do
@@ -314,6 +314,10 @@ defmodule LoopMemory do
       true -> true
       _ -> list_contains(rest, needle)
     end
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
   end
 
   defp read_if_exists(path) do

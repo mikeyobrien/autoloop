@@ -1179,7 +1179,7 @@ defmodule LoopHarness do
   end
 
   defp append_text(path, content) do
-    System.write_text(path, read_if_exists(path) <> content)
+    System.run("printf '%s' " <> shell_quote(content) <> " >> " <> shell_quote(path))
   end
 
   defp event_line(run_id, iteration, topic, fields_json) do
