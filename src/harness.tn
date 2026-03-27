@@ -2,6 +2,7 @@ defmodule LoopHarness do
   def run(project_dir, prompt_override, self_command, run_options) do
     loop = build_loop_context(project_dir, prompt_override, self_command, run_options)
     live_loop = reload_loop(loop)
+    live_loop = init_store(live_loop)
 
     ensure_layout(state_dir(live_loop))
     install_runtime_tools(live_loop)
@@ -10,6 +11,18 @@ defmodule LoopHarness do
 
     summary = iterate(live_loop, 1)
     print_summary(summary, live_loop)
+  end
+
+  defp init_store(loop) do
+    store = %{
+      "run_id" => run_id(loop),
+      "project_dir" => project_dir(loop),
+      "self_command" => self_command(loop),
+      "max_iterations" => max_iterations(loop),
+      "completion_event" => completion_event(loop),
+      "completion_promise" => completion_promise(loop)
+    }
+    Map.put(loop, :store, store)
   end
 
   def emit(project_dir, topic, payload) do
@@ -111,7 +124,7 @@ defmodule LoopHarness do
     harness_text = read_optional_project_file(project_dir, LoopConfig.get(config, "harness.instructions_file", "harness.md"))
     review_text = resolve_review_prompt(project_dir, config)
 
-    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, verbose: verbose(loop)}}
+    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, verbose: verbose(loop)}, store: store(loop)}
   end
 
   defp iterate(loop, iteration) do
@@ -1736,6 +1749,10 @@ defmodule LoopHarness do
 
   defp backend_override(loop) do
     Map.get(Map.get(loop, :runtime, %{}), :backend_override, %{})
+  end
+
+  defp store(loop) do
+    Map.get(loop, :store, %{})
   end
 
   defp verbose(loop) do
