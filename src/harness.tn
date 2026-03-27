@@ -71,6 +71,8 @@ defmodule LoopHarness do
     |> reload_loop()
   end
 
+  # Hot-reload: re-reads config/topology each iteration so operators can tune
+  # parameters (timeouts, roles, topology edges) mid-run without restarting.
   defp reload_loop(loop) do
     project_dir = project_dir(loop)
     config = LoopConfig.load_project(project_dir)
