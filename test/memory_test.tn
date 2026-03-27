@@ -1,3 +1,4 @@
+# Tests for LoopMemory: resolve, render, list, raw, stats, budget pressure.
 defmodule LoopConfig do
   def load_project(project_dir) do
     load(resolve_config_path(project_dir))
@@ -174,6 +175,20 @@ defmodule LoopMemory do
     truncate_text(text, budget_chars)
   end
 
+  def stats_project(project_dir, budget_chars) do
+    stats_file(resolve_file(project_dir), budget_chars)
+  end
+
+  def stats_file(path, budget_chars) do
+    memory = materialize(read_lines(path))
+    preferences = count_entries(Map.get(memory, :preferences, []), 0)
+    learnings = count_entries(Map.get(memory, :learnings, []), 0)
+    meta = count_entries(Map.get(memory, :meta, []), 0)
+    rendered_chars = String.length(render_materialized(memory))
+
+    %{preferences: preferences, learnings: learnings, meta: meta, total_entries: preferences + learnings + meta, rendered_chars: rendered_chars, budget_chars: budget_chars, truncated: memory_truncated(rendered_chars, budget_chars)}
+  end
+
   def list_project(project_dir) do
     render_materialized(materialize(read_lines(resolve_file(project_dir))))
   end
@@ -267,6 +282,22 @@ defmodule LoopMemory do
       true -> text
       _ -> String.slice(text, 0, budget_chars) <> "\n..."
     end
+  end
+
+  defp memory_truncated(_rendered_chars, budget_chars) when budget_chars <= 0 do
+    false
+  end
+
+  defp memory_truncated(rendered_chars, budget_chars) do
+    rendered_chars > budget_chars
+  end
+
+  defp count_entries([], count) do
+    count
+  end
+
+  defp count_entries([_entry | rest], count) do
+    count_entries(rest, count + 1)
   end
 
   defp materialize(lines) do
@@ -450,6 +481,20 @@ defmodule MemoryTest do
   def test_raw_project_returns_string() do
     result = LoopMemory.raw_project(project_dir())
     Assert.assert(is_binary(result), "raw_project should return a string")
+  end
+
+  def test_stats_file_reports_budget_pressure() do
+    path = "/tmp/miniloops-memory-stats-test.jsonl"
+    System.write_text(path, "{\"id\": \"mem-1\", \"type\": \"learning\", \"text\": \"Long learning text to trigger truncation\", \"source\": \"manual\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"mem-2\", \"type\": \"preference\", \"category\": \"Workflow\", \"text\": \"Keep prompts small\", \"created\": \"2026-03-27T00:00:00Z\"}\n")
+
+    stats = LoopMemory.stats_file(path, 20)
+    Assert.assert_equal(Map.get(stats, :learnings, 0), 1)
+    Assert.assert_equal(Map.get(stats, :preferences, 0), 1)
+    Assert.assert_equal(Map.get(stats, :meta, 0), 0)
+    Assert.assert_equal(Map.get(stats, :total_entries, 0), 2)
+    Assert.assert_equal(Map.get(stats, :budget_chars, 0), 20)
+    Assert.assert(Map.get(stats, :rendered_chars, 0) > 20, "rendered_chars should reflect full materialized length")
+    Assert.assert_equal(Map.get(stats, :truncated, false), true)
   end
 
   defp project_dir() do

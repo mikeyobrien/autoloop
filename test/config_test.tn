@@ -1,3 +1,4 @@
+# Tests for LoopConfig: defaults, get/get_int/get_list, put, deep merge, load_project, resolve helpers.
 defmodule LoopConfig do
   def load_project(project_dir) do
     load(resolve_config_path(project_dir))

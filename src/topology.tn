@@ -8,6 +8,22 @@ defmodule LoopTopology do
     match_any(topic, patterns)
   end
 
+  def get_role_ids(topology) do
+    role_ids(Map.get(topology, :roles, []), [])
+  end
+
+  def all_emitted_events(topology) do
+    collect_all_emits(Map.get(topology, :roles, []), [])
+  end
+
+  def handoff_keys(topology) do
+    Map.keys(Map.get(topology, :handoff, %{}))
+  end
+
+  def handoff_target_ids(topology) do
+    collect_handoff_targets(Map.keys(Map.get(topology, :handoff, %{})), Map.get(topology, :handoff, %{}), [])
+  end
+
   def load(project_dir) do
     path = Path.join(project_dir, "topology.toml")
 
@@ -63,7 +79,8 @@ defmodule LoopTopology do
 
   defp render_nonempty(topology, recent_event, roles) do
     suggested = suggested_roles(topology, recent_event)
-    allowed = allowed_events(topology, recent_event) "Topology (advisory):\n" <> "Recent routing event: " <> recent_event <> "\n" <> "Suggested next roles: " <> LoopUtils.list_text(suggested) <> "\n" <> "Allowed next events: " <> LoopUtils.list_text(allowed) <> "\n\n" <> "Role deck:\n" <> render_roles(roles)
+    allowed = allowed_events(topology, recent_event)
+    "Topology (advisory):\n" <> "Recent routing event: " <> recent_event <> "\n" <> "Suggested next roles: " <> LoopUtils.list_text(suggested) <> "\n" <> "Allowed next events: " <> LoopUtils.list_text(allowed) <> "\n\n" <> "Role deck:\n" <> render_roles(roles)
   end
 
   defp initial_state() do
@@ -375,6 +392,22 @@ defmodule LoopTopology do
       "true" -> true
       _ -> false
     end
+  end
+
+  defp collect_all_emits([], acc) do
+    dedup_list(acc, [])
+  end
+
+  defp collect_all_emits([role | rest], acc) do
+    collect_all_emits(rest, acc ++ Map.get(role, :emits, []))
+  end
+
+  defp collect_handoff_targets([], _handoff, acc) do
+    dedup_list(acc, [])
+  end
+
+  defp collect_handoff_targets([key | rest], handoff, acc) do
+    collect_handoff_targets(rest, handoff, acc ++ Map.get(handoff, key, []))
   end
 
 end

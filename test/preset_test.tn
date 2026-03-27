@@ -1,0 +1,663 @@
+# Tests for preset validation: each preset under examples/ loads correctly,
+# has a consistent topology (emits↔handoff, targets↔roles), and non-empty role prompts.
+
+defmodule PresetConfig do
+  def load_project(project_dir) do
+    load(resolve_config_path(project_dir))
+  end
+
+  def has_config(project_dir) do
+    System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
+  end
+
+  def get(config, key, fallback) do
+    case is_list(key) do
+      true -> get_in_path(config, key, fallback)
+      _ -> get_in_path(config, String.split(key, "."), fallback)
+    end
+  end
+
+  defp load(path) do
+    case System.path_exists(path) do
+      true -> deep_merge(defaults(), parse_toml(System.read_text(path)))
+      _ -> defaults()
+    end
+  end
+
+  defp resolve_config_path(project_dir) do
+    toml_path = Path.join(project_dir, "miniloops.toml")
+    conf_path = Path.join(project_dir, "miniloops.conf")
+
+    case System.path_exists(toml_path) do
+      true -> toml_path
+      _ -> conf_path
+    end
+  end
+
+  defp defaults() do
+    event_loop = %{
+      "max_iterations" => "3",
+      "completion_promise" => "LOOP_COMPLETE",
+      "completion_event" => "task.complete",
+      "required_events" => ""
+    }
+    backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
+    core = %{
+      "state_dir" => ".miniloops",
+      "journal_file" => ".miniloops/journal.jsonl",
+      "events_file" => ".miniloops/journal.jsonl",
+      "memory_file" => ".miniloops/memory.jsonl"
+    }
+    %{"event_loop" => event_loop, "backend" => backend, "core" => core}
+  end
+
+  defp get_in_path(_map, [], fallback) do
+    fallback
+  end
+
+  defp get_in_path(map, [key], fallback) do
+    case Map.get(map, key, nil) do
+      nil -> fallback
+      value -> value
+    end
+  end
+
+  defp get_in_path(map, [key | rest], fallback) do
+    case Map.get(map, key, nil) do
+      nil -> fallback
+      inner ->
+        case is_map(inner) do
+          true -> get_in_path(inner, rest, fallback)
+          _ -> fallback
+        end
+    end
+  end
+
+  defp put_in_path(map, [key], value) do
+    Map.put(map, key, value)
+  end
+
+  defp put_in_path(map, [key | rest], value) do
+    inner = case Map.get(map, key, nil) do
+      nil -> %{}
+      existing ->
+        case is_map(existing) do
+          true -> existing
+          _ -> %{}
+        end
+    end
+    Map.put(map, key, put_in_path(inner, rest, value))
+  end
+
+  defp deep_merge(base, override) do
+    merge_keys(Map.keys(override), base, override)
+  end
+
+  defp merge_keys([], result, _override) do
+    result
+  end
+
+  defp merge_keys([key | rest], result, override) do
+    over_val = Map.get(override, key, nil)
+    merged = merge_key_value(result, key, over_val)
+    merge_keys(rest, Map.put(result, key, merged), override)
+  end
+
+  defp merge_key_value(result, key, over_val) do
+    case Map.has_key(result, key) do
+      true -> merge_value(Map.get(result, key, nil), over_val)
+      _ -> over_val
+    end
+  end
+
+  defp merge_value(base, over) do
+    case is_map(base) and is_map(over) do
+      true -> deep_merge(base, over)
+      _ -> over
+    end
+  end
+
+  defp parse_toml(text) do
+    parse_toml_lines(String.split(text, line_sep()), "", %{})
+  end
+
+  defp parse_toml_lines([], _section, config) do
+    config
+  end
+
+  defp parse_toml_lines([line | rest], section, config) do
+    trimmed = String.trim(line)
+
+    case skip_line(trimmed) do
+      true -> parse_toml_lines(rest, section, config)
+      _ -> parse_toml_dispatch(trimmed, rest, section, config)
+    end
+  end
+
+  defp parse_toml_dispatch(line, rest, section, config) do
+    case is_section_header(line) do
+      true -> parse_toml_lines(rest, extract_section_name(line), config)
+      _ -> parse_toml_assignment(String.split(line, "="), rest, section, config)
+    end
+  end
+
+  defp is_section_header(line) do
+    String.starts_with(line, "[") and String.ends_with(line, "]")
+  end
+
+  defp extract_section_name(line) do
+    String.trim(slice_outer(line))
+  end
+
+  defp parse_toml_assignment([_single], rest, section, config) do
+    parse_toml_lines(rest, section, config)
+  end
+
+  defp parse_toml_assignment([key | value_parts], rest, section, config) do
+    value = rejoin(value_parts, "=")
+    raw_key = String.trim(key)
+    full_key = case section do
+      "" -> raw_key
+      _ -> section <> "." <> raw_key
+    end
+    path = String.split(full_key, ".")
+    parse_toml_lines(rest, section, put_in_path(config, path, normalize_value(String.trim(value))))
+  end
+
+  defp parse_toml_assignment([], rest, section, config) do
+    parse_toml_lines(rest, section, config)
+  end
+
+  defp rejoin([part], _sep) do
+    part
+  end
+
+  defp rejoin([part | rest], sep) do
+    part <> sep <> rejoin(rest, sep)
+  end
+
+  defp normalize_value(value) do
+    case is_array_literal(value) do
+      true -> join_csv(parse_array(value))
+      _ -> strip_quotes(value)
+    end
+  end
+
+  defp is_array_literal(value) do
+    String.starts_with(value, "[") and String.ends_with(value, "]")
+  end
+
+  defp parse_array(value) do
+    inner = String.trim(slice_outer(value))
+
+    case inner do
+      "" -> []
+      _ -> split_csv_parts(String.split(inner, ","), [])
+    end
+  end
+
+  defp slice_outer(text) do
+    String.slice(text, 1, String.length(text) - 2)
+  end
+
+  defp strip_quotes(value) do
+    case is_quoted(value) do
+      true -> slice_outer(value)
+      _ -> value
+    end
+  end
+
+  defp is_quoted(value) do
+    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
+  end
+
+  defp split_csv_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp split_csv_parts([part | rest], acc) do
+    trimmed = strip_quotes(String.trim(part))
+
+    case trimmed do
+      "" -> split_csv_parts(rest, acc)
+      _ -> split_csv_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp join_csv([]) do
+    ""
+  end
+
+  defp join_csv([item]) do
+    item
+  end
+
+  defp join_csv([item | rest]) do
+    item <> "," <> join_csv(rest)
+  end
+
+  defp skip_line("") do
+    true
+  end
+
+  defp skip_line(line) do
+    String.starts_with(line, "#")
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end
+
+defmodule PresetTopology do
+  def load(project_dir) do
+    path = Path.join(project_dir, "topology.toml")
+
+    case System.path_exists(path) do
+      true -> load_existing(path, project_dir)
+      _ -> default_topology()
+    end
+  end
+
+  def role_count(topology) do
+    count_roles(Map.get(topology, :roles, []), 0)
+  end
+
+  def get_role_ids(topology) do
+    role_ids(Map.get(topology, :roles, []), [])
+  end
+
+  def all_emitted_events(topology) do
+    collect_all_emits(Map.get(topology, :roles, []), [])
+  end
+
+  def handoff_keys(topology) do
+    Map.keys(Map.get(topology, :handoff, %{}))
+  end
+
+  def handoff_target_ids(topology) do
+    collect_handoff_targets(Map.keys(Map.get(topology, :handoff, %{})), Map.get(topology, :handoff, %{}), [])
+  end
+
+  def get_roles(topology) do
+    Map.get(topology, :roles, [])
+  end
+
+  defp load_existing(path, project_dir) do
+    lines = String.split(System.read_text(path), line_sep())
+    state = parse_lines(lines, initial_state())
+    finalize(state, project_dir)
+  end
+
+  defp default_topology() do
+    %{name: "", completion: "", roles: [], handoff: %{}}
+  end
+
+  defp initial_state() do
+    %{name: "", completion: "", roles: [], handoff: %{}, current_role: empty_role(), section: "root"}
+  end
+
+  defp empty_role() do
+    %{id: "", prompt: "", prompt_file: "", emits: []}
+  end
+
+  defp parse_lines([], state) do
+    state
+  end
+
+  defp parse_lines([line | rest], state) do
+    trimmed = String.trim(line)
+
+    case skip_line(trimmed) do
+      true -> parse_lines(rest, state)
+      _ -> parse_lines(rest, parse_line(trimmed, state))
+    end
+  end
+
+  defp parse_line("[[role]]", state) do
+    start_role(state)
+  end
+
+  defp parse_line("[handoff]", state) do
+    start_handoff(state)
+  end
+
+  defp parse_line(line, state) do
+    assign_parts(String.split(line, "="), state)
+  end
+
+  defp start_role(state) do
+    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), current_role: empty_role(), section: "role"}
+  end
+
+  defp start_handoff(state) do
+    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), current_role: empty_role(), section: "handoff"}
+  end
+
+  defp push_current_role(state) do
+    push_role_if_named(Map.get(state, :current_role, empty_role()), Map.get(state, :roles, []))
+  end
+
+  defp push_role_if_named(role, roles) do
+    case Map.get(role, :id, "") do
+      "" -> roles
+      _ -> [role] ++ roles
+    end
+  end
+
+  defp assign_parts([key, value], state) do
+    assign_raw_value(strip_quotes(String.trim(key)), String.trim(value), state)
+  end
+
+  defp assign_parts(_, state) do
+    state
+  end
+
+  defp assign_raw_value("name", raw_value, state) do
+    Map.put(state, :name, normalize_scalar(raw_value))
+  end
+
+  defp assign_raw_value("completion", raw_value, state) do
+    Map.put(state, :completion, normalize_scalar(raw_value))
+  end
+
+  defp assign_raw_value(key, raw_value, state) do
+    section = Map.get(state, :section, "root")
+    assign_in_section(section, state, key, raw_value)
+  end
+
+  defp assign_in_section("role", state, key, raw_value) do
+    Map.put(state, :current_role, role_put(Map.get(state, :current_role, empty_role()), key, raw_value))
+  end
+
+  defp assign_in_section("handoff", state, key, raw_value) do
+    handoff = Map.get(state, :handoff, %{})
+    Map.put(state, :handoff, Map.put(handoff, key, normalize_list(raw_value)))
+  end
+
+  defp assign_in_section(_, state, _key, _raw_value) do
+    state
+  end
+
+  defp role_put(role, "id", raw_value) do
+    Map.put(role, :id, normalize_scalar(raw_value))
+  end
+
+  defp role_put(role, "prompt", raw_value) do
+    Map.put(role, :prompt, normalize_scalar(raw_value))
+  end
+
+  defp role_put(role, "prompt_file", raw_value) do
+    Map.put(role, :prompt_file, normalize_scalar(raw_value))
+  end
+
+  defp role_put(role, "emits", raw_value) do
+    Map.put(role, :emits, normalize_list(raw_value))
+  end
+
+  defp role_put(role, _key, _raw_value) do
+    role
+  end
+
+  defp finalize(state, project_dir) do
+    roles = Enum.reverse(push_current_role(state))
+    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: load_role_prompts(roles, project_dir, []), handoff: Map.get(state, :handoff, %{})}
+  end
+
+  defp load_role_prompts([], _project_dir, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp load_role_prompts([role | rest], project_dir, acc) do
+    role_with_prompt = Map.put(role, :prompt, role_prompt(role, project_dir))
+    load_role_prompts(rest, project_dir, [role_with_prompt] ++ acc)
+  end
+
+  defp role_prompt(role, project_dir) do
+    inline = Map.get(role, :prompt, "")
+
+    case inline do
+      "" -> read_prompt_file(project_dir, Map.get(role, :prompt_file, ""))
+      _ -> inline
+    end
+  end
+
+  defp read_prompt_file(_project_dir, "") do
+    ""
+  end
+
+  defp read_prompt_file(project_dir, prompt_file) do
+    full_path = Path.join(project_dir, prompt_file)
+
+    case System.path_exists(full_path) do
+      true -> System.read_text(full_path)
+      _ -> ""
+    end
+  end
+
+  defp role_ids([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp role_ids([role | rest], acc) do
+    role_ids(rest, [Map.get(role, :id, "")] ++ acc)
+  end
+
+  defp count_roles([], count) do
+    count
+  end
+
+  defp count_roles([_role | rest], count) do
+    count_roles(rest, count + 1)
+  end
+
+  defp collect_all_emits([], acc) do
+    dedup_list(acc, [])
+  end
+
+  defp collect_all_emits([role | rest], acc) do
+    collect_all_emits(rest, acc ++ Map.get(role, :emits, []))
+  end
+
+  defp collect_handoff_targets([], _handoff, acc) do
+    dedup_list(acc, [])
+  end
+
+  defp collect_handoff_targets([key | rest], handoff, acc) do
+    collect_handoff_targets(rest, handoff, acc ++ Map.get(handoff, key, []))
+  end
+
+  defp dedup_list([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp dedup_list([item | rest], acc) do
+    case list_contains(acc, item) do
+      true -> dedup_list(rest, acc)
+      _ -> dedup_list(rest, [item] ++ acc)
+    end
+  end
+
+  defp list_contains([], _needle) do
+    false
+  end
+
+  defp list_contains([item | rest], needle) do
+    case item == needle do
+      true -> true
+      _ -> list_contains(rest, needle)
+    end
+  end
+
+  defp normalize_scalar(value) do
+    strip_quotes(value)
+  end
+
+  defp normalize_list(value) do
+    case is_array_literal(value) do
+      true -> parse_array(value)
+      _ -> [normalize_scalar(value)]
+    end
+  end
+
+  defp is_array_literal(value) do
+    String.starts_with(value, "[") and String.ends_with(value, "]")
+  end
+
+  defp parse_array(value) do
+    inner = String.trim(slice_outer(value))
+
+    case inner do
+      "" -> []
+      _ -> split_array_parts(String.split(inner, ","), [])
+    end
+  end
+
+  defp split_array_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp split_array_parts([part | rest], acc) do
+    trimmed = strip_quotes(String.trim(part))
+
+    case trimmed do
+      "" -> split_array_parts(rest, acc)
+      _ -> split_array_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp strip_quotes(value) do
+    case is_quoted(value) do
+      true -> slice_outer(value)
+      _ -> value
+    end
+  end
+
+  defp is_quoted(value) do
+    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
+  end
+
+  defp slice_outer(text) do
+    String.slice(text, 1, String.length(text) - 2)
+  end
+
+  defp skip_line("") do
+    true
+  end
+
+  defp skip_line(line) do
+    String.starts_with(line, "#")
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end
+
+defmodule PresetTest do
+  # Shared validation: config loads, topology loads with roles, emits↔handoff consistent,
+  # handoff targets↔roles consistent, all roles have non-empty prompts.
+  defp validate_preset(preset_dir) do
+    config = PresetConfig.load_project(preset_dir)
+    Assert.assert(is_map(config), preset_dir <> ": config should be a map")
+
+    topology = PresetTopology.load(preset_dir)
+    Assert.assert(PresetTopology.role_count(topology) > 0, preset_dir <> ": should have roles")
+    Assert.assert(Map.get(topology, :completion, "") != "", preset_dir <> ": should have completion event")
+
+    emits = PresetTopology.all_emitted_events(topology)
+    keys = PresetTopology.handoff_keys(topology)
+    assert_all_in(emits, keys, preset_dir <> ": emit missing from handoff")
+
+    targets = PresetTopology.handoff_target_ids(topology)
+    role_ids = PresetTopology.get_role_ids(topology)
+    assert_all_in(targets, role_ids, preset_dir <> ": handoff target not in role deck")
+
+    assert_all_prompts_nonempty(PresetTopology.get_roles(topology), preset_dir)
+  end
+
+  defp assert_all_prompts_nonempty([], _preset_dir) do
+    true
+  end
+
+  defp assert_all_prompts_nonempty([role | rest], preset_dir) do
+    id = Map.get(role, :id, "")
+    prompt = Map.get(role, :prompt, "")
+    Assert.assert(String.length(prompt) > 0, preset_dir <> ": role " <> id <> " has empty prompt")
+    assert_all_prompts_nonempty(rest, preset_dir)
+  end
+
+  defp assert_all_in([], _haystack, _msg) do
+    true
+  end
+
+  defp assert_all_in([item | rest], haystack, msg) do
+    Assert.assert(list_contains(haystack, item), msg <> ": " <> item)
+    assert_all_in(rest, haystack, msg)
+  end
+
+  defp list_contains([], _needle) do
+    false
+  end
+
+  defp list_contains([item | rest], needle) do
+    case item == needle do
+      true -> true
+      _ -> list_contains(rest, needle)
+    end
+  end
+
+  defp examples_dir() do
+    "/Users/rook/projects/tonic-loops/examples"
+  end
+
+  def test_preset_autocode() do
+    validate_preset(Path.join(examples_dir(), "autocode"))
+  end
+
+  def test_preset_autodoc() do
+    validate_preset(Path.join(examples_dir(), "autodoc"))
+  end
+
+  def test_preset_autofix() do
+    validate_preset(Path.join(examples_dir(), "autofix"))
+  end
+
+  def test_preset_autoideas() do
+    validate_preset(Path.join(examples_dir(), "autoideas"))
+  end
+
+  def test_preset_autoperf() do
+    validate_preset(Path.join(examples_dir(), "autoperf"))
+  end
+
+  def test_preset_autoqa() do
+    validate_preset(Path.join(examples_dir(), "autoqa"))
+  end
+
+  def test_preset_autoresearch() do
+    validate_preset(Path.join(examples_dir(), "autoresearch"))
+  end
+
+  def test_preset_autoreview() do
+    validate_preset(Path.join(examples_dir(), "autoreview"))
+  end
+
+  def test_preset_autosec() do
+    validate_preset(Path.join(examples_dir(), "autosec"))
+  end
+
+  def test_preset_autosimplify() do
+    validate_preset(Path.join(examples_dir(), "autosimplify"))
+  end
+
+  def test_preset_autospec() do
+    validate_preset(Path.join(examples_dir(), "autospec"))
+  end
+
+  def test_preset_autotest() do
+    validate_preset(Path.join(examples_dir(), "autotest"))
+  end
+end

@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+set -e
+exec tonic test test/ --fail-fast --timeout 10000 "$@"
