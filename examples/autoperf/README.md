@@ -8,7 +8,16 @@ Shape:
 - profiler — identifies hot paths, establishes baselines
 - optimizer — implements targeted optimization
 - measurer — runs benchmarks, captures before/after metrics
-- judge — evaluates improvement, keeps or discards
+- judge — skeptically evaluates improvement, keeps or discards
+
+## Fail-closed contract
+
+AutoPerf should distrust claimed wins.
+
+- No benchmark parity means no real comparison.
+- No correctness proof means no kept optimization.
+- Noisy or weakly evidenced gains should be rerun or discarded.
+- Completion means either the target was met with logged wins or the remaining candidate space was explicitly exhausted.
 
 ## How it works
 

@@ -27,5 +27,7 @@ On later activations (`review.complete`):
 
 Rules:
 - Read the actual code, not just the diff. Understand what the changed lines do in context.
+- Build a risk map in `review-context.md`: changed files, adjacent dependencies, trust boundaries, invariants that could break, and missing tests or context.
 - Note any files that the diff touches which interact with other systems — the checker needs this.
 - If the diff is large, break it into logical units (e.g., per-file or per-feature) in `review-context.md`.
+- If context is incomplete, say so explicitly instead of pretending review is ready.

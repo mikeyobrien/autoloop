@@ -11,8 +11,8 @@ On every activation:
 
 Process:
 1. Update `sec-report.md` with the latest finding result:
-   - If confirmed and fixed → record the finding and fix.
-   - If confirmed and blocked → record the finding as an open risk.
+   - If confirmed and fixed with verification evidence → record the finding and fix.
+   - If confirmed but blocked or weakly verified → record the finding as an open risk.
    - If dismissed → record the dismissal with reason.
 2. Update `progress.md`.
 3. Emit `report.updated` so the scanner continues with the next category.
@@ -35,6 +35,7 @@ Process:
 - Location: {file:line}
 - Issue: {description}
 - Fix: {what was changed}
+- Verification: {how the vulnerable path was shown closed}
 
 ## Open Risks
 
@@ -59,3 +60,4 @@ Rules:
 - Prioritize: critical and high findings first.
 - Open risks must have clear explanations of why they were not fixed and what the impact is.
 - Do not omit dismissed findings — they show thoroughness and prevent re-scanning.
+- If analyst evidence or hardener verification is missing, do not call it fixed.

@@ -10,7 +10,8 @@ backend.timeout_ms = 3000000
 # backend.kind = "command"
 # backend.command = "../../examples/mock-backend.sh"
 
-review.enabled = false
+review.enabled = true
+review.timeout_ms = 300000
 
 memory.prompt_budget_chars = 1600
 harness.instructions_file = "harness.md"

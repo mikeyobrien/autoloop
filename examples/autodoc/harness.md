@@ -8,7 +8,8 @@ Global rules:
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
 - Write documentation that matches the project's existing style and tone.
-- Documentation must be accurate — verify every claim against the actual code.
+- The writer should leave a claim-level verification checklist in `progress.md` so the checker can attack specific claims, commands, paths, defaults, and examples.
+- Documentation must be accurate — the checker should verify every claim against the actual code and default to rejection when a meaningful claim is unverified.
 - Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside auditor → writer → checker → publisher.
 

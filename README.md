@@ -25,11 +25,13 @@ Miniloops ships a family of 10 `auto*` preset workflows. Each is a self-containe
 | **autotest** | Test creation — find coverage gaps, write tests, run, assess | surveyor → writer → runner → assessor |
 | **autofix** | Bug repair — diagnose, fix, verify, close | diagnoser → fixer → verifier → closer |
 | **autoreview** | Code review — read diff, check issues, suggest fixes, summarize | reader → checker → suggester → summarizer |
-| **autodoc** | Documentation — audit gaps, write docs, verify accuracy, publish | auditor → writer → checker → publisher |
+| **autodoc** | Documentation — audit gaps, write docs, adversarially verify accuracy, publish | auditor → writer → checker → publisher |
 | **autosec** | Security audit — scan vulns, confirm, harden, report | scanner → analyst → hardener → reporter |
 | **autoperf** | Performance optimization — profile, optimize, measure, keep/discard | profiler → optimizer → measurer → judge |
 
 **Choosing a preset:** Use `autocode` for feature work. Use `autoideas` for improvement surveys. Use `autoresearch` for hypothesis-driven experiments. Use `autoqa` to validate with native surfaces. Use `autotest` to write new tests. Use `autofix` for bug reports. Use `autoreview` for PR review. Use `autodoc` for documentation gaps. Use `autosec` for security audits. Use `autoperf` for performance optimization.
+
+Across the `auto*` family, the intended posture is skeptical and fail-closed: checker/judge/verifier/reporter/finalizer roles should challenge claims, require evidence, and reject weak proof instead of rubber-stamping.
 
 See [`docs/auto-workflows.md`](docs/auto-workflows.md) for the full taxonomy, naming guidance, and chooser table.
 
@@ -142,7 +144,7 @@ backend.command = "pi"
 backend.timeout_ms = 300000
 # backend.args = ["--model", "anthropic/claude-sonnet-4"]
 
-review.enabled = false
+review.enabled = true
 review.timeout_ms = 300000
 # review.every_iterations = 0
 
@@ -254,6 +256,7 @@ Loop memory is separate and append-only:
 Miniloops can run a meta-level review pass every `review.every_iterations` task iterations.
 
 By default:
+- hyperagent review is enabled
 - review cadence = number of roles in `topology.toml`
 - review uses the same Pi adapter unless overridden
 - the harness re-reads runtime files before every task iteration, so edits take effect on the next turn

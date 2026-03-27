@@ -8,7 +8,10 @@ Global rules:
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
 - Prefer small, reversible changes that can be cleanly reverted if the experiment fails.
+- Missing baseline, missing raw measurement, missing correctness evidence, or ambiguous metrics should block or discard the experiment, not quietly pass.
 - The evaluator makes keep/discard decisions. Other roles do not commit or revert.
+- False keeps are worse than false discards.
+- Qualitative wins only count when the rubric was written down before the experiment.
 - Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside strategist -> implementer -> benchmarker -> evaluator.
 
@@ -22,3 +25,4 @@ LLM-as-judge:
 - Usage: `echo "<content>" | ../../scripts/llm-judge.sh "<criteria>"`
 - The judge returns JSON with `{"pass": true|false, "reason": "..."}` and exits 0 (pass) or 1 (fail).
 - Use the judge when hard metrics alone are insufficient (e.g., code quality, semantic correctness).
+- The judge does not override weak or missing hard evidence.

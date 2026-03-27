@@ -10,6 +10,17 @@ Shape:
 
 Shared state lives in project files plus the miniloops journal. One active step is tracked in `progress.md`.
 
+## Fail-closed contract
+
+Autocode is not an approval machine.
+
+- Planner decomposes work into the next smallest slice.
+- Builder implements and proves the slice.
+- Critic tries to break the slice and rejects on missing evidence.
+- Finalizer tries to prove the whole task is still incomplete before allowing completion.
+
+Success is evidence-based, not prose-based. Only the finalizer may emit `task.complete`.
+
 ## Files
 
 - `miniloops.toml` — loop + backend config

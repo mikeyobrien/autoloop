@@ -7,8 +7,10 @@ Global rules:
 - One review pass at a time. The reader builds context, then the checker and suggester work through findings.
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
-- Be constructive. Every finding should include a concrete suggestion, not just a complaint.
+- Be skeptical by default. The change is not safe just because no one found a bug quickly.
+- Findings should include concrete suggestions when possible, but lack of a ready fix does not invalidate a real finding.
 - Severity matters: distinguish blocking issues from nits.
+- If a risky area cannot be verified, block or downgrade confidence instead of handwaving.
 - Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside reader → checker → suggester → summarizer.
 

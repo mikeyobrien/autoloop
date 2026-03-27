@@ -9,15 +9,17 @@ Your job:
 
 On every activation:
 - Read `perf-profile.md`, `perf-log.jsonl`, and `progress.md`.
+- Start skeptical: assume discard until the win is proven.
 
 Process:
 1. Review the measurement results:
    - Did the metric improve?
    - By how much? Is it meaningful?
    - Did correctness tests pass?
+   - Is the evidence bundle complete and apples-to-apples?
 2. Decide:
-   - **Keep** if: metric improved meaningfully AND tests pass.
-   - **Discard** if: metric regressed, improvement is noise-level, or tests fail.
+   - **Keep** only if the metric improved meaningfully, the improvement survives noise scrutiny, and tests pass.
+   - **Discard** if the metric regressed, improvement is noise-level or weakly evidenced, or tests fail.
 3. Append to `perf-log.jsonl`:
    ```json
    {"id": N, "target": "...", "change": "...", "metric_before": X, "metric_after": Y, "verdict": "keep|discard", "reason": "..."}
@@ -31,6 +33,6 @@ Process:
 Rules:
 - Be rigorous about measurement. A 1% improvement on a noisy benchmark is not meaningful.
 - A 10% improvement that breaks tests is not acceptable — discard it.
-- Consider diminishing returns: if the last 3 optimizations were discarded, the profiler may need a new strategy.
 - Track cumulative improvement across all kept optimizations.
-- If the goal was "reduce latency by 30%" and cumulative improvement is 28%, that might be good enough — use judgment.
+- False keeps are worse than false discards.
+- Do not use `good enough` unless you tie it explicitly to the original target and remaining opportunity.

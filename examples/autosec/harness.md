@@ -7,8 +7,10 @@ Global rules:
 - One finding at a time. Confirm/dismiss before moving to the next.
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
-- Minimize false positives. Every confirmed finding must have evidence.
+- Minimize false positives. Every confirmed finding must have exploit evidence.
+- Zero confirmed findings is a valid outcome.
 - Fixes must not break functionality — verify after hardening.
+- Missing exploit proof, missing fix verification, or unresolved preconditions should become dismissals or open risks, not confident confirmations.
 - Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside scanner → analyst → hardener → reporter.
 

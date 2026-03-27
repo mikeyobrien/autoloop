@@ -15,6 +15,7 @@ On first activation (after `surfaces.identified`):
 - Create `qa-plan.md` with:
   - Domain summary (one line)
   - Available validation surfaces (from inspector)
+  - A coverage map: every discovered surface becomes either a planned step or an explicit skip with reason
   - Ordered validation steps, each with:
     - Step number
     - Surface being used
@@ -34,13 +35,14 @@ On first activation (after `surfaces.identified`):
   - exact command or action
   - expected pass criteria
 
-On later activations (`qa.blocked`):
-- Read what blocked the executor.
+On later activations (`qa.blocked` or `qa.continue`):
+- Read what blocked the executor or what the reporter recorded.
 - Adjust the plan: skip the surface, try an alternative, or reorder.
 - Emit `qa.planned` with the next viable step.
 
 Rules:
 - Never plan a step that requires installing something not already in the repo.
 - Never plan a step the executor cannot run with a single shell command or a short script.
-- Be precise: "cargo test --lib" not "run the tests."
+- Be precise: `cargo test --lib` not `run the tests`.
 - One step at a time. The executor only acts on the current step.
+- Do not quietly drop surfaces. Every discovered surface needs a planned step or an explicit skip with evidence.

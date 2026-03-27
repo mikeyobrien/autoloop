@@ -18,7 +18,7 @@ prompt_file = "roles/benchmarker.md"
 
 [[role]]
 id = "evaluator"
-emits = ["experiment.evaluated", "experiment.discarded", "task.complete"]
+emits = ["experiment.evaluated", "experiment.discarded"]
 prompt_file = "roles/evaluator.md"
 
 [handoff]

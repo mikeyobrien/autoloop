@@ -30,10 +30,11 @@ On later activations (`queue.advance` or `build.blocked`):
 - Re-read the shared working files.
 - If the current step still has unfinished work, hand the next smallest slice in the same step.
 - If the current step is complete, mark it complete in `progress.md`, advance to the next numbered step, and emit the next `tasks.ready`.
-- If the full plan is genuinely complete, emit `task.complete` instead of inventing more work.
+- Planner never emits completion. If the plan appears done, leave that proof to the critic/finalizer path instead of self-certifying success.
 
 Rules:
 - One active slice only.
 - Be specific enough that the builder can act without guessing.
 - Prefer vertical slices over broad refactors.
 - Do not create future-step work early just because you can imagine it.
+- Do not treat another role's summary as proof. The slice should be defined so later roles can reject it from concrete evidence.

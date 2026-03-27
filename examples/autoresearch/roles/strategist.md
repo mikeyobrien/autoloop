@@ -23,8 +23,16 @@ On first activation:
 On later activations (`experiment.evaluated` or `experiment.discarded`):
 - Re-read the shared working files and the experiment log.
 - Analyze what worked and what didn't across all experiments so far.
-- If the goal is met or no more productive experiments remain, emit `task.complete`.
+- If the goal is met or no more productive experiments remain, emit `task.complete` only with a log-backed rationale.
 - Otherwise, write the next experiment's hypothesis and plan into `progress.md` and emit `experiment.planned`.
+
+Every experiment plan must include:
+- exact benchmark command
+- primary metric and direction
+- success threshold or expected magnitude
+- falsification condition
+- rollback criteria
+- files expected to change
 
 Rules:
 - One experiment at a time.
@@ -32,3 +40,4 @@ Rules:
 - Each experiment should test exactly one hypothesis.
 - Prefer experiments that build on successful prior results.
 - Do not repeat a failed experiment without a meaningfully different approach.
+- Do not call the search complete by vibe. Completion needs explicit evidence that the target was met or the remaining candidate space was exhausted.

@@ -64,3 +64,8 @@ Let examples, presets, prompts, and role decks carry most of the specialization.
 ### 12. Make ownership explicit
 Relevant issues should never be hand-waved away as “pre-existing.”
 If something matters to the objective, touched surface, or verification path, it must be fixed, owned, deferred explicitly, or proven out of scope.
+
+### 13. Prefer clean breaks over compatibility shims
+This is alpha software. Breaking changes are expected.
+Do not add fallback paths, deprecation shims, compatibility aliases, dual-write migrations, or legacy codepaths unless explicitly requested.
+When a design changes, update the canonical path and remove the old one.

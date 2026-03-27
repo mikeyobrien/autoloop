@@ -27,5 +27,5 @@ prompt_file = "roles/reporter.md"
 "finding.confirmed" = ["hardener"]
 "finding.dismissed" = ["reporter"]
 "fix.applied" = ["reporter"]
-"fix.blocked" = ["analyst"]
+"fix.blocked" = ["reporter"]
 "report.updated" = ["scanner"]

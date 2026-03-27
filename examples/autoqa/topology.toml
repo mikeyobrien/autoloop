@@ -18,7 +18,7 @@ prompt_file = "roles/executor.md"
 
 [[role]]
 id = "reporter"
-emits = ["qa.passed", "qa.failed", "task.complete"]
+emits = ["qa.continue", "qa.failed", "task.complete"]
 prompt_file = "roles/reporter.md"
 
 [handoff]
@@ -28,4 +28,4 @@ prompt_file = "roles/reporter.md"
 "qa.blocked" = ["inspector"]
 "qa.executed" = ["reporter"]
 "qa.failed" = ["inspector"]
-"qa.passed" = ["planner"]
+"qa.continue" = ["planner"]

@@ -3,7 +3,7 @@ completion = "task.complete"
 
 [[role]]
 id = "planner"
-emits = ["tasks.ready", "task.complete"]
+emits = ["tasks.ready"]
 prompt_file = "roles/planner.md"
 
 [[role]]

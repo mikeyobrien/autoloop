@@ -8,7 +8,9 @@ Global rules:
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
 - Prefer minimal fixes. Do not refactor, clean up, or improve code beyond what is needed to fix the bug.
+- No reproduction => no diagnosis. No before/after proof => no verified fix.
 - Regression verification is mandatory: the failing test must pass, and existing tests must not break.
+- Record exact commands and key outputs in `progress.md` or `fix-log.md`, not just summaries.
 - Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside diagnoser → fixer → verifier → closer.
 

@@ -2,6 +2,8 @@
 
 Miniloops ships a family of `auto*` preset workflows. Each one is a self-contained agentic loop with a distinct behavioral center, topology, and shared-state contract. This document is the canonical taxonomy.
 
+Across the family, the intended posture is fail-closed rather than rubber-stamp: verifier, checker, judge, reporter, and final-gate roles should prefer explicit evidence, surface uncertainty, and reject weak proof instead of quietly approving work.
+
 ## Implemented presets
 
 ### autocode
@@ -62,7 +64,7 @@ Code review loop. Reads a PR diff or set of changes, checks for correctness, sec
 
 ### autodoc
 
-Documentation generation and maintenance. Audits existing docs against the codebase, identifies gaps and staleness, writes or updates documentation, and verifies accuracy against the actual code.
+Documentation generation and maintenance. Audits existing docs against the codebase, identifies gaps and staleness, writes or updates documentation, and then adversarially verifies accuracy against the actual code before publishing.
 
 **Shape:** auditor → writer → checker → publisher
 **Shared state:** `doc-plan.md`, `doc-report.md`, `progress.md`

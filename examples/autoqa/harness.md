@@ -9,6 +9,10 @@ Global rules:
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
 - Zero external dependencies. Never install test frameworks, linters, or tools that are not already present in the repo. Use only what is already there.
 - Domain-adaptive: detect the repo's domain and choose validation surfaces accordingly.
+- Absence of evidence is unresolved, not pass.
+- Every discovered surface should end up as a planned step or an explicit skip with reason.
+- Maintain a status table in `progress.md` for each discovered surface: `pending | passed | failed | blocked | skipped`.
+- Do not convert “couldn’t verify” into “looks fine”.
 - Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside inspector → planner → executor → reporter.
 

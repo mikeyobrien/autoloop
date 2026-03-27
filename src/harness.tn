@@ -103,7 +103,7 @@ defmodule LoopHarness do
     review_every = resolve_review_every(config, topology)
     review_enabled = truthy_setting(LoopConfig.get(config, "review.enabled", "true"))
     backend_timeout_ms = LoopConfig.get_int(config, "backend.timeout_ms", 300000)
-    review_timeout_ms = LoopConfig.get_int(config, "review.timeout_ms", backend_timeout_ms)
+    review_timeout_ms = LoopConfig.get_int(config, "review.timeout_ms", 300000)
     review_command = LoopConfig.get(config, "review.command", backend_command)
     review_kind = resolve_process_kind(LoopConfig.get(config, "review.kind", backend_kind), review_command)
     review_args = config_list_with_fallback(config, "review.args", backend_args)

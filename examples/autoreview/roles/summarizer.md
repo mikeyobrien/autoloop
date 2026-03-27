@@ -14,6 +14,7 @@ Process:
    - Group by severity (blocking first, then warnings, then nits)
    - Include the concrete suggestion for each finding
    - Add an overall assessment
+   - Add an `Unresolved Risks / Unknowns` section
 2. Update `review-findings.md` with the final compiled review.
 3. Emit `review.complete` if there are more change sets to review.
 4. Emit `task.complete` if all change sets are reviewed.
@@ -42,6 +43,9 @@ Process:
 ## Nits
 ...
 
+## Unresolved Risks / Unknowns
+- {anything the review could not fully validate}
+
 ## Overall Assessment
 {2-3 sentence summary of the changes and review outcome}
 ```
@@ -49,5 +53,5 @@ Process:
 Rules:
 - The summary should be useful to both the author and other reviewers.
 - Be clear about the overall verdict: approve, request changes, or comment-only.
-- If there are zero blocking issues and zero warnings, approve.
-- If there are blocking issues, request changes.
+- Do not auto-approve from counts alone. Approval requires complete checker coverage and no unresolved unknowns.
+- If evidence is incomplete, prefer COMMENT or REQUEST_CHANGES over a cheerful APPROVE.

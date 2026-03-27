@@ -23,10 +23,17 @@ On first activation:
 On later activations (`coverage.improved` or `coverage.stale`):
 - Re-read the shared working files.
 - Update the gap list based on what has been addressed.
-- If all high-priority gaps are filled or no more productive tests can be written, emit `task.complete`.
+- If all high-priority gaps are filled or no more productive tests can be written, emit `task.complete` only with an explicit remaining-gap ledger.
 - Otherwise, write the next gap into `progress.md` and emit `gaps.identified`.
+
+For each proposed gap, record:
+- exact file/function/branch
+- why it matters
+- what regression it should catch
+- why existing tests miss it
 
 Rules:
 - Prioritize: critical paths > error handling > edge cases > happy paths already partially tested.
-- Be specific: "function parse_config() in src/config.rs has no tests — branch on invalid TOML is untested" not "config module needs tests."
+- Be specific: `function parse_config() in src/config.rs has no tests — branch on invalid TOML is untested` not `config module needs tests`.
 - Do not suggest tests for trivial getters/setters or auto-generated code.
+- Do not pad the plan with low-value gaps just to keep the loop moving.

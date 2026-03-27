@@ -6,9 +6,18 @@ Shape:
 - strategist — decides what experiment to try next
 - implementer — executes the planned change
 - benchmarker — runs measurements and captures metrics
-- evaluator — judges keep/discard, optionally using LLM-as-judge
+- evaluator — skeptically judges keep/discard, optionally using LLM-as-judge
 
 State lives in `autoresearch.md`, `experiments.jsonl`, and `progress.md`.
+
+## Fail-closed contract
+
+Autoresearch is a skeptical experiment loop, not an auto-approval loop.
+
+- Every experiment needs an explicit benchmark command and success threshold.
+- Missing or noisy evidence should reroute to rerun, block, or discard.
+- The LLM judge can help on semantics, but it cannot rescue weak metrics.
+- The strategist, not the evaluator, decides when the overall search is done.
 
 ## Files
 
@@ -47,8 +56,8 @@ From the repo root:
 
 ## Experiment cycle
 
-1. **Strategist** reads history, forms a hypothesis, writes a plan
+1. **Strategist** reads history, forms a hypothesis, writes a plan with explicit success and falsification conditions
 2. **Implementer** makes the minimal code change to test the hypothesis
-3. **Benchmarker** runs the measurement command, captures metrics
-4. **Evaluator** compares metrics, optionally runs LLM judge, keeps or discards
-5. Loop back to strategist for the next experiment
+3. **Benchmarker** runs the measurement command, captures metrics, and records evidence
+4. **Evaluator** compares metrics, optionally runs LLM judge, and keeps or discards
+5. Loop back to strategist for the next experiment or an evidence-backed stop

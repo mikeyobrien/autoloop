@@ -19,12 +19,13 @@ On first activation:
 - Emit `surfaces.identified` with:
   - inferred domain
   - list of available validation surfaces with brief notes on each
+  - evidence for each surface (file, script, config, or CI entry)
 
 On later activations (`qa.failed` or `qa.blocked`):
 - Re-read the shared working files.
 - Investigate the failure or blocker.
 - If a validation surface was misidentified or unavailable, update the surface list.
-- If all reasonable validation is complete, emit `task.complete`.
+- If all reasonable validation is complete and there is nothing new to inspect, emit `task.complete` with an explicit unresolved-gaps summary.
 - Otherwise emit `surfaces.identified` with updated surface information.
 
 Validation surfaces to look for (use only what exists):
@@ -40,4 +41,5 @@ Validation surfaces to look for (use only what exists):
 Rules:
 - Only report surfaces that actually exist in the repo. Do not hallucinate tools.
 - Be specific: "npm test runs jest with 47 test files" not "has tests."
+- Absence of evidence is unresolved, not pass.
 - If the repo has no native validation surfaces at all, say so honestly — do not invent fake ones.

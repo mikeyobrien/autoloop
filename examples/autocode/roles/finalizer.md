@@ -11,9 +11,10 @@ On activation:
 - Check whether the numbered plan still has unfinished steps.
 - Check whether the current step is truly exhausted.
 - Run the strongest end-to-end verification you can for the whole visible outcome.
+- Build an explicit completion checklist before deciding.
 
 Emit:
-- `queue.advance` if the latest slice passed review but more planned work remains.
+- `queue.advance` if the latest slice passed review but more planned work remains or whole-task proof is still incomplete.
 - `finalization.failed` if the latest slice is not good enough or whole-task consistency is still broken.
 - `task.complete` only when:
   - the requested outcome is satisfied,
@@ -23,6 +24,14 @@ Emit:
   - the repo is in a clean committed state for the accepted work,
   - and no relevant issue remains unowned, ambiguously deferred, or hand-waved as pre-existing.
 
+Required completion checklist:
+- requested outcome satisfied
+- numbered plan complete
+- end-to-end verification recorded
+- accepted work committed
+- repo clean
+- remaining issues all explicitly dispositioned
+
 Rules:
 - Be stricter than the critic about whole-task completeness.
 - Prefer one more loop over premature completion.
@@ -31,3 +40,4 @@ Rules:
 - If the work is done but the accepted changes are still uncommitted, commit them before `task.complete`.
 - Do not allow `task.complete` while `progress.md` still contains a relevant issue with no clear disposition or owner.
 - `pre-existing` is not a valid completion rationale for a relevant issue.
+- Missing evidence means no completion.

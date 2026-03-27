@@ -23,7 +23,7 @@ On first activation:
 
 On later activations (`bug.closed` or `bug.reopened`):
 - Check if there are more bugs to fix from the original report.
-- If all bugs are resolved, emit `task.complete`.
+- If all bugs are resolved, emit `task.complete` only with an explicit all-bugs-accounted-for summary.
 - If more bugs remain, diagnose the next one and emit `cause.found`.
 
 On `diagnosis.blocked`:
@@ -32,6 +32,7 @@ On `diagnosis.blocked`:
 
 Rules:
 - Always reproduce before diagnosing. Do not guess at root causes.
-- Be precise: "the off-by-one in line 42 of parser.rs causes the last token to be dropped" not "parser has a bug."
+- Be precise: `the off-by-one in line 42 of parser.rs causes the last token to be dropped` not `parser has a bug`.
 - If the bug report is vague, state what assumptions you are making.
 - Identify the minimal scope of the fix — the fixer should know exactly what to change.
+- No reproduction means no diagnosis.

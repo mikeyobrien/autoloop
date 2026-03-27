@@ -19,11 +19,11 @@ Process:
    - Exit code
    - Key output lines (truncate verbose output, keep the signal)
    - Pass or fail per the plan's criteria
-4. If the step passed, emit `qa.executed` with:
+4. If the step ran, emit `qa.executed` with:
    - step number
-   - pass/fail
+   - result = pass or fail
    - concise evidence summary
-5. If the step cannot be executed (missing tool, permission error, environment issue), emit `qa.blocked` with:
+5. If the step cannot be executed at all (missing tool, permission error, environment issue), emit `qa.blocked` with:
    - step number
    - concrete reason
    - do not guess or fabricate output
@@ -33,4 +33,5 @@ Rules:
 - Do not fix issues you find. Just record them.
 - Do not skip steps. If a step fails, still record the failure and hand off to the reporter.
 - Capture real output. Never fabricate test results or exit codes.
+- Non-zero exit code is a failed step, not a blocked step.
 - Keep `progress.md` updated with the current step's status.

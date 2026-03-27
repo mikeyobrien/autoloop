@@ -27,11 +27,12 @@ On first activation:
 On later activations (`optimization.kept` or `optimization.discarded`):
 - Re-read the shared working files and the optimization log.
 - Analyze cumulative progress toward the goal.
-- If the goal is met or no more impactful optimizations remain, emit `task.complete`.
+- If the goal is met or no more impactful optimizations remain, emit `task.complete` only with an exhausted-candidate summary.
 - Otherwise, identify the next target and emit `hotspot.identified`.
 
 Rules:
 - Rank targets by estimated impact, not by ease of implementation.
-- Be specific: "string concatenation in hot loop at parser.rs:142 allocates on every iteration" not "parser is slow."
+- Be specific: `string concatenation in hot loop at parser.rs:142 allocates on every iteration` not `parser is slow`.
 - Include the baseline measurement for the target so the measurer knows what to compare against.
 - Do not suggest micro-optimizations when algorithmic improvements are available.
+- Do not claim the search is exhausted by vibe. Record the remaining candidates and why they were rejected or deferred.

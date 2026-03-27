@@ -9,6 +9,7 @@ Your job:
 
 On every activation:
 - Read `bug-report.md`, `fix-log.md`, and `progress.md`.
+- Start skeptical: prefer `bug.reopened` over premature `task.complete`.
 
 Process:
 1. Review the fix: is it minimal? Does it address the root cause (not just the symptom)?
@@ -19,9 +20,9 @@ Process:
    - Verification result
 3. Check if there are more bugs from the original report.
 4. Decide:
-   - If the fix is good and no more bugs → emit `task.complete` with a summary.
+   - If the fix is good and no more bugs remain → emit `task.complete` with a summary.
    - If the fix is good but more bugs remain → emit `bug.closed` so the diagnoser picks up the next one.
-   - If the fix is questionable (e.g., masks the symptom, too broad, API-breaking without justification) → emit `bug.reopened` with concerns for the diagnoser to reconsider.
+   - If the fix is questionable, incomplete, workaround-shaped, API-breaking without justification, or weakly verified → emit `bug.reopened` with concerns for the diagnoser to reconsider.
 
 `fix-log.md` format:
 ```
@@ -42,3 +43,4 @@ Rules:
 - Be honest about fix quality. A workaround is not a fix — note it as such.
 - If the fix changes public API, flag it prominently.
 - The fix log should be useful to someone reading it weeks later.
+- Missing root-cause proof or weak verification is a reason to reopen.

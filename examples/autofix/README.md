@@ -7,14 +7,23 @@ AutoFix takes a bug report or failing test, reproduces the issue, traces the roo
 Shape:
 - diagnoser — reproduces bug, traces root cause
 - fixer — implements minimal fix
-- verifier — confirms fix works, checks for regressions
+- verifier — tries to falsify the fix and checks for regressions
 - closer — validates fix quality, manages multi-bug reports
+
+## Fail-closed contract
+
+AutoFix should reject weak fixes.
+
+- No reproduction means no diagnosis.
+- No before/after proof means no verified fix.
+- A workaround, symptom mask, or regression tradeoff is not a clean close.
+- When evidence is thin, reopening is better than pretending the bug is solved.
 
 ## How it works
 
 1. **Diagnoser** parses the bug report, reproduces the issue, and traces the root cause to specific files and lines.
 2. **Fixer** implements the minimal code change to address the root cause.
-3. **Verifier** runs the originally failing test, then the full suite to check for regressions.
+3. **Verifier** reruns the original failure, then the strongest relevant regression checks.
 4. **Closer** reviews fix quality and decides whether more bugs need attention.
 
 ## AutoFix vs AutoCode

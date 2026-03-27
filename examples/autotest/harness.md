@@ -1,6 +1,6 @@
 This is a miniloops-native autotest loop that creates and tightens formal tests for a target repository.
 
-The loop surveys the codebase for coverage gaps, writes new tests, runs them, and assesses quality improvement — iterating until coverage goals are met or no more productive tests can be written.
+The loop surveys the codebase for coverage gaps, writes new tests, runs them, and assesses quality improvement — iterating until meaningful regression-catching gaps are covered or no more productive tests can be written.
 
 Global rules:
 - Shared working files are the source of truth: `test-plan.md`, `test-report.md`, `progress.md`.
@@ -8,7 +8,10 @@ Global rules:
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
 - Write tests using the repo's existing test framework and conventions. Match the style of existing tests.
-- If the repo has no test framework, install the idiomatic one for the language (e.g., pytest for Python, jest for JS/TS, cargo test for Rust).
+- If the repo has no test framework, only bootstrap one if it can be validated immediately. Do not scaffold a shallow passing setup just to claim progress.
+- False passes are worse than false fails.
+- Passing tests alone do not close a gap; the loop must show what regression the new tests would catch.
+- Maintain an evidence chain in `progress.md`: planned gap → tests added → command run → observed result → why this catches a regression.
 - Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside surveyor → writer → runner → assessor.
 

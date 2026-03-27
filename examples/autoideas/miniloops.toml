@@ -7,7 +7,8 @@ backend.kind = "pi"
 backend.command = "pi"
 backend.timeout_ms = 3000000
 
-review.enabled = false
+review.enabled = true
+review.timeout_ms = 300000
 
 memory.prompt_budget_chars = 1600
 harness.instructions_file = "harness.md"
