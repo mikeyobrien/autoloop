@@ -94,6 +94,7 @@ Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `h
 | `core.journal_file` | string | `".miniloops/journal.jsonl"` | Path to the journal file. |
 | `core.memory_file` | string | `".miniloops/memory.jsonl"` | Path to the memory file. |
 | `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. Still accepted; prefer `journal_file`. |
+| `core.run_id_format` | string | `"compact"` | Run ID format: `"compact"` for timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
 
 ## Full example
 
@@ -138,6 +139,7 @@ All `auto*` presets share the same structure. The only value that typically vari
 | Preset | Required event |
 |--------|---------------|
 | autocode | `review.passed` |
+| autosimplify | `simplification.verified` |
 | autodoc | `doc.checked` |
 | autofix | `fix.verified` |
 | autoperf | `perf.measured` |

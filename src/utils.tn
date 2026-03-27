@@ -102,4 +102,40 @@ defmodule LoopUtils do
   def skip_line(line) do
     String.starts_with(line, "#")
   end
+
+  def generate_compact_id(prefix) do
+    ts = epoch_seconds() * 1000
+    encoded = int_to_base36(ts)
+    suffix = random_suffix()
+    prefix <> "-" <> encoded <> "-" <> suffix
+  end
+
+  defp epoch_seconds() do
+    result = System.run("date +%s", %{})
+    ts_str = String.trim(Map.get(result, :output, "0"))
+    {ts, _} = Integer.parse(ts_str)
+    ts
+  end
+
+  defp random_suffix() do
+    tok = System.random_token(32)
+    String.downcase(String.slice(tok, 0, 4))
+  end
+
+  defp int_to_base36(0) do
+    "0"
+  end
+
+  defp int_to_base36(n) do
+    do_base36(n, "")
+  end
+
+  defp do_base36(0, acc) do
+    acc
+  end
+
+  defp do_base36(n, acc) do
+    chars = "0123456789abcdefghijklmnopqrstuvwxyz"
+    do_base36(div(n, 36), String.at(chars, rem(n, 36)) <> acc)
+  end
 end

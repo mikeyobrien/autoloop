@@ -74,7 +74,7 @@ defmodule LoopHarness do
     state_dir = Path.join(work_dir, LoopConfig.get(config, "core.state_dir", ".miniloops"))
     journal_file = LoopConfig.resolve_journal_file_in(project_dir, work_dir)
     memory_file = LoopConfig.resolve_memory_file_in(project_dir, work_dir)
-    run_id = next_run_id(journal_file)
+    run_id = next_run_id(journal_file, config)
     backend_override = Map.get(run_options, :backend_override, %{})
     verbose = Map.get(run_options, :verbose, false)
 
@@ -213,8 +213,10 @@ defmodule LoopHarness do
     allowed_events = LoopTopology.allowed_events(topology(loop), recent_event)
     backpressure = latest_invalid_note(run_lines, "")
     memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
+    memory_stats = LoopMemory.stats_file(memory_file(loop), memory_budget_chars(loop))
+    invalid_count = invalid_event_count(run_lines, 0)
 
-    %{iteration: iteration, recent_event: recent_event, allowed_roles: allowed_roles, allowed_events: allowed_events, backpressure: backpressure, scratchpad_text: scratchpad_text, memory_text: memory_text, prompt: render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, scratchpad_text, memory_text)}
+    %{iteration: iteration, recent_event: recent_event, allowed_roles: allowed_roles, allowed_events: allowed_events, backpressure: backpressure, scratchpad_text: scratchpad_text, memory_text: memory_text, prompt: render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, scratchpad_text, memory_text, memory_stats)}
   end
 
   defp finish_iteration(loop, iter, output) do
@@ -453,9 +455,10 @@ defmodule LoopHarness do
     "#!/bin/sh\n" <> "set -eu\n" <> "exec " <> self_command(loop) <> " pi-adapter \"$@\"\n"
   end
 
-  defp render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, scratchpad_text, memory_text) do
+  defp render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, scratchpad_text, memory_text, memory_stats) do
     "You are inside a bare-minimal miniloops harness.\n\n" <>
     harness_instructions_text(loop) <>
+    context_pressure_text(memory_stats, invalid_count) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
     LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
@@ -476,6 +479,56 @@ defmodule LoopHarness do
     case review_prompt(loop) do
       "" -> ""
       text -> "Additional hyperagent instructions:\n" <> text <> "\n\n"
+    end
+  end
+
+  defp context_pressure_text(memory_stats, invalid_count) do
+    "Context pressure:\n" <>
+    "- Memory: " <> memory_pressure_summary(memory_stats) <> "\n" <>
+    "- Invalid emits this run: " <> to_string(invalid_count) <> invalid_emit_hint(invalid_count) <> "\n" <>
+    context_pressure_recommendation(memory_stats, invalid_count)
+  end
+
+  defp memory_pressure_summary(memory_stats) do
+    rendered_chars = Map.get(memory_stats, :rendered_chars, 0)
+    budget_chars = Map.get(memory_stats, :budget_chars, 0)
+    total_entries = Map.get(memory_stats, :total_entries, 0)
+    preferences = Map.get(memory_stats, :preferences, 0)
+    learnings = Map.get(memory_stats, :learnings, 0)
+    meta = Map.get(memory_stats, :meta, 0)
+
+    case Map.get(memory_stats, :truncated, false) do
+      true -> to_string(rendered_chars) <> "/" <> to_string(budget_chars) <> " chars across " <> to_string(total_entries) <> " entries (" <> to_string(preferences) <> " preferences, " <> to_string(learnings) <> " learnings, " <> to_string(meta) <> " meta) — truncated by " <> to_string(rendered_chars - budget_chars) <> " chars"
+      _ -> memory_pressure_summary_within_budget(rendered_chars, budget_chars, total_entries, preferences, learnings, meta)
+    end
+  end
+
+  defp memory_pressure_summary_within_budget(rendered_chars, budget_chars, total_entries, preferences, learnings, meta) do
+    case budget_chars <= 0 do
+      true -> to_string(rendered_chars) <> " chars across " <> to_string(total_entries) <> " entries (" <> to_string(preferences) <> " preferences, " <> to_string(learnings) <> " learnings, " <> to_string(meta) <> " meta); prompt budget disabled"
+      _ -> to_string(rendered_chars) <> "/" <> to_string(budget_chars) <> " chars across " <> to_string(total_entries) <> " entries (" <> to_string(preferences) <> " preferences, " <> to_string(learnings) <> " learnings, " <> to_string(meta) <> " meta)"
+    end
+  end
+
+  defp invalid_emit_hint(0) do
+    ""
+  end
+
+  defp invalid_emit_hint(_invalid_count) do
+    " — routing is currently under backpressure"
+  end
+
+  defp context_pressure_recommendation(memory_stats, invalid_count) do
+    case Map.get(memory_stats, :truncated, false) do
+      true -> "- Recommendation: consolidate stale or duplicate context before adding new memory, and re-route using the allowed-event set when needed.\n\n"
+      _ -> context_pressure_recommendation_from_invalid_count(invalid_count)
+    end
+  end
+
+  defp context_pressure_recommendation_from_invalid_count(invalid_count) do
+    case invalid_count > 0 do
+      true -> "- Recommendation: consolidate stale or duplicate context before adding new memory, and re-route using the allowed-event set when needed.\n\n"
+      _ -> "\n"
     end
   end
 
@@ -620,9 +673,16 @@ defmodule LoopHarness do
   defp render_review_prompt_text(loop, iteration, run_lines) do
     scratchpad_text = render_run_scratchpad(run_lines)
     memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
+    memory_stats = LoopMemory.stats_file(memory_file(loop), memory_budget_chars(loop))
     recent_event = routing_event_from_lines(run_lines, "loop.start")
-    latest_iteration = to_string(max_review_prompt_iteration(run_lines)) "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "Do not modify files on disk. Store all feedback, recommendations, and durable findings exclusively via `" <> tool_path(loop) <> " memory add ...` commands.\n" <> "Do not emit normal loop events during review.\n\n" <>
+    backpressure = latest_invalid_note(run_lines, "")
+    invalid_count = invalid_event_count(run_lines, 0)
+    latest_iteration = to_string(max_review_prompt_iteration(run_lines))
+
+    "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "Do not modify files on disk. Store all feedback, recommendations, and durable findings exclusively via `" <> tool_path(loop) <> " memory add ...` commands.\n" <> "Do not emit normal loop events during review.\n\n" <>
     review_instructions_text(loop) <>
+    context_pressure_text(memory_stats, invalid_count) <>
+    backpressure_text(backpressure) <>
     memory_text_block(memory_text) <> "Review trigger iteration: #{iteration}\n" <> "Latest routing event: " <> recent_event <> "\n\n" <>
     LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Useful commands:\n" <>
     tool_path(loop) <> " inspect scratchpad --format md\n" <>
@@ -741,6 +801,20 @@ defmodule LoopHarness do
     end
   end
 
+  defp invalid_event_count([], count) do
+    count
+  end
+
+  defp invalid_event_count([line | rest], count) do
+    next =
+    case extract_topic(line) do
+      "event.invalid" -> count + 1
+      _ -> count
+    end
+
+    invalid_event_count(rest, next)
+  end
+
   defp clear_note_after_valid_emit(topic, note) do
     case system_topic(topic) do
       true -> note
@@ -749,7 +823,7 @@ defmodule LoopHarness do
   end
 
   defp invalid_note_from_line(line) do
-    "Emitted `" <> extract_field(line, "emitted") <> "` after `" <> extract_field(line, "recent_event") <> "`.\n" <> "Suggested roles: " <> empty_list_text(extract_field(line, "suggested_roles")) <> "\n" <> "Allowed next events: " <> empty_list_text(extract_field(line, "allowed_events"))
+    "Emitted `" <> extract_field(line, "emitted") <> "` after `" <> extract_field(line, "recent_event") <> "`.\n" <> "Suggested roles: " <> empty_list_text(extract_field(line, "suggested_roles")) <> "\n" <> "Allowed next events: " <> empty_list_text(extract_field(line, "allowed_events")) <> "\n" <> "Re-emit using one of the allowed events above."
   end
 
   defp empty_list_text("") do
@@ -1099,8 +1173,11 @@ defmodule LoopHarness do
     latest_loop_start_run(rest, next)
   end
 
-  defp next_run_id(path) do
-    "run-" <> to_string(count_topic(read_lines(path), "loop.start", 0) + 1)
+  defp next_run_id(path, config) do
+    case LoopConfig.get(config, "core.run_id_format", "compact") do
+      "counter" -> "run-" <> to_string(count_topic(read_lines(path), "loop.start", 0) + 1)
+      _ -> LoopUtils.generate_compact_id("run")
+    end
   end
 
   defp count_topic([], _topic, count) do

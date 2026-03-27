@@ -25,7 +25,8 @@ defmodule LoopChains do
   def run(chain_spec, project_dir, self_command, run_options) do
     chain_name = Map.get(chain_spec, :name, "inline")
     steps = Map.get(chain_spec, :steps, [])
-    chain_run_id = next_chain_run_id(project_dir)
+    config = LoopConfig.load_project(project_dir)
+    chain_run_id = next_chain_run_id(project_dir, config)
     chain_dir = Path.join(project_dir, ".miniloops/chains/" <> chain_run_id)
     journal_file = LoopConfig.resolve_journal_file(project_dir)
 
@@ -116,7 +117,7 @@ defmodule LoopChains do
   end
 
   def list_known_presets(project_dir) do
-    ["autocode", "autoideas", "autoresearch", "autoqa", "autotest", "autofix", "autoreview", "autodoc", "autosec", "autoperf"]
+    ["autocode", "autosimplify", "autoideas", "autoresearch", "autoqa", "autotest", "autofix", "autoreview", "autodoc", "autosec", "autoperf"]
   end
 
   def validate_preset_vocabulary(steps, project_dir) do
@@ -351,9 +352,17 @@ defmodule LoopChains do
     System.write_text(path, content)
   end
 
-  defp next_chain_run_id(project_dir) do
+  defp next_chain_run_id(project_dir, config) do
+    case LoopConfig.get(config, "core.run_id_format", "compact") do
+      "counter" -> counter_chain_run_id(project_dir)
+      _ -> LoopUtils.generate_compact_id("chain")
+    end
+  end
+
+  defp counter_chain_run_id(project_dir) do
     journal_file = LoopConfig.resolve_journal_file(project_dir)
-    "chain-" <> to_string(count_chain_starts(read_lines(journal_file), 0) + 1)
+    count = count_chain_starts(read_lines(journal_file), 0) + 1
+    "chain-" <> to_string(count)
   end
 
   defp count_chain_starts([], count) do

@@ -13,12 +13,12 @@ The journal is JSONL (one JSON object per line). There are two record shapes: **
 Emitted by the harness at lifecycle boundaries.
 
 ```json
-{"run": "run-1", "iteration": "3", "topic": "iteration.start", "fields": {"recent_event": "tasks.ready", "suggested_roles": "builder", "allowed_events": "review.ready,build.blocked", "backpressure": "", "prompt": "..."}}
+{"run": "run-mn9d3uk0-xi0m", "iteration": "3", "topic": "iteration.start", "fields": {"recent_event": "tasks.ready", "suggested_roles": "builder", "allowed_events": "review.ready,build.blocked", "backpressure": "", "prompt": "..."}}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `run` | string | Run identifier (e.g. `"run-1"`). Groups events within a single loop execution. |
+| `run` | string | Run identifier. Default format is compact: `"run-<base36_timestamp>-<suffix>"` (e.g. `"run-mn9d3uk0-xi0m"`). Set `core.run_id_format = "counter"` for sequential `"run-1"`, `"run-2"`, etc. |
 | `iteration` | string | Iteration number. Empty for `loop.start`. |
 | `topic` | string | Event type. |
 | `fields` | object | Topic-specific payload (varies by event type). |
@@ -28,7 +28,7 @@ Emitted by the harness at lifecycle boundaries.
 Emitted by the model via `miniloops emit`.
 
 ```json
-{"run": "run-1", "iteration": "3", "topic": "review.ready", "payload": "initial implementation complete", "source": "agent"}
+{"run": "run-mn9d3uk0-xi0m", "iteration": "3", "topic": "review.ready", "payload": "initial implementation complete", "source": "agent"}
 ```
 
 | Field | Type | Description |
@@ -44,7 +44,7 @@ Emitted by the model via `miniloops emit`.
 Coordination events use the agent event shape (with `payload` and `source: "agent"`) but encode structured data inside the payload using `key=value;` pairs:
 
 ```json
-{"run": "run-1", "iteration": "2", "topic": "issue.discovered", "payload": "id=issue-1; summary=fix login bug; disposition=open; owner=builder;", "source": "agent"}
+{"run": "run-mn9d3uk0-xi0m", "iteration": "2", "topic": "issue.discovered", "payload": "id=issue-1; summary=fix login bug; disposition=open; owner=builder;", "source": "agent"}
 ```
 
 ## Event lifecycle
