@@ -66,8 +66,8 @@ defmodule LoopConfig do
   end
 
   defp resolve_bundled_preset_dir(name, bundle_root) do
-    bundle_candidate = Path.join(bundle_root, "examples/" <> name)
-    cwd_candidate = Path.join(".", "examples/" <> name)
+    bundle_candidate = Path.join(bundle_root, "presets/" <> name)
+    cwd_candidate = Path.join(".", "presets/" <> name)
 
     case project_has_config(bundle_candidate) do
       true -> bundle_candidate
@@ -419,12 +419,12 @@ defmodule ConfigTest do
 
   def test_resolve_project_dir_resolves_bundled_preset_name() do
     resolved = LoopConfig.resolve_project_dir("autocode", project_dir())
-    Assert.assert_equal(resolved, Path.join(project_dir(), "examples/autocode"))
+    Assert.assert_equal(resolved, Path.join(project_dir(), "presets/autocode"))
   end
 
   def test_resolve_project_dir_resolves_autosimplify_preset_name() do
     resolved = LoopConfig.resolve_project_dir("autosimplify", project_dir())
-    Assert.assert_equal(resolved, Path.join(project_dir(), "examples/autosimplify"))
+    Assert.assert_equal(resolved, Path.join(project_dir(), "presets/autosimplify"))
   end
 
   def test_resolve_project_dir_returns_empty_for_unknown_preset() do

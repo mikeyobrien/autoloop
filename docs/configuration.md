@@ -136,18 +136,19 @@ Command mode invokes the executable directly and captures stdout. It is not a su
 
 All `auto*` presets share the same structure. The only value that typically varies per preset is `event_loop.required_events`, which names the quality-gate event for that workflow:
 
-| Preset | Required event |
-|--------|---------------|
+| Preset | Required event(s) |
+|--------|-------------------|
 | autocode | `review.passed` |
+| autospec | `research.ready`, `design.ready`, `spec.ready` |
 | autosimplify | `simplification.verified` |
 | autodoc | `doc.checked` |
 | autofix | `fix.verified` |
 | autoperf | `perf.measured` |
-| autoqa | `qa.passed` |
+| autoqa | `surfaces.identified` |
 | autoresearch | `experiment.measured` |
 | autoreview | `review.checked` |
-| autosec | `finding.confirmed` |
+| autosec | `findings.reported` |
 | autotest | `tests.passed` |
 | autoideas | `analysis.validated` |
 
-See `examples/<preset>/miniloops.toml` for complete files.
+See `presets/<preset>/miniloops.toml` for complete files.

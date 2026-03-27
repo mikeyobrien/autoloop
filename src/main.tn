@@ -581,7 +581,7 @@ defmodule Demo do
     IO.puts("Examples:")
     IO.puts("  miniloops run autocode")
     IO.puts("  miniloops run autocode \"Fix the login bug\"")
-    IO.puts("  miniloops run examples/autoqa \"QA recent changes\"")
+    IO.puts("  miniloops run presets/autoqa \"QA recent changes\"")
     IO.puts("  miniloops run . \"Run from current directory\"")
     Map.put(default_run_options(), :usage_error, true)
   end

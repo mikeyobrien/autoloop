@@ -8,11 +8,27 @@ Across the family, the intended posture is fail-closed rather than rubber-stamp:
 
 ### autocode
 
-Code implementation loop. Takes a task description (prose, `.code-task.md` path, or existing implementation directory), breaks it into slices, builds each slice, reviews, and gates completion.
+Code implementation loop. Takes a task description (prose, `.code-task.md` path, or existing implementation directory), breaks it into slices, builds each slice, reviews, and gates completion. The critic is expected to independently manual-smoke the builder's changed code path whenever a practical executable surface exists.
 
 **Shape:** planner → builder → critic → finalizer
 **Shared state:** `context.md`, `plan.md`, `progress.md`, `logs/`
-**Example:** `examples/autocode/`
+**Example:** `presets/autocode/`
+
+### autospec
+
+Specification loop. Takes a rough idea, local note, or draft spec and turns it into a durable RFC + `.code-task.md` pair. Clarifies scope first, inspects repo conventions and adjacent code/docs, drafts the design doc, drafts the implementation task, and adversarially checks that the pair is aligned and executable.
+
+**Shape:** clarifier → researcher → designer → planner → critic
+**Shared state:** `spec-brief.md`, `spec-research.md`, `progress.md`
+**Example:** `presets/autospec/`
+
+### autosimplify
+
+Post-implementation cleanup loop. Focuses on recently modified code, identifies safe opportunities to improve reuse, clarity, and obvious efficiency, applies behavior-preserving simplifications, and independently verifies that the result is actually cleaner.
+
+**Shape:** scoper → reviewer → simplifier → verifier
+**Shared state:** `simplify-context.md`, `simplify-plan.md`, `progress.md`
+**Example:** `presets/autosimplify/`
 
 ### autoideas
 
@@ -20,7 +36,7 @@ Repository survey and improvement report. Scans a target repo for areas worth im
 
 **Shape:** scanner → analyst → reviewer → synthesizer
 **Shared state:** `scan-areas.md`, `progress.md`, `ideas-report.md`
-**Example:** `examples/autoideas/`
+**Example:** `presets/autoideas/`
 
 ### autoresearch
 
@@ -28,7 +44,7 @@ Autonomous experiment loop. Hypothesize, implement, measure, keep or discard. Su
 
 **Shape:** strategist → implementer → benchmarker → evaluator
 **Shared state:** `autoresearch.md`, `experiments.jsonl`, `progress.md`
-**Example:** `examples/autoresearch/`
+**Example:** `presets/autoresearch/`
 
 ### autoqa
 
@@ -36,7 +52,7 @@ Native, zero-dependency validation orchestration. Inspects the target repo, infe
 
 **Shape:** inspector → planner → executor → reporter
 **Shared state:** `qa-plan.md`, `qa-report.md`, `progress.md`
-**Example:** `examples/autoqa/`
+**Example:** `presets/autoqa/`
 
 ### autotest
 
@@ -44,7 +60,7 @@ Formal test creation and test-suite tightening. Surveys the codebase for coverag
 
 **Shape:** surveyor → writer → runner → assessor
 **Shared state:** `test-plan.md`, `test-report.md`, `progress.md`
-**Example:** `examples/autotest/`
+**Example:** `presets/autotest/`
 
 ### autofix
 
@@ -52,7 +68,7 @@ Bug diagnosis and repair. Narrower than autocode — starts from a bug report or
 
 **Shape:** diagnoser → fixer → verifier → closer
 **Shared state:** `bug-report.md`, `fix-log.md`, `progress.md`
-**Example:** `examples/autofix/`
+**Example:** `presets/autofix/`
 
 ### autoreview
 
@@ -60,7 +76,7 @@ Code review loop. Reads a PR diff or set of changes, checks for correctness, sec
 
 **Shape:** reader → checker → suggester → summarizer
 **Shared state:** `review-context.md`, `review-findings.md`, `progress.md`
-**Example:** `examples/autoreview/`
+**Example:** `presets/autoreview/`
 
 ### autodoc
 
@@ -68,7 +84,7 @@ Documentation generation and maintenance. Audits existing docs against the codeb
 
 **Shape:** auditor → writer → checker → publisher
 **Shared state:** `doc-plan.md`, `doc-report.md`, `progress.md`
-**Example:** `examples/autodoc/`
+**Example:** `presets/autodoc/`
 
 ### autosec
 
@@ -76,7 +92,7 @@ Security audit and hardening. Scans for OWASP top-10 vulnerabilities, dependency
 
 **Shape:** scanner → analyst → hardener → reporter
 **Shared state:** `sec-findings.md`, `sec-report.md`, `progress.md`
-**Example:** `examples/autosec/`
+**Example:** `presets/autosec/`
 
 ### autoperf
 
@@ -84,7 +100,7 @@ Performance profiling and optimization. Identifies hot paths, establishes baseli
 
 **Shape:** profiler → optimizer → measurer → judge
 **Shared state:** `perf-profile.md`, `perf-log.jsonl`, `progress.md`
-**Example:** `examples/autoperf/`
+**Example:** `presets/autoperf/`
 
 ## Naming guidance
 
@@ -96,13 +112,15 @@ Performance profiling and optimization. Identifies hot paths, establishes baseli
 - `autoqa` = "does what we have work?" — uses native/manual validation surfaces that already exist in the repo (build system, type checker, linter, REPL, CLI invocation, existing test suite, file output inspection).
 - `autotest` = "do we have good tests?" — writes new formal tests, improves coverage, tightens the test suite.
 
-**Naming convention:** all presets use the `auto` prefix followed by a single lowercase word that describes the behavioral center. No hyphens, no camelCase. The word should answer "what does this loop do in one word?" — code, ideas, research, qa, test, fix, review, doc, sec, perf.
+**Naming convention:** all presets use the `auto` prefix followed by a single lowercase word that describes the behavioral center. No hyphens, no camelCase. The word should answer "what does this loop do in one word?" — code, spec, simplify, ideas, research, qa, test, fix, review, doc, sec, perf.
 
 ## Choosing a preset
 
 | You want to… | Use |
 |---|---|
+| Turn a rough idea into an RFC + implementation task | `autospec` |
 | Implement a feature or task | `autocode` |
+| Clean up a recent diff without changing behavior | `autosimplify` |
 | Survey a repo for improvement ideas | `autoideas` |
 | Run experiments and measure results | `autoresearch` |
 | Validate that things work without writing new tests | `autoqa` |

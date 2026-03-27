@@ -1,0 +1,38 @@
+name = "autospec"
+completion = "task.complete"
+
+[[role]]
+id = "clarifier"
+emits = ["brief.ready"]
+prompt_file = "roles/clarifier.md"
+
+[[role]]
+id = "researcher"
+emits = ["research.ready"]
+prompt_file = "roles/researcher.md"
+
+[[role]]
+id = "designer"
+emits = ["design.ready"]
+prompt_file = "roles/designer.md"
+
+[[role]]
+id = "planner"
+emits = ["spec.ready"]
+prompt_file = "roles/planner.md"
+
+[[role]]
+id = "critic"
+emits = ["brief.revise", "research.revise", "design.revise", "spec.revise", "task.complete"]
+prompt_file = "roles/critic.md"
+
+[handoff]
+"loop.start" = ["clarifier"]
+"brief.revise" = ["clarifier"]
+"brief.ready" = ["researcher"]
+"research.revise" = ["researcher"]
+"research.ready" = ["designer"]
+"design.revise" = ["designer"]
+"design.ready" = ["planner"]
+"spec.revise" = ["planner"]
+"spec.ready" = ["critic"]

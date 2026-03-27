@@ -1,4 +1,4 @@
-# Tests for preset validation: each preset under examples/ loads correctly,
+# Tests for preset validation: each preset under presets/ loads correctly,
 # has a consistent topology (emits↔handoff, targets↔roles), and non-empty role prompts.
 
 defmodule PresetConfig do
@@ -609,55 +609,55 @@ defmodule PresetTest do
     end
   end
 
-  defp examples_dir() do
-    "/Users/rook/projects/tonic-loops/examples"
+  defp presets_dir() do
+    "/Users/rook/projects/tonic-loops/presets"
   end
 
   def test_preset_autocode() do
-    validate_preset(Path.join(examples_dir(), "autocode"))
+    validate_preset(Path.join(presets_dir(), "autocode"))
   end
 
   def test_preset_autodoc() do
-    validate_preset(Path.join(examples_dir(), "autodoc"))
+    validate_preset(Path.join(presets_dir(), "autodoc"))
   end
 
   def test_preset_autofix() do
-    validate_preset(Path.join(examples_dir(), "autofix"))
+    validate_preset(Path.join(presets_dir(), "autofix"))
   end
 
   def test_preset_autoideas() do
-    validate_preset(Path.join(examples_dir(), "autoideas"))
+    validate_preset(Path.join(presets_dir(), "autoideas"))
   end
 
   def test_preset_autoperf() do
-    validate_preset(Path.join(examples_dir(), "autoperf"))
+    validate_preset(Path.join(presets_dir(), "autoperf"))
   end
 
   def test_preset_autoqa() do
-    validate_preset(Path.join(examples_dir(), "autoqa"))
+    validate_preset(Path.join(presets_dir(), "autoqa"))
   end
 
   def test_preset_autoresearch() do
-    validate_preset(Path.join(examples_dir(), "autoresearch"))
+    validate_preset(Path.join(presets_dir(), "autoresearch"))
   end
 
   def test_preset_autoreview() do
-    validate_preset(Path.join(examples_dir(), "autoreview"))
+    validate_preset(Path.join(presets_dir(), "autoreview"))
   end
 
   def test_preset_autosec() do
-    validate_preset(Path.join(examples_dir(), "autosec"))
+    validate_preset(Path.join(presets_dir(), "autosec"))
   end
 
   def test_preset_autosimplify() do
-    validate_preset(Path.join(examples_dir(), "autosimplify"))
+    validate_preset(Path.join(presets_dir(), "autosimplify"))
   end
 
   def test_preset_autospec() do
-    validate_preset(Path.join(examples_dir(), "autospec"))
+    validate_preset(Path.join(presets_dir(), "autospec"))
   end
 
   def test_preset_autotest() do
-    validate_preset(Path.join(examples_dir(), "autotest"))
+    validate_preset(Path.join(presets_dir(), "autotest"))
   end
 end

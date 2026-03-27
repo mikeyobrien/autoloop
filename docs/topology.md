@@ -159,10 +159,11 @@ A role that cannot proceed emits a `.blocked` event, routing to a role that can 
 
 ## Examples
 
-Every `auto*` preset in `examples/` includes a `topology.toml`. See:
+Every `auto*` preset in `presets/` includes a `topology.toml`. See:
 
-- `examples/autocode/topology.toml` — 4-role build loop with rejection
-- `examples/autodoc/topology.toml` — audit → write → check → publish cycle
-- `examples/autoresearch/topology.toml` — hypothesis → implement → measure → evaluate
-- `examples/autosec/topology.toml` — scan → analyze → harden → report
-- `examples/autofix/topology.toml` — diagnose → fix → verify → close with re-open support
+- `presets/autocode/topology.toml` — 4-role build loop with rejection
+- `presets/autospec/topology.toml` — clarify → research → design → task → critique spec loop
+- `presets/autodoc/topology.toml` — audit → write → check → publish cycle
+- `presets/autoresearch/topology.toml` — hypothesis → implement → measure → evaluate
+- `presets/autosec/topology.toml` — scan → analyze → harden → report
+- `presets/autofix/topology.toml` — diagnose → fix → verify → close with re-open support

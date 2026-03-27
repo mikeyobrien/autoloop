@@ -18,7 +18,7 @@ my-preset/
     └── ...
 ```
 
-The directory can live anywhere. Built-in presets live under `examples/<name>/`; custom presets just need a path that `miniloops run` can resolve.
+The directory can live anywhere. Built-in presets live under `presets/<name>/`; custom presets just need a path that `miniloops run` can resolve.
 
 ## Step 1: Define the topology
 
@@ -168,18 +168,25 @@ See [`docs/configuration.md`](configuration.md) for the full key reference.
 # From the repo root, using the launcher
 ./bin/miniloops run path/to/my-preset "Your objective here"
 
+# Built-in presets can use their bundled name
+./bin/miniloops run autocode "Your objective here"
+
 # With the installed shim
 miniloops run path/to/my-preset "Your objective here"
 
+# Explicit flag form for built-in names or custom dirs
+miniloops run --preset autocode "Your objective here"
+miniloops run --preset path/to/my-preset "Your objective here"
+
 # Override backend for a one-off run
-miniloops run -b claude path/to/my-preset "Your objective here"
+miniloops run -b claude --preset autocode "Your objective here"
 ```
 
-The first argument to `run` is the preset directory path. Miniloops loads `miniloops.toml`, `topology.toml`, and `harness.md` from that directory.
+`run` loads `miniloops.toml`, `topology.toml`, and `harness.md` from the selected preset directory. Built-in presets resolve by name through `presets/<name>/`; custom presets still use a directory path.
 
 ## Registering a preset in chains
 
-To use a custom preset in chain compositions, the chain step name must resolve to the preset directory. Built-in presets resolve via `examples/<name>/`. For custom presets, use the directory path as the step name:
+To use a custom preset in chain compositions, the chain step name must resolve to the preset directory. Built-in presets resolve via `presets/<name>/`. For custom presets, use the directory path as the step name:
 
 ```toml
 # chains.toml

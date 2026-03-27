@@ -117,7 +117,7 @@ defmodule LoopChains do
   end
 
   def list_known_presets(project_dir) do
-    ["autocode", "autosimplify", "autoideas", "autoresearch", "autoqa", "autotest", "autofix", "autoreview", "autodoc", "autosec", "autoperf"]
+    ["autocode", "autosimplify", "autoideas", "autoresearch", "autoqa", "autotest", "autofix", "autoreview", "autodoc", "autosec", "autoperf", "autospec"]
   end
 
   def validate_preset_vocabulary(steps, project_dir) do
@@ -265,7 +265,7 @@ defmodule LoopChains do
   end
 
   defp resolve_preset_dir(name, project_dir) do
-    candidate = Path.join(project_dir, "examples/" <> name)
+    candidate = Path.join(project_dir, "presets/" <> name)
 
     case System.path_exists(candidate) do
       true -> candidate
@@ -274,7 +274,7 @@ defmodule LoopChains do
   end
 
   defp resolve_preset_dir_cwd(name) do
-    candidate = Path.join(".", "examples/" <> name)
+    candidate = Path.join(".", "presets/" <> name)
 
     case System.path_exists(candidate) do
       true -> candidate

@@ -1,0 +1,32 @@
+name = "autosimplify"
+completion = "task.complete"
+
+[[role]]
+id = "scoper"
+emits = ["scope.ready", "task.complete"]
+prompt_file = "roles/scoper.md"
+
+[[role]]
+id = "reviewer"
+emits = ["plan.ready", "review.blocked"]
+prompt_file = "roles/reviewer.md"
+
+[[role]]
+id = "simplifier"
+emits = ["simplification.applied", "simplification.blocked"]
+prompt_file = "roles/simplifier.md"
+
+[[role]]
+id = "verifier"
+emits = ["simplification.verified", "simplification.rejected"]
+prompt_file = "roles/verifier.md"
+
+[handoff]
+"loop.start" = ["scoper"]
+"simplification.verified" = ["scoper"]
+"scope.ready" = ["reviewer"]
+"review.blocked" = ["scoper"]
+"plan.ready" = ["simplifier"]
+"simplification.blocked" = ["reviewer"]
+"simplification.applied" = ["verifier"]
+"simplification.rejected" = ["reviewer"]

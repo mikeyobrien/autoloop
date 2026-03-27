@@ -1,6 +1,6 @@
 # Named chain definitions for preset composition.
 # Each chain runs its presets in sequence with isolated state per step.
-# Preset names resolve to examples/<name>/ directories.
+# Preset names resolve to presets/<name>/ directories.
 
 # Budget constraints for dynamic chain generation.
 # These limits apply to all chains spawned at runtime.
@@ -14,6 +14,10 @@ max_consecutive_failures = 3
 [[chain]]
 name = "code-and-qa"
 steps = ["autocode", "autoqa"]
+
+[[chain]]
+name = "code-simplify-qa"
+steps = ["autocode", "autosimplify", "autoqa"]
 
 [[chain]]
 name = "code-test-fix"

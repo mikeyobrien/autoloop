@@ -14,11 +14,12 @@ Pi is the first-class backend. Miniloops now runs Pi itself with `pi -p --mode j
 
 ## Workflow family
 
-Miniloops ships a family of 11 `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
+Miniloops ships a family of 12 `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
 
 | Preset | What it does | Shape |
 |--------|-------------|-------|
 | **autocode** | Code implementation — slice, build, review, gate | planner → builder → critic → finalizer |
+| **autospec** | Specification — turn a rough idea into an RFC + `.code-task.md` pair | clarifier → researcher → designer → planner → critic |
 | **autosimplify** | Post-implementation cleanup — simplify recent changes without changing behavior | scoper → reviewer → simplifier → verifier |
 | **autoideas** | Repo survey — scan, deep-dive, validate, report | scanner → analyst → reviewer → synthesizer |
 | **autoresearch** | Experiment loop — hypothesize, implement, measure, keep/discard | strategist → implementer → benchmarker → evaluator |
@@ -30,7 +31,7 @@ Miniloops ships a family of 11 `auto*` preset workflows. Each is a self-containe
 | **autosec** | Security audit — scan vulns, confirm, harden, report | scanner → analyst → hardener → reporter |
 | **autoperf** | Performance optimization — profile, optimize, measure, keep/discard | profiler → optimizer → measurer → judge |
 
-**Choosing a preset:** Use `autocode` for feature work. Use `autosimplify` to clean up recent changes without changing behavior. Use `autoideas` for improvement surveys. Use `autoresearch` for hypothesis-driven experiments. Use `autoqa` to validate with native surfaces. Use `autotest` to write new tests. Use `autofix` for bug reports. Use `autoreview` for PR review. Use `autodoc` for documentation gaps. Use `autosec` for security audits. Use `autoperf` for performance optimization.
+**Choosing a preset:** Use `autospec` to turn a rough idea into durable planning artifacts. Use `autocode` for feature work. Use `autosimplify` to clean up recent changes without changing behavior. Use `autoideas` for improvement surveys. Use `autoresearch` for hypothesis-driven experiments. Use `autoqa` to validate with native surfaces. Use `autotest` to write new tests. Use `autofix` for bug reports. Use `autoreview` for PR review. Use `autodoc` for documentation gaps. Use `autosec` for security audits. Use `autoperf` for performance optimization.
 
 Across the `auto*` family, the intended posture is skeptical and fail-closed: checker/judge/verifier/reporter/finalizer roles should challenge claims, require evidence, and reject weak proof instead of rubber-stamping. In autocode specifically, the critic is expected to independently run a manual smoke test that exercises the builder's changed code path whenever the repo exposes a practical manual surface.
 
@@ -80,7 +81,7 @@ miniloops run . --chain autocode,autoqa,autoresearch
 - Handoff artifacts (prior step summaries) and result artifacts are written between steps
 - Chain lifecycle is journaled: `chain.start`, `chain.step.start`, `chain.step.finish`, `chain.complete`
 - If a step fails (non-completion stop), the chain stops and reports the failure
-- Preset resolution: step name → `examples/<name>/` directory
+- Preset resolution: step name → `presets/<name>/` directory
 
 Inspect chain state:
 
@@ -266,7 +267,9 @@ By default:
 - review cadence = number of roles in `topology.toml`
 - review uses the same Pi adapter unless overridden
 - the harness re-reads runtime files before every task iteration, so edits take effect on the next turn
+- the hyperagent may make bounded hygiene edits to runtime-facing loop files (`miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `context.md`, `plan.md`, `progress.md`, `docs/*.md`) when that improves the next turn
 - the hyperagent may consolidate stale context, resolved detours, and no-longer-relevant notes into `docs/*.md` so active working files stay focused on the current objective
+- the hyperagent must not edit app/product source code, tests, manifests, or `.miniloops/` state during review
 - short durable lessons still belong in loop memory; archived markdown context belongs in `docs/`
 
 ## Backpressure on hallucinated events

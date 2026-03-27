@@ -75,8 +75,8 @@ defmodule LoopConfig do
   end
 
   defp resolve_bundled_preset_dir(name, bundle_root) do
-    bundle_candidate = Path.join(bundle_root, "examples/" <> name)
-    cwd_candidate = Path.join(".", "examples/" <> name)
+    bundle_candidate = Path.join(bundle_root, "presets/" <> name)
+    cwd_candidate = Path.join(".", "presets/" <> name)
 
     case project_has_config(bundle_candidate) do
       true -> bundle_candidate
