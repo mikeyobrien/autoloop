@@ -166,7 +166,7 @@ defmodule LoopMemory do
   end
 
   defp add_entry(acc, _type, id, _line) do
-    case list_contains(Map.get(acc, :tombstoned, []), id) or list_contains(Map.get(acc, :seen, []), id) do
+    case LoopUtils.list_contains(Map.get(acc, :tombstoned, []), id) or LoopUtils.list_contains(Map.get(acc, :seen, []), id) do
       true -> acc
       _ -> add_entry_to_collection(acc, id, _type, _line)
     end
@@ -203,7 +203,7 @@ defmodule LoopMemory do
   end
 
   defp read_lines(path) do
-    collect_lines(String.split(read_if_exists(path), line_sep()), [])
+    collect_lines(String.split(read_if_exists(path), LoopUtils.line_sep()), [])
   end
 
   defp collect_lines([], acc) do
@@ -221,7 +221,7 @@ defmodule LoopMemory do
 
   defp append_memory_entry(path, content) do
     System.ensure_dir(Path.dirname(path))
-    System.run("printf '%s' " <> shell_quote(content) <> " >> " <> shell_quote(path))
+    System.run("printf '%s' " <> LoopUtils.shell_quote(content) <> " >> " <> LoopUtils.shell_quote(path))
   end
 
   defp next_id(path, prefix) do
@@ -256,13 +256,13 @@ defmodule LoopMemory do
   defp encode_json_value(text) do
     escaped_backslash = String.replace(text, "\\", "\\u005c")
     escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
-    escaped_newline = String.replace(escaped_quote, line_sep(), "\\u000a")
+    escaped_newline = String.replace(escaped_quote, LoopUtils.line_sep(), "\\u000a")
     escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
     String.replace(escaped_return, "\t", "\\u0009")
   end
 
   defp decode_json_value(text) do
-    restored_newline = String.replace(text, "\\u000a", line_sep())
+    restored_newline = String.replace(text, "\\u000a", LoopUtils.line_sep())
     restored_return = String.replace(restored_newline, "\\u000d", "\r")
     restored_tab = String.replace(restored_return, "\\u0009", "\t")
     restored_quote = String.replace(restored_tab, "\\u0022", "\"")
@@ -309,21 +309,6 @@ defmodule LoopMemory do
     item
   end
 
-  defp list_contains([], _needle) do
-    false
-  end
-
-  defp list_contains([item | rest], needle) do
-    case item == needle do
-      true -> true
-      _ -> list_contains(rest, needle)
-    end
-  end
-
-  defp shell_quote(text) do
-    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
-  end
-
   defp read_if_exists(path) do
     case System.path_exists(path) do
       true -> System.read_text(path)
@@ -331,8 +316,4 @@ defmodule LoopMemory do
     end
   end
 
-  defp line_sep() do
-    """
-"""
-  end
 end

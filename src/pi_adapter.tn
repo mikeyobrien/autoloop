@@ -42,7 +42,7 @@ defmodule LoopPiAdapter do
   end
 
   defp projected_prompt_from_tool(bin, iteration) do
-    result = System.run(shell_words([bin, "inspect", "prompt", iteration, "--format", "md"]))
+    result = System.run(LoopUtils.shell_words([bin, "inspect", "prompt", iteration, "--format", "md"]))
     output = Map.get(result, :output, "")
 
     case output do
@@ -77,7 +77,7 @@ defmodule LoopPiAdapter do
   end
 
   defp build_pi_command(command, extra_args, prompt) do
-    shell_words([command] ++ default_pi_args() ++ extra_args ++ [prompt])
+    LoopUtils.shell_words([command] ++ default_pi_args() ++ extra_args ++ [prompt])
   end
 
   defp default_pi_args() do
@@ -85,7 +85,7 @@ defmodule LoopPiAdapter do
   end
 
   defp parse_output(output) do
-    parse_lines(String.split(output, line_sep()), %{text: "", fallback_text: "", saw_turn_end: false, saw_agent_end: false, error: ""})
+    parse_lines(String.split(output, LoopUtils.line_sep()), %{text: "", fallback_text: "", saw_turn_end: false, saw_agent_end: false, error: ""})
   end
 
   defp parse_lines([], state) do
@@ -121,18 +121,18 @@ defmodule LoopPiAdapter do
 
   defp parse_tool_execution_end(line, state) do
     case String.contains(line, "\"isError\":true") do
-      true -> put_error(state, nonempty_or(last_json_string_after(line, "\"type\":\"text\",\"text\":\""), Map.get(state, :error, "")))
+      true -> put_error(state, LoopUtils.nonempty_or(last_json_string_after(line, "\"type\":\"text\",\"text\":\""), Map.get(state, :error, "")))
       _ -> state
     end
   end
 
   defp parse_turn_end(line, state) do
-    fallback = nonempty_or(Map.get(state, :fallback_text, ""), last_json_string_after(line, "\"type\":\"text\",\"text\":\""))
+    fallback = LoopUtils.nonempty_or(Map.get(state, :fallback_text, ""), last_json_string_after(line, "\"type\":\"text\",\"text\":\""))
     %{text: Map.get(state, :text, ""), fallback_text: fallback, saw_turn_end: true, saw_agent_end: Map.get(state, :saw_agent_end, false), error: Map.get(state, :error, "")}
   end
 
   defp parse_agent_end(line, state) do
-    fallback = nonempty_or(Map.get(state, :fallback_text, ""), last_json_string_after(line, "\"type\":\"text\",\"text\":\""))
+    fallback = LoopUtils.nonempty_or(Map.get(state, :fallback_text, ""), last_json_string_after(line, "\"type\":\"text\",\"text\":\""))
     %{text: Map.get(state, :text, ""), fallback_text: fallback, saw_turn_end: Map.get(state, :saw_turn_end, false), saw_agent_end: true, error: Map.get(state, :error, "")}
   end
 
@@ -179,7 +179,7 @@ defmodule LoopPiAdapter do
     error = Map.get(parsed, :error, "")
 
     case extracted do
-      "" -> nonempty_or(raw_output, error)
+      "" -> LoopUtils.nonempty_or(raw_output, error)
       value -> case error do
         "" -> value
         _ -> value <> "\n\npi error: " <> error
@@ -281,7 +281,7 @@ defmodule LoopPiAdapter do
   end
 
   defp json_escape("n") do
-    line_sep()
+    LoopUtils.line_sep()
   end
 
   defp json_escape("r") do
@@ -306,7 +306,7 @@ defmodule LoopPiAdapter do
 
   defp unicode_escape_placeholder(code) do
     case code do
-      "000a" -> line_sep()
+      "000a" -> LoopUtils.line_sep()
       "000d" -> "\r"
       "0009" -> "\t"
       "0022" -> "\""
@@ -359,32 +359,4 @@ defmodule LoopPiAdapter do
     ""
   end
 
-  defp nonempty_or("", fallback) do
-    fallback
-  end
-
-  defp nonempty_or(value, _fallback) do
-    value
-  end
-
-  defp shell_words([]) do
-    ""
-  end
-
-  defp shell_words([part]) do
-    shell_quote(part)
-  end
-
-  defp shell_words([part | rest]) do
-    shell_quote(part) <> " " <> shell_words(rest)
-  end
-
-  defp shell_quote(text) do
-    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
-  end
-
-  defp line_sep() do
-    """
-"""
-  end
 end

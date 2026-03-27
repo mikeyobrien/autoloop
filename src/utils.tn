@@ -1,0 +1,105 @@
+defmodule LoopUtils do
+  def list_contains([], _needle) do
+    false
+  end
+
+  def list_contains([item | rest], needle) do
+    case item == needle do
+      true -> true
+      _ -> list_contains(rest, needle)
+    end
+  end
+
+  def list_text([]) do
+    "(none)"
+  end
+
+  def list_text([item]) do
+    item
+  end
+
+  def list_text([item | rest]) do
+    item <> ", " <> list_text(rest)
+  end
+
+  def split_csv(text) do
+    split_csv_parts(String.split(text, ","), [])
+  end
+
+  def split_csv_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  def split_csv_parts([part | rest], acc) do
+    trimmed = String.trim(part)
+
+    case trimmed do
+      "" -> split_csv_parts(rest, acc)
+      _ -> split_csv_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  def join_csv([]) do
+    ""
+  end
+
+  def join_csv([item]) do
+    item
+  end
+
+  def join_csv([item | rest]) do
+    item <> "," <> join_csv(rest)
+  end
+
+  def line_sep() do
+    """
+"""
+  end
+
+  def nonempty_or("", fallback) do
+    fallback
+  end
+
+  def nonempty_or(value, _fallback) do
+    value
+  end
+
+  def shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
+  end
+
+  def shell_words([]) do
+    ""
+  end
+
+  def shell_words([part]) do
+    shell_quote(part)
+  end
+
+  def shell_words([part | rest]) do
+    shell_quote(part) <> " " <> shell_words(rest)
+  end
+
+  def strip_quotes(value) do
+    case is_quoted(value) do
+      true -> slice_outer(value)
+      _ -> value
+    end
+  end
+
+  def is_quoted(value) do
+    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
+  end
+
+  def slice_outer(text) do
+    String.slice(text, 1, String.length(text) - 2)
+  end
+
+  def skip_line("") do
+    true
+  end
+
+  def skip_line(line) do
+    String.starts_with(line, "#")
+  end
+end

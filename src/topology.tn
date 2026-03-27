@@ -43,7 +43,7 @@ defmodule LoopTopology do
   end
 
   defp load_existing(path, project_dir) do
-    lines = String.split(System.read_text(path), line_sep())
+    lines = String.split(System.read_text(path), LoopUtils.line_sep())
     state = parse_lines(lines, initial_state())
     finalize(state, project_dir)
   end
@@ -54,7 +54,7 @@ defmodule LoopTopology do
 
   defp render_nonempty(topology, recent_event, roles) do
     suggested = suggested_roles(topology, recent_event)
-    allowed = allowed_events(topology, recent_event) "Topology (advisory):\n" <> "Recent routing event: " <> recent_event <> "\n" <> "Suggested next roles: " <> list_text(suggested) <> "\n" <> "Allowed next events: " <> list_text(allowed) <> "\n\n" <> "Role deck:\n" <> render_roles(roles)
+    allowed = allowed_events(topology, recent_event) "Topology (advisory):\n" <> "Recent routing event: " <> recent_event <> "\n" <> "Suggested next roles: " <> LoopUtils.list_text(suggested) <> "\n" <> "Allowed next events: " <> LoopUtils.list_text(allowed) <> "\n\n" <> "Role deck:\n" <> render_roles(roles)
   end
 
   defp initial_state() do
@@ -72,7 +72,7 @@ defmodule LoopTopology do
   defp parse_lines([line | rest], state) do
     trimmed = String.trim(line)
 
-    case skip_line(trimmed) do
+    case LoopUtils.skip_line(trimmed) do
       true -> parse_lines(rest, state)
       _ -> parse_lines(rest, parse_line(trimmed, state))
     end
@@ -110,7 +110,7 @@ defmodule LoopTopology do
   end
 
   defp assign_parts([key, value], state) do
-    assign_raw_value(strip_quotes(String.trim(key)), String.trim(value), state)
+    assign_raw_value(LoopUtils.strip_quotes(String.trim(key)), String.trim(value), state)
   end
 
   defp assign_parts(_, state) do
@@ -207,7 +207,7 @@ defmodule LoopTopology do
   defp collect_events_for_roles([role | rest], role_ids, acc) do
     role_id = Map.get(role, :id, "")
 
-    case list_contains(role_ids, role_id) do
+    case LoopUtils.list_contains(role_ids, role_id) do
       true -> collect_events_with_role(role, rest, role_ids, acc)
       _ -> collect_events_for_roles(rest, role_ids, acc)
     end
@@ -223,7 +223,7 @@ defmodule LoopTopology do
   end
 
   defp append_unique([item | rest], acc) do
-    case list_contains(acc, item) do
+    case LoopUtils.list_contains(acc, item) do
       true -> append_unique(rest, acc)
       _ -> append_unique(rest, [item] ++ acc)
     end
@@ -250,12 +250,12 @@ defmodule LoopTopology do
   end
 
   defp render_roles([role | rest]) do
-    "- role `" <> Map.get(role, :id, "") <> "`\n" <> "  emits: " <> list_text(Map.get(role, :emits, [])) <> "\n" <> "  prompt: " <> prompt_summary(Map.get(role, :prompt, "")) <> "\n" <>
+    "- role `" <> Map.get(role, :id, "") <> "`\n" <> "  emits: " <> LoopUtils.list_text(Map.get(role, :emits, [])) <> "\n" <> "  prompt: " <> prompt_summary(Map.get(role, :prompt, "")) <> "\n" <>
     render_roles(rest)
   end
 
   defp prompt_summary(prompt) do
-    first_nonempty_line(String.split(prompt, line_sep()))
+    first_nonempty_line(String.split(prompt, LoopUtils.line_sep()))
   end
 
   defp first_nonempty_line([]) do
@@ -272,7 +272,7 @@ defmodule LoopTopology do
   end
 
   defp normalize_scalar(value) do
-    strip_quotes(value)
+    LoopUtils.strip_quotes(value)
   end
 
   defp normalize_list(value) do
@@ -287,7 +287,7 @@ defmodule LoopTopology do
   end
 
   defp parse_array(value) do
-    inner = String.trim(slice_outer(value))
+    inner = String.trim(LoopUtils.slice_outer(value))
 
     case inner do
       "" -> []
@@ -300,7 +300,7 @@ defmodule LoopTopology do
   end
 
   defp split_array_parts([part | rest], acc) do
-    trimmed = strip_quotes(String.trim(part))
+    trimmed = LoopUtils.strip_quotes(String.trim(part))
 
     case trimmed do
       "" -> split_array_parts(rest, acc)
@@ -308,54 +308,4 @@ defmodule LoopTopology do
     end
   end
 
-  defp strip_quotes(value) do
-    case is_quoted(value) do
-      true -> slice_outer(value)
-      _ -> value
-    end
-  end
-
-  defp is_quoted(value) do
-    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
-  end
-
-  defp slice_outer(text) do
-    String.slice(text, 1, String.length(text) - 2)
-  end
-
-  defp list_text([]) do
-    "(none)"
-  end
-
-  defp list_text([item]) do
-    item
-  end
-
-  defp list_text([item | rest]) do
-    item <> ", " <> list_text(rest)
-  end
-
-  defp list_contains([], _needle) do
-    false
-  end
-
-  defp list_contains([item | rest], needle) do
-    case item == needle do
-      true -> true
-      _ -> list_contains(rest, needle)
-    end
-  end
-
-  defp skip_line("") do
-    true
-  end
-
-  defp skip_line(line) do
-    String.starts_with(line, "#")
-  end
-
-  defp line_sep() do
-    """
-"""
-  end
 end

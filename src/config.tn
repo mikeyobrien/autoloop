@@ -5,7 +5,7 @@ defmodule LoopConfig do
 
   def load(path) do
     case System.path_exists(path) do
-      true -> parse_lines(String.split(System.read_text(path), line_sep()), defaults())
+      true -> parse_lines(String.split(System.read_text(path), LoopUtils.line_sep()), defaults())
       _ -> defaults()
     end
   end
@@ -81,7 +81,7 @@ defmodule LoopConfig do
   defp parse_lines([line | rest], config) do
     trimmed = String.trim(line)
 
-    case skip_line(trimmed) do
+    case LoopUtils.skip_line(trimmed) do
       true -> parse_lines(rest, config)
       _ -> parse_assignment(String.split(trimmed, "="), rest, config)
     end
@@ -111,8 +111,8 @@ defmodule LoopConfig do
 
   defp normalize_value(value) do
     case is_array_literal(value) do
-      true -> join_csv(parse_array(value))
-      _ -> strip_quotes(value)
+      true -> LoopUtils.join_csv(parse_array(value))
+      _ -> LoopUtils.strip_quotes(value)
     end
   end
 
@@ -121,7 +121,7 @@ defmodule LoopConfig do
   end
 
   defp parse_array(value) do
-    inner = String.trim(slice_outer(value))
+    inner = String.trim(LoopUtils.slice_outer(value))
 
     case inner do
       "" -> []
@@ -129,20 +129,6 @@ defmodule LoopConfig do
     end
   end
 
-  defp slice_outer(text) do
-    String.slice(text, 1, String.length(text) - 2)
-  end
-
-  defp strip_quotes(value) do
-    case is_quoted(value) do
-      true -> slice_outer(value)
-      _ -> value
-    end
-  end
-
-  defp is_quoted(value) do
-    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
-  end
 
   defp split_csv(text) do
     split_csv_parts(String.split(text, ","), [])
@@ -153,7 +139,7 @@ defmodule LoopConfig do
   end
 
   defp split_csv_parts([part | rest], acc) do
-    trimmed = strip_quotes(String.trim(part))
+    trimmed = LoopUtils.strip_quotes(String.trim(part))
 
     case trimmed do
       "" -> split_csv_parts(rest, acc)
@@ -161,28 +147,4 @@ defmodule LoopConfig do
     end
   end
 
-  defp join_csv([]) do
-    ""
-  end
-
-  defp join_csv([item]) do
-    item
-  end
-
-  defp join_csv([item | rest]) do
-    item <> "," <> join_csv(rest)
-  end
-
-  defp skip_line("") do
-    true
-  end
-
-  defp skip_line(line) do
-    String.starts_with(line, "#")
-  end
-
-  defp line_sep() do
-    """
-"""
-  end
 end

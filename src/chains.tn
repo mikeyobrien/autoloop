@@ -30,7 +30,7 @@ defmodule LoopChains do
     journal_file = LoopConfig.resolve_journal_file(project_dir)
 
     System.ensure_dir(chain_dir)
-    append_chain_event(journal_file, chain_run_id, "chain.start", json_field("name", chain_name) <> ", " <> json_field("steps", join_csv(step_names(steps))) <> ", " <> json_field("step_count", to_string(list_length(steps, 0))))
+    append_chain_event(journal_file, chain_run_id, "chain.start", json_field("name", chain_name) <> ", " <> json_field("steps", LoopUtils.join_csv(step_names(steps))) <> ", " <> json_field("step_count", to_string(list_length(steps, 0))))
 
     result = run_steps(steps, 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, [])
 
@@ -46,7 +46,7 @@ defmodule LoopChains do
   end
 
   defp load_existing(path, project_dir) do
-    lines = String.split(System.read_text(path), line_sep())
+    lines = String.split(System.read_text(path), LoopUtils.line_sep())
     state = parse_lines(lines, initial_state())
     finalize(state, project_dir)
   end
@@ -55,7 +55,7 @@ defmodule LoopChains do
     path = Path.join(project_dir, "chains.toml")
 
     case System.path_exists(path) do
-      true -> parse_budget(String.split(System.read_text(path), line_sep()))
+      true -> parse_budget(String.split(System.read_text(path), LoopUtils.line_sep()))
       _ -> default_budget()
     end
   end
@@ -143,7 +143,7 @@ defmodule LoopChains do
   defp parse_lines([line | rest], state) do
     trimmed = String.trim(line)
 
-    case skip_line(trimmed) do
+    case LoopUtils.skip_line(trimmed) do
       true -> parse_lines(rest, state)
       _ -> parse_lines(rest, parse_line(trimmed, state))
     end
@@ -194,7 +194,7 @@ defmodule LoopChains do
   end
 
   defp assign_in_chain_section("chain", "name", raw_value, state) do
-    chain = Map.put(Map.get(state, :current_chain, empty_chain()), :name, strip_quotes(raw_value))
+    chain = Map.put(Map.get(state, :current_chain, empty_chain()), :name, LoopUtils.strip_quotes(raw_value))
     Map.put(state, :current_chain, chain)
   end
 
@@ -205,7 +205,7 @@ defmodule LoopChains do
 
   defp assign_in_chain_section("budget", key, raw_value, state) do
     budget = Map.get(state, :budget, default_budget())
-    Map.put(state, :budget, assign_budget_key(budget, key, strip_quotes(raw_value)))
+    Map.put(state, :budget, assign_budget_key(budget, key, LoopUtils.strip_quotes(raw_value)))
   end
 
   defp assign_in_chain_section(_section, _key, _value, state) do
@@ -543,9 +543,9 @@ defmodule LoopChains do
     journal_file = LoopConfig.resolve_journal_file(project_dir)
     justification = Map.get(spec, :justification, "")
 
-    append_chain_event(journal_file, chain_id, "chain.spawn", json_field("chain_id", chain_id) <> ", " <> json_field("parent_id", parent_id) <> ", " <> json_field("steps", join_csv(steps_csv)) <> ", " <> json_field("justification", justification))
+    append_chain_event(journal_file, chain_id, "chain.spawn", json_field("chain_id", chain_id) <> ", " <> json_field("parent_id", parent_id) <> ", " <> json_field("steps", LoopUtils.join_csv(steps_csv)) <> ", " <> json_field("justification", justification))
 
-    chain_spec = parse_inline_chain(join_csv(steps_csv), project_dir)
+    chain_spec = parse_inline_chain(LoopUtils.join_csv(steps_csv), project_dir)
     named_spec = Map.put(chain_spec, :name, chain_id)
     result = run(named_spec, project_dir, self_command, run_options)
     Map.put(result, :chain_id, chain_id)
@@ -561,7 +561,7 @@ defmodule LoopChains do
   end
 
   defp count_json_files(dir) do
-    result = System.run("ls " <> shell_quote(dir) <> " 2>/dev/null | grep -c '\\.json$' || echo 0")
+    result = System.run("ls " <> LoopUtils.shell_quote(dir) <> " 2>/dev/null | grep -c '\\.json$' || echo 0")
     String.to_integer(String.trim(Map.get(result, :output, "0")))
   end
 
@@ -569,7 +569,7 @@ defmodule LoopChains do
     "{" <>
     json_field("chain_id", chain_id) <> ", " <>
     json_field("parent_id", Map.get(spec, :parent_id, "")) <> ", " <>
-    json_field("steps", join_csv(Map.get(spec, :steps, []))) <> ", " <>
+    json_field("steps", LoopUtils.join_csv(Map.get(spec, :steps, []))) <> ", " <>
     json_field("justification", Map.get(spec, :justification, "")) <>
     "}\n"
   end
@@ -581,22 +581,12 @@ defmodule LoopChains do
   end
 
   defp validate_step_names([name | rest], known) do
-    case list_contains(known, name) do
+    case LoopUtils.list_contains(known, name) do
       true -> validate_step_names(rest, known)
       _ -> {:rejected, "unknown preset: " <> name}
     end
   end
 
-  defp list_contains([], _needle) do
-    false
-  end
-
-  defp list_contains([item | rest], needle) do
-    case item == needle do
-      true -> true
-      _ -> list_contains(rest, needle)
-    end
-  end
 
   # --- budget parsing from chains.toml ---
 
@@ -619,7 +609,7 @@ defmodule LoopChains do
   end
 
   defp parse_budget_line(line, rest, budget, true) do
-    case skip_line(line) do
+    case LoopUtils.skip_line(line) do
       true -> parse_budget_lines(rest, budget, true)
       _ -> parse_budget_assignment(String.split(line, "="), rest, budget)
     end
@@ -630,7 +620,7 @@ defmodule LoopChains do
   end
 
   defp parse_budget_assignment([key, value], rest, budget) do
-    parse_budget_lines(rest, assign_budget_key(budget, String.trim(key), strip_quotes(String.trim(value))), true)
+    parse_budget_lines(rest, assign_budget_key(budget, String.trim(key), LoopUtils.strip_quotes(String.trim(value))), true)
   end
 
   defp parse_budget_assignment(_, rest, budget) do
@@ -662,7 +652,7 @@ defmodule LoopChains do
   defp normalize_list(value) do
     case is_array_literal(value) do
       true -> parse_array(value)
-      _ -> [strip_quotes(value)]
+      _ -> [LoopUtils.strip_quotes(value)]
     end
   end
 
@@ -671,7 +661,7 @@ defmodule LoopChains do
   end
 
   defp parse_array(value) do
-    inner = String.trim(slice_outer(value))
+    inner = String.trim(LoopUtils.slice_outer(value))
 
     case inner do
       "" -> []
@@ -684,7 +674,7 @@ defmodule LoopChains do
   end
 
   defp split_array_parts([part | rest], acc) do
-    trimmed = strip_quotes(String.trim(part))
+    trimmed = LoopUtils.strip_quotes(String.trim(part))
 
     case trimmed do
       "" -> split_array_parts(rest, acc)
@@ -692,20 +682,6 @@ defmodule LoopChains do
     end
   end
 
-  defp strip_quotes(value) do
-    case is_quoted(value) do
-      true -> slice_outer(value)
-      _ -> value
-    end
-  end
-
-  defp is_quoted(value) do
-    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
-  end
-
-  defp slice_outer(text) do
-    String.slice(text, 1, String.length(text) - 2)
-  end
 
   defp split_csv(text) do
     split_csv_parts(String.split(text, ","), [])
@@ -716,32 +692,12 @@ defmodule LoopChains do
   end
 
   defp split_csv_parts([part | rest], acc) do
-    trimmed = strip_quotes(String.trim(part))
+    trimmed = LoopUtils.strip_quotes(String.trim(part))
 
     case trimmed do
       "" -> split_csv_parts(rest, acc)
       _ -> split_csv_parts(rest, [trimmed] ++ acc)
     end
-  end
-
-  defp join_csv([]) do
-    ""
-  end
-
-  defp join_csv([item]) do
-    item
-  end
-
-  defp join_csv([item | rest]) do
-    item <> "," <> join_csv(rest)
-  end
-
-  defp skip_line("") do
-    true
-  end
-
-  defp skip_line(line) do
-    String.starts_with(line, "#")
   end
 
   defp extract_topic(line) do
@@ -789,7 +745,7 @@ defmodule LoopChains do
   end
 
   defp decode_json_value(text) do
-    restored_newline = String.replace(text, "\\u000a", line_sep())
+    restored_newline = String.replace(text, "\\u000a", LoopUtils.line_sep())
     restored_return = String.replace(restored_newline, "\\u000d", "\r")
     restored_tab = String.replace(restored_return, "\\u0009", "\t")
     restored_quote = String.replace(restored_tab, "\\u0022", "\"")
@@ -807,21 +763,17 @@ defmodule LoopChains do
   defp encode_json_value(text) do
     escaped_backslash = String.replace(text, "\\", "\\u005c")
     escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
-    escaped_newline = String.replace(escaped_quote, line_sep(), "\\u000a")
+    escaped_newline = String.replace(escaped_quote, LoopUtils.line_sep(), "\\u000a")
     escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
     String.replace(escaped_return, "\t", "\\u0009")
   end
 
-  defp shell_quote(text) do
-    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
-  end
-
   defp append_text(path, content) do
-    System.run("printf '%s' " <> shell_quote(content) <> " >> " <> shell_quote(path))
+    System.run("printf '%s' " <> LoopUtils.shell_quote(content) <> " >> " <> LoopUtils.shell_quote(path))
   end
 
   defp read_lines(path) do
-    collect_lines(String.split(read_if_exists(path), line_sep()), [])
+    collect_lines(String.split(read_if_exists(path), LoopUtils.line_sep()), [])
   end
 
   defp collect_lines([], acc) do
@@ -844,8 +796,4 @@ defmodule LoopChains do
     end
   end
 
-  defp line_sep() do
-    """
-"""
-  end
 end

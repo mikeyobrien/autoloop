@@ -258,11 +258,11 @@ defmodule LoopHarness do
   end
 
   defp invalid_event(emitted_topic, allowed_events) do
-    not list_contains(allowed_events, emitted_topic)
+    not LoopUtils.list_contains(allowed_events, emitted_topic)
   end
 
   defp completed_via_event(topics, completion_event, required_events) do
-    list_contains(topics, completion_event) and all_required_events_seen(topics, required_events)
+    LoopUtils.list_contains(topics, completion_event) and all_required_events_seen(topics, required_events)
   end
 
   defp completed_via_promise(_output, "") do
@@ -278,7 +278,7 @@ defmodule LoopHarness do
   end
 
   defp all_required_events_seen(topics, [event | rest]) do
-    case list_contains(topics, event) do
+    case LoopUtils.list_contains(topics, event) do
       true -> all_required_events_seen(topics, rest)
       _ -> false
     end
@@ -321,7 +321,7 @@ defmodule LoopHarness do
   end
 
   defp append_iteration_start(loop, iter) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.start", json_field("recent_event", recent_event(iter)) <> ", " <> json_field("suggested_roles", join_csv(allowed_roles(iter))) <> ", " <> json_field("allowed_events", join_csv(allowed_events(iter))) <> ", " <> json_field("backpressure", backpressure(iter)) <> ", " <> json_field("prompt", prompt_text(iter)))
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.start", json_field("recent_event", recent_event(iter)) <> ", " <> json_field("suggested_roles", LoopUtils.join_csv(allowed_roles(iter))) <> ", " <> json_field("allowed_events", LoopUtils.join_csv(allowed_events(iter))) <> ", " <> json_field("backpressure", backpressure(iter)) <> ", " <> json_field("prompt", prompt_text(iter)))
   end
 
   defp append_backend_start(loop, iter) do
@@ -437,16 +437,16 @@ defmodule LoopHarness do
 
   defp install_emit_tool(loop) do
     System.write_text(tool_path(loop), emit_tool_script(loop))
-    System.run("chmod +x " <> shell_quote(tool_path(loop)))
+    System.run("chmod +x " <> LoopUtils.shell_quote(tool_path(loop)))
   end
 
   defp install_pi_adapter_tool(loop) do
     System.write_text(pi_adapter_path(loop), pi_adapter_script(loop))
-    System.run("chmod +x " <> shell_quote(pi_adapter_path(loop)))
+    System.run("chmod +x " <> LoopUtils.shell_quote(pi_adapter_path(loop)))
   end
 
   defp emit_tool_script(loop) do
-    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> shell_quote(work_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> shell_quote(join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
+    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(work_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> LoopUtils.shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> LoopUtils.shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> LoopUtils.shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> LoopUtils.shell_quote(LoopUtils.join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> LoopUtils.shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
   end
 
   defp pi_adapter_script(loop) do
@@ -458,7 +458,7 @@ defmodule LoopHarness do
     harness_instructions_text(loop) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
-    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{list_text(allowed_roles)}\n" <> "Allowed next events now: #{list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
+    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
     tool_path(loop) <> " emit <allowed-topic> \"brief handoff summary\"\n" <>
     tool_path(loop) <> " emit " <> completion_event(loop) <> " \"brief completion summary\"\n" <>
     tool_path(loop) <> " memory add learning \"durable lesson\"\n" <>
@@ -531,7 +531,7 @@ defmodule LoopHarness do
   end
 
   defp required_events_text(required_events) do
-    join_csv(required_events)
+    LoopUtils.join_csv(required_events)
   end
 
   defp empty_fallback("") do
@@ -543,7 +543,7 @@ defmodule LoopHarness do
   end
 
   defp build_backend_command(loop, iter) do
-    build_process_command(loop, backend_spec(loop), prompt_text(iter), runtime_env_lines(loop, iteration_string(iter), recent_event(iter), join_csv(allowed_roles(iter)), join_csv(allowed_events(iter)), ""))
+    build_process_command(loop, backend_spec(loop), prompt_text(iter), runtime_env_lines(loop, iteration_string(iter), recent_event(iter), LoopUtils.join_csv(allowed_roles(iter)), LoopUtils.join_csv(allowed_events(iter)), ""))
   end
 
   defp build_review_command(loop, iteration, review_prompt) do
@@ -551,7 +551,7 @@ defmodule LoopHarness do
   end
 
   defp build_process_command(loop, spec, prompt, runtime_env) do
-    env_lines = runtime_env <> "export MINILOOPS_PROMPT=" <> shell_quote(prompt) <> "\n"
+    env_lines = runtime_env <> "export MINILOOPS_PROMPT=" <> LoopUtils.shell_quote(prompt) <> "\n"
     child_command = case process_kind(spec) do
       "pi" -> build_pi_adapter_invocation(loop, spec)
       _ -> build_command_invocation(spec, prompt)
@@ -561,15 +561,15 @@ defmodule LoopHarness do
   end
 
   defp build_pi_adapter_invocation(loop, spec) do
-    shell_words([pi_adapter_path(loop), process_command(spec)] ++ process_args(spec))
+    LoopUtils.shell_words([pi_adapter_path(loop), process_command(spec)] ++ process_args(spec))
   end
 
   defp build_command_invocation(spec, prompt) do
-    argv = shell_words([process_command(spec)] ++ process_args(spec))
+    argv = LoopUtils.shell_words([process_command(spec)] ++ process_args(spec))
 
     case process_prompt_mode(spec) do
-      "stdin" -> "printf '%s' " <> shell_quote(prompt) <> " | " <> argv
-      _ -> shell_words([process_command(spec)] ++ process_args(spec) ++ [prompt])
+      "stdin" -> "printf '%s' " <> LoopUtils.shell_quote(prompt) <> " | " <> argv
+      _ -> LoopUtils.shell_words([process_command(spec)] ++ process_args(spec) ++ [prompt])
     end
   end
 
@@ -592,21 +592,21 @@ defmodule LoopHarness do
   end
 
   defp runtime_env_lines(loop, iteration, recent_event, allowed_roles, allowed_events, review_mode) do
-    "export MINILOOPS_RUN_ID=" <> shell_quote(run_id(loop)) <> "\n" <>
-    "export MINILOOPS_ITERATION=" <> shell_quote(iteration) <> "\n" <>
+    "export MINILOOPS_RUN_ID=" <> LoopUtils.shell_quote(run_id(loop)) <> "\n" <>
+    "export MINILOOPS_ITERATION=" <> LoopUtils.shell_quote(iteration) <> "\n" <>
     runtime_env_line("MINILOOPS_REVIEW_MODE", review_mode) <>
-    "export MINILOOPS_COMPLETION_PROMISE=" <> shell_quote(completion_promise(loop)) <> "\n" <>
-    "export MINILOOPS_COMPLETION_EVENT=" <> shell_quote(completion_event(loop)) <> "\n" <>
-    "export MINILOOPS_STATE_DIR=" <> shell_quote(state_dir(loop)) <> "\n" <>
-    "export MINILOOPS_PROJECT_DIR=" <> shell_quote(work_dir(loop)) <> "\n" <>
-    "export MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <>
-    "export MINILOOPS_EVENTS_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <>
-    "export MINILOOPS_MEMORY_FILE=" <> shell_quote(memory_file(loop)) <> "\n" <>
-    "export MINILOOPS_REQUIRED_EVENTS=" <> shell_quote(join_csv(required_events(loop))) <> "\n" <>
-    "export MINILOOPS_RECENT_EVENT=" <> shell_quote(recent_event) <> "\n" <>
-    "export MINILOOPS_ALLOWED_ROLES=" <> shell_quote(allowed_roles) <> "\n" <>
-    "export MINILOOPS_ALLOWED_EVENTS=" <> shell_quote(allowed_events) <> "\n" <>
-    "export MINILOOPS_BIN=" <> shell_quote(tool_path(loop)) <> "\n"
+    "export MINILOOPS_COMPLETION_PROMISE=" <> LoopUtils.shell_quote(completion_promise(loop)) <> "\n" <>
+    "export MINILOOPS_COMPLETION_EVENT=" <> LoopUtils.shell_quote(completion_event(loop)) <> "\n" <>
+    "export MINILOOPS_STATE_DIR=" <> LoopUtils.shell_quote(state_dir(loop)) <> "\n" <>
+    "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(work_dir(loop)) <> "\n" <>
+    "export MINILOOPS_JOURNAL_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <>
+    "export MINILOOPS_EVENTS_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <>
+    "export MINILOOPS_MEMORY_FILE=" <> LoopUtils.shell_quote(memory_file(loop)) <> "\n" <>
+    "export MINILOOPS_REQUIRED_EVENTS=" <> LoopUtils.shell_quote(LoopUtils.join_csv(required_events(loop))) <> "\n" <>
+    "export MINILOOPS_RECENT_EVENT=" <> LoopUtils.shell_quote(recent_event) <> "\n" <>
+    "export MINILOOPS_ALLOWED_ROLES=" <> LoopUtils.shell_quote(allowed_roles) <> "\n" <>
+    "export MINILOOPS_ALLOWED_EVENTS=" <> LoopUtils.shell_quote(allowed_events) <> "\n" <>
+    "export MINILOOPS_BIN=" <> LoopUtils.shell_quote(tool_path(loop)) <> "\n"
   end
 
   defp runtime_env_line(_name, "") do
@@ -614,19 +614,7 @@ defmodule LoopHarness do
   end
 
   defp runtime_env_line(name, value) do
-    "export " <> name <> "=" <> shell_quote(value) <> "\n"
-  end
-
-  defp shell_words([]) do
-    ""
-  end
-
-  defp shell_words([part]) do
-    shell_quote(part)
-  end
-
-  defp shell_words([part | rest]) do
-    shell_quote(part) <> " " <> shell_words(rest)
+    "export " <> name <> "=" <> LoopUtils.shell_quote(value) <> "\n"
   end
 
   defp render_review_prompt_text(loop, iteration, run_lines) do
@@ -674,11 +662,11 @@ defmodule LoopHarness do
   defp reject_emit(journal_file, topic, validation) do
     message = invalid_emit_message(topic, validation)
     append_invalid_event(journal_file, Map.get(validation, :run_id, ""), Map.get(validation, :iteration, ""), Map.get(validation, :recent_event, "loop.start"), topic, Map.get(validation, :allowed_roles, []), Map.get(validation, :allowed_events, []))
-    System.run("printf '%s\\n' " <> shell_quote(message) <> " >&2; false")
+    System.run("printf '%s\\n' " <> LoopUtils.shell_quote(message) <> " >&2; false")
   end
 
   defp invalid_emit_message(topic, validation) do
-    "invalid event `" <> topic <> "`; recent event: `" <> Map.get(validation, :recent_event, "loop.start") <> "`; suggested roles: " <> list_text(Map.get(validation, :allowed_roles, [])) <> "; allowed next events: " <> list_text(Map.get(validation, :allowed_events, []))
+    "invalid event `" <> topic <> "`; recent event: `" <> Map.get(validation, :recent_event, "loop.start") <> "`; suggested roles: " <> LoopUtils.list_text(Map.get(validation, :allowed_roles, [])) <> "; allowed next events: " <> LoopUtils.list_text(Map.get(validation, :allowed_events, []))
   end
 
   defp emit_validation_context(journal_file) do
@@ -715,12 +703,12 @@ defmodule LoopHarness do
     case System.env(name) do
       nil -> []
       "" -> []
-      value -> split_csv(value)
+      value -> LoopUtils.split_csv(value)
     end
   end
 
   defp append_invalid_event(journal_file, run_id, iteration, recent_event, emitted_topic, allowed_roles, allowed_events) do
-    append_event(journal_file, run_id, iteration, "event.invalid", json_field("recent_event", recent_event) <> ", " <> json_field("emitted", emitted_topic) <> ", " <> json_field("suggested_roles", join_csv(allowed_roles)) <> ", " <> json_field("allowed_events", join_csv(allowed_events)))
+    append_event(journal_file, run_id, iteration, "event.invalid", json_field("recent_event", recent_event) <> ", " <> json_field("emitted", emitted_topic) <> ", " <> json_field("suggested_roles", LoopUtils.join_csv(allowed_roles)) <> ", " <> json_field("allowed_events", LoopUtils.join_csv(allowed_events)))
   end
 
   defp ensure_render_run_id(journal_file) do
@@ -813,7 +801,7 @@ defmodule LoopHarness do
   end
 
   defp read_lines(path) do
-    collect_lines(String.split(read_if_exists(path), line_sep()), [])
+    collect_lines(String.split(read_if_exists(path), LoopUtils.line_sep()), [])
   end
 
   defp collect_lines([], acc) do
@@ -1104,7 +1092,7 @@ defmodule LoopHarness do
   defp latest_loop_start_run([line | rest], current) do
     next =
     case extract_topic(line) do
-      "loop.start" -> nonempty_or(extract_run(line), current)
+      "loop.start" -> LoopUtils.nonempty_or(extract_run(line), current)
       _ -> current
     end
 
@@ -1137,19 +1125,11 @@ defmodule LoopHarness do
   defp latest_iteration_from_lines([line | rest], current) do
     next =
     case extract_topic(line) do
-      "iteration.start" -> nonempty_or(extract_iteration(line), current)
+      "iteration.start" -> LoopUtils.nonempty_or(extract_iteration(line), current)
       _ -> current
     end
 
     latest_iteration_from_lines(rest, next)
-  end
-
-  defp nonempty_or("", fallback) do
-    fallback
-  end
-
-  defp nonempty_or(value, _fallback) do
-    value
   end
 
   defp extract_run(line) do
@@ -1379,58 +1359,6 @@ defmodule LoopHarness do
     false
   end
 
-  defp list_contains([], _needle) do
-    false
-  end
-
-  defp list_contains([item | rest], needle) do
-    case item == needle do
-      true -> true
-      _ -> list_contains(rest, needle)
-    end
-  end
-
-  defp list_text([]) do
-    "(none)"
-  end
-
-  defp list_text([item]) do
-    item
-  end
-
-  defp list_text([item | rest]) do
-    item <> ", " <> list_text(rest)
-  end
-
-  defp split_csv(text) do
-    split_csv_parts(String.split(text, ","), [])
-  end
-
-  defp split_csv_parts([], acc) do
-    Enum.reverse(acc)
-  end
-
-  defp split_csv_parts([part | rest], acc) do
-    trimmed = String.trim(part)
-
-    case trimmed do
-      "" -> split_csv_parts(rest, acc)
-      _ -> split_csv_parts(rest, [trimmed] ++ acc)
-    end
-  end
-
-  defp join_csv([]) do
-    ""
-  end
-
-  defp join_csv([item]) do
-    item
-  end
-
-  defp join_csv([item | rest]) do
-    item <> "," <> join_csv(rest)
-  end
-
   defp append_event(path, run_id, iteration, topic, fields_json) do
     append_text(path, event_line(run_id, iteration, topic, fields_json))
   end
@@ -1440,7 +1368,7 @@ defmodule LoopHarness do
   end
 
   defp append_text(path, content) do
-    System.run("printf '%s' " <> shell_quote(content) <> " >> " <> shell_quote(path))
+    System.run("printf '%s' " <> LoopUtils.shell_quote(content) <> " >> " <> LoopUtils.shell_quote(path))
   end
 
   defp event_line(run_id, iteration, topic, fields_json) do
@@ -1484,21 +1412,17 @@ defmodule LoopHarness do
   defp encode_json_value(text) do
     escaped_backslash = String.replace(text, "\\", "\\u005c")
     escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
-    escaped_newline = String.replace(escaped_quote, line_sep(), "\\u000a")
+    escaped_newline = String.replace(escaped_quote, LoopUtils.line_sep(), "\\u000a")
     escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
     String.replace(escaped_return, "\t", "\\u0009")
   end
 
   defp decode_json_value(text) do
-    restored_newline = String.replace(text, "\\u000a", line_sep())
+    restored_newline = String.replace(text, "\\u000a", LoopUtils.line_sep())
     restored_return = String.replace(restored_newline, "\\u000d", "\r")
     restored_tab = String.replace(restored_return, "\\u0009", "\t")
     restored_quote = String.replace(restored_tab, "\\u0022", "\"")
     String.replace(restored_quote, "\\u005c", "\\")
-  end
-
-  defp shell_quote(text) do
-    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
   end
 
   defp read_if_exists(path) do
@@ -1506,11 +1430,6 @@ defmodule LoopHarness do
       true -> System.read_text(path)
       _ -> ""
     end
-  end
-
-  defp line_sep() do
-    """
-"""
   end
 
   defp print_summary(summary, loop) do
@@ -1536,7 +1455,7 @@ defmodule LoopHarness do
   defp print_iteration_banner(loop, iter) do
     iter_label = "iteration #{iteration(iter)}/#{max_iterations(loop)}"
     rule = pad_right("━━━ " <> iter_label <> " ", "━", 68)
-    role_line = "role: " <> list_text(allowed_roles(iter)) <> " │ event: " <> recent_event(iter) <> " │ next: " <> list_text(allowed_events(iter))
+    role_line = "role: " <> LoopUtils.list_text(allowed_roles(iter)) <> " │ event: " <> recent_event(iter) <> " │ next: " <> LoopUtils.list_text(allowed_events(iter))
     bottom_rule = String.duplicate("━", 68)
 
     print_lines(["", rule, role_line, bottom_rule])
@@ -1721,7 +1640,7 @@ defmodule LoopHarness do
 
     case raw == marker do
       true -> fallback
-      _ -> split_csv(raw)
+      _ -> LoopUtils.split_csv(raw)
     end
   end
 
@@ -1797,7 +1716,7 @@ defmodule LoopHarness do
   end
 
   defp last_n_lines(text, n) do
-    lines = String.split(text, line_sep())
+    lines = String.split(text, LoopUtils.line_sep())
     total = list_length(lines, 0)
     drop_count = total - n
     case drop_count > 0 do
@@ -1839,7 +1758,7 @@ defmodule LoopHarness do
   end
 
   defp rejoin_lines([part | rest]) do
-    part <> line_sep() <> rejoin_lines(rest)
+    part <> LoopUtils.line_sep() <> rejoin_lines(rest)
   end
 
   defp process_string_override(override, key, fallback) do

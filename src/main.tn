@@ -417,13 +417,13 @@ defmodule Demo do
 
   defp self_command([command, "run", harness_project | _rest]) do
     case is_tonic_command(command) do
-      true -> "tonic run " <> shell_quote(absolute_path(harness_project))
-      _ -> shell_quote(command)
+      true -> "tonic run " <> LoopUtils.shell_quote(absolute_path(harness_project))
+      _ -> LoopUtils.shell_quote(command)
     end
   end
 
   defp self_command([command | _rest]) do
-    shell_quote(command)
+    LoopUtils.shell_quote(command)
   end
 
   defp self_command([]) do
@@ -467,10 +467,6 @@ defmodule Demo do
 
   defp cli_command(_value) do
     false
-  end
-
-  defp shell_quote(text) do
-    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
   end
 
   defp join_tokens([]) do
