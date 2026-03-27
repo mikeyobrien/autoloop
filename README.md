@@ -12,6 +12,21 @@ Pi is the first-class backend. Miniloops now runs Pi itself with `pi -p --mode j
 
 `examples/mock-backend.sh` remains only as a local mock backend for deterministic harness debugging.
 
+## Workflow family
+
+Miniloops ships a family of `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
+
+| Preset | What it does | Shape |
+|--------|-------------|-------|
+| **autocode** | Code implementation — slice, build, review, gate | planner → builder → critic → finalizer |
+| **autoideas** | Repo survey — scan, deep-dive, validate, report | scanner → analyst → reviewer → synthesizer |
+| **autoresearch** | Experiment loop — hypothesize, implement, measure, keep/discard | strategist → implementer → benchmarker → evaluator |
+| **autoqa** | Zero-dependency validation — inspect domain, plan checks, execute, report | inspector → planner → executor → reporter |
+
+**Choosing a preset:** Use `autocode` for feature work and implementation tasks. Use `autoideas` when you want a survey of what to improve. Use `autoresearch` for hypothesis-driven experiments with measurable outcomes. Use `autoqa` to validate a repo using its native build/lint/type-check surfaces without installing anything.
+
+Six more presets are documented as future-facing: `autotest`, `autofix`, `autoreview`, `autodoc`, `autosec`, `autoperf`. See [`docs/auto-workflows.md`](docs/auto-workflows.md) for the full taxonomy, naming guidance, and chooser table.
+
 ## Runtime files
 
 - `miniloops.toml` — preferred runtime config
