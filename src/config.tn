@@ -87,12 +87,26 @@ defmodule LoopConfig do
     end
   end
 
-  defp parse_assignment([key, value], rest, config) do
+  defp parse_assignment([_single], rest, config) do
+    IO.puts("[config] warning: skipping unparseable line (no '=' found)")
+    parse_lines(rest, config)
+  end
+
+  defp parse_assignment([key | value_parts], rest, config) do
+    value = rejoin(value_parts, "=")
     parse_lines(rest, Map.put(config, String.trim(key), normalize_value(String.trim(value))))
   end
 
-  defp parse_assignment(_, rest, config) do
+  defp parse_assignment([], rest, config) do
     parse_lines(rest, config)
+  end
+
+  defp rejoin([part], _sep) do
+    part
+  end
+
+  defp rejoin([part | rest], sep) do
+    part <> sep <> rejoin(rest, sep)
   end
 
   defp normalize_value(value) do
