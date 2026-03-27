@@ -1,0 +1,23 @@
+# Named chain definitions for preset composition.
+# Each chain runs its presets in sequence with isolated state per step.
+# Preset names resolve to examples/<name>/ directories.
+
+[[chain]]
+name = "code-and-qa"
+steps = ["autocode", "autoqa"]
+
+[[chain]]
+name = "code-test-fix"
+steps = ["autocode", "autotest", "autofix"]
+
+[[chain]]
+name = "full-cycle"
+steps = ["autocode", "autoqa", "autoresearch", "autocode"]
+
+[[chain]]
+name = "security-hardening"
+steps = ["autosec", "autofix", "autotest"]
+
+[[chain]]
+name = "doc-review"
+steps = ["autodoc", "autoreview"]

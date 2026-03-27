@@ -33,6 +33,60 @@ Miniloops ships a family of 10 `auto*` preset workflows. Each is a self-containe
 
 See [`docs/auto-workflows.md`](docs/auto-workflows.md) for the full taxonomy, naming guidance, and chooser table.
 
+## Loop Chaining
+
+Chains compose presets into multi-loop sequences. Each step runs as an isolated loop with its own state directory.
+
+### chains.toml
+
+Define reusable named chains:
+
+```toml
+[[chain]]
+name = "code-and-qa"
+steps = ["autocode", "autoqa"]
+
+[[chain]]
+name = "full-cycle"
+steps = ["autocode", "autoqa", "autoresearch", "autocode"]
+```
+
+### CLI usage
+
+Run a named chain:
+
+```bash
+miniloops chain run code-and-qa .
+miniloops chain list .
+```
+
+Run an ad hoc chain:
+
+```bash
+miniloops run . --chain autocode,autoqa,autoresearch
+```
+
+### How chains work
+
+- Each step runs its preset in sequence with isolated state in `.miniloops/chains/<chain-run-id>/step-<n>/`
+- Handoff artifacts (prior step summaries) and result artifacts are written between steps
+- Chain lifecycle is journaled: `chain.start`, `chain.step.start`, `chain.step.finish`, `chain.complete`
+- If a step fails (non-completion stop), the chain stops and reports the failure
+- Preset resolution: step name → `examples/<name>/` directory
+
+Inspect chain state:
+
+```bash
+miniloops inspect chain --format md
+```
+
+### Chains vs Topology
+
+- **Topology** (`topology.toml`) = intra-loop role routing (planner → builder → critic → finalizer)
+- **Chains** (`chains.toml` / `--chain`) = inter-loop preset composition (autocode → autoqa → autoresearch)
+
+These are separate layers. Topology stays focused on roles within one loop; chains compose whole loops together.
+
 ## Runtime files
 
 - `miniloops.toml` — preferred runtime config
@@ -260,6 +314,18 @@ Inspect the raw journal:
 
 ```bash
 miniloops inspect journal --format json
+```
+
+Inspect coordination state (issues, slices, commits from journal):
+
+```bash
+miniloops inspect coordination --format md
+```
+
+Inspect chain state:
+
+```bash
+miniloops inspect chain --format md
 ```
 
 Against another project directory:

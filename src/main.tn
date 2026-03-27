@@ -45,10 +45,83 @@ defmodule Demo do
     LoopMemory.remove(resolve_runtime_project_dir(), id, join_tokens(rest))
   end
 
+  defp dispatch(["chain", "list"], _argv) do
+    handle_chain_list(resolve_runtime_project_dir())
+  end
+
+  defp dispatch(["chain", "list", project_dir], _argv) do
+    handle_chain_list(project_dir)
+  end
+
+  defp dispatch(["chain", "run", name], argv) do
+    handle_chain_run(name, resolve_runtime_project_dir(), argv)
+  end
+
+  defp dispatch(["chain", "run", name, project_dir], argv) do
+    handle_chain_run(name, project_dir, argv)
+  end
+
   defp dispatch(args, argv) do
     options = parse_run_args(args)
 
-    LoopHarness.run(Map.get(options, :project_dir, "."), normalize_prompt(Map.get(options, :prompt, nil)), self_command(argv), options)
+    case Map.get(options, :chain, nil) do
+      nil -> LoopHarness.run(Map.get(options, :project_dir, "."), normalize_prompt(Map.get(options, :prompt, nil)), self_command(argv), options)
+      chain_csv -> run_inline_chain(chain_csv, Map.get(options, :project_dir, "."), self_command(argv), options)
+    end
+  end
+
+  defp handle_chain_list(project_dir) do
+    chains = LoopChains.load(project_dir)
+    chain_list = LoopChains.list_chains(chains)
+
+    case chain_list do
+      [] -> IO.puts("No chains defined. Add [[chain]] sections to chains.toml.")
+      _ -> print_chain_list(chain_list)
+    end
+  end
+
+  defp print_chain_list([]) do
+    :ok
+  end
+
+  defp print_chain_list([chain | rest]) do
+    IO.puts(Map.get(chain, :name, "?") <> ": " <> render_step_names(Map.get(chain, :steps, [])))
+    print_chain_list(rest)
+  end
+
+  defp render_step_names([]) do
+    "(empty)"
+  end
+
+  defp render_step_names(steps) do
+    join_step_names(steps)
+  end
+
+  defp join_step_names([]) do
+    ""
+  end
+
+  defp join_step_names([step]) do
+    Map.get(step, :name, "?")
+  end
+
+  defp join_step_names([step | rest]) do
+    Map.get(step, :name, "?") <> " -> " <> join_step_names(rest)
+  end
+
+  defp handle_chain_run(name, project_dir, argv) do
+    chains = LoopChains.load(project_dir)
+    chain_spec = LoopChains.resolve_chain(chains, name)
+
+    case chain_spec do
+      nil -> IO.puts("chain `" <> name <> "` not found in chains.toml")
+      _ -> LoopChains.run(chain_spec, project_dir, self_command(argv), %{})
+    end
+  end
+
+  defp run_inline_chain(chain_csv, project_dir, self_command, options) do
+    chain_spec = LoopChains.parse_inline_chain(chain_csv, project_dir)
+    LoopChains.run(chain_spec, project_dir, self_command, options)
   end
 
   defp handle_inspect(args) do
@@ -79,6 +152,10 @@ defmodule Demo do
 
   defp dispatch_inspect("coordination", "", project_dir, "md") do
     LoopHarness.render_coordination(project_dir)
+  end
+
+  defp dispatch_inspect("chain", "", project_dir, "md") do
+    IO.puts(LoopChains.render_chain_state(project_dir))
   end
 
   defp dispatch_inspect("prompt", iteration, project_dir, "md") do
@@ -178,6 +255,14 @@ defmodule Demo do
     %{artifact: "coordination", selector: "", project_dir: project_dir, format: format}
   end
 
+  defp parse_inspect_positionals("chain", format, []) do
+    %{artifact: "chain", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("chain", format, [project_dir]) do
+    %{artifact: "chain", selector: "", project_dir: project_dir, format: format}
+  end
+
   defp parse_inspect_positionals(artifact, _format, _positionals) do
     inspect_usage_error("invalid inspect usage for `" <> artifact <> "`")
   end
@@ -239,6 +324,15 @@ defmodule Demo do
 
   defp parse_run_args(["--backend", backend | rest]) do
     attach_backend_override(parse_run_args(rest), backend_override_spec(backend))
+  end
+
+  defp parse_run_args(["--chain"]) do
+    IO.puts("missing chain after --chain")
+    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false}
+  end
+
+  defp parse_run_args(["--chain", chain_csv | rest]) do
+    Map.put(parse_run_args(rest), :chain, chain_csv)
   end
 
   defp parse_run_args([]) do
@@ -360,6 +454,10 @@ defmodule Demo do
   end
 
   defp cli_command("memory") do
+    true
+  end
+
+  defp cli_command("chain") do
     true
   end
 

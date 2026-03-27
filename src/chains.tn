@@ -1,0 +1,538 @@
+defmodule LoopChains do
+  def load(project_dir) do
+    path = Path.join(project_dir, "chains.toml")
+
+    case System.path_exists(path) do
+      true -> load_existing(path, project_dir)
+      _ -> default_chains()
+    end
+  end
+
+  def resolve_chain(chains, name) do
+    find_chain(Map.get(chains, :chains, []), name)
+  end
+
+  def list_chains(chains) do
+    Map.get(chains, :chains, [])
+  end
+
+  def parse_inline_chain(csv_steps, project_dir) do
+    steps = split_csv(csv_steps)
+
+    %{name: "inline", steps: resolve_steps(steps, project_dir)}
+  end
+
+  def run(chain_spec, project_dir, self_command, run_options) do
+    chain_name = Map.get(chain_spec, :name, "inline")
+    steps = Map.get(chain_spec, :steps, [])
+    chain_run_id = next_chain_run_id(project_dir)
+    chain_dir = Path.join(project_dir, ".miniloops/chains/" <> chain_run_id)
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+
+    System.ensure_dir(chain_dir)
+    append_chain_event(journal_file, chain_run_id, "chain.start", json_field("name", chain_name) <> ", " <> json_field("steps", join_csv(step_names(steps))) <> ", " <> json_field("step_count", to_string(list_length(steps, 0))))
+
+    result = run_steps(steps, 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, [])
+
+    append_chain_event(journal_file, chain_run_id, "chain.complete", json_field("name", chain_name) <> ", " <> json_field("steps_completed", to_string(list_length(Map.get(result, :completed, []), 0))) <> ", " <> json_field("outcome", Map.get(result, :outcome, "unknown")))
+
+    result
+  end
+
+  def render_chain_state(project_dir) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    lines = read_lines(journal_file)
+    render_chain_lines(lines, [])
+  end
+
+  defp load_existing(path, project_dir) do
+    lines = String.split(System.read_text(path), line_sep())
+    state = parse_lines(lines, initial_state())
+    finalize(state, project_dir)
+  end
+
+  defp default_chains() do
+    %{chains: []}
+  end
+
+  defp initial_state() do
+    %{chains: [], current_chain: empty_chain(), section: "root"}
+  end
+
+  defp empty_chain() do
+    %{name: "", steps: []}
+  end
+
+  defp parse_lines([], state) do
+    state
+  end
+
+  defp parse_lines([line | rest], state) do
+    trimmed = String.trim(line)
+
+    case skip_line(trimmed) do
+      true -> parse_lines(rest, state)
+      _ -> parse_lines(rest, parse_line(trimmed, state))
+    end
+  end
+
+  defp parse_line("[[chain]]", state) do
+    start_chain(state)
+  end
+
+  defp parse_line(line, state) do
+    assign_parts(String.split(line, "="), state)
+  end
+
+  defp start_chain(state) do
+    %{chains: push_current_chain(state), current_chain: empty_chain(), section: "chain"}
+  end
+
+  defp push_current_chain(state) do
+    push_chain_if_named(Map.get(state, :current_chain, empty_chain()), Map.get(state, :chains, []))
+  end
+
+  defp push_chain_if_named(chain, chains) do
+    case Map.get(chain, :name, "") do
+      "" -> chains
+      _ -> [chain] ++ chains
+    end
+  end
+
+  defp assign_parts([key, value], state) do
+    assign_chain_value(String.trim(key), String.trim(value), state)
+  end
+
+  defp assign_parts(_, state) do
+    state
+  end
+
+  defp assign_chain_value("name", raw_value, state) do
+    chain = Map.put(Map.get(state, :current_chain, empty_chain()), :name, strip_quotes(raw_value))
+    Map.put(state, :current_chain, chain)
+  end
+
+  defp assign_chain_value("steps", raw_value, state) do
+    chain = Map.put(Map.get(state, :current_chain, empty_chain()), :steps, normalize_list(raw_value))
+    Map.put(state, :current_chain, chain)
+  end
+
+  defp assign_chain_value(_key, _value, state) do
+    state
+  end
+
+  defp finalize(state, project_dir) do
+    chains = Enum.reverse(push_current_chain(state))
+    %{chains: resolve_all_chains(chains, project_dir, [])}
+  end
+
+  defp resolve_all_chains([], _project_dir, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp resolve_all_chains([chain | rest], project_dir, acc) do
+    resolved = Map.put(chain, :steps, resolve_steps(Map.get(chain, :steps, []), project_dir))
+    resolve_all_chains(rest, project_dir, [resolved] ++ acc)
+  end
+
+  defp resolve_steps(step_names, project_dir) do
+    resolve_step_list(step_names, project_dir, [])
+  end
+
+  defp resolve_step_list([], _project_dir, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp resolve_step_list([name | rest], project_dir, acc) do
+    step = %{name: name, preset_dir: resolve_preset_dir(name, project_dir)}
+    resolve_step_list(rest, project_dir, [step] ++ acc)
+  end
+
+  defp resolve_preset_dir(name, project_dir) do
+    candidate = Path.join(project_dir, "examples/" <> name)
+
+    case System.path_exists(candidate) do
+      true -> candidate
+      _ -> resolve_preset_dir_cwd(name)
+    end
+  end
+
+  defp resolve_preset_dir_cwd(name) do
+    candidate = Path.join(".", "examples/" <> name)
+
+    case System.path_exists(candidate) do
+      true -> candidate
+      _ -> name
+    end
+  end
+
+  defp find_chain([], _name) do
+    nil
+  end
+
+  defp find_chain([chain | rest], name) do
+    case Map.get(chain, :name, "") == name do
+      true -> chain
+      _ -> find_chain(rest, name)
+    end
+  end
+
+  defp run_steps([], _step_num, _project_dir, _chain_dir, _chain_run_id, _self_command, _run_options, _journal_file, completed) do
+    %{completed: completed, outcome: "all_steps_complete"}
+  end
+
+  defp run_steps([step | rest], step_num, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, completed) do
+    step_name = Map.get(step, :name, "unknown")
+    preset_dir = Map.get(step, :preset_dir, ".")
+    step_work_dir = Path.join(chain_dir, "step-" <> to_string(step_num))
+    System.ensure_dir(step_work_dir)
+
+    write_handoff_artifact(step_work_dir, step_num, completed)
+
+    append_chain_event(journal_file, chain_run_id, "chain.step.start", json_field("step", to_string(step_num)) <> ", " <> json_field("preset", step_name) <> ", " <> json_field("preset_dir", preset_dir) <> ", " <> json_field("work_dir", step_work_dir))
+
+    step_options = Map.put(run_options, :work_dir, step_work_dir)
+    result = LoopHarness.run(preset_dir, nil, self_command, step_options)
+    stop_reason = Map.get(result, :stop_reason, "unknown")
+
+    write_result_artifact(step_work_dir, step_num, step_name, result)
+
+    append_chain_event(journal_file, chain_run_id, "chain.step.finish", json_field("step", to_string(step_num)) <> ", " <> json_field("preset", step_name) <> ", " <> json_field("stop_reason", stop_reason))
+
+    step_record = %{step: step_num, name: step_name, stop_reason: stop_reason}
+
+    case stop_reason do
+      "completion_event" -> run_steps(rest, step_num + 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, completed ++ [step_record])
+      "completion_promise" -> run_steps(rest, step_num + 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, completed ++ [step_record])
+      _ -> %{completed: completed ++ [step_record], outcome: "step_failed", failed_step: step_num, failed_reason: stop_reason}
+    end
+  end
+
+  defp write_handoff_artifact(step_work_dir, step_num, completed) do
+    path = Path.join(step_work_dir, "handoff.md")
+    content = "# Chain Handoff — Step " <> to_string(step_num) <> "\n\n" <> render_prior_steps(completed)
+    System.write_text(path, content)
+  end
+
+  defp render_prior_steps([]) do
+    "First step in chain. No prior results.\n"
+  end
+
+  defp render_prior_steps(steps) do
+    "## Prior Steps\n" <> render_step_records(steps)
+  end
+
+  defp render_step_records([]) do
+    ""
+  end
+
+  defp render_step_records([record | rest]) do
+    "- Step " <> to_string(Map.get(record, :step, 0)) <> " (" <> Map.get(record, :name, "?") <> "): " <> Map.get(record, :stop_reason, "?") <> "\n" <> render_step_records(rest)
+  end
+
+  defp write_result_artifact(step_work_dir, step_num, step_name, result) do
+    path = Path.join(step_work_dir, "result.md")
+    content = "# Chain Result — Step " <> to_string(step_num) <> " (" <> step_name <> ")\n\n" <> "Stop reason: " <> Map.get(result, :stop_reason, "unknown") <> "\n" <> "Iterations: " <> to_string(Map.get(result, :iterations, 0)) <> "\n"
+    System.write_text(path, content)
+  end
+
+  defp next_chain_run_id(project_dir) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    "chain-" <> to_string(count_chain_starts(read_lines(journal_file), 0) + 1)
+  end
+
+  defp count_chain_starts([], count) do
+    count
+  end
+
+  defp count_chain_starts([line | rest], count) do
+    case extract_topic(line) == "chain.start" do
+      true -> count_chain_starts(rest, count + 1)
+      _ -> count_chain_starts(rest, count)
+    end
+  end
+
+  defp append_chain_event(journal_file, chain_run_id, topic, fields_json) do
+    line = "{" <> json_field("chain_run", chain_run_id) <> ", " <> json_field("topic", topic) <> ", " <> "\"fields\": {" <> fields_json <> "}}\n"
+    append_text(journal_file, line)
+  end
+
+  defp render_chain_lines([], acc) do
+    case acc do
+      [] -> "(no chain runs found)"
+      _ -> "# Chain State\n\n" <> render_chain_entries(Enum.reverse(acc))
+    end
+  end
+
+  defp render_chain_lines([line | rest], acc) do
+    topic = extract_topic(line)
+
+    case chain_topic(topic) do
+      true -> render_chain_lines(rest, [%{topic: topic, line: line}] ++ acc)
+      _ -> render_chain_lines(rest, acc)
+    end
+  end
+
+  defp chain_topic("chain.start") do
+    true
+  end
+
+  defp chain_topic("chain.step.start") do
+    true
+  end
+
+  defp chain_topic("chain.step.finish") do
+    true
+  end
+
+  defp chain_topic("chain.complete") do
+    true
+  end
+
+  defp chain_topic(_topic) do
+    false
+  end
+
+  defp render_chain_entries([]) do
+    ""
+  end
+
+  defp render_chain_entries([entry | rest]) do
+    topic = Map.get(entry, :topic, "")
+    line = Map.get(entry, :line, "")
+
+    render_chain_entry(topic, line) <> render_chain_entries(rest)
+  end
+
+  defp render_chain_entry("chain.start", line) do
+    "## Chain: " <> extract_field(line, "name") <> "\n" <> "Steps: " <> extract_field(line, "steps") <> "\n\n"
+  end
+
+  defp render_chain_entry("chain.step.start", line) do
+    "- Step " <> extract_field(line, "step") <> " (" <> extract_field(line, "preset") <> ") started\n"
+  end
+
+  defp render_chain_entry("chain.step.finish", line) do
+    "- Step " <> extract_field(line, "step") <> " (" <> extract_field(line, "preset") <> ") finished: " <> extract_field(line, "stop_reason") <> "\n"
+  end
+
+  defp render_chain_entry("chain.complete", line) do
+    "\nOutcome: " <> extract_field(line, "outcome") <> " (" <> extract_field(line, "steps_completed") <> " steps completed)\n\n"
+  end
+
+  defp render_chain_entry(_topic, _line) do
+    ""
+  end
+
+  defp step_names(steps) do
+    collect_step_names(steps, [])
+  end
+
+  defp collect_step_names([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_step_names([step | rest], acc) do
+    collect_step_names(rest, [Map.get(step, :name, "?")] ++ acc)
+  end
+
+  defp list_length([], acc) do
+    acc
+  end
+
+  defp list_length([_item | rest], acc) do
+    list_length(rest, acc + 1)
+  end
+
+  # --- shared parsing helpers ---
+
+  defp normalize_list(value) do
+    case is_array_literal(value) do
+      true -> parse_array(value)
+      _ -> [strip_quotes(value)]
+    end
+  end
+
+  defp is_array_literal(value) do
+    String.starts_with(value, "[") and String.ends_with(value, "]")
+  end
+
+  defp parse_array(value) do
+    inner = String.trim(slice_outer(value))
+
+    case inner do
+      "" -> []
+      _ -> split_array_parts(String.split(inner, ","), [])
+    end
+  end
+
+  defp split_array_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp split_array_parts([part | rest], acc) do
+    trimmed = strip_quotes(String.trim(part))
+
+    case trimmed do
+      "" -> split_array_parts(rest, acc)
+      _ -> split_array_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp strip_quotes(value) do
+    case is_quoted(value) do
+      true -> slice_outer(value)
+      _ -> value
+    end
+  end
+
+  defp is_quoted(value) do
+    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
+  end
+
+  defp slice_outer(text) do
+    String.slice(text, 1, String.length(text) - 2)
+  end
+
+  defp split_csv(text) do
+    split_csv_parts(String.split(text, ","), [])
+  end
+
+  defp split_csv_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp split_csv_parts([part | rest], acc) do
+    trimmed = strip_quotes(String.trim(part))
+
+    case trimmed do
+      "" -> split_csv_parts(rest, acc)
+      _ -> split_csv_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp join_csv([]) do
+    ""
+  end
+
+  defp join_csv([item]) do
+    item
+  end
+
+  defp join_csv([item | rest]) do
+    item <> "," <> join_csv(rest)
+  end
+
+  defp skip_line("") do
+    true
+  end
+
+  defp skip_line(line) do
+    String.starts_with(line, "#")
+  end
+
+  defp extract_topic(line) do
+    decode_json_value(first_quoted_value(first_after_marker(String.split(line, "\"topic\": "))))
+  end
+
+  defp extract_field(line, key) do
+    marker = "\"" <> key <> "\": "
+    decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
+  end
+
+  defp first_after_marker([]) do
+    ""
+  end
+
+  defp first_after_marker([_only]) do
+    ""
+  end
+
+  defp first_after_marker([_prefix | rest]) do
+    first_or_empty(rest)
+  end
+
+  defp first_quoted_value(text) do
+    first_quoted_value_parts(String.split(text, "\""))
+  end
+
+  defp first_quoted_value_parts([]) do
+    ""
+  end
+
+  defp first_quoted_value_parts([part | rest]) do
+    case part do
+      "" -> first_or_empty(rest)
+      _ -> first_quoted_value_parts(rest)
+    end
+  end
+
+  defp first_or_empty([]) do
+    ""
+  end
+
+  defp first_or_empty([item | _rest]) do
+    item
+  end
+
+  defp decode_json_value(text) do
+    restored_newline = String.replace(text, "\\u000a", line_sep())
+    restored_return = String.replace(restored_newline, "\\u000d", "\r")
+    restored_tab = String.replace(restored_return, "\\u0009", "\t")
+    restored_quote = String.replace(restored_tab, "\\u0022", "\"")
+    String.replace(restored_quote, "\\u005c", "\\")
+  end
+
+  defp json_field(key, value) do
+    "\"" <> key <> "\": " <> json_string(value)
+  end
+
+  defp json_string(text) do
+    "\"" <> encode_json_value(text) <> "\""
+  end
+
+  defp encode_json_value(text) do
+    escaped_backslash = String.replace(text, "\\", "\\u005c")
+    escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
+    escaped_newline = String.replace(escaped_quote, line_sep(), "\\u000a")
+    escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
+    String.replace(escaped_return, "\t", "\\u0009")
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
+  end
+
+  defp append_text(path, content) do
+    System.run("printf '%s' " <> shell_quote(content) <> " >> " <> shell_quote(path))
+  end
+
+  defp read_lines(path) do
+    collect_lines(String.split(read_if_exists(path), line_sep()), [])
+  end
+
+  defp collect_lines([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_lines([line | rest], acc) do
+    trimmed = String.trim(line)
+
+    case trimmed do
+      "" -> collect_lines(rest, acc)
+      _ -> collect_lines(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp read_if_exists(path) do
+    case System.path_exists(path) do
+      true -> System.read_text(path)
+      _ -> ""
+    end
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end
