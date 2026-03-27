@@ -133,14 +133,14 @@ defmodule LoopHarness do
     run_lines = read_run_lines(journal_file(loop), run_id(loop))
     review_prompt = render_review_prompt_text(loop, iteration, run_lines)
 
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.start", "\"kind\": " <> json_string("hyperagent") <> ", \"backend_kind\": " <> json_string(review_kind(loop)) <> ", \"command\": " <> json_string(review_command(loop)) <> ", \"prompt_mode\": " <> json_string(review_prompt_mode(loop)) <> ", \"prompt\": " <> json_string(review_prompt) <> ", \"timeout_ms\": " <> json_string(to_string(review_timeout_ms(loop))))
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.start", json_field("kind", "hyperagent") <> ", " <> json_field("backend_kind", review_kind(loop)) <> ", " <> json_field("command", review_command(loop)) <> ", " <> json_field("prompt_mode", review_prompt_mode(loop)) <> ", " <> json_field("prompt", review_prompt) <> ", " <> json_field("timeout_ms", to_string(review_timeout_ms(loop))))
 
     result = System.run(build_review_command(loop, iteration, review_prompt), %{stream: true, timeout_ms: review_timeout_ms(loop)})
     output = Map.get(result, :output, "")
     exit_code = Map.get(result, :exit_code, 1)
     timed_out = Map.get(result, :timed_out, false)
 
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.finish", "\"kind\": " <> json_string("hyperagent") <> ", \"exit_code\": " <> json_string(to_string(exit_code)) <> ", \"timed_out\": " <> json_bool(timed_out) <> ", \"output\": " <> json_string(output))
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.finish", json_field("kind", "hyperagent") <> ", " <> json_field("exit_code", to_string(exit_code)) <> ", " <> json_field_raw("timed_out", json_bool(timed_out)) <> ", " <> json_field("output", output))
   end
 
   defp divisible_by(value, divisor) do
@@ -271,7 +271,7 @@ defmodule LoopHarness do
 
   defp stop_max_iterations(loop) do
     verbose_log(loop, "loop stop reason=max_iterations")
-    append_event(journal_file(loop), run_id(loop), "", "loop.stop", "\"reason\": " <> json_string("max_iterations"))
+    append_event(journal_file(loop), run_id(loop), "", "loop.stop", json_field("reason", "max_iterations"))
 
     %{iterations: max_iterations(loop), stop_reason: "max_iterations"}
   end
@@ -280,7 +280,7 @@ defmodule LoopHarness do
     verbose_log(loop, "loop stop reason=backend_failed iteration=" <> to_string(iteration))
     print_failure_diagnostic(output)
     tail = last_n_chars(output, 500)
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_failed") <> ", \"iteration\": " <> json_string(to_string(iteration)) <> ", \"output_tail\": " <> json_string(tail))
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", json_field("reason", "backend_failed") <> ", " <> json_field("iteration", to_string(iteration)) <> ", " <> json_field("output_tail", tail))
 
     %{iterations: iteration, stop_reason: "backend_failed"}
   end
@@ -289,36 +289,36 @@ defmodule LoopHarness do
     verbose_log(loop, "loop stop reason=backend_timeout iteration=" <> to_string(iteration))
     print_failure_diagnostic(output)
     tail = last_n_chars(output, 500)
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_timeout") <> ", \"iteration\": " <> json_string(to_string(iteration)) <> ", \"output_tail\": " <> json_string(tail))
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", json_field("reason", "backend_timeout") <> ", " <> json_field("iteration", to_string(iteration)) <> ", " <> json_field("output_tail", tail))
 
     %{iterations: iteration, stop_reason: "backend_timeout"}
   end
 
   defp complete_loop(loop, iteration, reason) do
     verbose_log(loop, "loop complete reason=" <> reason)
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.complete", "\"reason\": " <> json_string(reason))
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.complete", json_field("reason", reason))
 
     %{iterations: iteration, stop_reason: reason}
   end
 
   defp append_loop_start(loop) do
-    append_event(journal_file(loop), run_id(loop), "", "loop.start", "\"max_iterations\": " <> json_string(to_string(max_iterations(loop))) <> ", " <> "\"completion_promise\": " <> json_string(completion_promise(loop)) <> ", " <> "\"completion_event\": " <> json_string(completion_event(loop)) <> ", " <> "\"review_every\": " <> json_string(to_string(review_every(loop))) <> ", " <> "\"objective\": " <> json_string(objective(loop)))
+    append_event(journal_file(loop), run_id(loop), "", "loop.start", json_field("max_iterations", to_string(max_iterations(loop))) <> ", " <> json_field("completion_promise", completion_promise(loop)) <> ", " <> json_field("completion_event", completion_event(loop)) <> ", " <> json_field("review_every", to_string(review_every(loop))) <> ", " <> json_field("objective", objective(loop)))
   end
 
   defp append_iteration_start(loop, iter) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.start", "\"recent_event\": " <> json_string(recent_event(iter)) <> ", " <> "\"suggested_roles\": " <> json_string(join_csv(allowed_roles(iter))) <> ", " <> "\"allowed_events\": " <> json_string(join_csv(allowed_events(iter))) <> ", " <> "\"backpressure\": " <> json_string(backpressure(iter)) <> ", " <> "\"prompt\": " <> json_string(prompt_text(iter)))
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.start", json_field("recent_event", recent_event(iter)) <> ", " <> json_field("suggested_roles", join_csv(allowed_roles(iter))) <> ", " <> json_field("allowed_events", join_csv(allowed_events(iter))) <> ", " <> json_field("backpressure", backpressure(iter)) <> ", " <> json_field("prompt", prompt_text(iter)))
   end
 
   defp append_backend_start(loop, iter) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "backend.start", "\"backend_kind\": " <> json_string(backend_kind(loop)) <> ", " <> "\"command\": " <> json_string(backend_command(loop)) <> ", " <> "\"prompt_mode\": " <> json_string(backend_prompt_mode(loop)) <> ", " <> "\"timeout_ms\": " <> json_string(to_string(backend_timeout_ms(loop))))
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "backend.start", json_field("backend_kind", backend_kind(loop)) <> ", " <> json_field("command", backend_command(loop)) <> ", " <> json_field("prompt_mode", backend_prompt_mode(loop)) <> ", " <> json_field("timeout_ms", to_string(backend_timeout_ms(loop))))
   end
 
   defp append_backend_finish(loop, iter, output, exit_code, timed_out) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "backend.finish", "\"exit_code\": " <> json_string(to_string(exit_code)) <> ", " <> "\"timed_out\": " <> json_bool(timed_out) <> ", " <> "\"output\": " <> json_string(output))
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "backend.finish", json_field("exit_code", to_string(exit_code)) <> ", " <> json_field_raw("timed_out", json_bool(timed_out)) <> ", " <> json_field("output", output))
   end
 
   defp append_iteration_finish(loop, iter, output, exit_code, timed_out) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.finish", "\"exit_code\": " <> json_string(to_string(exit_code)) <> ", " <> "\"timed_out\": " <> json_bool(timed_out) <> ", " <> "\"output\": " <> json_string(output))
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.finish", json_field("exit_code", to_string(exit_code)) <> ", " <> json_field_raw("timed_out", json_bool(timed_out)) <> ", " <> json_field("output", output))
   end
 
   defp resolve_prompt(project_dir, config, prompt_override) do
@@ -705,7 +705,7 @@ defmodule LoopHarness do
   end
 
   defp append_invalid_event(journal_file, run_id, iteration, recent_event, emitted_topic, allowed_roles, allowed_events) do
-    append_event(journal_file, run_id, iteration, "event.invalid", "\"recent_event\": " <> json_string(recent_event) <> ", " <> "\"emitted\": " <> json_string(emitted_topic) <> ", " <> "\"suggested_roles\": " <> json_string(join_csv(allowed_roles)) <> ", " <> "\"allowed_events\": " <> json_string(join_csv(allowed_events)))
+    append_event(journal_file, run_id, iteration, "event.invalid", json_field("recent_event", recent_event) <> ", " <> json_field("emitted", emitted_topic) <> ", " <> json_field("suggested_roles", join_csv(allowed_roles)) <> ", " <> json_field("allowed_events", join_csv(allowed_events)))
   end
 
   defp ensure_render_run_id(journal_file) do
@@ -1184,20 +1184,20 @@ defmodule LoopHarness do
 
   defp event_line(run_id, iteration, topic, fields_json) do
     "{" <>
-    record_prefix(run_id, iteration) <> "\"topic\": " <> json_string(topic) <> ", " <> "\"fields\": {" <> fields_json <> "}}\n"
+    record_prefix(run_id, iteration) <> json_field("topic", topic) <> ", " <> "\"fields\": {" <> fields_json <> "}}\n"
   end
 
   defp emitted_event_line(run_id, iteration, topic, payload) do
     "{" <>
-    record_prefix(run_id, iteration) <> "\"topic\": " <> json_string(topic) <> ", " <> "\"payload\": " <> json_string(payload) <> ", " <> "\"source\": " <> json_string("agent") <> "}\n"
+    record_prefix(run_id, iteration) <> json_field("topic", topic) <> ", " <> json_field("payload", payload) <> ", " <> json_field("source", "agent") <> "}\n"
   end
 
   defp record_prefix(run_id, "") do
-    "\"run\": " <> json_string(run_id) <> ", "
+    json_field("run", run_id) <> ", "
   end
 
   defp record_prefix(run_id, iteration) do
-    "\"run\": " <> json_string(run_id) <> ", " <> "\"iteration\": " <> json_string(iteration) <> ", "
+    json_field("run", run_id) <> ", " <> json_field("iteration", iteration) <> ", "
   end
 
   defp json_string(text) do
@@ -1210,6 +1210,14 @@ defmodule LoopHarness do
 
   defp json_bool(_value) do
     "false"
+  end
+
+  defp json_field(key, value) do
+    "\"" <> key <> "\": " <> json_string(value)
+  end
+
+  defp json_field_raw(key, raw_value) do
+    "\"" <> key <> "\": " <> raw_value
   end
 
   defp encode_json_value(text) do

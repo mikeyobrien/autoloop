@@ -22,25 +22,25 @@ defmodule LoopMemory do
   end
 
   def add_learning(project_dir, text, source) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "learning", "\"text\": " <> json_string(text) <> ", \"source\": " <> json_string(source) <> ", \"created\": " <> json_string(current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "learning", json_field("text", text) <> ", " <> json_field("source", source) <> ", " <> json_field("created", current_time())))
 
     IO.puts("stored learning")
   end
 
   def add_preference(project_dir, category, text) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "preference", "\"category\": " <> json_string(category) <> ", \"text\": " <> json_string(text) <> ", \"created\": " <> json_string(current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "preference", json_field("category", category) <> ", " <> json_field("text", text) <> ", " <> json_field("created", current_time())))
 
     IO.puts("stored preference")
   end
 
   def add_meta(project_dir, key, value) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "meta"), "meta", "\"key\": " <> json_string(key) <> ", \"value\": " <> json_string(value) <> ", \"created\": " <> json_string(current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "meta"), "meta", json_field("key", key) <> ", " <> json_field("value", value) <> ", " <> json_field("created", current_time())))
 
     IO.puts("stored meta")
   end
 
   def remove(project_dir, id, reason) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "ts"), "tombstone", "\"target_id\": " <> json_string(id) <> ", \"reason\": " <> json_string(reason) <> ", \"created\": " <> json_string(current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "ts"), "tombstone", json_field("target_id", id) <> ", " <> json_field("reason", reason) <> ", " <> json_field("created", current_time())))
 
     IO.puts("removed #{id}")
   end
@@ -242,11 +242,15 @@ defmodule LoopMemory do
   end
 
   defp memory_line(id, type, fields_json) do
-    "{" <> "\"id\": " <> json_string(id) <> ", \"type\": " <> json_string(type) <> ", " <> fields_json <> "}\n"
+    "{" <> json_field("id", id) <> ", " <> json_field("type", type) <> ", " <> fields_json <> "}\n"
   end
 
   defp json_string(text) do
     "\"" <> encode_json_value(text) <> "\""
+  end
+
+  defp json_field(key, value) do
+    "\"" <> key <> "\": " <> json_string(value)
   end
 
   defp encode_json_value(text) do
