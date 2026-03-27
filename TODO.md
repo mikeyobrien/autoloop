@@ -1,0 +1,2 @@
+- Add lifecycle hooks
+- Add task tracking using the journal.jsonl and folding

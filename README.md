@@ -157,6 +157,8 @@ By default:
 - review cadence = number of roles in `topology.toml`
 - review uses the same Pi adapter unless overridden
 - the harness re-reads runtime files before every task iteration, so edits take effect on the next turn
+- the hyperagent may consolidate stale context, resolved detours, and no-longer-relevant notes into `docs/*.md` so active working files stay focused on the current objective
+- short durable lessons still belong in loop memory; archived markdown context belongs in `docs/`
 
 ## Backpressure on hallucinated events
 

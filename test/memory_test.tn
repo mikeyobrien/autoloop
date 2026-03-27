@@ -1,0 +1,463 @@
+defmodule LoopConfig do
+  def load_project(project_dir) do
+    load(resolve_config_path(project_dir))
+  end
+
+  def load(path) do
+    case System.path_exists(path) do
+      true -> parse_lines(String.split(System.read_text(path), line_sep()), defaults())
+      _ -> defaults()
+    end
+  end
+
+  def get(config, key, fallback) do
+    case Map.get(config, key, nil) do
+      nil -> fallback
+      value -> value
+    end
+  end
+
+  def get_int(config, key, fallback) do
+    case Map.get(config, key, nil) do
+      nil -> fallback
+      value -> String.to_integer(value)
+    end
+  end
+
+  def get_list(config, key) do
+    split_csv(get(config, key, ""))
+  end
+
+  def project_has_config(project_dir) do
+    System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
+  end
+
+  def resolve_journal_file(project_dir) do
+    config = load_project(project_dir)
+    Path.join(project_dir, journal_path(config))
+  end
+
+  def resolve_memory_file(project_dir) do
+    config = load_project(project_dir)
+    Path.join(project_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+  end
+
+  defp journal_path(config) do
+    get(config, "core.journal_file", get(config, "core.events_file", ".miniloops/journal.jsonl"))
+  end
+
+  defp resolve_config_path(project_dir) do
+    toml_path = Path.join(project_dir, "miniloops.toml")
+    conf_path = Path.join(project_dir, "miniloops.conf")
+
+    case System.path_exists(toml_path) do
+      true -> toml_path
+      _ -> conf_path
+    end
+  end
+
+  defp defaults() do
+    Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(%{}, "event_loop.max_iterations", "3"), "event_loop.completion_promise", "LOOP_COMPLETE"), "event_loop.completion_event", "task.complete"), "event_loop.required_events", ""), "backend.kind", "pi"), "backend.command", "pi"), "backend.timeout_ms", "300000"), "core.state_dir", ".miniloops"), "core.journal_file", ".miniloops/journal.jsonl"), "core.events_file", ".miniloops/journal.jsonl"), "core.memory_file", ".miniloops/memory.jsonl")
+  end
+
+  defp parse_lines([], config) do
+    config
+  end
+
+  defp parse_lines([line | rest], config) do
+    trimmed = String.trim(line)
+
+    case skip_line(trimmed) do
+      true -> parse_lines(rest, config)
+      _ -> parse_assignment(String.split(trimmed, "="), rest, config)
+    end
+  end
+
+  defp parse_assignment([key, value], rest, config) do
+    parse_lines(rest, Map.put(config, String.trim(key), normalize_value(String.trim(value))))
+  end
+
+  defp parse_assignment(_, rest, config) do
+    parse_lines(rest, config)
+  end
+
+  defp normalize_value(value) do
+    case is_array_literal(value) do
+      true -> join_csv(parse_array(value))
+      _ -> strip_quotes(value)
+    end
+  end
+
+  defp is_array_literal(value) do
+    String.starts_with(value, "[") and String.ends_with(value, "]")
+  end
+
+  defp parse_array(value) do
+    inner = String.trim(slice_outer(value))
+
+    case inner do
+      "" -> []
+      _ -> split_csv_parts(String.split(inner, ","), [])
+    end
+  end
+
+  defp slice_outer(text) do
+    String.slice(text, 1, String.length(text) - 2)
+  end
+
+  defp strip_quotes(value) do
+    case is_quoted(value) do
+      true -> slice_outer(value)
+      _ -> value
+    end
+  end
+
+  defp is_quoted(value) do
+    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
+  end
+
+  defp split_csv(text) do
+    split_csv_parts(String.split(text, ","), [])
+  end
+
+  defp split_csv_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp split_csv_parts([part | rest], acc) do
+    trimmed = strip_quotes(String.trim(part))
+
+    case trimmed do
+      "" -> split_csv_parts(rest, acc)
+      _ -> split_csv_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp join_csv([]) do
+    ""
+  end
+
+  defp join_csv([item]) do
+    item
+  end
+
+  defp join_csv([item | rest]) do
+    item <> "," <> join_csv(rest)
+  end
+
+  defp skip_line("") do
+    true
+  end
+
+  defp skip_line(line) do
+    String.starts_with(line, "#")
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end
+
+defmodule LoopMemory do
+  def resolve_file(project_dir) do
+    config = LoopConfig.load_project(project_dir)
+    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+  end
+
+  def render_project(project_dir, budget_chars) do
+    render_file(resolve_file(project_dir), budget_chars)
+  end
+
+  def render_file(path, budget_chars) do
+    text = render_materialized(materialize(read_lines(path)))
+    truncate_text(text, budget_chars)
+  end
+
+  def list_project(project_dir) do
+    render_materialized(materialize(read_lines(resolve_file(project_dir))))
+  end
+
+  def raw_project(project_dir) do
+    read_if_exists(resolve_file(project_dir))
+  end
+
+  defp render_materialized(memory) do
+    preferences = Map.get(memory, :preferences, [])
+    learnings = Map.get(memory, :learnings, [])
+    meta = Map.get(memory, :meta, [])
+
+    case preferences == [] and learnings == [] and meta == [] do
+      true -> ""
+      _ ->
+        "Loop memory:\n" <>
+        render_preferences(preferences) <>
+        render_learnings(learnings) <>
+        render_meta(meta)
+    end
+  end
+
+  defp render_preferences([]) do
+    ""
+  end
+
+  defp render_preferences(entries) do
+    "Preferences:\n" <> render_preference_lines(entries)
+  end
+
+  defp render_preference_lines([]) do
+    ""
+  end
+
+  defp render_preference_lines([entry | rest]) do
+    "- [" <> extract_field(entry, "category") <> "] " <> extract_field(entry, "text") <> "\n" <> render_preference_lines(rest)
+  end
+
+  defp render_learnings([]) do
+    ""
+  end
+
+  defp render_learnings(entries) do
+    "Learnings:\n" <> render_learning_lines(entries)
+  end
+
+  defp render_learning_lines([]) do
+    ""
+  end
+
+  defp render_learning_lines([entry | rest]) do
+    source = extract_field(entry, "source")
+    prefix = learning_prefix(source)
+    "- " <> prefix <> extract_field(entry, "text") <> "\n" <> render_learning_lines(rest)
+  end
+
+  defp learning_prefix("") do
+    ""
+  end
+
+  defp learning_prefix(source) do
+    "(" <> source <> ") "
+  end
+
+  defp render_meta([]) do
+    ""
+  end
+
+  defp render_meta(entries) do
+    "Meta:\n" <> render_meta_lines(entries)
+  end
+
+  defp render_meta_lines([]) do
+    ""
+  end
+
+  defp render_meta_lines([entry | rest]) do
+    "- " <> extract_field(entry, "key") <> ": " <> extract_field(entry, "value") <> "\n" <> render_meta_lines(rest)
+  end
+
+  defp truncate_text(text, budget_chars) do
+    case budget_chars <= 0 do
+      true -> text
+      _ -> truncate_text_with_budget(text, budget_chars)
+    end
+  end
+
+  defp truncate_text_with_budget(text, budget_chars) do
+    case String.length(text) <= budget_chars do
+      true -> text
+      _ -> String.slice(text, 0, budget_chars) <> "\n..."
+    end
+  end
+
+  defp materialize(lines) do
+    reversed = Enum.reverse(lines)
+    collect_materialized(reversed, %{seen: [], tombstoned: [], preferences: [], learnings: [], meta: []})
+  end
+
+  defp collect_materialized([], acc) do
+    %{preferences: Enum.reverse(Map.get(acc, :preferences, [])), learnings: Enum.reverse(Map.get(acc, :learnings, [])), meta: Enum.reverse(Map.get(acc, :meta, []))}
+  end
+
+  defp collect_materialized([line | rest], acc) do
+    type = extract_field(line, "type")
+    id = extract_field(line, "id")
+
+    next =
+    case type do
+      "tombstone" -> add_tombstone(acc, extract_field(line, "target_id"))
+      _ -> add_entry(acc, type, id, line)
+    end
+
+    collect_materialized(rest, next)
+  end
+
+  defp add_tombstone(acc, target_id) do
+    Map.put(acc, :tombstoned, [target_id] ++ Map.get(acc, :tombstoned, []))
+  end
+
+  defp add_entry(acc, _type, "", _line) do
+    acc
+  end
+
+  defp add_entry(acc, _type, id, _line) when id == "" do
+    acc
+  end
+
+  defp add_entry(acc, _type, id, _line) do
+    case list_contains(Map.get(acc, :tombstoned, []), id) or list_contains(Map.get(acc, :seen, []), id) do
+      true -> acc
+      _ -> add_entry_to_collection(acc, id, _type, _line)
+    end
+  end
+
+  defp add_entry_to_collection(acc, id, type, line) do
+    seen = Map.put(acc, :seen, [id] ++ Map.get(acc, :seen, []))
+
+    case type do
+      "preference" -> Map.put(seen, :preferences, [line] ++ Map.get(seen, :preferences, []))
+      "learning" -> Map.put(seen, :learnings, [line] ++ Map.get(seen, :learnings, []))
+      "meta" -> put_meta_entry(seen, line)
+      _ -> seen
+    end
+  end
+
+  defp put_meta_entry(acc, line) do
+    key = extract_field(line, "key")
+    existing = Map.get(acc, :meta, [])
+
+    case meta_key_seen(existing, key) do
+      true -> acc
+      _ -> Map.put(acc, :meta, [line] ++ existing)
+    end
+  end
+
+  defp meta_key_seen([], _key) do
+    false
+  end
+
+  defp meta_key_seen([line | rest], key) do
+    case extract_field(line, "key") == key do
+      true -> true
+      _ -> meta_key_seen(rest, key)
+    end
+  end
+
+  defp read_lines(path) do
+    collect_lines(String.split(read_if_exists(path), line_sep()), [])
+  end
+
+  defp collect_lines([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_lines([line | rest], acc) do
+    trimmed = String.trim(line)
+
+    case trimmed do
+      "" -> collect_lines(rest, acc)
+      _ -> collect_lines(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp extract_field(line, key) do
+    marker = "\"" <> key <> "\": "
+    decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
+  end
+
+  defp first_after_marker([]) do
+    ""
+  end
+
+  defp first_after_marker([_only]) do
+    ""
+  end
+
+  defp first_after_marker([_prefix | rest]) do
+    first_or_empty(rest)
+  end
+
+  defp first_quoted_value(text) do
+    first_quoted_value_parts(String.split(text, "\""))
+  end
+
+  defp first_quoted_value_parts([]) do
+    ""
+  end
+
+  defp first_quoted_value_parts([part | rest]) do
+    case part do
+      "" -> first_or_empty(rest)
+      _ -> first_quoted_value_parts(rest)
+    end
+  end
+
+  defp first_or_empty([]) do
+    ""
+  end
+
+  defp first_or_empty([item | _rest]) do
+    item
+  end
+
+  defp decode_json_value(text) do
+    restored_newline = String.replace(text, "\\u000a", line_sep())
+    restored_return = String.replace(restored_newline, "\\u000d", "\r")
+    restored_tab = String.replace(restored_return, "\\u0009", "\t")
+    restored_quote = String.replace(restored_tab, "\\u0022", "\"")
+    String.replace(restored_quote, "\\u005c", "\\")
+  end
+
+  defp list_contains([], _needle) do
+    false
+  end
+
+  defp list_contains([item | rest], needle) do
+    case item == needle do
+      true -> true
+      _ -> list_contains(rest, needle)
+    end
+  end
+
+  defp read_if_exists(path) do
+    case System.path_exists(path) do
+      true -> System.read_text(path)
+      _ -> ""
+    end
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end
+
+defmodule MemoryTest do
+  def test_resolve_file_returns_path() do
+    path = LoopMemory.resolve_file(project_dir())
+    Assert.assert_contains(path, "memory.jsonl")
+  end
+
+  def test_render_project_returns_string() do
+    result = LoopMemory.render_project(project_dir(), 0)
+    Assert.assert(is_binary(result), "render_project should return a string")
+  end
+
+  def test_list_project_returns_string() do
+    result = LoopMemory.list_project(project_dir())
+    Assert.assert(is_binary(result), "list_project should return a string")
+  end
+
+  def test_raw_project_returns_string() do
+    result = LoopMemory.raw_project(project_dir())
+    Assert.assert(is_binary(result), "raw_project should return a string")
+  end
+
+  defp project_dir() do
+    "/Users/rook/projects/tonic-loops"
+  end
+
+  def test_resolve_file_uses_config() do
+    path = LoopMemory.resolve_file("/nonexistent/project")
+    Assert.assert_contains(path, ".miniloops/memory.jsonl")
+  end
+end
