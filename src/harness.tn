@@ -182,10 +182,10 @@ defmodule LoopHarness do
     print_iteration_footer(iter)
 
     case timed_out do
-      true -> stop_backend_timeout(loop, iteration)
+      true -> stop_backend_timeout(loop, iteration, output)
       _ -> case exit_code do
         0 -> finish_iteration(loop, iter, output)
-        _ -> stop_backend_failed(loop, iteration)
+        _ -> stop_backend_failed(loop, iteration, output)
       end
     end
   end
@@ -276,14 +276,20 @@ defmodule LoopHarness do
     %{iterations: max_iterations(loop), stop_reason: "max_iterations"}
   end
 
-  defp stop_backend_failed(loop, iteration) do
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_failed") <> ", \"iteration\": " <> json_string(to_string(iteration)))
+  defp stop_backend_failed(loop, iteration, output) do
+    verbose_log(loop, "loop stop reason=backend_failed iteration=" <> to_string(iteration))
+    print_failure_diagnostic(output)
+    tail = last_n_chars(output, 500)
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_failed") <> ", \"iteration\": " <> json_string(to_string(iteration)) <> ", \"output_tail\": " <> json_string(tail))
 
     %{iterations: iteration, stop_reason: "backend_failed"}
   end
 
-  defp stop_backend_timeout(loop, iteration) do
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_timeout") <> ", \"iteration\": " <> json_string(to_string(iteration)))
+  defp stop_backend_timeout(loop, iteration, output) do
+    verbose_log(loop, "loop stop reason=backend_timeout iteration=" <> to_string(iteration))
+    print_failure_diagnostic(output)
+    tail = last_n_chars(output, 500)
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_timeout") <> ", \"iteration\": " <> json_string(to_string(iteration)) <> ", \"output_tail\": " <> json_string(tail))
 
     %{iterations: iteration, stop_reason: "backend_timeout"}
   end
@@ -1499,6 +1505,60 @@ defmodule LoopHarness do
       true -> IO.puts("[verbose] " <> message)
       _ -> :ok
     end
+  end
+
+  defp print_failure_diagnostic(output) do
+    tail = last_n_lines(output, 15)
+    case tail do
+      "" -> :ok
+      _ -> print_lines(["", "── backend output (last 15 lines) ──", tail, "──────────────────────────────────────"])
+    end
+  end
+
+  defp last_n_lines(text, n) do
+    lines = String.split(text, line_sep())
+    total = list_length(lines, 0)
+    drop_count = total - n
+    case drop_count > 0 do
+      true -> rejoin_lines(drop_n(lines, drop_count))
+      _ -> text
+    end
+  end
+
+  defp last_n_chars(text, n) do
+    len = String.length(text)
+    case len > n do
+      true -> String.slice(text, len - n, n)
+      _ -> text
+    end
+  end
+
+  defp list_length([], acc) do
+    acc
+  end
+
+  defp list_length([_head | rest], acc) do
+    list_length(rest, acc + 1)
+  end
+
+  defp drop_n(list, 0) do
+    list
+  end
+
+  defp drop_n([_head | rest], n) do
+    drop_n(rest, n - 1)
+  end
+
+  defp rejoin_lines([]) do
+    ""
+  end
+
+  defp rejoin_lines([part]) do
+    part
+  end
+
+  defp rejoin_lines([part | rest]) do
+    part <> line_sep() <> rejoin_lines(rest)
   end
 
   defp process_string_override(override, key, fallback) do
