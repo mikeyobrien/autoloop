@@ -1,10 +1,10 @@
-# Context: Add iteration-21 review note to loop memory
+# Context: Add iteration-29 review note to loop memory
 
 ## Objective
 Record the requested review summary as a durable loop learning via `./.miniloops/miniloops memory add learning ...`.
 
 ## Requested Learning
-`Review iteration 21: Loop healthy, no changes needed. 4/8 areas done, 12 validated suggestions. Area 5 (timeout values) in progress — scanner(19), analyst(20), reviewer next(21). Routing correct: analysis.ready → reviewer. Cadence steady at ~4 iters/area with occasional +1 emit overhead (iter 18 was report.updated relay). No wasted iterations, no routing errors. Projected completion ~36 iters.`
+`Review iteration 29: Loop healthy, no changes needed. 6/8 areas done, 18 validated suggestions. Area 7 (event routing visualization) scanned at iter 28, analyst correctly queued next. Routing correct: areas.identified → analyst. Cadence recovered to 4 iters for Area 6 (24-27), reversing the degradation trend noted at iter 25. Two areas remain (7, 8); at 4 iters each, projected completion ~iter 37-38. No routing errors, no blocked events, no intervention needed.`
 
 ## Constraints
 - Do not change product code.
