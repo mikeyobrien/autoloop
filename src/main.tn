@@ -229,6 +229,14 @@ defmodule Demo do
     LoopHarness.render_coordination(project_dir)
   end
 
+  defp dispatch_inspect("metrics", "", project_dir, format) do
+    LoopHarness.render_metrics(project_dir, format)
+  end
+
+  defp dispatch_inspect("metrics", run_id, project_dir, format) do
+    LoopHarness.render_metrics_for_run(project_dir, run_id, format)
+  end
+
   defp dispatch_inspect("chain", "", project_dir, "md") do
     IO.puts(LoopChains.render_chain_state(project_dir))
   end
@@ -328,6 +336,18 @@ defmodule Demo do
 
   defp parse_inspect_positionals("coordination", format, [project_dir]) do
     %{artifact: "coordination", selector: "", project_dir: project_dir, format: format}
+  end
+
+  defp parse_inspect_positionals("metrics", format, []) do
+    %{artifact: "metrics", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("metrics", format, [run_id]) do
+    %{artifact: "metrics", selector: run_id, project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("metrics", format, [run_id, project_dir]) do
+    %{artifact: "metrics", selector: run_id, project_dir: project_dir, format: format}
   end
 
   defp parse_inspect_positionals("chain", format, []) do
@@ -687,7 +707,7 @@ defmodule Demo do
     IO.puts("  miniloops inspect <artifact> [selector] [project-dir] --format <md|text|json>")
     IO.puts("")
     IO.puts("Artifacts:")
-    IO.puts("  scratchpad, prompt, output, journal, memory, coordination, chain")
+    IO.puts("  scratchpad, prompt, output, journal, memory, coordination, chain, metrics")
   end
 
   defp print_memory_usage() do

@@ -80,6 +80,21 @@ defmodule LoopHarness do
     print_text(empty_fallback(coordination_from_lines(lines, %{issues: [], slices: [], commits: [], archives: []})))
   end
 
+  def render_metrics(project_dir, format) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    run_id = ensure_render_run_id(journal_file)
+    lines = read_run_lines(journal_file, run_id)
+    rows = collect_metrics_rows(lines, [])
+    print_text(format_metrics(rows, format))
+  end
+
+  def render_metrics_for_run(project_dir, run_id, format) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    lines = read_run_lines(journal_file, run_id)
+    rows = collect_metrics_rows(lines, [])
+    print_text(format_metrics(rows, format))
+  end
+
   defp build_loop_context(project_dir, prompt_override, self_command, run_options) do
     config = LoopConfig.load_project(project_dir)
     topology = LoopTopology.load(project_dir)
@@ -1880,6 +1895,301 @@ defmodule LoopHarness do
 
   defp rejoin_lines([part | rest]) do
     part <> LoopUtils.line_sep() <> rejoin_lines(rest)
+  end
+
+  # --- Metrics collection and formatting ---
+
+  defp collect_metrics_rows([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_metrics_rows([line | rest], acc) do
+    topic = extract_topic(line)
+
+    case topic do
+      "iteration.start" -> collect_metrics_rows(rest, [metrics_row_from_start(line)] ++ acc)
+      "iteration.finish" -> collect_metrics_rows(rest, merge_finish_into_rows(acc, line))
+      _ -> collect_metrics_rows(rest, merge_event_into_rows(topic, line, acc))
+    end
+  end
+
+  defp metrics_row_from_start(line) do
+    roles = extract_field(line, "suggested_roles")
+    role = first_csv_value(roles)
+
+    %{iteration: extract_iteration(line), role: role, event: "none", elapsed_s: "", exit_code: "", timed_out: "false", outcome: "continue"}
+  end
+
+  defp first_csv_value("") do
+    ""
+  end
+
+  defp first_csv_value(csv) do
+    String.trim(first_or_empty(String.split(csv, ",")))
+  end
+
+  defp merge_finish_into_rows([], _line) do
+    []
+  end
+
+  defp merge_finish_into_rows([current | rest], line) do
+    iter = extract_iteration(line)
+
+    case Map.get(current, :iteration, "") == iter do
+      true -> [apply_finish_to_row(current, line)] ++ rest
+      _ -> [current] ++ merge_finish_into_rows(rest, line)
+    end
+  end
+
+  defp apply_finish_to_row(row, line) do
+    exit_code = extract_field(line, "exit_code")
+    timed_out = extract_field(line, "timed_out")
+    elapsed_s = extract_field(line, "elapsed_s")
+    outcome = compute_outcome(exit_code, timed_out, Map.get(row, :event, "none"))
+    Map.put(Map.put(Map.put(Map.put(row, :exit_code, exit_code), :timed_out, timed_out), :elapsed_s, elapsed_s), :outcome, outcome)
+  end
+
+  defp merge_event_into_rows(_topic, _line, []) do
+    []
+  end
+
+  defp merge_event_into_rows(topic, line, [current | rest]) do
+    case system_topic(topic) do
+      true -> [current] ++ rest
+      _ -> try_merge_event(topic, line, current, rest)
+    end
+  end
+
+  defp try_merge_event(topic, line, current, rest) do
+    iter = extract_iteration(line)
+
+    case Map.get(current, :iteration, "") == iter do
+      true -> [Map.put(current, :event, topic)] ++ rest
+      _ -> [current] ++ rest
+    end
+  end
+
+  defp compute_outcome(exit_code, timed_out, event) do
+    case timed_out do
+      "true" -> "timeout"
+      _ -> compute_outcome_from_exit(exit_code, event)
+    end
+  end
+
+  defp compute_outcome_from_exit("0", event) do
+    case event do
+      "none" -> "continue"
+      _ -> "emitted"
+    end
+  end
+
+  defp compute_outcome_from_exit(_exit_code, _event) do
+    "failed"
+  end
+
+  defp format_metrics(rows, "csv") do
+    format_metrics_csv(rows)
+  end
+
+  defp format_metrics(rows, "json") do
+    format_metrics_json(rows)
+  end
+
+  defp format_metrics(rows, _format) do
+    format_metrics_md(rows)
+  end
+
+  # --- Markdown table ---
+
+  defp format_metrics_md([]) do
+    "No metrics data available."
+  end
+
+  defp format_metrics_md(rows) do
+    header = "| iteration | role | event | elapsed_s | exit_code | timed_out | outcome |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+    header <> metrics_md_rows(rows) <> "\n" <> metrics_summary(rows)
+  end
+
+  defp metrics_md_rows([]) do
+    ""
+  end
+
+  defp metrics_md_rows([row | rest]) do
+    "| " <> Map.get(row, :iteration, "") <> " | " <> Map.get(row, :role, "") <> " | " <> Map.get(row, :event, "") <> " | " <> Map.get(row, :elapsed_s, "") <> " | " <> Map.get(row, :exit_code, "") <> " | " <> Map.get(row, :timed_out, "") <> " | " <> Map.get(row, :outcome, "") <> " |\n" <> metrics_md_rows(rest)
+  end
+
+  defp metrics_summary(rows) do
+    total = to_string(list_length(rows, 0))
+    elapsed = sum_elapsed(rows, 0)
+    events = count_distinct_events(rows, [])
+
+    "**Summary:** " <> total <> " iterations, " <> to_string(elapsed) <> "s total elapsed, " <> to_string(events) <> " distinct events"
+  end
+
+  defp sum_elapsed([], total) do
+    total
+  end
+
+  defp sum_elapsed([row | rest], total) do
+    val = Map.get(row, :elapsed_s, "")
+
+    case val do
+      "" -> sum_elapsed(rest, total)
+      s -> sum_elapsed(rest, total + parse_float_or_zero(s))
+    end
+  end
+
+  defp parse_float_or_zero(s) do
+    int_part = first_or_empty(String.split(s, "."))
+
+    case int_part do
+      "" -> 0
+      v -> parse_int_or_zero(v)
+    end
+  end
+
+  defp parse_int_or_zero(s) do
+    case Integer.parse(s) do
+      {n, _} -> n
+      _ -> 0
+    end
+  end
+
+  defp count_distinct_events([], acc) do
+    list_length(acc, 0)
+  end
+
+  defp count_distinct_events([row | rest], acc) do
+    event = Map.get(row, :event, "none")
+
+    case event do
+      "none" -> count_distinct_events(rest, acc)
+      _ -> count_distinct_events(rest, add_if_new(acc, event))
+    end
+  end
+
+  defp add_if_new([], item) do
+    [item]
+  end
+
+  defp add_if_new([head | rest], item) do
+    case head == item do
+      true -> [head] ++ rest
+      _ -> [head] ++ add_if_new(rest, item)
+    end
+  end
+
+  # --- CSV output (RFC 4180) ---
+
+  defp format_metrics_csv([]) do
+    "iteration,role,event,elapsed_s,exit_code,timed_out,outcome"
+  end
+
+  defp format_metrics_csv(rows) do
+    "iteration,role,event,elapsed_s,exit_code,timed_out,outcome\n" <> metrics_csv_rows(rows)
+  end
+
+  defp metrics_csv_rows([]) do
+    ""
+  end
+
+  defp metrics_csv_rows([row]) do
+    metrics_csv_row(row)
+  end
+
+  defp metrics_csv_rows([row | rest]) do
+    metrics_csv_row(row) <> "\n" <> metrics_csv_rows(rest)
+  end
+
+  defp metrics_csv_row(row) do
+    csv_quote_field(Map.get(row, :iteration, "")) <> "," <> csv_quote_field(Map.get(row, :role, "")) <> "," <> csv_quote_field(Map.get(row, :event, "")) <> "," <> csv_quote_field(Map.get(row, :elapsed_s, "")) <> "," <> csv_quote_field(Map.get(row, :exit_code, "")) <> "," <> csv_quote_field(Map.get(row, :timed_out, "")) <> "," <> csv_quote_field(Map.get(row, :outcome, ""))
+  end
+
+  defp csv_quote_field(value) do
+    case csv_needs_quoting(value) do
+      true -> "\"" <> csv_escape_quotes(value) <> "\""
+      _ -> value
+    end
+  end
+
+  defp csv_needs_quoting(value) do
+    String.contains(value, ",") or String.contains(value, "\"") or String.contains(value, "\n")
+  end
+
+  defp csv_escape_quotes(value) do
+    case String.contains(value, "\"") do
+      true -> join_with_escaped(String.split(value, "\""))
+      _ -> value
+    end
+  end
+
+  defp join_with_escaped([]) do
+    ""
+  end
+
+  defp join_with_escaped([part]) do
+    part
+  end
+
+  defp join_with_escaped([part | rest]) do
+    part <> "\"\"" <> join_with_escaped(rest)
+  end
+
+  # --- JSON output ---
+
+  defp format_metrics_json([]) do
+    "[]"
+  end
+
+  defp format_metrics_json(rows) do
+    "[" <> metrics_json_rows(rows) <> "]"
+  end
+
+  defp metrics_json_rows([]) do
+    ""
+  end
+
+  defp metrics_json_rows([row]) do
+    metrics_json_row(row)
+  end
+
+  defp metrics_json_rows([row | rest]) do
+    metrics_json_row(row) <> ", " <> metrics_json_rows(rest)
+  end
+
+  defp metrics_json_row(row) do
+    "{" <>
+    json_str_field("iteration", Map.get(row, :iteration, "")) <> ", " <>
+    json_str_field("role", Map.get(row, :role, "")) <> ", " <>
+    json_str_field("event", Map.get(row, :event, "")) <> ", " <>
+    json_str_field("elapsed_s", Map.get(row, :elapsed_s, "")) <> ", " <>
+    json_str_field("exit_code", Map.get(row, :exit_code, "")) <> ", " <>
+    json_str_field("timed_out", Map.get(row, :timed_out, "")) <> ", " <>
+    json_str_field("outcome", Map.get(row, :outcome, "")) <>
+    "}"
+  end
+
+  defp json_str_field(key, value) do
+    "\"" <> key <> "\": \"" <> json_escape_string(value) <> "\""
+  end
+
+  defp json_escape_string(value) do
+    case String.contains(value, "\"") do
+      true -> join_with_json_escaped(String.split(value, "\""))
+      _ -> value
+    end
+  end
+
+  defp join_with_json_escaped([]) do
+    ""
+  end
+
+  defp join_with_json_escaped([part]) do
+    part
+  end
+
+  defp join_with_json_escaped([part | rest]) do
+    part <> "\\\"" <> join_with_json_escaped(rest)
   end
 
   defp process_string_override(override, key, fallback) do
