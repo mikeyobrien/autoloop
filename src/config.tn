@@ -116,7 +116,8 @@ defmodule LoopConfig do
       "journal_file" => ".miniloops/journal.jsonl",
       "events_file" => ".miniloops/journal.jsonl",
       "memory_file" => ".miniloops/memory.jsonl",
-      "run_id_format" => "compact"
+      "run_id_format" => "compact",
+      "log_level" => "info"
     }
     %{"event_loop" => event_loop, "backend" => backend, "core" => core}
   end

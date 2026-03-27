@@ -382,11 +382,11 @@ defmodule Demo do
   end
 
   defp parse_run_tokens(["--verbose" | rest], bundle_root, options) do
-    parse_run_tokens(rest, bundle_root, Map.put(options, :verbose, true))
+    parse_run_tokens(rest, bundle_root, Map.put(options, :log_level, "debug"))
   end
 
   defp parse_run_tokens(["-v" | rest], bundle_root, options) do
-    parse_run_tokens(rest, bundle_root, Map.put(options, :verbose, true))
+    parse_run_tokens(rest, bundle_root, Map.put(options, :log_level, "debug"))
   end
 
   defp parse_run_tokens(["-b"], _bundle_root, _options) do
@@ -500,7 +500,7 @@ defmodule Demo do
   end
 
   defp default_run_options() do
-    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false, chain: nil, preset_explicit: false, positionals: [], usage_error: false}
+    %{project_dir: ".", prompt: nil, backend_override: %{}, log_level: nil, chain: nil, preset_explicit: false, positionals: [], usage_error: false}
   end
 
   defp push_positional(options, token) do
@@ -665,7 +665,7 @@ defmodule Demo do
     IO.puts("")
     IO.puts("Flags:")
     IO.puts("  -h, --help       Show this help")
-    IO.puts("  -v, --verbose    Verbose output")
+    IO.puts("  -v, --verbose    Set log level to debug")
     IO.puts("  -b, --backend    Override backend command")
     IO.puts("  -p, --preset     Resolve a bundled preset name or custom preset dir")
     IO.puts("  --chain          Run an inline chain (comma-separated presets)")

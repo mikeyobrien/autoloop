@@ -7,7 +7,7 @@ defmodule LoopHarness do
     ensure_layout(state_dir(live_loop))
     install_runtime_tools(live_loop)
     append_loop_start(live_loop)
-    verbose_log(live_loop, "loop start run_id=" <> run_id(live_loop) <> " max_iterations=" <> to_string(max_iterations(live_loop)))
+    log(live_loop, :info, "loop start run_id=" <> run_id(live_loop) <> " max_iterations=" <> to_string(max_iterations(live_loop)))
 
     summary = iterate(live_loop, 1)
     print_summary(summary, live_loop)
@@ -89,9 +89,11 @@ defmodule LoopHarness do
     memory_file = LoopConfig.resolve_memory_file_in(project_dir, work_dir)
     run_id = next_run_id(journal_file, config)
     backend_override = Map.get(run_options, :backend_override, %{})
-    verbose = Map.get(run_options, :verbose, false)
+    cli_log_level = Map.get(run_options, :log_level, nil)
+    config_log_level = LoopConfig.get(config, "core.log_level", "info")
+    log_level = resolve_log_level(cli_log_level, config_log_level)
 
-    %{paths: %{project_dir: project_dir, work_dir: work_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override, backend_override: backend_override, verbose: verbose}}
+    %{paths: %{project_dir: project_dir, work_dir: work_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override, backend_override: backend_override, log_level: log_level}}
     |> reload_loop()
   end
 
@@ -124,7 +126,7 @@ defmodule LoopHarness do
     harness_text = read_optional_project_file(project_dir, LoopConfig.get(config, "harness.instructions_file", "harness.md"))
     review_text = resolve_review_prompt(project_dir, config)
 
-    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, verbose: verbose(loop)}, store: store(loop)}
+    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, log_level: log_level(loop)}, store: store(loop)}
   end
 
   defp iterate(loop, iteration) do
@@ -193,9 +195,9 @@ defmodule LoopHarness do
 
     print_iteration_banner(loop, iter)
     append_iteration_start(loop, iter)
-    verbose_log(loop, "iteration " <> to_string(iteration) <> " start")
+    log(loop, :debug, "iteration " <> to_string(iteration) <> " start")
     append_backend_start(loop, iter)
-    verbose_log(loop, "backend start command=" <> backend_command(loop))
+    log(loop, :debug, "backend start command=" <> backend_command(loop))
 
     start_epoch = epoch_seconds()
     result = System.run(build_backend_command(loop, iter), %{stream: true, timeout_ms: backend_timeout_ms(loop)})
@@ -206,7 +208,7 @@ defmodule LoopHarness do
 
     append_backend_finish(loop, iter, output, exit_code, timed_out)
     append_iteration_finish(loop, iter, output, exit_code, timed_out, elapsed_s)
-    verbose_log(loop, "iteration " <> to_string(iteration) <> " finish exit_code=" <> to_string(exit_code))
+    log(loop, :debug, "iteration " <> to_string(iteration) <> " finish exit_code=" <> to_string(exit_code))
     print_iteration_footer(iter, elapsed_s)
 
     case timed_out do
@@ -300,14 +302,14 @@ defmodule LoopHarness do
   end
 
   defp stop_max_iterations(loop) do
-    verbose_log(loop, "loop stop reason=max_iterations")
+    log(loop, :warn, "loop stop reason=max_iterations")
     append_event(journal_file(loop), run_id(loop), "", "loop.stop", LoopJson.json_field("reason", "max_iterations"))
 
     %{iterations: max_iterations(loop), stop_reason: "max_iterations"}
   end
 
   defp stop_backend_failed(loop, iteration, output) do
-    verbose_log(loop, "loop stop reason=backend_failed iteration=" <> to_string(iteration))
+    log(loop, :error, "loop stop reason=backend_failed iteration=" <> to_string(iteration))
     print_failure_diagnostic(output)
     tail = last_n_chars(output, 500)
     append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", LoopJson.json_field("reason", "backend_failed") <> ", " <> LoopJson.json_field("iteration", to_string(iteration)) <> ", " <> LoopJson.json_field("output_tail", tail))
@@ -316,7 +318,7 @@ defmodule LoopHarness do
   end
 
   defp stop_backend_timeout(loop, iteration, output) do
-    verbose_log(loop, "loop stop reason=backend_timeout iteration=" <> to_string(iteration))
+    log(loop, :error, "loop stop reason=backend_timeout iteration=" <> to_string(iteration))
     print_failure_diagnostic(output)
     tail = last_n_chars(output, 500)
     append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", LoopJson.json_field("reason", "backend_timeout") <> ", " <> LoopJson.json_field("iteration", to_string(iteration)) <> ", " <> LoopJson.json_field("output_tail", tail))
@@ -325,7 +327,7 @@ defmodule LoopHarness do
   end
 
   defp complete_loop(loop, iteration, reason) do
-    verbose_log(loop, "loop complete reason=" <> reason)
+    log(loop, :info, "loop complete reason=" <> reason)
     append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.complete", LoopJson.json_field("reason", reason))
 
     %{iterations: iteration, stop_reason: reason}
@@ -474,7 +476,7 @@ defmodule LoopHarness do
     context_pressure_text(memory_stats, invalid_count) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
-    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
+    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Log level: #{log_level_name(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
     tool_path(loop) <> " emit <allowed-topic> \"brief handoff summary\"\n" <>
     tool_path(loop) <> " emit " <> completion_event(loop) <> " \"brief completion summary\"\n" <>
     tool_path(loop) <> " memory add learning \"durable lesson\"\n" <>
@@ -1755,15 +1757,75 @@ defmodule LoopHarness do
     Map.get(loop, :store, %{})
   end
 
-  defp verbose(loop) do
-    Map.get(Map.get(loop, :runtime, %{}), :verbose, false)
+  defp log_level(loop) do
+    Map.get(Map.get(loop, :runtime, %{}), :log_level, "info")
   end
 
-  defp verbose_log(loop, message) do
-    case verbose(loop) do
-      true -> IO.puts("[verbose] " <> message)
+  defp log(loop, level, message) do
+    case log_level_rank(level) >= log_level_rank(log_level_atom(log_level(loop))) do
+      true -> System.log(level, message, %{source: "miniloops"})
       _ -> :ok
     end
+  end
+
+  defp log_level_atom("debug") do
+    :debug
+  end
+
+  defp log_level_atom("info") do
+    :info
+  end
+
+  defp log_level_atom("warn") do
+    :warn
+  end
+
+  defp log_level_atom("error") do
+    :error
+  end
+
+  defp log_level_atom("none") do
+    :none
+  end
+
+  defp log_level_atom(_other) do
+    :info
+  end
+
+  defp log_level_rank(:debug) do
+    0
+  end
+
+  defp log_level_rank(:info) do
+    1
+  end
+
+  defp log_level_rank(:warn) do
+    2
+  end
+
+  defp log_level_rank(:error) do
+    3
+  end
+
+  defp log_level_rank(:none) do
+    4
+  end
+
+  defp log_level_rank(_other) do
+    1
+  end
+
+  defp resolve_log_level(nil, config_level) do
+    config_level
+  end
+
+  defp resolve_log_level(cli_level, _config_level) do
+    cli_level
+  end
+
+  defp log_level_name(loop) do
+    log_level(loop)
   end
 
   defp print_failure_diagnostic(output) do
