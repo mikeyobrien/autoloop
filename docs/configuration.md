@@ -74,6 +74,16 @@ The review pass is a separate backend invocation that runs periodically for cons
 
 Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `hyperagent.md`).
 
+### Parallel
+
+Structured parallelism stays intentionally small in v1. These keys only enable the `.parallel` event protocol and bound future wave execution behavior; branch plans still come from event payloads rather than config.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `parallel.enabled` | bool | `false` | Enable structured parallel trigger validation (`explore.parallel` and `<allowed-event>.parallel`). |
+| `parallel.max_branches` | int | `3` | Maximum number of branch objectives accepted from one `.parallel` trigger payload. |
+| `parallel.branch_timeout_ms` | int | `180000` | Timeout budget per branch wave in milliseconds. |
+
 ### Memory
 
 | Key | Type | Default | Description |
@@ -112,6 +122,10 @@ backend.timeout_ms = 300000
 review.enabled = false
 review.timeout_ms = 300000
 review.every_iterations = 0
+
+parallel.enabled = false
+parallel.max_branches = 3
+parallel.branch_timeout_ms = 180000
 
 memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"

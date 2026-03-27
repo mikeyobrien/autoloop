@@ -321,6 +321,9 @@ defmodule ConfigTest do
     Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_promise", ""), "LOOP_COMPLETE")
     Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_event", ""), "task.complete")
     Assert.assert_equal(LoopConfig.get(config, "backend.command", ""), "pi")
+    Assert.assert_equal(LoopConfig.get(config, "parallel.enabled", ""), "false")
+    Assert.assert_equal(LoopConfig.get(config, "parallel.max_branches", ""), "3")
+    Assert.assert_equal(LoopConfig.get(config, "parallel.branch_timeout_ms", ""), "180000")
     Assert.assert_equal(LoopConfig.get(config, "memory.prompt_budget_chars", ""), "8000")
     Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloop")
   end
@@ -329,6 +332,9 @@ defmodule ConfigTest do
     config = LoopConfig.load("/nonexistent/path/that/wont/exist")
     Assert.assert_equal(LoopConfig.get(config, ["event_loop", "max_iterations"], ""), "3")
     Assert.assert_equal(LoopConfig.get(config, ["backend", "kind"], ""), "pi")
+    Assert.assert_equal(LoopConfig.get(config, ["parallel", "enabled"], ""), "false")
+    Assert.assert_equal(LoopConfig.get(config, ["parallel", "max_branches"], ""), "3")
+    Assert.assert_equal(LoopConfig.get(config, ["parallel", "branch_timeout_ms"], ""), "180000")
     Assert.assert_equal(LoopConfig.get(config, ["memory", "prompt_budget_chars"], ""), "8000")
     Assert.assert_equal(LoopConfig.get(config, ["core", "memory_file"], ""), ".miniloop/memory.jsonl")
   end
@@ -390,7 +396,9 @@ defmodule ConfigTest do
   def test_load_project_deep_merge_preserves_defaults() do
     config = LoopConfig.load_project(project_dir())
     Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_promise", "missing"), "LOOP_COMPLETE")
-    Assert.assert_equal(LoopConfig.get(config, "memory.prompt_budget_chars", "missing"), "8000")
+    Assert.assert_equal(LoopConfig.get(config, "parallel.enabled", "missing"), "false")
+    Assert.assert_equal(LoopConfig.get(config, "parallel.max_branches", "missing"), "3")
+    Assert.assert_equal(LoopConfig.get(config, "parallel.branch_timeout_ms", "missing"), "180000")
   end
 
   def test_load_project_list_path_access() do

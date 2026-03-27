@@ -120,6 +120,7 @@ defmodule LoopConfig do
       "required_events" => ""
     }
     backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
+    parallel = %{"enabled" => "false", "max_branches" => "3", "branch_timeout_ms" => "180000"}
     memory = %{"prompt_budget_chars" => "8000"}
     core = %{
       "state_dir" => ".miniloop",
@@ -129,7 +130,7 @@ defmodule LoopConfig do
       "run_id_format" => "compact",
       "log_level" => "info"
     }
-    %{"event_loop" => event_loop, "backend" => backend, "memory" => memory, "core" => core}
+    %{"event_loop" => event_loop, "backend" => backend, "parallel" => parallel, "memory" => memory, "core" => core}
   end
 
   # --- Path traversal helpers ---

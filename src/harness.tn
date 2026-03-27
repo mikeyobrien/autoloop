@@ -29,12 +29,12 @@ defmodule LoopHarness do
     journal_file = resolve_emit_journal_file(project_dir)
     ensure_layout(Path.dirname(journal_file))
 
-    validation = emit_validation_context(journal_file)
+    validation = emit_validation_context(project_dir, journal_file)
 
     case coordination_topic(topic) do
       true -> accept_emit(journal_file, topic, payload, validation)
       _ ->
-        case invalid_event(topic, Map.get(validation, :allowed_events, [])) do
+        case invalid_event(topic, Map.get(validation, :allowed_events, []), Map.get(validation, :parallel_enabled, false), Map.get(validation, :completion_event, "task.complete")) do
           true -> reject_emit(journal_file, topic, validation)
           _ -> accept_emit(journal_file, topic, payload, validation)
         end
@@ -130,6 +130,9 @@ defmodule LoopHarness do
     completion_event = LoopTopology.completion_event(topology, LoopConfig.get(config, "event_loop.completion_event", "task.complete"))
     required_events = LoopConfig.get_list(config, "event_loop.required_events")
     objective = resolve_prompt(project_dir, config, prompt_override)
+    parallel_enabled = truthy_setting(LoopConfig.get(config, "parallel.enabled", "false"))
+    parallel_max_branches = LoopConfig.get_int(config, "parallel.max_branches", 3)
+    parallel_branch_timeout_ms = LoopConfig.get_int(config, "parallel.branch_timeout_ms", 180000)
     memory_budget_chars = LoopConfig.get_int(config, "memory.prompt_budget_chars", 8000)
     review_every = resolve_review_every(config, topology)
     review_enabled = truthy_setting(LoopConfig.get(config, "review.enabled", "true"))
@@ -142,7 +145,7 @@ defmodule LoopHarness do
     harness_text = read_optional_project_file(project_dir, LoopConfig.get(config, "harness.instructions_file", "harness.md"))
     review_text = resolve_review_prompt(project_dir, config)
 
-    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, log_level: log_level(loop)}, store: store(loop)}
+    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, parallel: %{enabled: parallel_enabled, max_branches: parallel_max_branches, branch_timeout_ms: parallel_branch_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, log_level: log_level(loop)}, store: store(loop)}
   end
 
   defp iterate(loop, iteration) do
@@ -256,7 +259,7 @@ defmodule LoopHarness do
     turn_topics = topics_for_iteration(run_lines, iteration_string(iter))
     emitted_topic = latest_agent_event(turn_topics)
 
-    case invalid_event(emitted_topic, allowed_events(iter)) do
+    case invalid_event(emitted_topic, allowed_events(iter), parallel_enabled(loop), completion_event(loop)) do
       true -> reject_invalid_and_continue(loop, iter, emitted_topic)
       _ -> continue_after_valid_turn(loop, iteration(iter), output, all_topics)
     end
@@ -282,16 +285,95 @@ defmodule LoopHarness do
     iterate(loop, iteration(iter) + 1)
   end
 
-  defp invalid_event("", _allowed_events) do
+  defp invalid_event("", _allowed_events, _parallel_enabled, _completion_event) do
     false
   end
 
-  defp invalid_event(_emitted_topic, []) do
+  defp invalid_event(emitted_topic, allowed_events, parallel_enabled, completion_event) do
+    case reserved_parallel_joined_topic(emitted_topic) do
+      true -> true
+      _ -> invalid_event_after_join_check(emitted_topic, allowed_events, parallel_enabled, completion_event)
+    end
+  end
+
+  defp invalid_event_after_join_check(emitted_topic, allowed_events, false, _completion_event) do
+    case parallel_topic(emitted_topic) do
+      true -> true
+      _ -> invalid_event_after_parallel_check(emitted_topic, allowed_events)
+    end
+  end
+
+  defp invalid_event_after_join_check(emitted_topic, allowed_events, true, completion_event) do
+    case valid_parallel_trigger_event(emitted_topic, allowed_events, completion_event) do
+      true -> false
+      _ -> invalid_event_after_parallel_check(emitted_topic, allowed_events)
+    end
+  end
+
+  defp invalid_event_after_parallel_check(_emitted_topic, []) do
     false
   end
 
-  defp invalid_event(emitted_topic, allowed_events) do
+  defp invalid_event_after_parallel_check(emitted_topic, allowed_events) do
     not LoopTopology.event_matches_any(emitted_topic, allowed_events)
+  end
+
+  defp valid_parallel_trigger_event("explore.parallel", _allowed_events, _completion_event) do
+    true
+  end
+
+  defp valid_parallel_trigger_event(emitted_topic, allowed_events, completion_event) do
+    base_event = parallel_dispatch_base(emitted_topic)
+
+    case base_event do
+      "" -> false
+      _ -> valid_parallel_dispatch_base(base_event, allowed_events, completion_event)
+    end
+  end
+
+  defp valid_parallel_dispatch_base(base_event, allowed_events, completion_event) do
+    case base_event == completion_event do
+      true -> false
+      _ -> valid_parallel_dispatch_base_noncompletion(base_event, allowed_events)
+    end
+  end
+
+  defp valid_parallel_dispatch_base_noncompletion(base_event, allowed_events) do
+    case coordination_topic(base_event) or core_system_topic(base_event) or parallel_topic(base_event) do
+      true -> false
+      _ -> valid_parallel_dispatch_allowed(base_event, allowed_events)
+    end
+  end
+
+  defp valid_parallel_dispatch_allowed(_base_event, []) do
+    false
+  end
+
+  defp valid_parallel_dispatch_allowed(base_event, allowed_events) do
+    LoopTopology.event_matches_any(base_event, allowed_events)
+  end
+
+  defp parallel_dispatch_base(topic) do
+    case dispatch_parallel_topic(topic) do
+      true -> String.slice(topic, 0, String.length(topic) - String.length(".parallel"))
+      _ -> ""
+    end
+  end
+
+  defp dispatch_parallel_topic("explore.parallel") do
+    false
+  end
+
+  defp dispatch_parallel_topic(topic) do
+    String.ends_with(topic, ".parallel")
+  end
+
+  defp reserved_parallel_joined_topic(topic) do
+    String.ends_with(topic, ".parallel.joined")
+  end
+
+  defp parallel_topic(topic) do
+    dispatch_parallel_topic(topic) or reserved_parallel_joined_topic(topic)
   end
 
   defp completed_via_event(topics, completion_event, required_events) do
@@ -488,7 +570,7 @@ defmodule LoopHarness do
   end
 
   defp emit_tool_script(loop) do
-    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(project_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> LoopUtils.shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> LoopUtils.shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> LoopUtils.shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> LoopUtils.shell_quote(LoopUtils.join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> LoopUtils.shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
+    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(project_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> LoopUtils.shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> LoopUtils.shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> LoopUtils.shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> LoopUtils.shell_quote(LoopUtils.join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> LoopUtils.shell_quote(tool_path(loop)) <> "\n" <> "stdout_file=$(mktemp)\n" <> "stderr_file=$(mktemp)\n" <> "cleanup() {\n" <> "  rm -f \"$stdout_file\" \"$stderr_file\"\n" <> "}\n" <> "trap cleanup EXIT\n" <> "if " <> self_command(loop) <> " \"$@\" >\"$stdout_file\" 2>\"$stderr_file\"; then\n" <> "  status=0\n" <> "else\n" <> "  status=$?\n" <> "fi\n" <> "cat \"$stderr_file\" >&2\n" <> "if [ \"${1:-}\" = \"emit\" ]; then\n" <> "  inner=$(sed -n 's/^%{:exit_code => \\([0-9][0-9]*\\),.*$/\\1/p' \"$stdout_file\" | tail -n 1)\n" <> "  if [ -n \"$inner\" ]; then\n" <> "    exit \"$inner\"\n" <> "  fi\n" <> "fi\n" <> "cat \"$stdout_file\"\n" <> "exit \"$status\"\n"
   end
 
   defp pi_adapter_script(loop) do
@@ -770,9 +852,13 @@ defmodule LoopHarness do
     "invalid event `" <> topic <> "`; recent event: `" <> Map.get(validation, :recent_event, "loop.start") <> "`; suggested roles: " <> LoopUtils.list_text(Map.get(validation, :allowed_roles, [])) <> "; allowed next events: " <> LoopUtils.list_text(Map.get(validation, :allowed_events, []))
   end
 
-  defp emit_validation_context(journal_file) do
+  defp emit_validation_context(project_dir, journal_file) do
     run_id = resolve_emit_run_id(journal_file)
-    %{run_id: run_id, iteration: resolve_emit_iteration(journal_file, run_id), recent_event: emit_recent_event(), allowed_roles: env_csv_list("MINILOOPS_ALLOWED_ROLES"), allowed_events: env_csv_list("MINILOOPS_ALLOWED_EVENTS")}
+    config = LoopConfig.load_project(project_dir)
+    topology = LoopTopology.load(project_dir)
+    completion_event = LoopTopology.completion_event(topology, LoopConfig.get(config, "event_loop.completion_event", "task.complete"))
+
+    %{run_id: run_id, iteration: resolve_emit_iteration(journal_file, run_id), recent_event: emit_recent_event(), allowed_roles: env_csv_list("MINILOOPS_ALLOWED_ROLES"), allowed_events: env_csv_list("MINILOOPS_ALLOWED_EVENTS"), parallel_enabled: truthy_setting(LoopConfig.get(config, "parallel.enabled", "false")), completion_event: completion_event}
   end
 
   defp resolve_emit_run_id(journal_file) do

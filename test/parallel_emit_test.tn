@@ -1,0 +1,165 @@
+defmodule ParallelEmitTest do
+  def test_emit_accepts_explore_parallel_when_enabled() do
+    fixture = prepare_fixture(true)
+    result = emit_with_env(fixture, "explore.parallel", "- compare two plans", "review.ready,build.blocked", "tasks.ready")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "emitted explore.parallel")
+    Assert.assert_contains(read_journal(fixture), "\"topic\": \"explore.parallel\"")
+  end
+
+  def test_emit_accepts_dispatch_parallel_for_allowed_base_event() do
+    fixture = prepare_fixture(true)
+    result = emit_with_env(fixture, "tasks.ready.parallel", "- implement config parsing", "tasks.ready,task.complete", "loop.start")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "emitted tasks.ready.parallel")
+    Assert.assert_contains(read_journal(fixture), "\"topic\": \"tasks.ready.parallel\"")
+  end
+
+  def test_emit_rejects_dispatch_parallel_for_disallowed_base_event() do
+    fixture = prepare_fixture(true)
+    result = emit_with_env(fixture, "review.ready.parallel", "- run critic lane", "tasks.ready,build.blocked", "tasks.ready")
+
+    Assert.refute(Map.get(result, :exit_code, 0) == 0, "disallowed dispatch base should fail closed")
+    Assert.assert_contains(Map.get(result, :output, ""), "invalid event `review.ready.parallel`")
+    Assert.refute(String.contains(Map.get(result, :output, ""), "%{:exit_code =>"), "event tool should hide tonic's raw subprocess map on invalid emits")
+    Assert.assert_contains(read_journal(fixture), "\"topic\": \"event.invalid\"")
+  end
+
+  def test_emit_rejects_parallel_topics_when_disabled() do
+    fixture = prepare_fixture(false)
+    result = emit_with_env(fixture, "explore.parallel", "- compare two plans", "review.ready,build.blocked", "tasks.ready")
+
+    Assert.refute(Map.get(result, :exit_code, 0) == 0, "parallel triggers should stay disabled by default")
+    Assert.assert_contains(Map.get(result, :output, ""), "invalid event `explore.parallel`")
+    Assert.assert_contains(read_journal(fixture), "\"topic\": \"event.invalid\"")
+  end
+
+  def test_emit_rejects_harness_owned_joined_parallel_topics() do
+    fixture = prepare_fixture(true)
+    result = emit_with_env(fixture, "explore.parallel.joined", "joined by model", "explore.parallel.joined,tasks.ready", "tasks.ready")
+
+    Assert.refute(Map.get(result, :exit_code, 0) == 0, "joined topics must stay harness-owned")
+    Assert.assert_contains(Map.get(result, :output, ""), "invalid event `explore.parallel.joined`")
+    Assert.assert_contains(read_journal(fixture), "\"topic\": \"event.invalid\"")
+  end
+
+  def test_emit_rejects_parallelized_completion_event() do
+    fixture = prepare_fixture(true)
+    result = emit_with_env(fixture, "task.complete.parallel", "- skip the barrier", "task.complete", "review.passed")
+
+    Assert.refute(Map.get(result, :exit_code, 0) == 0, "completion events must not gain .parallel variants")
+    Assert.assert_contains(Map.get(result, :output, ""), "invalid event `task.complete.parallel`")
+    Assert.assert_contains(read_journal(fixture), "\"topic\": \"event.invalid\"")
+  end
+
+  defp prepare_fixture(parallel_enabled) do
+    project_dir = fixture_dir()
+    journal_dir = Path.join(project_dir, ".miniloop")
+    journal_path = Path.join(journal_dir, "journal.jsonl")
+    roles_dir = Path.join(project_dir, "roles")
+    backend_path = Path.join(project_dir, "backend.sh")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(roles_dir))
+    System.write_text(Path.join(project_dir, "miniloops.toml"), miniloops_toml(parallel_enabled, backend_path))
+    System.write_text(Path.join(project_dir, "topology.toml"), topology_toml())
+    System.write_text(Path.join(project_dir, "harness.md"), "parallel emit test harness\n")
+    System.write_text(Path.join(roles_dir, "worker.md"), "You are the worker.\n")
+    System.write_text(backend_path, backend_script())
+    System.run("chmod +x " <> shell_quote(backend_path))
+
+    setup = System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_miniloops_env() <> " tonic run " <> shell_quote(repo_root()) <> " " <> shell_quote(project_dir) <> " \"setup prompt\"")
+    Assert.assert_equal(Map.get(setup, :exit_code, 1), 0)
+
+    %{project_dir: project_dir, journal_path: journal_path, tool_path: Path.join(journal_dir, "miniloops")}
+  end
+
+  defp emit_with_env(fixture, topic, payload, allowed_events, recent_event) do
+    System.run(
+      "cd " <> shell_quote(Map.get(fixture, :project_dir, "")) <>
+      " && " <> clean_miniloops_env() <>
+      " env MINILOOPS_ITERATION=1" <>
+      " MINILOOPS_RECENT_EVENT=" <> shell_quote(recent_event) <>
+      " MINILOOPS_ALLOWED_ROLES='planner,builder'" <>
+      " MINILOOPS_ALLOWED_EVENTS=" <> shell_quote(allowed_events) <>
+      " " <> shell_quote(Map.get(fixture, :tool_path, "")) <> " emit " <> shell_quote(topic) <> " " <> shell_quote(payload) <> " 2>&1"
+    )
+  end
+
+  defp read_journal(fixture) do
+    path = Map.get(fixture, :journal_path, "")
+
+    case System.path_exists(path) do
+      true -> System.read_text(path)
+      _ -> ""
+    end
+  end
+
+  defp miniloops_toml(parallel_enabled, backend_path) do
+    enabled_value = case parallel_enabled do
+      true -> "true"
+      _ -> "false"
+    end
+
+    "event_loop.max_iterations = 1\n" <>
+    "event_loop.completion_event = \"task.complete\"\n" <>
+    "backend.kind = \"command\"\n" <>
+    "backend.command = \"" <> backend_path <> "\"\n" <>
+    "backend.timeout_ms = 10000\n" <>
+    "review.enabled = false\n" <>
+    "parallel.enabled = " <> enabled_value <> "\n" <>
+    "parallel.max_branches = 3\n" <>
+    "parallel.branch_timeout_ms = 180000\n" <>
+    "memory.prompt_budget_chars = 8000\n" <>
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+  end
+
+  defp clean_miniloops_env() do
+    "env" <>
+    " -u MINILOOPS_ALLOWED_EVENTS" <>
+    " -u MINILOOPS_ALLOWED_ROLES" <>
+    " -u MINILOOPS_BIN" <>
+    " -u MINILOOPS_COMPLETION_EVENT" <>
+    " -u MINILOOPS_EVENTS_FILE" <>
+    " -u MINILOOPS_ITERATION" <>
+    " -u MINILOOPS_JOURNAL_FILE" <>
+    " -u MINILOOPS_MEMORY_FILE" <>
+    " -u MINILOOPS_PROJECT_DIR" <>
+    " -u MINILOOPS_RECENT_EVENT" <>
+    " -u MINILOOPS_REQUIRED_EVENTS" <>
+    " -u MINILOOPS_RUN_ID"
+  end
+
+  defp repo_root() do
+    "/Users/rook/projects/tonic-loops"
+  end
+
+  defp topology_toml() do
+    "name = \"parallel-emit-check\"\n" <>
+    "completion = \"task.complete\"\n\n" <>
+    "[[role]]\n" <>
+    "id = \"worker\"\n" <>
+    "emits = [\"loop.next\"]\n" <>
+    "prompt_file = \"roles/worker.md\"\n\n" <>
+    "[handoff]\n" <>
+    "\"loop.start\" = [\"worker\"]\n" <>
+    "\"loop.next\" = [\"worker\"]\n"
+  end
+
+  defp backend_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "printf 'setup backend\\n'\n"
+  end
+
+  defp fixture_dir() do
+    "/tmp/miniloops-parallel-emit-fixture"
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
+  end
+end
