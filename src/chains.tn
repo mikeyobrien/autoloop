@@ -30,11 +30,11 @@ defmodule LoopChains do
     journal_file = LoopConfig.resolve_journal_file(project_dir)
 
     System.ensure_dir(chain_dir)
-    append_chain_event(journal_file, chain_run_id, "chain.start", json_field("name", chain_name) <> ", " <> json_field("steps", LoopUtils.join_csv(step_names(steps))) <> ", " <> json_field("step_count", to_string(list_length(steps, 0))))
+    append_chain_event(journal_file, chain_run_id, "chain.start", LoopJson.json_field("name", chain_name) <> ", " <> LoopJson.json_field("steps", LoopUtils.join_csv(step_names(steps))) <> ", " <> LoopJson.json_field("step_count", to_string(list_length(steps, 0))))
 
     result = run_steps(steps, 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, [])
 
-    append_chain_event(journal_file, chain_run_id, "chain.complete", json_field("name", chain_name) <> ", " <> json_field("steps_completed", to_string(list_length(Map.get(result, :completed, []), 0))) <> ", " <> json_field("outcome", Map.get(result, :outcome, "unknown")))
+    append_chain_event(journal_file, chain_run_id, "chain.complete", LoopJson.json_field("name", chain_name) <> ", " <> LoopJson.json_field("steps_completed", to_string(list_length(Map.get(result, :completed, []), 0))) <> ", " <> LoopJson.json_field("outcome", Map.get(result, :outcome, "unknown")))
 
     result
   end
@@ -304,7 +304,7 @@ defmodule LoopChains do
 
     write_handoff_artifact(step_work_dir, step_num, completed)
 
-    append_chain_event(journal_file, chain_run_id, "chain.step.start", json_field("step", to_string(step_num)) <> ", " <> json_field("preset", step_name) <> ", " <> json_field("preset_dir", preset_dir) <> ", " <> json_field("work_dir", step_work_dir))
+    append_chain_event(journal_file, chain_run_id, "chain.step.start", LoopJson.json_field("step", to_string(step_num)) <> ", " <> LoopJson.json_field("preset", step_name) <> ", " <> LoopJson.json_field("preset_dir", preset_dir) <> ", " <> LoopJson.json_field("work_dir", step_work_dir))
 
     step_options = Map.put(run_options, :work_dir, step_work_dir)
     result = LoopHarness.run(preset_dir, nil, self_command, step_options)
@@ -312,7 +312,7 @@ defmodule LoopChains do
 
     write_result_artifact(step_work_dir, step_num, step_name, result)
 
-    append_chain_event(journal_file, chain_run_id, "chain.step.finish", json_field("step", to_string(step_num)) <> ", " <> json_field("preset", step_name) <> ", " <> json_field("stop_reason", stop_reason))
+    append_chain_event(journal_file, chain_run_id, "chain.step.finish", LoopJson.json_field("step", to_string(step_num)) <> ", " <> LoopJson.json_field("preset", step_name) <> ", " <> LoopJson.json_field("stop_reason", stop_reason))
 
     step_record = %{step: step_num, name: step_name, stop_reason: stop_reason}
 
@@ -368,7 +368,7 @@ defmodule LoopChains do
   end
 
   defp append_chain_event(journal_file, chain_run_id, topic, fields_json) do
-    line = "{" <> json_field("chain_run", chain_run_id) <> ", " <> json_field("topic", topic) <> ", " <> "\"fields\": {" <> fields_json <> "}}\n"
+    line = "{" <> LoopJson.json_field("chain_run", chain_run_id) <> ", " <> LoopJson.json_field("topic", topic) <> ", " <> "\"fields\": {" <> fields_json <> "}}\n"
     append_text(journal_file, line)
   end
 
@@ -543,7 +543,7 @@ defmodule LoopChains do
     journal_file = LoopConfig.resolve_journal_file(project_dir)
     justification = Map.get(spec, :justification, "")
 
-    append_chain_event(journal_file, chain_id, "chain.spawn", json_field("chain_id", chain_id) <> ", " <> json_field("parent_id", parent_id) <> ", " <> json_field("steps", LoopUtils.join_csv(steps_csv)) <> ", " <> json_field("justification", justification))
+    append_chain_event(journal_file, chain_id, "chain.spawn", LoopJson.json_field("chain_id", chain_id) <> ", " <> LoopJson.json_field("parent_id", parent_id) <> ", " <> LoopJson.json_field("steps", LoopUtils.join_csv(steps_csv)) <> ", " <> LoopJson.json_field("justification", justification))
 
     chain_spec = parse_inline_chain(LoopUtils.join_csv(steps_csv), project_dir)
     named_spec = Map.put(chain_spec, :name, chain_id)
@@ -567,10 +567,10 @@ defmodule LoopChains do
 
   defp render_dynamic_spec_json(spec, chain_id) do
     "{" <>
-    json_field("chain_id", chain_id) <> ", " <>
-    json_field("parent_id", Map.get(spec, :parent_id, "")) <> ", " <>
-    json_field("steps", LoopUtils.join_csv(Map.get(spec, :steps, []))) <> ", " <>
-    json_field("justification", Map.get(spec, :justification, "")) <>
+    LoopJson.json_field("chain_id", chain_id) <> ", " <>
+    LoopJson.json_field("parent_id", Map.get(spec, :parent_id, "")) <> ", " <>
+    LoopJson.json_field("steps", LoopUtils.join_csv(Map.get(spec, :steps, []))) <> ", " <>
+    LoopJson.json_field("justification", Map.get(spec, :justification, "")) <>
     "}\n"
   end
 
@@ -701,12 +701,12 @@ defmodule LoopChains do
   end
 
   defp extract_topic(line) do
-    decode_json_value(first_quoted_value(first_after_marker(String.split(line, "\"topic\": "))))
+    LoopJson.decode_json_value(first_quoted_value(first_after_marker(String.split(line, "\"topic\": "))))
   end
 
   defp extract_field(line, key) do
     marker = "\"" <> key <> "\": "
-    decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
+    LoopJson.decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
   end
 
   defp first_after_marker([]) do
@@ -744,29 +744,6 @@ defmodule LoopChains do
     item
   end
 
-  defp decode_json_value(text) do
-    restored_newline = String.replace(text, "\\u000a", LoopUtils.line_sep())
-    restored_return = String.replace(restored_newline, "\\u000d", "\r")
-    restored_tab = String.replace(restored_return, "\\u0009", "\t")
-    restored_quote = String.replace(restored_tab, "\\u0022", "\"")
-    String.replace(restored_quote, "\\u005c", "\\")
-  end
-
-  defp json_field(key, value) do
-    "\"" <> key <> "\": " <> json_string(value)
-  end
-
-  defp json_string(text) do
-    "\"" <> encode_json_value(text) <> "\""
-  end
-
-  defp encode_json_value(text) do
-    escaped_backslash = String.replace(text, "\\", "\\u005c")
-    escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
-    escaped_newline = String.replace(escaped_quote, LoopUtils.line_sep(), "\\u000a")
-    escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
-    String.replace(escaped_return, "\t", "\\u0009")
-  end
 
   defp append_text(path, content) do
     System.run("printf '%s' " <> LoopUtils.shell_quote(content) <> " >> " <> LoopUtils.shell_quote(path))

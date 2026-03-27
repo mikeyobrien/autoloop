@@ -22,25 +22,25 @@ defmodule LoopMemory do
   end
 
   def add_learning(project_dir, text, source) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "learning", json_field("text", text) <> ", " <> json_field("source", source) <> ", " <> json_field("created", current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "learning", LoopJson.json_field("text", text) <> ", " <> LoopJson.json_field("source", source) <> ", " <> LoopJson.json_field("created", current_time())))
 
     IO.puts("stored learning")
   end
 
   def add_preference(project_dir, category, text) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "preference", json_field("category", category) <> ", " <> json_field("text", text) <> ", " <> json_field("created", current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "preference", LoopJson.json_field("category", category) <> ", " <> LoopJson.json_field("text", text) <> ", " <> LoopJson.json_field("created", current_time())))
 
     IO.puts("stored preference")
   end
 
   def add_meta(project_dir, key, value) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "meta"), "meta", json_field("key", key) <> ", " <> json_field("value", value) <> ", " <> json_field("created", current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "meta"), "meta", LoopJson.json_field("key", key) <> ", " <> LoopJson.json_field("value", value) <> ", " <> LoopJson.json_field("created", current_time())))
 
     IO.puts("stored meta")
   end
 
   def remove(project_dir, id, reason) do
-    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "ts"), "tombstone", json_field("target_id", id) <> ", " <> json_field("reason", reason) <> ", " <> json_field("created", current_time())))
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "ts"), "tombstone", LoopJson.json_field("target_id", id) <> ", " <> LoopJson.json_field("reason", reason) <> ", " <> LoopJson.json_field("created", current_time())))
 
     IO.puts("removed #{id}")
   end
@@ -242,36 +242,13 @@ defmodule LoopMemory do
   end
 
   defp memory_line(id, type, fields_json) do
-    "{" <> json_field("id", id) <> ", " <> json_field("type", type) <> ", " <> fields_json <> "}\n"
+    "{" <> LoopJson.json_field("id", id) <> ", " <> LoopJson.json_field("type", type) <> ", " <> fields_json <> "}\n"
   end
 
-  defp json_string(text) do
-    "\"" <> encode_json_value(text) <> "\""
-  end
-
-  defp json_field(key, value) do
-    "\"" <> key <> "\": " <> json_string(value)
-  end
-
-  defp encode_json_value(text) do
-    escaped_backslash = String.replace(text, "\\", "\\u005c")
-    escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
-    escaped_newline = String.replace(escaped_quote, LoopUtils.line_sep(), "\\u000a")
-    escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
-    String.replace(escaped_return, "\t", "\\u0009")
-  end
-
-  defp decode_json_value(text) do
-    restored_newline = String.replace(text, "\\u000a", LoopUtils.line_sep())
-    restored_return = String.replace(restored_newline, "\\u000d", "\r")
-    restored_tab = String.replace(restored_return, "\\u0009", "\t")
-    restored_quote = String.replace(restored_tab, "\\u0022", "\"")
-    String.replace(restored_quote, "\\u005c", "\\")
-  end
 
   defp extract_field(line, key) do
     marker = "\"" <> key <> "\": "
-    decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
+    LoopJson.decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
   end
 
   defp first_after_marker([]) do
