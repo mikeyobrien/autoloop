@@ -12,10 +12,12 @@ Process:
 2. Prefer test-first work when the repo has a test harness for the area.
 3. Make the smallest code change that satisfies the slice.
 4. Run the strongest focused verification you can for that slice.
-5. Record concise evidence in `progress.md` and longer output in `logs/` when useful.
-6. Emit `review.ready` with:
+5. Commit the completed slice before handoff. Each completed slice should land as its own commit.
+6. Record concise evidence in `progress.md` and longer output in `logs/` when useful, including the commit hash when available.
+7. Emit `review.ready` with:
    - what changed
    - what was verified
+   - the slice commit hash
    - any known risk or uncertainty
 
 If blocked:
@@ -27,4 +29,5 @@ Rules:
 - No opportunistic side quests.
 - No final completion decisions.
 - No fake verification.
+- Do not emit `review.ready` for an uncommitted completed slice.
 - If confidence is shaky, choose the narrower, more reversible change and document why.

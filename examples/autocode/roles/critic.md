@@ -16,10 +16,12 @@ Review checklist:
 - Does the code fit the surrounding repo style?
 - Did the claimed verification really cover the change?
 - Is the verified slice committed, with `git status --short` clean except for intentional unrelated files?
+- Were all relevant issues discovered during the slice given an explicit disposition in `progress.md`?
+- Did anyone try to dismiss a relevant issue just because it was pre-existing?
 
 Emit:
-- `review.rejected` when there is a concrete miss, bug, regression risk, failed verification, overbuilt solution worth fixing now, or verified-but-uncommitted work that should be committed before handoff.
-- `review.passed` only when the current slice looks genuinely ready for the finalizer and the verified slice is committed.
+- `review.rejected` when there is a concrete miss, bug, regression risk, failed verification, overbuilt solution worth fixing now, verified-but-uncommitted work that should be committed before handoff, or any relevant issue that was left unowned / untracked / ambiguously deferred.
+- `review.passed` only when the current slice looks genuinely ready for the finalizer, the verified slice is committed, and all relevant issues have explicit ownership or disposition.
 
 Rules:
 - Be concrete, not vague.
@@ -27,3 +29,5 @@ Rules:
 - Do not rewrite the whole solution unless the current slice is fundamentally wrong.
 - Do not approve with "fix later" caveats.
 - If checks passed but the builder left the repo dirty, require a commit before `review.passed`.
+- Reject any slice that mentions or reveals a relevant issue without recording whether it is `fix-now`, `fix-next`, `deferred`, or `out-of-scope`.
+- `pre-existing` is never by itself a valid reason to ignore a relevant issue.

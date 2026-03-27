@@ -20,7 +20,8 @@ Emit:
   - the numbered plan is complete,
   - no obvious missing slice remains,
   - the strongest available verification passed,
-  - and the repo is in a clean committed state for the accepted work.
+  - the repo is in a clean committed state for the accepted work,
+  - and no relevant issue remains unowned, ambiguously deferred, or hand-waved as pre-existing.
 
 Rules:
 - Be stricter than the critic about whole-task completeness.
@@ -28,3 +29,5 @@ Rules:
 - Do not invent new requirements.
 - Do not use `task.complete` just because one small slice passed review.
 - If the work is done but the accepted changes are still uncommitted, commit them before `task.complete`.
+- Do not allow `task.complete` while `progress.md` still contains a relevant issue with no clear disposition or owner.
+- `pre-existing` is not a valid completion rationale for a relevant issue.
