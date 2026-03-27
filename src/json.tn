@@ -24,7 +24,13 @@ defmodule LoopJson do
     escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
     escaped_newline = String.replace(escaped_quote, LoopUtils.line_sep(), "\\u000a")
     escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
-    String.replace(escaped_return, "\t", "\\u0009")
+    escaped_tab = String.replace(escaped_return, "\t", "\\u0009")
+    escape_remaining_control_chars(escaped_tab)
+  end
+
+  defp escape_remaining_control_chars(text) do
+    result = System.run("printf '%s' " <> LoopUtils.shell_quote(text) <> " | perl -pe 's/[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]/sprintf(\"\\\\u%04x\",ord($&))/ge'")
+    Map.get(result, :output, text)
   end
 
   def decode_json_value(text) do
