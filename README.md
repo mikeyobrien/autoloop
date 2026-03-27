@@ -55,10 +55,10 @@ core.memory_file = ".miniloops/memory.jsonl"
 ```
 
 Notes:
-- Pi is the documented default and only real built-in adapter.
+- Pi is the documented default and only supported real adapter.
 - `backend.command` defaults to `pi`; override it only if you need a different Pi binary path.
 - `backend.args` are extra Pi flags appended after the built-in `-p --mode json --no-session` arguments.
-- `review.kind`, `review.command`, and `review.args` default to the backend settings when omitted.
+- Review uses the same Pi adapter settings by default.
 - `review.every_iterations = 0` means “use the number of roles in `topology.toml`”.
 - `event_loop.completion_event` is the real completion signal; `completion_promise` is a text fallback.
 - `miniloops.conf` is still accepted for older projects.
@@ -72,7 +72,21 @@ backend.kind = "command"
 backend.command = "./examples/mock-backend.sh"
 ```
 
-Command mode is kept for local mock testing. It is not the primary Pi integration path anymore.
+Command mode is kept for local mock testing. It is not a supported real adapter path.
+
+## Regression check
+
+Run the end-to-end Pi smoke check:
+
+```bash
+./scripts/pi-smoke.sh
+```
+
+It creates a temp miniloops project, runs a one-iteration Pi-backed loop, and fails unless all of these hold:
+- the loop completes via `task.complete`
+- the journal records `backend.start`, `backend.finish`, and `loop.complete`
+- the projected iteration output is exactly `hello`
+- the raw Pi NDJSON log is written to `.miniloops/pi-stream.1.jsonl`
 
 ## Topology
 
@@ -165,9 +179,11 @@ Important shape:
 Examples:
 
 ```bash
-"$MINILOOPS_BIN" emit task.progress "finished the first pass"
+"$MINILOOPS_BIN" emit review.ready "implemented and verified"
 "$MINILOOPS_BIN" emit task.complete "all done"
 ```
+
+The topic must be in the current allowed next-event set or the emit will be rejected.
 
 Manual usage:
 
@@ -253,6 +269,20 @@ Run against another project directory:
 tonic run . /path/to/your/miniloops-project
 tonic run . /path/to/your/miniloops-project "Write a tiny checklist"
 ```
+
+### One-shot backend override
+
+For temporary command-mode experiments, you can override the configured backend at launch time:
+
+```bash
+./bin/miniloops -b claude examples/autocode "Add a --verbose flag to the CLI"
+```
+
+Notes:
+- `-b pi` keeps the built-in Pi adapter path.
+- `-b claude` runs Claude in command mode as `claude -p ...`.
+- other `-b <command>` values run that command directly in command mode.
+- this does not rewrite `miniloops.toml`; it is a one-run override.
 
 ## Install `miniloops` as a command
 

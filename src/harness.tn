@@ -1,11 +1,12 @@
 defmodule LoopHarness do
-  def run(project_dir, prompt_override, self_command) do
-    loop = build_loop_context(project_dir, prompt_override, self_command)
+  def run(project_dir, prompt_override, self_command, run_options) do
+    loop = build_loop_context(project_dir, prompt_override, self_command, run_options)
     live_loop = reload_loop(loop)
 
     ensure_layout(state_dir(live_loop))
     install_runtime_tools(live_loop)
     append_loop_start(live_loop)
+    verbose_log(live_loop, "loop start run_id=" <> run_id(live_loop) <> " max_iterations=" <> to_string(max_iterations(live_loop)))
 
     summary = iterate(live_loop, 1)
     print_summary(summary, live_loop)
@@ -55,15 +56,18 @@ defmodule LoopHarness do
     print_text(read_if_exists(LoopConfig.resolve_journal_file(project_dir)))
   end
 
-  defp build_loop_context(project_dir, prompt_override, self_command) do
+  defp build_loop_context(project_dir, prompt_override, self_command, run_options) do
     config = LoopConfig.load_project(project_dir)
     topology = LoopTopology.load(project_dir)
-    state_dir = Path.join(project_dir, LoopConfig.get(config, "core.state_dir", ".miniloops"))
-    journal_file = LoopConfig.resolve_journal_file(project_dir)
-    memory_file = LoopConfig.resolve_memory_file(project_dir)
+    work_dir = Map.get(run_options, :work_dir, ".")
+    state_dir = Path.join(work_dir, LoopConfig.get(config, "core.state_dir", ".miniloops"))
+    journal_file = LoopConfig.resolve_journal_file_in(project_dir, work_dir)
+    memory_file = LoopConfig.resolve_memory_file_in(project_dir, work_dir)
     run_id = next_run_id(journal_file)
+    backend_override = Map.get(run_options, :backend_override, %{})
+    verbose = Map.get(run_options, :verbose, false)
 
-    %{paths: %{project_dir: project_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override}}
+    %{paths: %{project_dir: project_dir, work_dir: work_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override, backend_override: backend_override, verbose: verbose}}
     |> reload_loop()
   end
 
@@ -72,10 +76,11 @@ defmodule LoopHarness do
     config = LoopConfig.load_project(project_dir)
     topology = LoopTopology.load(project_dir)
     prompt_override = prompt_override(loop)
-    backend_command = LoopConfig.get(config, "backend.command", "pi")
-    backend_kind = resolve_process_kind(LoopConfig.get(config, "backend.kind", ""), backend_command)
-    backend_args = config_list_with_fallback(config, "backend.args", [])
-    backend_prompt_mode = normalize_prompt_mode(LoopConfig.get(config, "backend.prompt_mode", "arg"))
+    backend_override = backend_override(loop)
+    backend_command = process_string_override(backend_override, :command, LoopConfig.get(config, "backend.command", "pi"))
+    backend_kind = resolve_process_kind(process_string_override(backend_override, :kind, LoopConfig.get(config, "backend.kind", "")), backend_command)
+    backend_args = process_list_override(backend_override, :args, config_list_with_fallback(config, "backend.args", []))
+    backend_prompt_mode = normalize_prompt_mode(process_string_override(backend_override, :prompt_mode, LoopConfig.get(config, "backend.prompt_mode", "arg")))
     max_iterations = LoopConfig.get_int(config, "event_loop.max_iterations", 3)
     completion_promise = LoopConfig.get(config, "event_loop.completion_promise", "LOOP_COMPLETE")
     completion_event = LoopTopology.completion_event(topology, LoopConfig.get(config, "event_loop.completion_event", "task.complete"))
@@ -93,7 +98,7 @@ defmodule LoopHarness do
     harness_text = read_optional_project_file(project_dir, LoopConfig.get(config, "harness.instructions_file", "harness.md"))
     review_text = resolve_review_prompt(project_dir, config)
 
-    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override}}
+    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, verbose: verbose(loop)}}
   end
 
   defp iterate(loop, iteration) do
@@ -124,6 +129,7 @@ defmodule LoopHarness do
   end
 
   defp run_hyperagent_review(loop, iteration) do
+    print_review_banner(loop, iteration)
     run_lines = read_run_lines(journal_file(loop), run_id(loop))
     review_prompt = render_review_prompt_text(loop, iteration, run_lines)
 
@@ -159,8 +165,11 @@ defmodule LoopHarness do
   defp run_iteration(loop, iteration) do
     iter = build_iteration_context(loop, iteration)
 
+    print_iteration_banner(loop, iter)
     append_iteration_start(loop, iter)
+    verbose_log(loop, "iteration " <> to_string(iteration) <> " start")
     append_backend_start(loop, iter)
+    verbose_log(loop, "backend start command=" <> backend_command(loop))
 
     result = System.run(build_backend_command(loop, iter), %{stream: true, timeout_ms: backend_timeout_ms(loop)})
     output = Map.get(result, :output, "")
@@ -169,6 +178,8 @@ defmodule LoopHarness do
 
     append_backend_finish(loop, iter, output, exit_code, timed_out)
     append_iteration_finish(loop, iter, output, exit_code, timed_out)
+    verbose_log(loop, "iteration " <> to_string(iteration) <> " finish exit_code=" <> to_string(exit_code))
+    print_iteration_footer(iter)
 
     case timed_out do
       true -> stop_backend_timeout(loop, iteration)
@@ -259,6 +270,7 @@ defmodule LoopHarness do
   end
 
   defp stop_max_iterations(loop) do
+    verbose_log(loop, "loop stop reason=max_iterations")
     append_event(journal_file(loop), run_id(loop), "", "loop.stop", "\"reason\": " <> json_string("max_iterations"))
 
     %{iterations: max_iterations(loop), stop_reason: "max_iterations"}
@@ -277,6 +289,7 @@ defmodule LoopHarness do
   end
 
   defp complete_loop(loop, iteration, reason) do
+    verbose_log(loop, "loop complete reason=" <> reason)
     append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.complete", "\"reason\": " <> json_string(reason))
 
     %{iterations: iteration, stop_reason: reason}
@@ -412,7 +425,7 @@ defmodule LoopHarness do
   end
 
   defp emit_tool_script(loop) do
-    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> shell_quote(project_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> shell_quote(join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
+    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> shell_quote(work_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> shell_quote(join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
   end
 
   defp pi_adapter_script(loop) do
@@ -424,8 +437,8 @@ defmodule LoopHarness do
     harness_instructions_text(loop) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
-    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{list_text(allowed_roles)}\n" <> "Allowed next events now: #{list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish progress and completion.\n" <> "Examples:\n" <>
-    tool_path(loop) <> " emit task.progress \"brief update\"\n" <>
+    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{list_text(allowed_roles)}\n" <> "Allowed next events now: #{list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
+    tool_path(loop) <> " emit <allowed-topic> \"brief handoff summary\"\n" <>
     tool_path(loop) <> " emit " <> completion_event(loop) <> " \"brief completion summary\"\n" <>
     tool_path(loop) <> " memory add learning \"durable lesson\"\n" <>
     tool_path(loop) <> " memory add preference Workflow \"short preference note\"\n\n" <> "Backpressure rule: if you emit an event outside the allowed next-event set, the loop will reject that handoff and ask you to re-route.\n" <> "Prompt/output/scratchpad/memory are projections or stores you can inspect with `" <> tool_path(loop) <> " inspect prompt #{iteration} --format md`, `" <> tool_path(loop) <> " inspect scratchpad --format md`, and `" <> tool_path(loop) <> " inspect memory --format md`.\n" <> "Plain text alone does not publish an event. Prefer the event tool over the stdout completion promise.\n"
@@ -518,11 +531,12 @@ defmodule LoopHarness do
 
   defp build_process_command(loop, spec, prompt, runtime_env) do
     env_lines = runtime_env <> "export MINILOOPS_PROMPT=" <> shell_quote(prompt) <> "\n"
-
-    case process_kind(spec) do
-      "pi" -> env_lines <> build_pi_adapter_invocation(loop, spec)
-      _ -> env_lines <> build_command_invocation(spec, prompt)
+    child_command = case process_kind(spec) do
+      "pi" -> build_pi_adapter_invocation(loop, spec)
+      _ -> build_command_invocation(spec, prompt)
     end
+
+    env_lines <> wrap_process_invocation(child_command)
   end
 
   defp build_pi_adapter_invocation(loop, spec) do
@@ -538,6 +552,24 @@ defmodule LoopHarness do
     end
   end
 
+  defp wrap_process_invocation(command) do
+    "miniloops_child_pid=''\n" <>
+    "miniloops_cleanup() {\n" <>
+    "  if [ -n \"$miniloops_child_pid\" ]; then\n" <>
+    "    kill \"$miniloops_child_pid\" 2>/dev/null || true\n" <>
+    "    wait \"$miniloops_child_pid\" 2>/dev/null || true\n" <>
+    "  fi\n" <>
+    "}\n" <>
+    "trap 'miniloops_cleanup; exit 130' INT TERM\n" <>
+    "(\n" <> command <> "\n" <>
+    ") &\n" <>
+    "miniloops_child_pid=$!\n" <>
+    "wait \"$miniloops_child_pid\"\n" <>
+    "miniloops_status=$?\n" <>
+    "trap - INT TERM\n" <>
+    "exit \"$miniloops_status\"\n"
+  end
+
   defp runtime_env_lines(loop, iteration, recent_event, allowed_roles, allowed_events, review_mode) do
     "export MINILOOPS_RUN_ID=" <> shell_quote(run_id(loop)) <> "\n" <>
     "export MINILOOPS_ITERATION=" <> shell_quote(iteration) <> "\n" <>
@@ -545,7 +577,7 @@ defmodule LoopHarness do
     "export MINILOOPS_COMPLETION_PROMISE=" <> shell_quote(completion_promise(loop)) <> "\n" <>
     "export MINILOOPS_COMPLETION_EVENT=" <> shell_quote(completion_event(loop)) <> "\n" <>
     "export MINILOOPS_STATE_DIR=" <> shell_quote(state_dir(loop)) <> "\n" <>
-    "export MINILOOPS_PROJECT_DIR=" <> shell_quote(project_dir(loop)) <> "\n" <>
+    "export MINILOOPS_PROJECT_DIR=" <> shell_quote(work_dir(loop)) <> "\n" <>
     "export MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <>
     "export MINILOOPS_EVENTS_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <>
     "export MINILOOPS_MEMORY_FILE=" <> shell_quote(memory_file(loop)) <> "\n" <>
@@ -580,14 +612,14 @@ defmodule LoopHarness do
     scratchpad_text = render_run_scratchpad(run_lines)
     memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
     recent_event = routing_event_from_lines(run_lines, "loop.start")
-    latest_iteration = to_string(max_review_prompt_iteration(run_lines)) "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "This harness hot-reloads miniloops.toml, topology.toml, roles/*.md, harness.md, hyperagent.md, and loop memory on every iteration, so runtime file edits take effect on the next task iteration.\n" <> "Prefer modifying runtime files over changing the Tonic source unless the engine itself is clearly the bottleneck.\n" <> "Store durable findings with `" <> tool_path(loop) <> " memory add ...`.\n" <> "Do not emit normal loop events during review.\n\n" <>
+    latest_iteration = to_string(max_review_prompt_iteration(run_lines)) "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "Do not modify files on disk. Store all feedback, recommendations, and durable findings exclusively via `" <> tool_path(loop) <> " memory add ...` commands.\n" <> "Do not emit normal loop events during review.\n\n" <>
     review_instructions_text(loop) <>
     memory_text_block(memory_text) <> "Review trigger iteration: #{iteration}\n" <> "Latest routing event: " <> recent_event <> "\n\n" <>
     LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Useful commands:\n" <>
     tool_path(loop) <> " inspect scratchpad --format md\n" <>
     tool_path(loop) <> " inspect memory --format md\n" <>
     tool_path(loop) <> " inspect prompt " <> latest_iteration <> " --format md\n" <>
-    tool_path(loop) <> " inspect output " <> latest_iteration <> " --format text\n\n" <> "If no runtime changes are needed, store a short learning explaining why and exit cleanly.\n"
+    tool_path(loop) <> " inspect output " <> latest_iteration <> " --format text\n\n" <> "If no improvements are needed, store a short learning explaining why and exit cleanly.\n"
   end
 
   defp resolve_emit_journal_file(project_dir) do
@@ -636,28 +668,32 @@ defmodule LoopHarness do
 
   defp resolve_emit_run_id(journal_file) do
     case System.env("MINILOOPS_RUN_ID") do
-      nil -> latest_run_id(journal_file) "" -> latest_run_id(journal_file)
+      nil -> latest_run_id(journal_file)
+      "" -> latest_run_id(journal_file)
       value -> value
     end
   end
 
   defp resolve_emit_iteration(journal_file, run_id) do
     case System.env("MINILOOPS_ITERATION") do
-      nil -> latest_iteration_for_run(journal_file, run_id) "" -> latest_iteration_for_run(journal_file, run_id)
+      nil -> latest_iteration_for_run(journal_file, run_id)
+      "" -> latest_iteration_for_run(journal_file, run_id)
       value -> value
     end
   end
 
   defp emit_recent_event() do
     case System.env("MINILOOPS_RECENT_EVENT") do
-      nil -> "loop.start" "" -> "loop.start"
+      nil -> "loop.start"
+      "" -> "loop.start"
       value -> value
     end
   end
 
   defp env_csv_list(name) do
     case System.env(name) do
-      nil -> [] "" -> []
+      nil -> []
+      "" -> []
       value -> split_csv(value)
     end
   end
@@ -677,7 +713,8 @@ defmodule LoopHarness do
 
   defp render_run_id(journal_file) do
     case System.env("MINILOOPS_RUN_ID") do
-      nil -> latest_run_id(journal_file) "" -> latest_run_id(journal_file)
+      nil -> latest_run_id(journal_file)
+      "" -> latest_run_id(journal_file)
       value -> value
     end
   end
@@ -724,8 +761,8 @@ defmodule LoopHarness do
 
   defp find_iteration_field([line | rest], iteration, topic, field, current) do
     next =
-    case extract_topic(line) do
-      ^ topic -> match_iteration_field(line, iteration, field, current)
+    case extract_topic(line) == topic do
+      true -> match_iteration_field(line, iteration, field, current)
       _ -> current
     end
 
@@ -1221,6 +1258,34 @@ defmodule LoopHarness do
     end
   end
 
+  defp print_iteration_banner(loop, iter) do
+    iter_label = "iteration #{iteration(iter)}/#{max_iterations(loop)}"
+    rule = pad_right("━━━ " <> iter_label <> " ", "━", 68)
+    role_line = "role: " <> list_text(allowed_roles(iter)) <> " │ event: " <> recent_event(iter) <> " │ next: " <> list_text(allowed_events(iter))
+    bottom_rule = String.duplicate("━", 68)
+
+    print_lines(["", rule, role_line, bottom_rule])
+  end
+
+  defp print_iteration_footer(iter) do
+    label = "──── end iteration #{iteration(iter)} ────"
+    print_lines([label, ""])
+  end
+
+  defp print_review_banner(loop, iteration) do
+    rule = pad_right("━━━ review before iteration #{iteration} ", "━", 68)
+    print_lines(["", rule])
+  end
+
+  defp pad_right(text, char, width) do
+    len = String.length(text)
+
+    case len >= width do
+      true -> text
+      _ -> text <> String.duplicate(char, width - len)
+    end
+  end
+
   defp objective(loop) do
     Map.get(loop, :objective, "")
   end
@@ -1385,6 +1450,10 @@ defmodule LoopHarness do
     Map.get(Map.get(loop, :paths, %{}), :project_dir, ".")
   end
 
+  defp work_dir(loop) do
+    Map.get(Map.get(loop, :paths, %{}), :work_dir, ".")
+  end
+
   defp state_dir(loop) do
     Map.get(Map.get(loop, :paths, %{}), :state_dir, ".miniloops")
   end
@@ -1415,6 +1484,35 @@ defmodule LoopHarness do
 
   defp prompt_override(loop) do
     Map.get(Map.get(loop, :runtime, %{}), :prompt_override, nil)
+  end
+
+  defp backend_override(loop) do
+    Map.get(Map.get(loop, :runtime, %{}), :backend_override, %{})
+  end
+
+  defp verbose(loop) do
+    Map.get(Map.get(loop, :runtime, %{}), :verbose, false)
+  end
+
+  defp verbose_log(loop, message) do
+    case verbose(loop) do
+      true -> IO.puts("[verbose] " <> message)
+      _ -> :ok
+    end
+  end
+
+  defp process_string_override(override, key, fallback) do
+    case Map.get(override, key, nil) do
+      nil -> fallback
+      value -> value
+    end
+  end
+
+  defp process_list_override(override, key, fallback) do
+    case Map.get(override, key, nil) do
+      nil -> fallback
+      value -> value
+    end
   end
 
   defp iteration(iter) do

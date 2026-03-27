@@ -37,7 +37,9 @@ backend.kind = "pi"
 backend.command = "pi"
 ```
 
-For deterministic local harness debugging, switch to the repo mock backend:
+Pi is the only supported real adapter path here.
+
+For deterministic local harness debugging only, switch to the repo mock backend:
 
 ```toml
 backend.kind = "command"
@@ -56,6 +58,12 @@ Or with the installed shim:
 
 ```bash
 miniloops run /path/to/tonic-loops/examples/autocode "Add a --verbose flag to the CLI"
+```
+
+For a one-off Claude dogfood run without editing config:
+
+```bash
+./bin/miniloops -b claude examples/autocode "Add a --verbose flag to the CLI"
 ```
 
 ## Intended input styles

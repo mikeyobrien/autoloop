@@ -19,10 +19,12 @@ Emit:
   - the requested outcome is satisfied,
   - the numbered plan is complete,
   - no obvious missing slice remains,
-  - and the strongest available verification passed.
+  - the strongest available verification passed,
+  - and the repo is in a clean committed state for the accepted work.
 
 Rules:
 - Be stricter than the critic about whole-task completeness.
 - Prefer one more loop over premature completion.
 - Do not invent new requirements.
 - Do not use `task.complete` just because one small slice passed review.
+- If the work is done but the accepted changes are still uncommitted, commit them before `task.complete`.

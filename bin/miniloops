@@ -3,4 +3,17 @@ set -eu
 
 REPO_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 
-exec tonic run "$REPO_DIR" "$@"
+tonic run "$REPO_DIR" "$@" &
+child=$!
+
+cleanup() {
+  kill "$child" 2>/dev/null || true
+  wait "$child" 2>/dev/null || true
+}
+
+trap 'cleanup; exit 130' INT TERM
+
+wait "$child"
+status=$?
+trap - INT TERM
+exit "$status"

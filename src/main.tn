@@ -48,7 +48,7 @@ defmodule Demo do
   defp dispatch(args, argv) do
     options = parse_run_args(args)
 
-    LoopHarness.run(Map.get(options, :project_dir, "."), normalize_prompt(Map.get(options, :prompt, nil)), self_command(argv))
+    LoopHarness.run(Map.get(options, :project_dir, "."), normalize_prompt(Map.get(options, :prompt, nil)), self_command(argv), options)
   end
 
   defp handle_inspect(args) do
@@ -205,21 +205,45 @@ defmodule Demo do
     parse_run_args(rest)
   end
 
+  defp parse_run_args(["--verbose" | rest]) do
+    Map.put(parse_run_args(rest), :verbose, true)
+  end
+
+  defp parse_run_args(["-v" | rest]) do
+    Map.put(parse_run_args(rest), :verbose, true)
+  end
+
+  defp parse_run_args(["-b"]) do
+    backend_usage_error("missing backend after -b")
+  end
+
+  defp parse_run_args(["--backend"]) do
+    backend_usage_error("missing backend after --backend")
+  end
+
+  defp parse_run_args(["-b", backend | rest]) do
+    attach_backend_override(parse_run_args(rest), backend_override_spec(backend))
+  end
+
+  defp parse_run_args(["--backend", backend | rest]) do
+    attach_backend_override(parse_run_args(rest), backend_override_spec(backend))
+  end
+
   defp parse_run_args([]) do
-    %{project_dir: ".", prompt: nil}
+    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false}
   end
 
   defp parse_run_args([arg]) do
     case looks_like_project_dir(arg) do
-      true -> %{project_dir: arg, prompt: nil}
-      _ -> %{project_dir: ".", prompt: arg}
+      true -> %{project_dir: arg, prompt: nil, backend_override: %{}, verbose: false}
+      _ -> %{project_dir: ".", prompt: arg, backend_override: %{}, verbose: false}
     end
   end
 
   defp parse_run_args([first | rest]) do
     case looks_like_project_dir(first) do
-      true -> %{project_dir: first, prompt: join_tokens(rest)}
-      _ -> %{project_dir: ".", prompt: join_tokens([first] ++ rest)}
+      true -> %{project_dir: first, prompt: join_tokens(rest), backend_override: %{}, verbose: false}
+      _ -> %{project_dir: ".", prompt: join_tokens([first] ++ rest), backend_override: %{}, verbose: false}
     end
   end
 
@@ -248,6 +272,34 @@ defmodule Demo do
 
   defp normalize_prompt(prompt) do
     prompt
+  end
+
+  defp attach_backend_override(options, override) do
+    Map.put(options, :backend_override, override)
+  end
+
+  defp backend_override_spec("pi") do
+    %{kind: "pi", command: "pi", args: [], prompt_mode: "arg"}
+  end
+
+  defp backend_override_spec(backend) do
+    case claude_backend(backend) do
+      true -> %{kind: "command", command: backend, args: ["-p", "--dangerously-skip-permissions"], prompt_mode: "arg"}
+      _ -> %{kind: "command", command: backend, args: [], prompt_mode: "arg"}
+    end
+  end
+
+  defp claude_backend("claude") do
+    true
+  end
+
+  defp claude_backend(backend) do
+    String.ends_with(backend, "/claude")
+  end
+
+  defp backend_usage_error(message) do
+    IO.puts(message)
+    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false}
   end
 
   defp looks_like_project_dir(path) do

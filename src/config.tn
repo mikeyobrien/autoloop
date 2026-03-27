@@ -37,6 +37,11 @@ defmodule LoopConfig do
     Path.join(project_dir, journal_path(config))
   end
 
+  def resolve_journal_file_in(project_dir, work_dir) do
+    config = load_project(project_dir)
+    Path.join(work_dir, journal_path(config))
+  end
+
   def resolve_events_file(project_dir) do
     resolve_journal_file(project_dir)
   end
@@ -44,6 +49,11 @@ defmodule LoopConfig do
   def resolve_memory_file(project_dir) do
     config = load_project(project_dir)
     Path.join(project_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+  end
+
+  def resolve_memory_file_in(project_dir, work_dir) do
+    config = load_project(project_dir)
+    Path.join(work_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
   end
 
   defp journal_path(config) do

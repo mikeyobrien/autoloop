@@ -6,7 +6,10 @@ event_loop.required_events = ["review.passed"]
 
 backend.kind = "pi"
 backend.command = "pi"
-backend.timeout_ms = 300000
+backend.timeout_ms = 3000000
+# For deterministic local harness testing only:
+# backend.kind = "command"
+# backend.command = "../../examples/mock-backend.sh"
 
 review.enabled = false
 
