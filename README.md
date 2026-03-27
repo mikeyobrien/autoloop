@@ -80,12 +80,37 @@ Inspect chain state:
 miniloops inspect chain --format md
 ```
 
+### Dynamic chain generation
+
+Chains can be generated dynamically at runtime by a meta-level orchestrator. Dynamic chains have:
+- **Budget constraints**: max depth, steps, runtime, children, consecutive failures
+- **Quality gates**: refuse spawning after repeated failures
+- **Lineage tracking**: every dynamic chain records its parent
+- **Durable specs**: chain definitions stored as JSON in `.miniloops/chains/specs/`
+- **Preset vocabulary**: constrained to known preset names
+
+Configure budgets in `chains.toml`:
+
+```toml
+[budget]
+max_depth = 5
+max_steps = 50
+max_runtime_ms = 3600000
+max_children = 10
+max_consecutive_failures = 3
+```
+
+See [`docs/dynamic-chains.md`](docs/dynamic-chains.md) for the full design.
+
 ### Chains vs Topology
 
-- **Topology** (`topology.toml`) = intra-loop role routing (planner → builder → critic → finalizer)
-- **Chains** (`chains.toml` / `--chain`) = inter-loop preset composition (autocode → autoqa → autoresearch)
+| Layer | Config | Scope |
+|-------|--------|-------|
+| **Topology** | `topology.toml` | Intra-loop role routing (planner → builder → critic) |
+| **Chains** | `chains.toml` / `--chain` | Inter-loop preset composition (autocode → autoqa) |
+| **Dynamic chains** | Runtime specs | Meta-level chain planning, selection, spawning |
 
-These are separate layers. Topology stays focused on roles within one loop; chains compose whole loops together.
+These are separate layers. Topology stays focused on roles within one loop; chains compose whole loops together; dynamic chains add budget-bounded meta-orchestration above chains.
 
 ## Runtime files
 

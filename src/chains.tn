@@ -51,12 +51,85 @@ defmodule LoopChains do
     finalize(state, project_dir)
   end
 
+  def load_budget(project_dir) do
+    path = Path.join(project_dir, "chains.toml")
+
+    case System.path_exists(path) do
+      true -> parse_budget(String.split(System.read_text(path), line_sep()))
+      _ -> default_budget()
+    end
+  end
+
+  def default_budget() do
+    %{max_depth: 5, max_steps: 50, max_runtime_ms: 3600000, max_children: 10, max_consecutive_failures: 3}
+  end
+
+  def check_budget(budget, tracker) do
+    cond_budget_check(budget, tracker)
+  end
+
+  def spawn_dynamic_chain(spec, project_dir, self_command, run_options, parent_id) do
+    budget = Map.get(spec, :budget, default_budget())
+    tracker = load_chain_tracker(project_dir)
+    budget_result = check_budget(budget, tracker)
+
+    spawn_after_budget_check(budget_result, spec, project_dir, self_command, run_options, parent_id)
+  end
+
+  defp spawn_after_budget_check(:ok, spec, project_dir, self_command, run_options, parent_id) do
+    quality_result = check_quality_gate(project_dir)
+    spawn_after_quality_check(quality_result, spec, project_dir, self_command, run_options, parent_id)
+  end
+
+  defp spawn_after_budget_check(rejection, _spec, _project_dir, _self_command, _run_options, _parent_id) do
+    %{outcome: "budget_exceeded", reason: rejection_reason(rejection)}
+  end
+
+  defp spawn_after_quality_check(:ok, spec, project_dir, self_command, run_options, parent_id) do
+    execute_dynamic_chain(spec, project_dir, self_command, run_options, parent_id)
+  end
+
+  defp spawn_after_quality_check(rejection, _spec, _project_dir, _self_command, _run_options, _parent_id) do
+    %{outcome: "quality_gate_rejected", reason: rejection_reason(rejection)}
+  end
+
+  defp rejection_reason(:ok) do
+    ""
+  end
+
+  defp rejection_reason({:rejected, reason}) do
+    reason
+  end
+
+  defp rejection_reason(_other) do
+    "unknown rejection"
+  end
+
+  def write_dynamic_spec(project_dir, spec) do
+    specs_dir = Path.join(project_dir, ".miniloops/chains/specs")
+    System.ensure_dir(specs_dir)
+    chain_id = Map.get(spec, :chain_id, "dyn-" <> to_string(count_dynamic_specs(specs_dir) + 1))
+    path = Path.join(specs_dir, chain_id <> ".json")
+    content = render_dynamic_spec_json(spec, chain_id)
+    System.write_text(path, content)
+    chain_id
+  end
+
+  def list_known_presets(project_dir) do
+    ["autocode", "autoideas", "autoresearch", "autoqa", "autotest", "autofix", "autoreview", "autodoc", "autosec", "autoperf"]
+  end
+
+  def validate_preset_vocabulary(steps, project_dir) do
+    known = list_known_presets(project_dir)
+    validate_step_names(steps, known)
+  end
+
   defp default_chains() do
-    %{chains: []}
+    %{chains: [], budget: default_budget()}
   end
 
   defp initial_state() do
-    %{chains: [], current_chain: empty_chain(), section: "root"}
+    %{chains: [], current_chain: empty_chain(), section: "root", budget: default_budget()}
   end
 
   defp empty_chain() do
@@ -80,12 +153,20 @@ defmodule LoopChains do
     start_chain(state)
   end
 
+  defp parse_line("[budget]", state) do
+    start_budget(state)
+  end
+
   defp parse_line(line, state) do
     assign_parts(String.split(line, "="), state)
   end
 
   defp start_chain(state) do
-    %{chains: push_current_chain(state), current_chain: empty_chain(), section: "chain"}
+    %{chains: push_current_chain(state), current_chain: empty_chain(), section: "chain", budget: Map.get(state, :budget, default_budget())}
+  end
+
+  defp start_budget(state) do
+    %{chains: push_current_chain(state), current_chain: empty_chain(), section: "budget", budget: Map.get(state, :budget, default_budget())}
   end
 
   defp push_current_chain(state) do
@@ -107,23 +188,57 @@ defmodule LoopChains do
     state
   end
 
-  defp assign_chain_value("name", raw_value, state) do
+  defp assign_chain_value(key, raw_value, state) do
+    section = Map.get(state, :section, "root")
+    assign_in_chain_section(section, key, raw_value, state)
+  end
+
+  defp assign_in_chain_section("chain", "name", raw_value, state) do
     chain = Map.put(Map.get(state, :current_chain, empty_chain()), :name, strip_quotes(raw_value))
     Map.put(state, :current_chain, chain)
   end
 
-  defp assign_chain_value("steps", raw_value, state) do
+  defp assign_in_chain_section("chain", "steps", raw_value, state) do
     chain = Map.put(Map.get(state, :current_chain, empty_chain()), :steps, normalize_list(raw_value))
     Map.put(state, :current_chain, chain)
   end
 
-  defp assign_chain_value(_key, _value, state) do
+  defp assign_in_chain_section("budget", key, raw_value, state) do
+    budget = Map.get(state, :budget, default_budget())
+    Map.put(state, :budget, assign_budget_key(budget, key, strip_quotes(raw_value)))
+  end
+
+  defp assign_in_chain_section(_section, _key, _value, state) do
     state
+  end
+
+  defp assign_budget_key(budget, "max_depth", value) do
+    Map.put(budget, :max_depth, String.to_integer(value))
+  end
+
+  defp assign_budget_key(budget, "max_steps", value) do
+    Map.put(budget, :max_steps, String.to_integer(value))
+  end
+
+  defp assign_budget_key(budget, "max_runtime_ms", value) do
+    Map.put(budget, :max_runtime_ms, String.to_integer(value))
+  end
+
+  defp assign_budget_key(budget, "max_children", value) do
+    Map.put(budget, :max_children, String.to_integer(value))
+  end
+
+  defp assign_budget_key(budget, "max_consecutive_failures", value) do
+    Map.put(budget, :max_consecutive_failures, String.to_integer(value))
+  end
+
+  defp assign_budget_key(budget, _key, _value) do
+    budget
   end
 
   defp finalize(state, project_dir) do
     chains = Enum.reverse(push_current_chain(state))
-    %{chains: resolve_all_chains(chains, project_dir, [])}
+    %{chains: resolve_all_chains(chains, project_dir, []), budget: Map.get(state, :budget, default_budget())}
   end
 
   defp resolve_all_chains([], _project_dir, acc) do
@@ -289,6 +404,10 @@ defmodule LoopChains do
     true
   end
 
+  defp chain_topic("chain.spawn") do
+    true
+  end
+
   defp chain_topic(_topic) do
     false
   end
@@ -320,8 +439,202 @@ defmodule LoopChains do
     "\nOutcome: " <> extract_field(line, "outcome") <> " (" <> extract_field(line, "steps_completed") <> " steps completed)\n\n"
   end
 
+  defp render_chain_entry("chain.spawn", line) do
+    "- Spawned: " <> extract_field(line, "chain_id") <> " (parent: " <> extract_field(line, "parent_id") <> ", steps: " <> extract_field(line, "steps") <> ")\n"
+  end
+
   defp render_chain_entry(_topic, _line) do
     ""
+  end
+
+  # --- budget checking ---
+
+  defp cond_budget_check(budget, tracker) do
+    depth = Map.get(tracker, :depth, 0)
+    total_steps = Map.get(tracker, :total_steps, 0)
+    children = Map.get(tracker, :children, 0)
+    consecutive_failures = Map.get(tracker, :consecutive_failures, 0)
+
+    case depth >= Map.get(budget, :max_depth, 5) do
+      true -> {:rejected, "max_depth exceeded (" <> to_string(depth) <> "/" <> to_string(Map.get(budget, :max_depth, 5)) <> ")"}
+      _ -> check_budget_steps(budget, total_steps, children, consecutive_failures)
+    end
+  end
+
+  defp check_budget_steps(budget, total_steps, children, consecutive_failures) do
+    case total_steps >= Map.get(budget, :max_steps, 50) do
+      true -> {:rejected, "max_steps exceeded (" <> to_string(total_steps) <> "/" <> to_string(Map.get(budget, :max_steps, 50)) <> ")"}
+      _ -> check_budget_children(budget, children, consecutive_failures)
+    end
+  end
+
+  defp check_budget_children(budget, children, consecutive_failures) do
+    case children >= Map.get(budget, :max_children, 10) do
+      true -> {:rejected, "max_children exceeded (" <> to_string(children) <> "/" <> to_string(Map.get(budget, :max_children, 10)) <> ")"}
+      _ -> check_budget_failures(budget, consecutive_failures)
+    end
+  end
+
+  defp check_budget_failures(budget, consecutive_failures) do
+    case consecutive_failures >= Map.get(budget, :max_consecutive_failures, 3) do
+      true -> {:rejected, "max_consecutive_failures exceeded (" <> to_string(consecutive_failures) <> "/" <> to_string(Map.get(budget, :max_consecutive_failures, 3)) <> ")"}
+      _ -> :ok
+    end
+  end
+
+  defp load_chain_tracker(project_dir) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    lines = read_lines(journal_file)
+    build_chain_tracker(lines, %{depth: 0, total_steps: 0, children: 0, consecutive_failures: 0})
+  end
+
+  defp build_chain_tracker([], acc) do
+    acc
+  end
+
+  defp build_chain_tracker([line | rest], acc) do
+    topic = extract_topic(line)
+    next = update_tracker(topic, line, acc)
+    build_chain_tracker(rest, next)
+  end
+
+  defp update_tracker("chain.start", _line, acc) do
+    Map.put(Map.put(acc, :children, Map.get(acc, :children, 0) + 1), :consecutive_failures, 0)
+  end
+
+  defp update_tracker("chain.step.finish", _line, acc) do
+    Map.put(acc, :total_steps, Map.get(acc, :total_steps, 0) + 1)
+  end
+
+  defp update_tracker("chain.complete", line, acc) do
+    outcome = extract_field(line, "outcome")
+    update_tracker_outcome(outcome, acc)
+  end
+
+  defp update_tracker(_topic, _line, acc) do
+    acc
+  end
+
+  defp update_tracker_outcome("all_steps_complete", acc) do
+    Map.put(acc, :consecutive_failures, 0)
+  end
+
+  defp update_tracker_outcome(_outcome, acc) do
+    Map.put(acc, :consecutive_failures, Map.get(acc, :consecutive_failures, 0) + 1)
+  end
+
+  # --- quality gate ---
+
+  defp check_quality_gate(project_dir) do
+    tracker = load_chain_tracker(project_dir)
+    consecutive_failures = Map.get(tracker, :consecutive_failures, 0)
+
+    case consecutive_failures >= 2 do
+      true -> {:rejected, "quality gate: " <> to_string(consecutive_failures) <> " consecutive failures — consolidate before spawning"}
+      _ -> :ok
+    end
+  end
+
+  # --- dynamic chain execution ---
+
+  defp execute_dynamic_chain(spec, project_dir, self_command, run_options, parent_id) do
+    chain_id = write_dynamic_spec(project_dir, Map.put(spec, :parent_id, parent_id))
+    steps_csv = Map.get(spec, :steps, [])
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    justification = Map.get(spec, :justification, "")
+
+    append_chain_event(journal_file, chain_id, "chain.spawn", json_field("chain_id", chain_id) <> ", " <> json_field("parent_id", parent_id) <> ", " <> json_field("steps", join_csv(steps_csv)) <> ", " <> json_field("justification", justification))
+
+    chain_spec = parse_inline_chain(join_csv(steps_csv), project_dir)
+    named_spec = Map.put(chain_spec, :name, chain_id)
+    result = run(named_spec, project_dir, self_command, run_options)
+    Map.put(result, :chain_id, chain_id)
+  end
+
+  # --- dynamic spec file ---
+
+  defp count_dynamic_specs(specs_dir) do
+    case System.path_exists(specs_dir) do
+      true -> count_json_files(specs_dir)
+      _ -> 0
+    end
+  end
+
+  defp count_json_files(dir) do
+    result = System.run("ls " <> shell_quote(dir) <> " 2>/dev/null | grep -c '\\.json$' || echo 0")
+    String.to_integer(String.trim(Map.get(result, :output, "0")))
+  end
+
+  defp render_dynamic_spec_json(spec, chain_id) do
+    "{" <>
+    json_field("chain_id", chain_id) <> ", " <>
+    json_field("parent_id", Map.get(spec, :parent_id, "")) <> ", " <>
+    json_field("steps", join_csv(Map.get(spec, :steps, []))) <> ", " <>
+    json_field("justification", Map.get(spec, :justification, "")) <>
+    "}\n"
+  end
+
+  # --- preset vocabulary validation ---
+
+  defp validate_step_names([], _known) do
+    :ok
+  end
+
+  defp validate_step_names([name | rest], known) do
+    case list_contains(known, name) do
+      true -> validate_step_names(rest, known)
+      _ -> {:rejected, "unknown preset: " <> name}
+    end
+  end
+
+  defp list_contains([], _needle) do
+    false
+  end
+
+  defp list_contains([item | rest], needle) do
+    case item == needle do
+      true -> true
+      _ -> list_contains(rest, needle)
+    end
+  end
+
+  # --- budget parsing from chains.toml ---
+
+  defp parse_budget(lines) do
+    parse_budget_lines(lines, default_budget(), false)
+  end
+
+  defp parse_budget_lines([], budget, _in_section) do
+    budget
+  end
+
+  defp parse_budget_lines([line | rest], budget, in_section) do
+    trimmed = String.trim(line)
+
+    case trimmed do
+      "[budget]" -> parse_budget_lines(rest, budget, true)
+      "[[chain]]" -> parse_budget_lines(rest, budget, false)
+      _ -> parse_budget_line(trimmed, rest, budget, in_section)
+    end
+  end
+
+  defp parse_budget_line(line, rest, budget, true) do
+    case skip_line(line) do
+      true -> parse_budget_lines(rest, budget, true)
+      _ -> parse_budget_assignment(String.split(line, "="), rest, budget)
+    end
+  end
+
+  defp parse_budget_line(_line, rest, budget, false) do
+    parse_budget_lines(rest, budget, false)
+  end
+
+  defp parse_budget_assignment([key, value], rest, budget) do
+    parse_budget_lines(rest, assign_budget_key(budget, String.trim(key), strip_quotes(String.trim(value))), true)
+  end
+
+  defp parse_budget_assignment(_, rest, budget) do
+    parse_budget_lines(rest, budget, true)
   end
 
   defp step_names(steps) do

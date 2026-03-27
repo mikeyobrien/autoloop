@@ -2,6 +2,15 @@
 # Each chain runs its presets in sequence with isolated state per step.
 # Preset names resolve to examples/<name>/ directories.
 
+# Budget constraints for dynamic chain generation.
+# These limits apply to all chains spawned at runtime.
+[budget]
+max_depth = 5
+max_steps = 50
+max_runtime_ms = 3600000
+max_children = 10
+max_consecutive_failures = 3
+
 [[chain]]
 name = "code-and-qa"
 steps = ["autocode", "autoqa"]
