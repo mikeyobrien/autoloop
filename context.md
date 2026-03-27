@@ -1,24 +1,18 @@
-# Context: `check .`
+# Context: Add iteration-21 review note to loop memory
 
 ## Objective
-Run the repo's project check from the repository root and get it passing.
+Record the requested review summary as a durable loop learning via `./.miniloops/miniloops memory add learning ...`.
 
-## Interpreted command
-- `tonic check .` from `/Users/rook/projects/tonic-loops`
-- Source: `README.md` documents `tonic check .` as the repo check surface.
-
-## Source type
-- Bare-minimal miniloops harness request
-- No `.code-task.md` input
+## Requested Learning
+`Review iteration 21: Loop healthy, no changes needed. 4/8 areas done, 12 validated suggestions. Area 5 (timeout values) in progress — scanner(19), analyst(20), reviewer next(21). Routing correct: analysis.ready → reviewer. Cadence steady at ~4 iters/area with occasional +1 emit overhead (iter 18 was report.updated relay). No wasted iterations, no routing errors. Projected completion ~36 iters.`
 
 ## Constraints
-- Planner only: do not implement or review in this turn.
-- Keep one concrete slice active.
-- Prefer the smallest fix that makes `tonic check .` pass.
-- If `tonic check .` fails, fix the first real blocker on the touched surface before widening scope.
-- Verification for completion must include a fresh successful `tonic check .`.
+- Do not change product code.
+- Keep the run limited to the requested memory entry and shared-workfile refresh.
+- Verify through `./.miniloops/miniloops inspect memory --format md`.
 
-## Acceptance criteria
-1. `tonic check .` succeeds from the repo root.
-2. Any code change is narrowly scoped to the failure blocking that check.
-3. Shared working files stay aligned with this objective.
+## Likely Changed Files
+- `./.miniloops/memory.jsonl`
+- `context.md`
+- `plan.md`
+- `progress.md`

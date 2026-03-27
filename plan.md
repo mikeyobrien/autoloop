@@ -1,6 +1,6 @@
-# Plan: make `tonic check .` pass
+# Plan: Add iteration-21 review note
 
-1. Run `tonic check .` and capture the first concrete failure.
-2. Apply the smallest code or config fix for that failure.
-3. Re-run `tonic check .` to verify a clean pass.
-4. Hand off for review/finalization only after the green check is confirmed.
+1. Refresh the shared working files so they match the current iteration-21 memory-only objective.
+2. Add exactly one learning entry with the requested iteration-21 review text.
+3. Verify the learning is visible in `./.miniloops/miniloops inspect memory --format md`.
+4. If verification passes, commit only the slice files before `review.ready` and hand off for review.
