@@ -1,4 +1,13 @@
 defmodule LoopTopology do
+  # Regex event matching: topology entries wrapped in `/` delimiters
+  # (e.g., "/review\\..+/") are treated as extended regex patterns.
+  # The topic is matched against the full pattern (anchored with ^...$).
+  # Since tonic stdlib has no Regex module, matching shells out to grep -qE.
+
+  def event_matches_any(topic, patterns) do
+    match_any(topic, patterns)
+  end
+
   def load(project_dir) do
     path = Path.join(project_dir, "topology.toml")
 
@@ -17,7 +26,7 @@ defmodule LoopTopology do
 
   def suggested_roles(topology, recent_event) do
     handoff = Map.get(topology, :handoff, %{})
-    roles = Map.get(handoff, recent_event, [])
+    roles = collect_matching_roles(Map.keys(handoff), handoff, recent_event, [])
 
     case roles do
       [] -> role_ids(Map.get(topology, :roles, []), [])
@@ -305,6 +314,66 @@ defmodule LoopTopology do
     case trimmed do
       "" -> split_array_parts(rest, acc)
       _ -> split_array_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  # --- Regex event matching helpers ---
+
+  defp collect_matching_roles([], _handoff, _event, acc) do
+    dedup_list(acc, [])
+  end
+
+  defp collect_matching_roles([key | rest], handoff, event, acc) do
+    case event_matches_pattern(event, key) do
+      true -> collect_matching_roles(rest, handoff, event, acc ++ Map.get(handoff, key, []))
+      _ -> collect_matching_roles(rest, handoff, event, acc)
+    end
+  end
+
+  defp dedup_list([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp dedup_list([item | rest], acc) do
+    case LoopUtils.list_contains(acc, item) do
+      true -> dedup_list(rest, acc)
+      _ -> dedup_list(rest, [item] ++ acc)
+    end
+  end
+
+  defp match_any(_topic, []) do
+    false
+  end
+
+  defp match_any(topic, [pattern | rest]) do
+    case event_matches_pattern(topic, pattern) do
+      true -> true
+      _ -> match_any(topic, rest)
+    end
+  end
+
+  defp event_matches_pattern(topic, pattern) do
+    case is_regex_pattern(pattern) do
+      true -> regex_match(topic, strip_regex_delimiters(pattern))
+      _ -> topic == pattern
+    end
+  end
+
+  defp is_regex_pattern(value) do
+    String.length(value) >= 3 and String.starts_with(value, "/") and String.ends_with(value, "/")
+  end
+
+  defp strip_regex_delimiters(value) do
+    String.slice(value, 1, String.length(value) - 2)
+  end
+
+  defp regex_match(topic, pattern) do
+    cmd = "printf '%s' " <> LoopUtils.shell_quote(topic) <> " | grep -qE " <> LoopUtils.shell_quote("^" <> pattern <> "$") <> " && printf true || printf false"
+    result = System.run(cmd)
+
+    case Map.get(result, :output, "false") do
+      "true" -> true
+      _ -> false
     end
   end
 

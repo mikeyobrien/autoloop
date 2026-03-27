@@ -275,7 +275,7 @@ defmodule LoopHarness do
   end
 
   defp invalid_event(emitted_topic, allowed_events) do
-    not LoopUtils.list_contains(allowed_events, emitted_topic)
+    not LoopTopology.event_matches_any(emitted_topic, allowed_events)
   end
 
   defp completed_via_event(topics, completion_event, required_events) do
