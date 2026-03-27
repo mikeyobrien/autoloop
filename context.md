@@ -1,29 +1,37 @@
-# Context: Implement Remaining Auto Workflow Presets
+# Context: Implement Remaining .agents/tasks
 
 ## Request summary
-Implement the 6 future-facing presets documented in `docs/auto-workflows.md`: autotest, autofix, autoreview, autodoc, autosec, autoperf.
+Implement the 3 remaining code-task specs from `.agents/tasks/tonic-loops/`:
+1. **journal-first-runtime-simplification** — Push coordination state into JSONL journal
+2. **first-class-loop-chaining** — Add `chains.toml` and CLI chain composition
+3. **dynamic-chain-generation** — Add bounded open-ended chain generation (depends on #2)
+
+## Execution order
+journal-first → loop-chaining → dynamic-chains
 
 ## Source type
-Taxonomy document at `docs/auto-workflows.md`
+Task specs in `.agents/tasks/tonic-loops/`
 
-## Existing presets (reference for structure)
-| Preset | Shape | Required event | Shared state |
-|--------|-------|----------------|--------------|
-| `autocode` | planner → builder → critic → finalizer | `review.passed` | context.md, plan.md, progress.md |
-| `autoideas` | scanner → analyst → reviewer → synthesizer | `analysis.validated` | scan-areas.md, progress.md, ideas-report.md |
-| `autoresearch` | strategist → implementer → benchmarker → evaluator | `experiment.measured` | autoresearch.md, experiments.jsonl, progress.md |
-| `autoqa` | inspector → planner → executor → reporter | `qa.passed` | qa-plan.md, qa-report.md, progress.md |
+## Core engine (Tonic source)
+| File | Role | Lines |
+|------|------|-------|
+| `src/harness.tn` | Main event loop, journal append, prompt rendering, scratchpad | ~1615 |
+| `src/main.tn` | CLI dispatch (run, emit, inspect, memory, pi-adapter) | ~414 |
+| `src/config.tn` | Config file loading (TOML/INI) | ~189 |
+| `src/topology.tn` | Topology parsing, role/handoff management | ~362 |
+| `src/memory.tn` | Memory JSONL store (learnings, preferences, meta) | ~339 |
+| `src/pi_adapter.tn` | Pi backend integration | ~300 |
 
-## Preset structure (every preset has)
-- `miniloops.toml` — loop config (Pi backend, 100 iterations, completion/required events)
-- `topology.toml` — name, roles with emits + prompt_file, handoff map
-- `harness.md` — global rules loaded every iteration
-- `roles/*.md` — one file per role
-- `README.md` — usage and explanation
+## Key patterns
+- Journal events: `append_event(journal_file, run_id, iteration, topic, fields_json)`
+- JSON encoding: `json_field(key, value)` for strings, `json_field_raw(key, raw)` for booleans
+- Inspect surfaces: scratchpad, prompt, output, journal, memory
+- All state in `.miniloops/` directory (journal.jsonl, memory.jsonl, pi-stream.*.jsonl)
+- Config: flat `key = value` in miniloops.toml, TOML-like arrays `[...]`
+- Topology: `[[role]]` sections + `[handoff]` map in topology.toml
 
 ## Constraints
-- Follow existing patterns exactly (Pi backend, same config shape)
-- Each preset gets its own behavioral center — do not clone autocode topology
-- Handoff graphs must have no dead ends and all events routed
-- No core engine changes
-- Validate with `tonic check .` after each preset
+- Follow repo tenets in AGENTS.md (12 principles)
+- No giant frameworks — keep core narrow
+- Validate with `tonic check .` after each slice
+- Preserve existing test suite

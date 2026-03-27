@@ -1,96 +1,119 @@
-# Plan: Implement Remaining Auto Workflow Presets
+# Plan: Implement Remaining .agents/tasks
 
-## Slice 1 — `autotest` preset
+Three tasks in dependency order. Each task is broken into small verifiable slices.
 
-Formal test creation and test-suite tightening.
+## Task 1 — Journal-First Runtime Simplification
 
-**Shape:** surveyor → writer → runner → assessor
-- surveyor: analyze codebase, find coverage gaps, identify untested paths
-- writer: write test code for the identified gap
-- runner: execute the new tests, capture results
-- assessor: evaluate test quality, coverage delta, decide continue/complete
+### Slice 1.1 — Add structured coordination event types to harness
 
-**Required event:** `tests.passed`
-**Shared state:** `test-plan.md`, `test-report.md`, `progress.md`
-**Files:** `examples/autotest/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+Add new journal event topics that agents can emit for coordination state:
+- `issue.discovered` — fields: id, summary, disposition, owner
+- `issue.resolved` — fields: id, resolution
+- `slice.started` — fields: id, description
+- `slice.verified` — fields: id, method
+- `slice.committed` — fields: id, commit_hash
+- `context.archived` — fields: source_file, dest_file, reason
 
-## Slice 2 — `autofix` preset
+These are agent-emittable events that pass through the existing emit path. Mark them as non-routing system topics so they don't affect topology routing.
 
-Bug diagnosis and repair from a bug report or failing test.
+**Files:** `src/harness.tn`
 
-**Shape:** diagnoser → fixer → verifier → closer
-- diagnoser: reproduce the bug, trace root cause, narrow scope
-- fixer: implement the minimal fix
-- verifier: verify the fix (run failing test, check regression)
-- closer: confirm fix is correct, decide if more fixes needed
+### Slice 1.2 — Add coordination projection (inspect coordination)
 
-**Required event:** `fix.verified`
-**Shared state:** `bug-report.md`, `fix-log.md`, `progress.md`
-**Files:** `examples/autofix/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+Add `render_coordination(project_dir)` that reads journal lines, collects coordination events, and materializes a structured summary showing current issues, slice lifecycle, and commits. Wire into `dispatch_inspect` via `miniloops inspect coordination --format md`.
 
-## Slice 3 — `autoreview` preset
+**Files:** `src/harness.tn`, `src/main.tn`
 
-Code review loop for PR diffs or change sets.
+### Slice 1.3 — Update prompts and docs
 
-**Shape:** reader → checker → suggester → summarizer
-- reader: read the diff/changes, build context
-- checker: check for correctness, security, style, performance issues
-- suggester: propose concrete fixes for found issues
-- summarizer: compile review into structured feedback
+Update `harness.md`, role prompts, and `AGENTS.md` to document the journal/markdown/docs/memory split. Add coordination event usage guidance to harness instructions.
 
-**Required event:** `review.checked`
-**Shared state:** `review-context.md`, `review-findings.md`, `progress.md`
-**Files:** `examples/autoreview/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+**Files:** `harness.md`, `AGENTS.md`, `roles/build.md`, `roles/verify.md`, `roles/finalizer.md`
 
-## Slice 4 — `autodoc` preset
+### Slice 1.4 — Validate
 
-Documentation generation and maintenance.
+Run `tonic check .`, verify existing tests pass.
 
-**Shape:** auditor → writer → checker → publisher
-- auditor: compare docs to code, find gaps and staleness
-- writer: write or update documentation for the identified gap
-- checker: verify doc accuracy against actual code
-- publisher: compile doc-report, decide continue/complete
+---
 
-**Required event:** `doc.checked`
-**Shared state:** `doc-plan.md`, `doc-report.md`, `progress.md`
-**Files:** `examples/autodoc/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+## Task 2 — First-Class Loop Chaining
 
-## Slice 5 — `autosec` preset
+### Slice 2.1 — Add chains.toml parser (src/chains.tn)
 
-Security audit and hardening.
+New module for parsing chain definitions. Format:
+```toml
+[[chain]]
+name = "code-and-qa"
+steps = ["autocode", "autoqa"]
+```
 
-**Shape:** scanner → analyst → hardener → reporter
-- scanner: scan for vulnerabilities (OWASP top-10, deps, secrets, config)
-- analyst: deep-dive each finding, classify severity, confirm/dismiss
-- hardener: implement the fix or mitigation
-- reporter: compile security report, track findings
+Preset resolution: name → `examples/<name>/` directory.
 
-**Required event:** `finding.confirmed`
-**Shared state:** `sec-findings.md`, `sec-report.md`, `progress.md`
-**Files:** `examples/autosec/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+**Files:** `src/chains.tn` (new), `test/chains_test.tn` (new)
 
-## Slice 6 — `autoperf` preset
+### Slice 2.2 — Add chain execution engine
 
-Performance profiling and optimization.
+`LoopChains.run()` that runs each preset in sequence with:
+- Isolated state dirs: `.miniloops/chains/<chain-run-id>/step-<n>/`
+- Handoff/result artifacts between steps
+- Chain lifecycle journal events: `chain.start`, `chain.step.start`, `chain.step.finish`, `chain.complete`
 
-**Shape:** profiler → optimizer → measurer → judge
-- profiler: identify hot paths, establish baselines
-- optimizer: implement targeted optimization
-- measurer: run benchmarks, capture before/after metrics
-- judge: evaluate improvement, keep/discard, decide next target
+**Files:** `src/chains.tn`, `src/harness.tn` (accept work_dir in run options)
 
-**Required event:** `perf.measured`
-**Shared state:** `perf-profile.md`, `perf-log.jsonl`, `progress.md`
-**Files:** `examples/autoperf/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+### Slice 2.3 — CLI support for chains
 
-## Slice 7 — Update docs and validate
+- `miniloops run . --chain autocode,autoqa` (ad hoc)
+- `miniloops chain run <name> [project]` (named)
+- `miniloops chain list [project]`
 
-- Update `docs/auto-workflows.md` to mark all 10 presets as implemented
-- Update README.md workflow family table to include all 10
-- Run `tonic check .`
+**Files:** `src/main.tn`
+
+### Slice 2.4 — Chain inspection and docs
+
+Add `miniloops inspect chain --format md`. Update README with chain documentation.
+
+**Files:** `src/main.tn`, `src/chains.tn`, `README.md`
+
+### Slice 2.5 — Validate
+
+Run `tonic check .`, verify tests.
+
+---
+
+## Task 3 — Dynamic Chain Generation
+
+### Slice 3.1 — Chain budget model
+
+Add budget config: max_depth, max_steps, max_runtime_ms, max_children, max_consecutive_failures. Stored in chains.toml `[budget]` section.
+
+**Files:** `src/chains.tn`
+
+### Slice 3.2 — Dynamic chain spec format
+
+Durable JSON chain spec files in `.miniloops/chains/specs/`. LLM-writable, validated against known presets and budget limits.
+
+**Files:** `src/chains.tn`
+
+### Slice 3.3 — Chain lineage and quality gates
+
+Parent/ancestry tracking. Quality gate: refuse spawn if last N chains were no-ops/failures.
+
+**Files:** `src/chains.tn`
+
+### Slice 3.4 — Meta-orchestrator emit path
+
+Agents emit `chain.spawn` with chain spec payload. Harness validates and schedules.
+
+**Files:** `src/harness.tn`, `src/chains.tn`
+
+### Slice 3.5 — Docs and validation
+
+Document bounded open-ended execution model. Run `tonic check .`.
+
+**Files:** `README.md`, `docs/dynamic-chains.md` (new)
 
 ## Out of scope
-- Core engine changes
-- LLM-as-judge additions beyond what autoresearch already provides
-- CWD/preset separation
+- Parallel chain execution
+- Plugin systems or heavy schedulers
+- Changes to Pi adapter internals
+- Modifying existing preset topologies

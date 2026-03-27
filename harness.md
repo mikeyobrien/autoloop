@@ -13,3 +13,19 @@ Global rules:
 - Use `./.miniloops/miniloops memory add learning ...` for durable repo/process learnings.
 - Do not invent extra phases. Stay inside planner → builder → critic → finalizer.
 - If the prompt is a path to a `.code-task.md` file or an existing implementation directory, use that as source material instead of treating it like plain prose.
+
+State ownership split:
+- **Journal** = machine-owned runtime facts (use coordination events below)
+- **Markdown** = curated intent (`context.md`, `plan.md`, concise `progress.md` summary)
+- **Docs** = archived reference material (`docs/*.md`)
+- **Memory** = durable lessons, preferences, meta notes
+
+Coordination events (emit these alongside normal workflow events):
+- `issue.discovered "id=<id>; summary=<text>; disposition=<fix-now|fix-next|deferred|out-of-scope>; owner=<role>"` — record a relevant issue
+- `issue.resolved "id=<id>; resolution=<text>"` — mark an issue resolved
+- `slice.started "id=<id>; description=<text>"` — mark slice work beginning
+- `slice.verified "id=<id>; method=<text>"` — mark slice verified
+- `slice.committed "id=<id>; commit_hash=<hash>"` — record slice commit
+- `context.archived "source_file=<path>; dest_file=<path>; reason=<text>"` — record context archival
+
+Inspect coordination state: `./.miniloops/miniloops inspect coordination --format md`

@@ -9,12 +9,16 @@ On every activation:
 
 Process:
 1. Understand the active slice and its acceptance criteria.
-2. Prefer test-first work when the repo has a test harness for the area.
-3. Make the smallest code change that satisfies the slice.
-4. Run the strongest focused verification you can for that slice.
-5. Commit the completed slice before handoff. Each completed slice should land as its own commit.
-6. Record concise evidence in `progress.md` and longer output in `logs/` when useful, including the commit hash when available.
-7. Emit `review.ready` with:
+2. Emit `slice.started "id=<slice-id>; description=<brief>"` at the start.
+3. Prefer test-first work when the repo has a test harness for the area.
+4. Make the smallest code change that satisfies the slice.
+5. Run the strongest focused verification you can for that slice.
+6. Emit `slice.verified "id=<slice-id>; method=<what you checked>"` after verification.
+7. Commit the completed slice before handoff. Each completed slice should land as its own commit.
+8. Emit `slice.committed "id=<slice-id>; commit_hash=<hash>"` after committing.
+9. Record concise evidence in `progress.md` and longer output in `logs/` when useful.
+10. If you discover a relevant issue, emit `issue.discovered "id=<issue-id>; summary=<text>; disposition=<fix-now|fix-next|deferred|out-of-scope>; owner=<role>"`.
+11. Emit `review.ready` with:
    - what changed
    - what was verified
    - the slice commit hash

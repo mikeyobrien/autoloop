@@ -18,9 +18,13 @@ defmodule LoopHarness do
 
     validation = emit_validation_context(journal_file)
 
-    case invalid_event(topic, Map.get(validation, :allowed_events, [])) do
-      true -> reject_emit(journal_file, topic, validation)
-      _ -> accept_emit(journal_file, topic, payload, validation)
+    case coordination_topic(topic) do
+      true -> accept_emit(journal_file, topic, payload, validation)
+      _ ->
+        case invalid_event(topic, Map.get(validation, :allowed_events, [])) do
+          true -> reject_emit(journal_file, topic, validation)
+          _ -> accept_emit(journal_file, topic, payload, validation)
+        end
     end
   end
 
@@ -54,6 +58,13 @@ defmodule LoopHarness do
 
   def render_journal(project_dir) do
     print_text(read_if_exists(LoopConfig.resolve_journal_file(project_dir)))
+  end
+
+  def render_coordination(project_dir) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    run_id = ensure_render_run_id(journal_file)
+    lines = read_run_lines(journal_file, run_id)
+    print_text(empty_fallback(coordination_from_lines(lines, %{issues: [], slices: [], commits: [], archives: []})))
   end
 
   defp build_loop_context(project_dir, prompt_override, self_command, run_options) do
@@ -873,6 +884,213 @@ defmodule LoopHarness do
     extract_field(line, "output") <> "\n"
   end
 
+  defp coordination_from_lines([], acc) do
+    render_coordination_state(acc)
+  end
+
+  defp coordination_from_lines([line | rest], acc) do
+    topic = extract_topic(line)
+    next = collect_coordination_event(topic, line, acc)
+    coordination_from_lines(rest, next)
+  end
+
+  defp collect_coordination_event("issue.discovered", line, acc) do
+    entry = %{id: extract_payload_field(line, "id"), summary: extract_payload_field(line, "summary"), disposition: extract_payload_field(line, "disposition"), owner: extract_payload_field(line, "owner")}
+    Map.put(acc, :issues, Map.get(acc, :issues, []) ++ [entry])
+  end
+
+  defp collect_coordination_event("issue.resolved", line, acc) do
+    id = extract_payload_field(line, "id")
+    resolution = extract_payload_field(line, "resolution")
+    Map.put(acc, :issues, update_issue_resolution(Map.get(acc, :issues, []), id, resolution, []))
+  end
+
+  defp collect_coordination_event("slice.started", line, acc) do
+    entry = %{id: extract_payload_field(line, "id"), description: extract_payload_field(line, "description"), status: "in-progress"}
+    Map.put(acc, :slices, Map.get(acc, :slices, []) ++ [entry])
+  end
+
+  defp collect_coordination_event("slice.verified", line, acc) do
+    id = extract_payload_field(line, "id")
+    Map.put(acc, :slices, update_slice_status(Map.get(acc, :slices, []), id, "verified", []))
+  end
+
+  defp collect_coordination_event("slice.committed", line, acc) do
+    id = extract_payload_field(line, "id")
+    commit_hash = extract_payload_field(line, "commit_hash")
+    with_commit = Map.put(acc, :commits, Map.get(acc, :commits, []) ++ [%{slice_id: id, commit_hash: commit_hash}])
+    Map.put(with_commit, :slices, update_slice_status(Map.get(with_commit, :slices, []), id, "committed", []))
+  end
+
+  defp collect_coordination_event("context.archived", line, acc) do
+    entry = %{source_file: extract_payload_field(line, "source_file"), dest_file: extract_payload_field(line, "dest_file"), reason: extract_payload_field(line, "reason")}
+    Map.put(acc, :archives, Map.get(acc, :archives, []) ++ [entry])
+  end
+
+  defp collect_coordination_event(_topic, _line, acc) do
+    acc
+  end
+
+  defp extract_payload_field(line, key) do
+    payload = extract_field(line, "payload")
+    extract_kv_from_payload(payload, key)
+  end
+
+  defp extract_kv_from_payload(payload, key) do
+    marker = key <> "="
+    parts = String.split(payload, marker)
+    extract_kv_value(parts)
+  end
+
+  defp extract_kv_value([_only]) do
+    ""
+  end
+
+  defp extract_kv_value([_prefix, rest | _]) do
+    first_field_value(rest)
+  end
+
+  defp extract_kv_value([]) do
+    ""
+  end
+
+  defp first_field_value(text) do
+    String.trim(first_delimited(String.split(text, ";")))
+  end
+
+  defp first_delimited([]) do
+    ""
+  end
+
+  defp first_delimited([item | _rest]) do
+    String.trim(item)
+  end
+
+  defp update_issue_resolution([], _id, _resolution, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp update_issue_resolution([issue | rest], id, resolution, acc) do
+    case Map.get(issue, :id, "") == id do
+      true -> update_issue_resolution(rest, id, resolution, [Map.put(Map.put(issue, :disposition, "resolved"), :resolution, resolution)] ++ acc)
+      _ -> update_issue_resolution(rest, id, resolution, [issue] ++ acc)
+    end
+  end
+
+  defp update_slice_status([], _id, _status, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp update_slice_status([slice | rest], id, status, acc) do
+    case Map.get(slice, :id, "") == id do
+      true -> update_slice_status(rest, id, status, [Map.put(slice, :status, status)] ++ acc)
+      _ -> update_slice_status(rest, id, status, [slice] ++ acc)
+    end
+  end
+
+  defp render_coordination_state(acc) do
+    issues = Map.get(acc, :issues, [])
+    slices = Map.get(acc, :slices, [])
+    commits = Map.get(acc, :commits, [])
+    archives = Map.get(acc, :archives, [])
+
+    case issues == [] and slices == [] and commits == [] and archives == [] do
+      true -> ""
+      _ ->
+        "# Coordination State (from journal)\n\n" <>
+        render_coordination_issues(issues) <>
+        render_coordination_slices(slices) <>
+        render_coordination_commits(commits) <>
+        render_coordination_archives(archives)
+    end
+  end
+
+  defp render_coordination_issues([]) do
+    ""
+  end
+
+  defp render_coordination_issues(issues) do
+    "## Issues\n" <> render_issue_lines(issues)
+  end
+
+  defp render_issue_lines([]) do
+    "\n"
+  end
+
+  defp render_issue_lines([issue | rest]) do
+    disposition = Map.get(issue, :disposition, "open")
+    line = "- [" <> disposition <> "] " <> Map.get(issue, :id, "?") <> ": " <> Map.get(issue, :summary, "") <> render_issue_resolution(Map.get(issue, :resolution, "")) <> render_issue_owner(Map.get(issue, :owner, "")) <> "\n"
+    line <> render_issue_lines(rest)
+  end
+
+  defp render_issue_resolution("") do
+    ""
+  end
+
+  defp render_issue_resolution(resolution) do
+    " — " <> resolution
+  end
+
+  defp render_issue_owner("") do
+    ""
+  end
+
+  defp render_issue_owner(owner) do
+    " (owner: " <> owner <> ")"
+  end
+
+  defp render_coordination_slices([]) do
+    ""
+  end
+
+  defp render_coordination_slices(slices) do
+    "## Slices\n" <> render_slice_lines(slices)
+  end
+
+  defp render_slice_lines([]) do
+    "\n"
+  end
+
+  defp render_slice_lines([slice | rest]) do
+    status = Map.get(slice, :status, "unknown")
+    line = "- [" <> status <> "] " <> Map.get(slice, :id, "?") <> ": " <> Map.get(slice, :description, "") <> "\n"
+    line <> render_slice_lines(rest)
+  end
+
+  defp render_coordination_commits([]) do
+    ""
+  end
+
+  defp render_coordination_commits(commits) do
+    "## Commits\n" <> render_commit_lines(commits)
+  end
+
+  defp render_commit_lines([]) do
+    "\n"
+  end
+
+  defp render_commit_lines([commit | rest]) do
+    line = "- " <> Map.get(commit, :slice_id, "?") <> " → " <> Map.get(commit, :commit_hash, "?") <> "\n"
+    line <> render_commit_lines(rest)
+  end
+
+  defp render_coordination_archives([]) do
+    ""
+  end
+
+  defp render_coordination_archives(archives) do
+    "## Archives\n" <> render_archive_lines(archives)
+  end
+
+  defp render_archive_lines([]) do
+    "\n"
+  end
+
+  defp render_archive_lines([archive | rest]) do
+    line = "- " <> Map.get(archive, :source_file, "?") <> " → " <> Map.get(archive, :dest_file, "?") <> " (" <> Map.get(archive, :reason, "") <> ")\n"
+    line <> render_archive_lines(rest)
+  end
+
   defp latest_run_id(path) do
     latest_loop_start_run(read_lines(path), "")
   end
@@ -1072,51 +1290,86 @@ defmodule LoopHarness do
     false
   end
 
-  defp routing_topic(_topic) do
+  defp routing_topic(topic) do
+    not coordination_topic(topic)
+  end
+
+  defp system_topic(topic) do
+    case coordination_topic(topic) do
+      true -> true
+      _ -> core_system_topic(topic)
+    end
+  end
+
+  defp core_system_topic("iteration.start") do
     true
   end
 
-  defp system_topic("iteration.start") do
+  defp core_system_topic("iteration.finish") do
     true
   end
 
-  defp system_topic("iteration.finish") do
+  defp core_system_topic("loop.start") do
     true
   end
 
-  defp system_topic("loop.start") do
+  defp core_system_topic("loop.complete") do
     true
   end
 
-  defp system_topic("loop.complete") do
+  defp core_system_topic("loop.stop") do
     true
   end
 
-  defp system_topic("loop.stop") do
+  defp core_system_topic("review.start") do
     true
   end
 
-  defp system_topic("review.start") do
+  defp core_system_topic("review.finish") do
     true
   end
 
-  defp system_topic("review.finish") do
+  defp core_system_topic("backend.start") do
     true
   end
 
-  defp system_topic("backend.start") do
+  defp core_system_topic("backend.finish") do
     true
   end
 
-  defp system_topic("backend.finish") do
+  defp core_system_topic("event.invalid") do
     true
   end
 
-  defp system_topic("event.invalid") do
+  defp core_system_topic(_topic) do
+    false
+  end
+
+  defp coordination_topic("issue.discovered") do
     true
   end
 
-  defp system_topic(_topic) do
+  defp coordination_topic("issue.resolved") do
+    true
+  end
+
+  defp coordination_topic("slice.started") do
+    true
+  end
+
+  defp coordination_topic("slice.verified") do
+    true
+  end
+
+  defp coordination_topic("slice.committed") do
+    true
+  end
+
+  defp coordination_topic("context.archived") do
+    true
+  end
+
+  defp coordination_topic(_topic) do
     false
   end
 

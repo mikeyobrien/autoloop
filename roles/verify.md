@@ -18,6 +18,7 @@ Review checklist:
 - Is the verified slice committed, with `git status --short` clean except for intentional unrelated files?
 - Were all relevant issues discovered during the slice given an explicit disposition in `progress.md`?
 - Did anyone try to dismiss a relevant issue just because it was pre-existing?
+- Did the builder emit coordination events (`slice.started`, `slice.verified`, `slice.committed`, `issue.discovered`)? Check via `inspect coordination --format md`.
 
 Emit:
 - `review.rejected` when there is a concrete miss, bug, regression risk, failed verification, overbuilt solution worth fixing now, verified-but-uncommitted work that should be committed before handoff, or any relevant issue that was left unowned / untracked / ambiguously deferred.

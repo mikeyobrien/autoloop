@@ -7,6 +7,7 @@ Your job is to decide whether the whole requested outcome is complete or whether
 
 On activation:
 - Re-read `context.md`, `plan.md`, and `progress.md`.
+- Inspect coordination state via `inspect coordination --format md` to see journal-canonical slice/issue/commit history.
 - Reconcile the latest reviewed slice against the whole request.
 - Check whether the numbered plan still has unfinished steps.
 - Check whether the current step is truly exhausted.
