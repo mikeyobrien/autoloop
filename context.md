@@ -1,34 +1,29 @@
-# Context: Separate example preset dirs from CWD working directory
+# Context: Implement Remaining Auto Workflow Presets
 
 ## Request summary
-Move examples so they run from CWD instead of their own directory. Examples should be "presets" that provide config (topology, roles, harness) but journal/memory/state lives in the CWD. Multiple examples share the same CWD state when run from the same directory.
+Implement the 6 future-facing presets documented in `docs/auto-workflows.md`: autotest, autofix, autoreview, autodoc, autosec, autoperf.
 
-## Current architecture
-- `project_dir` is used for BOTH config loading AND state storage
-- When running `bin/miniloops examples/autocode "prompt"`:
-  - Config loads from `examples/autocode/miniloops.toml`, `topology.toml`, `harness.md`, `roles/`
-  - State goes to `examples/autocode/.miniloops/` (journal, memory, tool scripts)
-  - The generated emit tool sets `MINILOOPS_PROJECT_DIR='examples/autocode'`
+## Source type
+Taxonomy document at `docs/auto-workflows.md`
 
-## Desired architecture
-- Separate "config dir" (example preset) from "work dir" (CWD)
-- Config (miniloops.toml, topology.toml, harness.md, roles/) loads from the example dir
-- State (.miniloops/, journal, memory) lives in CWD (".")
-- The emit tool sets `MINILOOPS_PROJECT_DIR='.'`
+## Existing presets (reference for structure)
+| Preset | Shape | Required event | Shared state |
+|--------|-------|----------------|--------------|
+| `autocode` | planner → builder → critic → finalizer | `review.passed` | context.md, plan.md, progress.md |
+| `autoideas` | scanner → analyst → reviewer → synthesizer | `analysis.validated` | scan-areas.md, progress.md, ideas-report.md |
+| `autoresearch` | strategist → implementer → benchmarker → evaluator | `experiment.measured` | autoresearch.md, experiments.jsonl, progress.md |
+| `autoqa` | inspector → planner → executor → reporter | `qa.passed` | qa-plan.md, qa-report.md, progress.md |
 
-## Key files
-- `src/main.tn` — CLI dispatch, `parse_run_args`, `resolve_runtime_project_dir`
-- `src/harness.tn` — `build_loop_context`, `reload_loop`, `install_runtime_tools`, `emit_tool_script`
-- `src/config.tn` — `load_project`, `resolve_journal_file`, `resolve_memory_file`
-- `src/topology.tn` — `load(project_dir)`
+## Preset structure (every preset has)
+- `miniloops.toml` — loop config (Pi backend, 100 iterations, completion/required events)
+- `topology.toml` — name, roles with emits + prompt_file, handoff map
+- `harness.md` — global rules loaded every iteration
+- `roles/*.md` — one file per role
+- `README.md` — usage and explanation
 
 ## Constraints
-- Examples must remain self-contained preset directories (don't merge them into root)
-- CWD state paths use the root miniloops.toml defaults for state_dir/journal/memory
-- Config values (backend, event_loop, review, harness, memory budget) come from the example's miniloops.toml
-- The emit tool and pi-adapter scripts must resolve state relative to CWD
-
-## Acceptance criteria
-1. `bin/miniloops examples/autocode "prompt"` loads config from examples/autocode/ but writes state to `./.miniloops/`
-2. Multiple examples share journal/memory when run from the same CWD
-3. All existing functionality (emit, inspect, memory commands) works with the new layout
+- Follow existing patterns exactly (Pi backend, same config shape)
+- Each preset gets its own behavioral center — do not clone autocode topology
+- Handoff graphs must have no dead ends and all events routed
+- No core engine changes
+- Validate with `tonic check .` after each preset

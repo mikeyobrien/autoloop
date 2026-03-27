@@ -14,7 +14,7 @@ Pi is the first-class backend. Miniloops now runs Pi itself with `pi -p --mode j
 
 ## Workflow family
 
-Miniloops ships a family of `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
+Miniloops ships a family of 10 `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
 
 | Preset | What it does | Shape |
 |--------|-------------|-------|
@@ -22,10 +22,16 @@ Miniloops ships a family of `auto*` preset workflows. Each is a self-contained a
 | **autoideas** | Repo survey — scan, deep-dive, validate, report | scanner → analyst → reviewer → synthesizer |
 | **autoresearch** | Experiment loop — hypothesize, implement, measure, keep/discard | strategist → implementer → benchmarker → evaluator |
 | **autoqa** | Zero-dependency validation — inspect domain, plan checks, execute, report | inspector → planner → executor → reporter |
+| **autotest** | Test creation — find coverage gaps, write tests, run, assess | surveyor → writer → runner → assessor |
+| **autofix** | Bug repair — diagnose, fix, verify, close | diagnoser → fixer → verifier → closer |
+| **autoreview** | Code review — read diff, check issues, suggest fixes, summarize | reader → checker → suggester → summarizer |
+| **autodoc** | Documentation — audit gaps, write docs, verify accuracy, publish | auditor → writer → checker → publisher |
+| **autosec** | Security audit — scan vulns, confirm, harden, report | scanner → analyst → hardener → reporter |
+| **autoperf** | Performance optimization — profile, optimize, measure, keep/discard | profiler → optimizer → measurer → judge |
 
-**Choosing a preset:** Use `autocode` for feature work and implementation tasks. Use `autoideas` when you want a survey of what to improve. Use `autoresearch` for hypothesis-driven experiments with measurable outcomes. Use `autoqa` to validate a repo using its native build/lint/type-check surfaces without installing anything.
+**Choosing a preset:** Use `autocode` for feature work. Use `autoideas` for improvement surveys. Use `autoresearch` for hypothesis-driven experiments. Use `autoqa` to validate with native surfaces. Use `autotest` to write new tests. Use `autofix` for bug reports. Use `autoreview` for PR review. Use `autodoc` for documentation gaps. Use `autosec` for security audits. Use `autoperf` for performance optimization.
 
-Six more presets are documented as future-facing: `autotest`, `autofix`, `autoreview`, `autodoc`, `autosec`, `autoperf`. See [`docs/auto-workflows.md`](docs/auto-workflows.md) for the full taxonomy, naming guidance, and chooser table.
+See [`docs/auto-workflows.md`](docs/auto-workflows.md) for the full taxonomy, naming guidance, and chooser table.
 
 ## Runtime files
 

@@ -1,60 +1,96 @@
-# Plan: Implement autoideas improvements
+# Plan: Implement Remaining Auto Workflow Presets
 
-Based on the ideas-report.md produced by the autoideas loop, implement the actionable suggestions across 5 slices. Each slice is independently committable.
+## Slice 1 — `autotest` preset
 
-## Slice 1 — Fix config parser `=` splitting (Idea 4.1 + 4.2)
+Formal test creation and test-suite tightening.
 
-**Why first:** This is a silent data-loss bug. Most impactful correctness fix.
+**Shape:** surveyor → writer → runner → assessor
+- surveyor: analyze codebase, find coverage gaps, identify untested paths
+- writer: write test code for the identified gap
+- runner: execute the new tests, capture results
+- assessor: evaluate test quality, coverage delta, decide continue/complete
 
-In `src/config.tn`:
-- Replace `parse_assignment([key, value], rest, config)` with a `join_with_eq` approach that takes the first element as key and re-joins the rest with `=`.
-- Add stderr warning for lines that can't be parsed (non-comment, non-blank, no `=`).
+**Required event:** `tests.passed`
+**Shared state:** `test-plan.md`, `test-report.md`, `progress.md`
+**Files:** `examples/autotest/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
 
-Files: `src/config.tn`
+## Slice 2 — `autofix` preset
 
-## Slice 2 — Add backend failure diagnostics (Ideas 5.1 + 5.2 + 5.3)
+Bug diagnosis and repair from a bug report or failing test.
 
-In `src/harness.tn`:
-- Thread `output` through `stop_backend_failed(loop, iteration, output)` and `stop_backend_timeout(loop, iteration, output)`.
-- Add `print_failure_diagnostic(output)` that prints last ~15 lines of output.
-- Add `verbose_log` calls to both failure stop handlers.
-- Add `output_tail` field to the journal `loop.stop` event for failures.
-- Add `last_n_lines(text, n)` helper.
+**Shape:** diagnoser → fixer → verifier → closer
+- diagnoser: reproduce the bug, trace root cause, narrow scope
+- fixer: implement the minimal fix
+- verifier: verify the fix (run failing test, check regression)
+- closer: confirm fix is correct, decide if more fixes needed
 
-Files: `src/harness.tn`
+**Required event:** `fix.verified`
+**Shared state:** `bug-report.md`, `fix-log.md`, `progress.md`
+**Files:** `examples/autofix/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
 
-## Slice 3 — Shell-based append_text (Idea 2.2)
+## Slice 3 — `autoreview` preset
 
-Replace the O(n²) read-then-rewrite `append_text` with shell append in both `src/harness.tn` and `src/memory.tn`:
-```
-defp append_text(path, content) do
-  System.run("printf '%s' " <> shell_quote(content) <> " >> " <> shell_quote(path))
-end
-```
+Code review loop for PR diffs or change sets.
 
-Files: `src/harness.tn`, `src/memory.tn`
+**Shape:** reader → checker → suggester → summarizer
+- reader: read the diff/changes, build context
+- checker: check for correctness, security, style, performance issues
+- suggester: propose concrete fixes for found issues
+- summarizer: compile review into structured feedback
 
-## Slice 4 — JSON helpers: json_field + json_object (Ideas 3.3 + 3.1)
+**Required event:** `review.checked`
+**Shared state:** `review-context.md`, `review-findings.md`, `progress.md`
+**Files:** `examples/autoreview/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
 
-In `src/harness.tn`:
-- Add `json_field(key, value)` → `"\"key\": " <> json_string(value)`
-- Add `json_field_raw(key, raw_value)` → `"\"key\": " <> raw_value`
-- Add `json_object(pairs)` builder that joins key-value pairs with commas and wraps in `{}`
-- Migrate all 16+ call sites in harness.tn to use the new helpers
-- Add same helpers to `src/memory.tn` and migrate its 4 call sites
+## Slice 4 — `autodoc` preset
 
-Files: `src/harness.tn`, `src/memory.tn`
+Documentation generation and maintenance.
 
-## Slice 5 — Document hot-reload as intentional (Idea 6.3)
+**Shape:** auditor → writer → checker → publisher
+- auditor: compare docs to code, find gaps and staleness
+- writer: write or update documentation for the identified gap
+- checker: verify doc accuracy against actual code
+- publisher: compile doc-report, decide continue/complete
 
-Add a comment to `reload_loop` explaining the design tradeoff.
+**Required event:** `doc.checked`
+**Shared state:** `doc-plan.md`, `doc-report.md`, `progress.md`
+**Files:** `examples/autodoc/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
 
-Files: `src/harness.tn`
+## Slice 5 — `autosec` preset
+
+Security audit and hardening.
+
+**Shape:** scanner → analyst → hardener → reporter
+- scanner: scan for vulnerabilities (OWASP top-10, deps, secrets, config)
+- analyst: deep-dive each finding, classify severity, confirm/dismiss
+- hardener: implement the fix or mitigation
+- reporter: compile security report, track findings
+
+**Required event:** `finding.confirmed`
+**Shared state:** `sec-findings.md`, `sec-report.md`, `progress.md`
+**Files:** `examples/autosec/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+
+## Slice 6 — `autoperf` preset
+
+Performance profiling and optimization.
+
+**Shape:** profiler → optimizer → measurer → judge
+- profiler: identify hot paths, establish baselines
+- optimizer: implement targeted optimization
+- measurer: run benchmarks, capture before/after metrics
+- judge: evaluate improvement, keep/discard, decide next target
+
+**Required event:** `perf.measured`
+**Shared state:** `perf-profile.md`, `perf-log.jsonl`, `progress.md`
+**Files:** `examples/autoperf/` (miniloops.toml, topology.toml, harness.md, 4 roles, README.md)
+
+## Slice 7 — Update docs and validate
+
+- Update `docs/auto-workflows.md` to mark all 10 presets as implemented
+- Update README.md workflow family table to include all 10
+- Run `tonic check .`
 
 ## Out of scope
-- Idea 2.1 (native System.append_text) — requires runtime changes
-- Idea 2.3 (batch journal writes) — complex refactor, low ROI after slice 3
-- Idea 3.2 (RFC 8259 control chars) — nice-to-have, not critical
-- Ideas 1.1/1.2/1.3 (shared modules) — larger refactor, does not fix bugs
-- Idea 4.3 (full TOML) — explicitly non-goal
-- Ideas 6.1/6.2 (caching) — premature optimization
+- Core engine changes
+- LLM-as-judge additions beyond what autoresearch already provides
+- CWD/preset separation

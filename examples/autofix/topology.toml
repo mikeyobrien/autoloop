@@ -1,0 +1,33 @@
+name = "autofix"
+completion = "task.complete"
+
+[[role]]
+id = "diagnoser"
+emits = ["cause.found", "diagnosis.blocked", "task.complete"]
+prompt_file = "roles/diagnoser.md"
+
+[[role]]
+id = "fixer"
+emits = ["fix.applied", "fix.blocked"]
+prompt_file = "roles/fixer.md"
+
+[[role]]
+id = "verifier"
+emits = ["fix.verified", "fix.failed"]
+prompt_file = "roles/verifier.md"
+
+[[role]]
+id = "closer"
+emits = ["bug.closed", "bug.reopened", "task.complete"]
+prompt_file = "roles/closer.md"
+
+[handoff]
+"loop.start" = ["diagnoser"]
+"cause.found" = ["fixer"]
+"diagnosis.blocked" = ["diagnoser"]
+"fix.applied" = ["verifier"]
+"fix.blocked" = ["diagnoser"]
+"fix.verified" = ["closer"]
+"fix.failed" = ["fixer"]
+"bug.closed" = ["diagnoser"]
+"bug.reopened" = ["diagnoser"]

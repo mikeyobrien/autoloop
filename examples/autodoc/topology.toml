@@ -1,0 +1,31 @@
+name = "autodoc"
+completion = "task.complete"
+
+[[role]]
+id = "auditor"
+emits = ["gaps.found", "task.complete"]
+prompt_file = "roles/auditor.md"
+
+[[role]]
+id = "writer"
+emits = ["doc.written", "write.blocked"]
+prompt_file = "roles/writer.md"
+
+[[role]]
+id = "checker"
+emits = ["doc.checked", "doc.inaccurate"]
+prompt_file = "roles/checker.md"
+
+[[role]]
+id = "publisher"
+emits = ["doc.published", "task.complete"]
+prompt_file = "roles/publisher.md"
+
+[handoff]
+"loop.start" = ["auditor"]
+"gaps.found" = ["writer"]
+"write.blocked" = ["auditor"]
+"doc.written" = ["checker"]
+"doc.checked" = ["publisher"]
+"doc.inaccurate" = ["writer"]
+"doc.published" = ["auditor"]

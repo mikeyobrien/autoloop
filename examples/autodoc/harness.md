@@ -1,0 +1,18 @@
+This is a miniloops-native autodoc loop for documentation generation and maintenance.
+
+The loop audits existing documentation against the codebase, identifies gaps and staleness, writes or updates docs, verifies accuracy, and compiles a report — iterating until the documentation is current.
+
+Global rules:
+- Shared working files are the source of truth: `doc-plan.md`, `doc-report.md`, `progress.md`.
+- One documentation gap at a time. Do not start writing the next doc before the current one is checked.
+- Use the event tool instead of prose-only handoffs.
+- Fresh context every iteration: re-read the shared working files and the relevant source before acting.
+- Write documentation that matches the project's existing style and tone.
+- Documentation must be accurate — verify every claim against the actual code.
+- Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
+- Do not invent extra phases. Stay inside auditor → writer → checker → publisher.
+
+State files:
+- `doc-plan.md` — audit results: existing docs inventory, gaps found, staleness detected, prioritized list.
+- `doc-report.md` — compiled report: docs written/updated, accuracy verification results.
+- `progress.md` — current gap being addressed, what the next role should do.

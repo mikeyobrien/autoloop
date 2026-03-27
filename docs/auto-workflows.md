@@ -36,33 +36,53 @@ Native, zero-dependency validation orchestration. Inspects the target repo, infe
 **Shared state:** `qa-plan.md`, `qa-report.md`, `progress.md`
 **Example:** `examples/autoqa/`
 
-## Future-facing presets
-
-These are documented as the natural next members of the family. They are not yet implemented.
-
 ### autotest
 
-Formal test creation and test-suite tightening. Where autoqa validates using whatever native surfaces already exist, autotest writes new tests: unit tests, integration tests, property tests, coverage gap analysis.
+Formal test creation and test-suite tightening. Surveys the codebase for coverage gaps, writes new tests using the repo's existing framework and conventions, runs them, and assesses quality improvement.
+
+**Shape:** surveyor → writer → runner → assessor
+**Shared state:** `test-plan.md`, `test-report.md`, `progress.md`
+**Example:** `examples/autotest/`
 
 ### autofix
 
-Bug diagnosis and repair. Narrower than autocode — starts from a bug report or failing test rather than a feature request. Focuses on root-cause analysis, minimal fix, and regression verification.
+Bug diagnosis and repair. Narrower than autocode — starts from a bug report or failing test rather than a feature request. Reproduces the issue, traces the root cause, implements a minimal fix, and verifies with regression checks.
+
+**Shape:** diagnoser → fixer → verifier → closer
+**Shared state:** `bug-report.md`, `fix-log.md`, `progress.md`
+**Example:** `examples/autofix/`
 
 ### autoreview
 
-Code review loop. Reads a PR diff or set of changes, checks for correctness, style, security, and performance issues, and produces structured review feedback.
+Code review loop. Reads a PR diff or set of changes, checks for correctness, security, style, performance, and maintainability issues, proposes concrete fixes, and produces structured review feedback with a clear verdict.
+
+**Shape:** reader → checker → suggester → summarizer
+**Shared state:** `review-context.md`, `review-findings.md`, `progress.md`
+**Example:** `examples/autoreview/`
 
 ### autodoc
 
-Documentation generation and maintenance. Audits existing docs against the codebase, identifies gaps and staleness, and writes or updates documentation.
+Documentation generation and maintenance. Audits existing docs against the codebase, identifies gaps and staleness, writes or updates documentation, and verifies accuracy against the actual code.
+
+**Shape:** auditor → writer → checker → publisher
+**Shared state:** `doc-plan.md`, `doc-report.md`, `progress.md`
+**Example:** `examples/autodoc/`
 
 ### autosec
 
-Security audit and hardening. Scans for OWASP top-10 vulnerabilities, dependency issues, secret leaks, and configuration weaknesses. Produces a prioritized findings report.
+Security audit and hardening. Scans for OWASP top-10 vulnerabilities, dependency issues, secret leaks, and configuration weaknesses. Each finding is confirmed or dismissed with evidence, then fixed with standard security patterns.
+
+**Shape:** scanner → analyst → hardener → reporter
+**Shared state:** `sec-findings.md`, `sec-report.md`, `progress.md`
+**Example:** `examples/autosec/`
 
 ### autoperf
 
-Performance profiling and optimization. Identifies hot paths, runs benchmarks, proposes optimizations, measures results, and keeps or discards changes — similar to autoresearch but scoped to performance.
+Performance profiling and optimization. Identifies hot paths, establishes baselines, implements targeted optimizations, measures results, and keeps or discards changes — similar to autoresearch but scoped to performance.
+
+**Shape:** profiler → optimizer → measurer → judge
+**Shared state:** `perf-profile.md`, `perf-log.jsonl`, `progress.md`
+**Example:** `examples/autoperf/`
 
 ## Naming guidance
 
@@ -84,9 +104,9 @@ Performance profiling and optimization. Identifies hot paths, runs benchmarks, p
 | Survey a repo for improvement ideas | `autoideas` |
 | Run experiments and measure results | `autoresearch` |
 | Validate that things work without writing new tests | `autoqa` |
-| Write or improve formal tests | `autotest` (future) |
-| Fix a specific bug | `autofix` (future) |
-| Review code changes | `autoreview` (future) |
-| Generate or update documentation | `autodoc` (future) |
-| Audit for security issues | `autosec` (future) |
-| Profile and optimize performance | `autoperf` (future) |
+| Write or improve formal tests | `autotest` |
+| Fix a specific bug | `autofix` |
+| Review code changes | `autoreview` |
+| Generate or update documentation | `autodoc` |
+| Audit for security issues | `autosec` |
+| Profile and optimize performance | `autoperf` |
