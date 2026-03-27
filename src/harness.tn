@@ -27,7 +27,7 @@ defmodule LoopHarness do
 
   def emit(project_dir, topic, payload) do
     journal_file = resolve_emit_journal_file(project_dir)
-    ensure_layout(Path.join(project_dir, ".miniloops"))
+    ensure_layout(Path.dirname(journal_file))
 
     validation = emit_validation_context(journal_file)
 
@@ -42,13 +42,13 @@ defmodule LoopHarness do
   end
 
   def render_scratchpad(project_dir) do
-    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
-    print_text(empty_fallback(render_run_scratchpad(read_run_lines(journal_file, run_id))))
+    print_text(empty_fallback(render_run_scratchpad_full(read_run_lines(journal_file, run_id))))
   end
 
   def render_prompt(project_dir, iteration) do
-    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
     prompt = iteration_field_for_run(journal_file, run_id, iteration, "iteration.start", "prompt")
 
@@ -59,7 +59,7 @@ defmodule LoopHarness do
   end
 
   def render_output(project_dir, iteration) do
-    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
     output = iteration_field_for_run(journal_file, run_id, iteration, "iteration.finish", "output")
 
@@ -70,18 +70,18 @@ defmodule LoopHarness do
   end
 
   def render_journal(project_dir) do
-    print_text(read_if_exists(LoopConfig.resolve_journal_file(project_dir)))
+    print_text(read_if_exists(resolve_emit_journal_file(project_dir)))
   end
 
   def render_coordination(project_dir) do
-    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
     lines = read_run_lines(journal_file, run_id)
     print_text(empty_fallback(coordination_from_lines(lines, %{issues: [], slices: [], commits: [], archives: []})))
   end
 
   def render_metrics(project_dir, format) do
-    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
     lines = read_run_lines(journal_file, run_id)
     rows = collect_metrics_rows(lines, [])
@@ -89,26 +89,27 @@ defmodule LoopHarness do
   end
 
   def render_metrics_for_run(project_dir, run_id, format) do
-    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    journal_file = resolve_emit_journal_file(project_dir)
     lines = read_run_lines(journal_file, run_id)
     rows = collect_metrics_rows(lines, [])
     print_text(format_metrics(rows, format))
   end
 
   defp build_loop_context(project_dir, prompt_override, self_command, run_options) do
-    config = LoopConfig.load_project(project_dir)
-    topology = LoopTopology.load(project_dir)
-    work_dir = Map.get(run_options, :work_dir, ".")
-    state_dir = Path.join(work_dir, LoopConfig.get(config, "core.state_dir", ".miniloops"))
-    journal_file = LoopConfig.resolve_journal_file_in(project_dir, work_dir)
-    memory_file = LoopConfig.resolve_memory_file_in(project_dir, work_dir)
+    resolved_project_dir = absolute_path(project_dir)
+    resolved_work_dir = absolute_path(Map.get(run_options, :work_dir, "."))
+    config = LoopConfig.load_project(resolved_project_dir)
+    topology = LoopTopology.load(resolved_project_dir)
+    state_dir = Path.join(resolved_work_dir, LoopConfig.get(config, "core.state_dir", ".miniloop"))
+    journal_file = LoopConfig.resolve_journal_file_in(resolved_project_dir, resolved_work_dir)
+    memory_file = LoopConfig.resolve_memory_file_in(resolved_project_dir, resolved_work_dir)
     run_id = next_run_id(journal_file, config)
     backend_override = Map.get(run_options, :backend_override, %{})
     cli_log_level = Map.get(run_options, :log_level, nil)
     config_log_level = LoopConfig.get(config, "core.log_level", "info")
     log_level = resolve_log_level(cli_log_level, config_log_level)
 
-    %{paths: %{project_dir: project_dir, work_dir: work_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override, backend_override: backend_override, log_level: log_level}}
+    %{paths: %{project_dir: resolved_project_dir, work_dir: resolved_work_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override, backend_override: backend_override, log_level: log_level}}
     |> reload_loop()
   end
 
@@ -129,7 +130,7 @@ defmodule LoopHarness do
     completion_event = LoopTopology.completion_event(topology, LoopConfig.get(config, "event_loop.completion_event", "task.complete"))
     required_events = LoopConfig.get_list(config, "event_loop.required_events")
     objective = resolve_prompt(project_dir, config, prompt_override)
-    memory_budget_chars = LoopConfig.get_int(config, "memory.prompt_budget_chars", 1600)
+    memory_budget_chars = LoopConfig.get_int(config, "memory.prompt_budget_chars", 8000)
     review_every = resolve_review_every(config, topology)
     review_enabled = truthy_setting(LoopConfig.get(config, "review.enabled", "true"))
     backend_timeout_ms = LoopConfig.get_int(config, "backend.timeout_ms", 300000)
@@ -150,7 +151,7 @@ defmodule LoopHarness do
     reviewed_loop = maybe_run_hyperagent_review(live_loop, iteration)
 
     case iteration > max_iterations(reviewed_loop) do
-      true -> stop_max_iterations(reviewed_loop)
+      true -> stop_max_iterations(reviewed_loop, iteration)
       _ -> run_iteration(reviewed_loop, iteration)
     end
   end
@@ -237,7 +238,7 @@ defmodule LoopHarness do
 
   defp build_iteration_context(loop, iteration) do
     run_lines = read_run_lines(journal_file(loop), run_id(loop))
-    scratchpad_text = render_run_scratchpad(run_lines)
+    scratchpad_text = render_run_scratchpad_prompt(run_lines)
     recent_event = routing_event_from_lines(run_lines, "loop.start")
     allowed_roles = LoopTopology.suggested_roles(topology(loop), recent_event)
     allowed_events = LoopTopology.allowed_events(topology(loop), recent_event)
@@ -316,11 +317,20 @@ defmodule LoopHarness do
     end
   end
 
-  defp stop_max_iterations(loop) do
-    log(loop, :warn, "loop stop reason=max_iterations")
-    append_event(journal_file(loop), run_id(loop), "", "loop.stop", LoopJson.json_field("reason", "max_iterations"))
+  defp stop_max_iterations(loop, iteration) do
+    completed_iterations = max_iteration_stop_count(iteration)
+    limit = max_iterations(loop)
+    log(loop, :warn, "loop stop reason=max_iterations completed_iterations=" <> to_string(completed_iterations) <> " max_iterations=" <> to_string(limit))
+    append_event(journal_file(loop), run_id(loop), "", "loop.stop", LoopJson.json_field("reason", "max_iterations") <> ", " <> LoopJson.json_field("completed_iterations", to_string(completed_iterations)) <> ", " <> LoopJson.json_field("stopped_before_iteration", to_string(iteration)) <> ", " <> LoopJson.json_field("max_iterations", to_string(limit)))
 
-    %{iterations: max_iterations(loop), stop_reason: "max_iterations"}
+    %{iterations: completed_iterations, stop_reason: "max_iterations"}
+  end
+
+  defp max_iteration_stop_count(iteration) do
+    case iteration <= 1 do
+      true -> 0
+      _ -> iteration - 1
+    end
   end
 
   defp stop_backend_failed(loop, iteration, output) do
@@ -478,7 +488,7 @@ defmodule LoopHarness do
   end
 
   defp emit_tool_script(loop) do
-    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(work_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> LoopUtils.shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> LoopUtils.shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> LoopUtils.shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> LoopUtils.shell_quote(LoopUtils.join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> LoopUtils.shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
+    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(project_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> LoopUtils.shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> LoopUtils.shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> LoopUtils.shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> LoopUtils.shell_quote(LoopUtils.join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> LoopUtils.shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
   end
 
   defp pi_adapter_script(loop) do
@@ -491,7 +501,7 @@ defmodule LoopHarness do
     context_pressure_text(memory_stats, invalid_count) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
-    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Log level: #{log_level_name(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
+    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Log level: #{log_level_name(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Loop-owned working files belong under: #{state_dir(loop)}\n" <> "Do not leave loop-owned artifacts at the repo root. Use paths under #{state_dir(loop)} such as #{state_dir(loop)}/progress.md or #{state_dir(loop)}/logs/.\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
     tool_path(loop) <> " emit <allowed-topic> \"brief handoff summary\"\n" <>
     tool_path(loop) <> " emit " <> completion_event(loop) <> " \"brief completion summary\"\n" <>
     tool_path(loop) <> " memory add learning \"durable lesson\"\n" <>
@@ -678,10 +688,11 @@ defmodule LoopHarness do
     "export MINILOOPS_RUN_ID=" <> LoopUtils.shell_quote(run_id(loop)) <> "\n" <>
     "export MINILOOPS_ITERATION=" <> LoopUtils.shell_quote(iteration) <> "\n" <>
     runtime_env_line("MINILOOPS_REVIEW_MODE", review_mode) <>
+    "export MINILOOPS_LOG_LEVEL=" <> LoopUtils.shell_quote(log_level_name(loop)) <> "\n" <>
     "export MINILOOPS_COMPLETION_PROMISE=" <> LoopUtils.shell_quote(completion_promise(loop)) <> "\n" <>
     "export MINILOOPS_COMPLETION_EVENT=" <> LoopUtils.shell_quote(completion_event(loop)) <> "\n" <>
     "export MINILOOPS_STATE_DIR=" <> LoopUtils.shell_quote(state_dir(loop)) <> "\n" <>
-    "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(work_dir(loop)) <> "\n" <>
+    "export MINILOOPS_PROJECT_DIR=" <> LoopUtils.shell_quote(project_dir(loop)) <> "\n" <>
     "export MINILOOPS_JOURNAL_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <>
     "export MINILOOPS_EVENTS_FILE=" <> LoopUtils.shell_quote(journal_file(loop)) <> "\n" <>
     "export MINILOOPS_MEMORY_FILE=" <> LoopUtils.shell_quote(memory_file(loop)) <> "\n" <>
@@ -701,7 +712,7 @@ defmodule LoopHarness do
   end
 
   defp render_review_prompt_text(loop, iteration, run_lines) do
-    scratchpad_text = render_run_scratchpad(run_lines)
+    scratchpad_text = render_run_scratchpad_prompt(run_lines)
     memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
     memory_stats = LoopMemory.stats_file(memory_file(loop), memory_budget_chars(loop))
     recent_event = routing_event_from_lines(run_lines, "loop.start")
@@ -709,7 +720,7 @@ defmodule LoopHarness do
     invalid_count = invalid_event_count(run_lines, 0)
     latest_iteration = to_string(max_review_prompt_iteration(run_lines))
 
-    "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "Do not modify files on disk. Store all feedback, recommendations, and durable findings exclusively via `" <> tool_path(loop) <> " memory add ...` commands.\n" <> "Do not emit normal loop events during review.\n\n" <>
+    "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" <> "Safe edit targets include `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `" <> state_dir(loop) <> "/context.md`, `" <> state_dir(loop) <> "/plan.md`, `" <> state_dir(loop) <> "/progress.md`, `" <> state_dir(loop) <> "/logs/`, and `" <> state_dir(loop) <> "/docs/*.md`.\n" <> "Keep loop-owned artifacts under `" <> state_dir(loop) <> "/`; do not leave loop-owned working files at the repo root.\n" <> "Use `" <> tool_path(loop) <> " memory add ...` for short durable lessons or operator notes that should persist across turns.\n" <> "Do not edit app/product source code, tests, package manifests, generated state under `" <> state_dir(loop) <> "/`, or journal history during review.\n" <> "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" <> "Do not emit normal loop events during review.\n\n" <>
     review_instructions_text(loop) <>
     context_pressure_text(memory_stats, invalid_count) <>
     backpressure_text(backpressure) <>
@@ -761,7 +772,6 @@ defmodule LoopHarness do
 
   defp emit_validation_context(journal_file) do
     run_id = resolve_emit_run_id(journal_file)
-
     %{run_id: run_id, iteration: resolve_emit_iteration(journal_file, run_id), recent_event: emit_recent_event(), allowed_roles: env_csv_list("MINILOOPS_ALLOWED_ROLES"), allowed_events: env_csv_list("MINILOOPS_ALLOWED_EVENTS")}
   end
 
@@ -955,27 +965,92 @@ defmodule LoopHarness do
     end
   end
 
-  defp render_run_scratchpad(lines) do
-    scratchpad_from_lines(lines, "")
+  def render_run_scratchpad_full(lines) do
+    render_scratchpad_entries(collect_scratchpad_entries(lines, []))
   end
 
-  defp scratchpad_from_lines([], acc) do
-    acc
+  defp render_run_scratchpad_prompt(lines) do
+    entries = collect_scratchpad_entries(lines, [])
+    total = list_length(entries, 0)
+
+    case total <= 4 do
+      true -> render_scratchpad_entries(entries)
+      _ -> render_compact_scratchpad(entries, total - 4)
+    end
   end
 
-  defp scratchpad_from_lines([line | rest], acc) do
+  defp collect_scratchpad_entries([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_scratchpad_entries([line | rest], acc) do
     next =
     case extract_topic(line) do
-      "iteration.finish" -> acc <> scratchpad_entry(line)
+      "iteration.finish" -> [scratchpad_entry_map(line)] ++ acc
       _ -> acc
     end
 
-    scratchpad_from_lines(rest, next)
+    collect_scratchpad_entries(rest, next)
   end
 
-  defp scratchpad_entry(line) do
-    "## Iteration " <> extract_iteration(line) <> "\n\n" <> "exit_code=" <> extract_field(line, "exit_code") <> "\n\n" <>
-    extract_field(line, "output") <> "\n"
+  defp scratchpad_entry_map(line) do
+    %{iteration: extract_iteration(line), exit_code: extract_field(line, "exit_code"), output: extract_field(line, "output")}
+  end
+
+  defp render_scratchpad_entries([]) do
+    ""
+  end
+
+  defp render_scratchpad_entries([entry | rest]) do
+    scratchpad_entry_text(entry) <> render_scratchpad_entries(rest)
+  end
+
+  defp render_compact_scratchpad(entries, compact_count) do
+    compacted = take_n(entries, compact_count, [])
+    recent = drop_n(entries, compact_count)
+
+    "## Earlier iterations (compacted)\n\n" <> render_compact_scratchpad_entries(compacted) <> "\n" <> render_scratchpad_entries(recent)
+  end
+
+  defp render_compact_scratchpad_entries([]) do
+    ""
+  end
+
+  defp render_compact_scratchpad_entries([entry | rest]) do
+    "- Iteration " <> Map.get(entry, :iteration, "") <> " exit_code=" <> Map.get(entry, :exit_code, "") <> " — " <> scratchpad_entry_summary(entry) <> "\n" <> render_compact_scratchpad_entries(rest)
+  end
+
+  defp scratchpad_entry_text(entry) do
+    "## Iteration " <> Map.get(entry, :iteration, "") <> "\n\n" <> "exit_code=" <> Map.get(entry, :exit_code, "") <> "\n\n" <>
+    Map.get(entry, :output, "") <> "\n"
+  end
+
+  defp scratchpad_entry_summary(entry) do
+    summarize_scratchpad_output(Map.get(entry, :output, ""))
+  end
+
+  defp summarize_scratchpad_output(output) do
+    summarize_scratchpad_lines(String.split(output, LoopUtils.line_sep()))
+  end
+
+  defp summarize_scratchpad_lines([]) do
+    "(no output)"
+  end
+
+  defp summarize_scratchpad_lines([line | rest]) do
+    trimmed = String.trim(line)
+
+    case trimmed do
+      "" -> summarize_scratchpad_lines(rest)
+      _ -> truncate_scratchpad_summary(trimmed)
+    end
+  end
+
+  defp truncate_scratchpad_summary(text) do
+    case String.length(text) <= 120 do
+      true -> text
+      _ -> String.slice(text, 0, 120) <> "..."
+    end
   end
 
   defp coordination_from_lines([], acc) do
@@ -1526,16 +1601,17 @@ defmodule LoopHarness do
 
   defp print_iteration_banner(loop, iter) do
     iter_label = "iteration #{iteration(iter)}/#{max_iterations(loop)}"
-    rule = pad_right("━━━ " <> iter_label <> " ", "━", 68)
+    width = banner_width("━━━ " <> iter_label <> " ")
+    rule = pad_right("━━━ " <> iter_label <> " ", "━", width)
     role_line = "role: " <> LoopUtils.list_text(allowed_roles(iter)) <> " │ event: " <> recent_event(iter) <> " │ next: " <> LoopUtils.list_text(allowed_events(iter))
-    bottom_rule = String.duplicate("━", 68)
+    bottom_rule = String.duplicate("━", width)
 
     print_lines(["", rule, role_line, bottom_rule])
   end
 
   defp print_iteration_footer(iter, elapsed_s) do
-    label = "──── end iteration #{iteration(iter)} (#{format_elapsed(elapsed_s)}) ────"
-    print_lines([label, ""])
+    label = "──── end iteration #{iteration(iter)} (#{format_elapsed(elapsed_s)}) "
+    print_lines([pad_right(label, "─", banner_width(label)), ""])
   end
 
   defp format_elapsed(seconds) do
@@ -1550,9 +1626,78 @@ defmodule LoopHarness do
     String.to_integer(String.trim(Map.get(result, :output, "0")))
   end
 
-  defp print_review_banner(loop, iteration) do
-    rule = pad_right("━━━ review before iteration #{iteration} ", "━", 68)
+  defp print_review_banner(_loop, iteration) do
+    label = "━━━ review before iteration #{iteration} "
+    rule = pad_right(label, "━", banner_width(label))
     print_lines(["", rule])
+  end
+
+  defp banner_width(label) do
+    terminal = terminal_width()
+    label_width = String.length(label)
+
+    case terminal > label_width do
+      true -> terminal
+      _ -> label_width
+    end
+  end
+
+  defp terminal_width() do
+    width = positive_env_int("MINILOOPS_WIDTH")
+
+    case width > 0 do
+      true -> width
+      _ -> terminal_width_from_columns()
+    end
+  end
+
+  defp terminal_width_from_columns() do
+    width = positive_env_int("COLUMNS")
+
+    case width > 0 do
+      true -> width
+      _ -> terminal_width_from_command()
+    end
+  end
+
+  defp terminal_width_from_command() do
+    width = command_positive_int("tput cols 2>/dev/null || true")
+
+    case width > 0 do
+      true -> width
+      _ -> terminal_width_from_stty()
+    end
+  end
+
+  defp terminal_width_from_stty() do
+    width = command_positive_int("stty size 2>/dev/null | awk '{print $2}' || true")
+
+    case width > 0 do
+      true -> width
+      _ -> 68
+    end
+  end
+
+  defp positive_env_int(name) do
+    case System.env(name) do
+      nil -> 0
+      "" -> 0
+      value -> positive_int(value)
+    end
+  end
+
+  defp command_positive_int(command) do
+    result = System.run(command)
+    positive_int(String.trim(Map.get(result, :output, "")))
+  end
+
+  defp positive_int(value) do
+    parsed = parse_int_or_zero(value)
+
+    case parsed > 0 do
+      true -> parsed
+      _ -> 0
+    end
   end
 
   defp pad_right(text, char, width) do
@@ -1561,6 +1706,13 @@ defmodule LoopHarness do
     case len >= width do
       true -> text
       _ -> text <> String.duplicate(char, width - len)
+    end
+  end
+
+  defp absolute_path(path) do
+    case String.starts_with(path, "/") do
+      true -> path
+      _ -> Path.join(System.cwd(), path)
     end
   end
 
@@ -1716,8 +1868,27 @@ defmodule LoopHarness do
     end
   end
 
+  defp parallel_spec(loop) do
+    Map.get(loop, :parallel, %{})
+  end
+
+  defp parallel_enabled(loop) do
+    case Map.get(parallel_spec(loop), :enabled, false) do
+      false -> false
+      _ -> true
+    end
+  end
+
+  defp parallel_max_branches(loop) do
+    Map.get(parallel_spec(loop), :max_branches, 3)
+  end
+
+  defp parallel_branch_timeout_ms(loop) do
+    Map.get(parallel_spec(loop), :branch_timeout_ms, 180000)
+  end
+
   defp memory_budget_chars(loop) do
-    Map.get(Map.get(loop, :memory, %{}), :budget_chars, 1600)
+    Map.get(Map.get(loop, :memory, %{}), :budget_chars, 8000)
   end
 
   defp harness_instructions(loop) do
@@ -1733,23 +1904,23 @@ defmodule LoopHarness do
   end
 
   defp state_dir(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :state_dir, ".miniloops")
+    Map.get(Map.get(loop, :paths, %{}), :state_dir, ".miniloop")
   end
 
   defp journal_file(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :journal_file, ".miniloops/journal.jsonl")
+    Map.get(Map.get(loop, :paths, %{}), :journal_file, ".miniloop/journal.jsonl")
   end
 
   defp memory_file(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :memory_file, ".miniloops/memory.jsonl")
+    Map.get(Map.get(loop, :paths, %{}), :memory_file, ".miniloop/memory.jsonl")
   end
 
   defp tool_path(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :tool_path, ".miniloops/miniloops")
+    Map.get(Map.get(loop, :paths, %{}), :tool_path, ".miniloop/miniloops")
   end
 
   defp pi_adapter_path(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :pi_adapter_path, ".miniloops/pi-adapter")
+    Map.get(Map.get(loop, :paths, %{}), :pi_adapter_path, ".miniloop/pi-adapter")
   end
 
   defp run_id(loop) do
@@ -1883,6 +2054,18 @@ defmodule LoopHarness do
 
   defp drop_n([_head | rest], n) do
     drop_n(rest, n - 1)
+  end
+
+  defp take_n(_list, 0, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp take_n([], _n, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp take_n([head | rest], n, acc) do
+    take_n(rest, n - 1, [head] ++ acc)
   end
 
   defp rejoin_lines([]) do
@@ -2020,32 +2203,47 @@ defmodule LoopHarness do
 
   defp metrics_summary(rows) do
     total = to_string(list_length(rows, 0))
-    elapsed = sum_elapsed(rows, 0)
+    elapsed = sum_elapsed_text(rows)
     events = count_distinct_events(rows, [])
 
-    "**Summary:** " <> total <> " iterations, " <> to_string(elapsed) <> "s total elapsed, " <> to_string(events) <> " distinct events"
+    "**Summary:** " <> total <> " iterations, " <> elapsed <> "s total elapsed, " <> to_string(events) <> " distinct events"
   end
 
-  defp sum_elapsed([], total) do
-    total
-  end
+  defp sum_elapsed_text(rows) do
+    vals = collect_elapsed_values(rows, [])
 
-  defp sum_elapsed([row | rest], total) do
-    val = Map.get(row, :elapsed_s, "")
-
-    case val do
-      "" -> sum_elapsed(rest, total)
-      s -> sum_elapsed(rest, total + parse_float_or_zero(s))
+    case vals do
+      [] -> "0"
+      _ -> sum_elapsed_values(vals)
     end
   end
 
-  defp parse_float_or_zero(s) do
-    int_part = first_or_empty(String.split(s, "."))
+  defp collect_elapsed_values([], acc) do
+    Enum.reverse(acc)
+  end
 
-    case int_part do
-      "" -> 0
-      v -> parse_int_or_zero(v)
+  defp collect_elapsed_values([row | rest], acc) do
+    case Map.get(row, :elapsed_s, "") do
+      "" -> collect_elapsed_values(rest, acc)
+      value -> collect_elapsed_values(rest, [value] ++ acc)
     end
+  end
+
+  defp sum_elapsed_values(values) do
+    result = System.run("printf '%s' " <> LoopUtils.shell_quote(join_lines(values)) <> " | perl -ne 'chomp; next if $_ eq q{}; $sum += $_; END { printf \"%g\", $sum || 0 }'")
+    String.trim(Map.get(result, :output, "0"))
+  end
+
+  defp join_lines([]) do
+    ""
+  end
+
+  defp join_lines([item]) do
+    item
+  end
+
+  defp join_lines([item | rest]) do
+    item <> LoopUtils.line_sep() <> join_lines(rest)
   end
 
   defp parse_int_or_zero(s) do
@@ -2159,18 +2357,34 @@ defmodule LoopHarness do
 
   defp metrics_json_row(row) do
     "{" <>
-    json_str_field("iteration", Map.get(row, :iteration, "")) <> ", " <>
+    json_number_field_or_null("iteration", Map.get(row, :iteration, "")) <> ", " <>
     json_str_field("role", Map.get(row, :role, "")) <> ", " <>
     json_str_field("event", Map.get(row, :event, "")) <> ", " <>
-    json_str_field("elapsed_s", Map.get(row, :elapsed_s, "")) <> ", " <>
-    json_str_field("exit_code", Map.get(row, :exit_code, "")) <> ", " <>
-    json_str_field("timed_out", Map.get(row, :timed_out, "")) <> ", " <>
+    json_number_field_or_null("elapsed_s", Map.get(row, :elapsed_s, "")) <> ", " <>
+    json_number_field_or_null("exit_code", Map.get(row, :exit_code, "")) <> ", " <>
+    json_bool_field("timed_out", Map.get(row, :timed_out, "")) <> ", " <>
     json_str_field("outcome", Map.get(row, :outcome, "")) <>
     "}"
   end
 
   defp json_str_field(key, value) do
-    "\"" <> key <> "\": \"" <> json_escape_string(value) <> "\""
+    LoopJson.json_field(key, value)
+  end
+
+  defp json_number_field_or_null(key, "") do
+    "\"" <> key <> "\": null"
+  end
+
+  defp json_number_field_or_null(key, value) do
+    "\"" <> key <> "\": " <> value
+  end
+
+  defp json_bool_field(key, "true") do
+    "\"" <> key <> "\": true"
+  end
+
+  defp json_bool_field(key, _value) do
+    "\"" <> key <> "\": false"
   end
 
   defp json_escape_string(value) do

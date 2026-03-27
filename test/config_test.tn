@@ -58,11 +58,11 @@ defmodule LoopConfig do
 
   def resolve_memory_file(project_dir) do
     config = load_project(project_dir)
-    Path.join(project_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+    Path.join(project_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
   end
 
   defp journal_path(config) do
-    get(config, "core.journal_file", get(config, "core.events_file", ".miniloops/journal.jsonl"))
+    get(config, "core.journal_file", get(config, "core.events_file", ".miniloop/journal.jsonl"))
   end
 
   defp resolve_bundled_preset_dir(name, bundle_root) do
@@ -100,13 +100,15 @@ defmodule LoopConfig do
       "required_events" => ""
     }
     backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
+    parallel = %{"enabled" => "false", "max_branches" => "3", "branch_timeout_ms" => "180000"}
+    memory = %{"prompt_budget_chars" => "8000"}
     core = %{
-      "state_dir" => ".miniloops",
-      "journal_file" => ".miniloops/journal.jsonl",
-      "events_file" => ".miniloops/journal.jsonl",
-      "memory_file" => ".miniloops/memory.jsonl"
+      "state_dir" => ".miniloop",
+      "journal_file" => ".miniloop/journal.jsonl",
+      "events_file" => ".miniloop/journal.jsonl",
+      "memory_file" => ".miniloop/memory.jsonl"
     }
-    %{"event_loop" => event_loop, "backend" => backend, "core" => core}
+    %{"event_loop" => event_loop, "backend" => backend, "parallel" => parallel, "memory" => memory, "core" => core}
   end
 
   defp get_in_path(_map, [], fallback) do
@@ -319,14 +321,16 @@ defmodule ConfigTest do
     Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_promise", ""), "LOOP_COMPLETE")
     Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_event", ""), "task.complete")
     Assert.assert_equal(LoopConfig.get(config, "backend.command", ""), "pi")
-    Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloops")
+    Assert.assert_equal(LoopConfig.get(config, "memory.prompt_budget_chars", ""), "8000")
+    Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloop")
   end
 
   def test_defaults_accessible_via_list_path() do
     config = LoopConfig.load("/nonexistent/path/that/wont/exist")
     Assert.assert_equal(LoopConfig.get(config, ["event_loop", "max_iterations"], ""), "3")
     Assert.assert_equal(LoopConfig.get(config, ["backend", "kind"], ""), "pi")
-    Assert.assert_equal(LoopConfig.get(config, ["core", "memory_file"], ""), ".miniloops/memory.jsonl")
+    Assert.assert_equal(LoopConfig.get(config, ["memory", "prompt_budget_chars"], ""), "8000")
+    Assert.assert_equal(LoopConfig.get(config, ["core", "memory_file"], ""), ".miniloop/memory.jsonl")
   end
 
   def test_get_returns_fallback_for_missing_key() do
@@ -380,12 +384,13 @@ defmodule ConfigTest do
     iters = LoopConfig.get(config, "event_loop.max_iterations", "")
     Assert.assert_equal(iters, "100")
     Assert.assert_equal(LoopConfig.get(config, "backend.kind", ""), "pi")
-    Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloops")
+    Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloop")
   end
 
   def test_load_project_deep_merge_preserves_defaults() do
     config = LoopConfig.load_project(project_dir())
     Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_promise", "missing"), "LOOP_COMPLETE")
+    Assert.assert_equal(LoopConfig.get(config, "memory.prompt_budget_chars", "missing"), "8000")
   end
 
   def test_load_project_list_path_access() do

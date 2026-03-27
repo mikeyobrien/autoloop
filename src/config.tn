@@ -62,16 +62,25 @@ defmodule LoopConfig do
 
   def resolve_memory_file(project_dir) do
     config = load_project(project_dir)
-    Path.join(project_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+    Path.join(project_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
   end
 
   def resolve_memory_file_in(project_dir, work_dir) do
     config = load_project(project_dir)
-    Path.join(work_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+    Path.join(work_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
+  end
+
+  def state_dir_name(project_dir) do
+    config = load_project(project_dir)
+    get(config, "core.state_dir", ".miniloop")
+  end
+
+  def state_dir_path(project_dir) do
+    Path.join(project_dir, state_dir_name(project_dir))
   end
 
   defp journal_path(config) do
-    get(config, "core.journal_file", get(config, "core.events_file", ".miniloops/journal.jsonl"))
+    get(config, "core.journal_file", get(config, "core.events_file", ".miniloop/journal.jsonl"))
   end
 
   defp resolve_bundled_preset_dir(name, bundle_root) do
@@ -111,15 +120,16 @@ defmodule LoopConfig do
       "required_events" => ""
     }
     backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
+    memory = %{"prompt_budget_chars" => "8000"}
     core = %{
-      "state_dir" => ".miniloops",
-      "journal_file" => ".miniloops/journal.jsonl",
-      "events_file" => ".miniloops/journal.jsonl",
-      "memory_file" => ".miniloops/memory.jsonl",
+      "state_dir" => ".miniloop",
+      "journal_file" => ".miniloop/journal.jsonl",
+      "events_file" => ".miniloop/journal.jsonl",
+      "memory_file" => ".miniloop/memory.jsonl",
       "run_id_format" => "compact",
       "log_level" => "info"
     }
-    %{"event_loop" => event_loop, "backend" => backend, "core" => core}
+    %{"event_loop" => event_loop, "backend" => backend, "memory" => memory, "core" => core}
   end
 
   # --- Path traversal helpers ---

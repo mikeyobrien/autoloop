@@ -78,7 +78,7 @@ Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `h
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `memory.prompt_budget_chars` | int | `1600` | Maximum characters of materialized memory injected into each iteration's prompt. |
+| `memory.prompt_budget_chars` | int | `8000` | Maximum characters of materialized memory injected into each iteration's prompt. |
 
 ### Harness
 
@@ -90,9 +90,9 @@ Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `h
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `core.state_dir` | string | `".miniloops"` | Directory for runtime state (journal, memory, tools). |
-| `core.journal_file` | string | `".miniloops/journal.jsonl"` | Path to the journal file. |
-| `core.memory_file` | string | `".miniloops/memory.jsonl"` | Path to the memory file. |
+| `core.state_dir` | string | `".miniloop"` | Directory for runtime state (journal, memory, tools). |
+| `core.journal_file` | string | `".miniloop/journal.jsonl"` | Path to the journal file. |
+| `core.memory_file` | string | `".miniloop/memory.jsonl"` | Path to the memory file. |
 | `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. Still accepted; prefer `journal_file`. |
 | `core.run_id_format` | string | `"compact"` | Run ID format: `"compact"` for timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
 
@@ -113,12 +113,12 @@ review.enabled = false
 review.timeout_ms = 300000
 review.every_iterations = 0
 
-memory.prompt_budget_chars = 1600
+memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloops"
-core.journal_file = ".miniloops/journal.jsonl"
-core.memory_file = ".miniloops/memory.jsonl"
+core.state_dir = ".miniloop"
+core.journal_file = ".miniloop/journal.jsonl"
+core.memory_file = ".miniloop/memory.jsonl"
 ```
 
 ## Mock backend mode
