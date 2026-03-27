@@ -304,9 +304,16 @@ defmodule LoopHarness do
   end
 
   defp invalid_event_after_join_check(emitted_topic, allowed_events, true, completion_event) do
+    case parallel_topic(emitted_topic) do
+      true -> invalid_parallel_topic(emitted_topic, allowed_events, completion_event)
+      _ -> invalid_event_after_parallel_check(emitted_topic, allowed_events)
+    end
+  end
+
+  defp invalid_parallel_topic(emitted_topic, allowed_events, completion_event) do
     case valid_parallel_trigger_event(emitted_topic, allowed_events, completion_event) do
       true -> false
-      _ -> invalid_event_after_parallel_check(emitted_topic, allowed_events)
+      _ -> true
     end
   end
 
@@ -368,12 +375,20 @@ defmodule LoopHarness do
     String.ends_with(topic, ".parallel")
   end
 
+  defp parallel_trigger_topic("explore.parallel") do
+    true
+  end
+
+  defp parallel_trigger_topic(topic) do
+    dispatch_parallel_topic(topic)
+  end
+
   defp reserved_parallel_joined_topic(topic) do
     String.ends_with(topic, ".parallel.joined")
   end
 
   defp parallel_topic(topic) do
-    dispatch_parallel_topic(topic) or reserved_parallel_joined_topic(topic)
+    parallel_trigger_topic(topic) or reserved_parallel_joined_topic(topic)
   end
 
   defp completed_via_event(topics, completion_event, required_events) do

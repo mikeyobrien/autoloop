@@ -27,6 +27,15 @@ defmodule ParallelEmitTest do
     Assert.assert_contains(read_journal(fixture), "\"topic\": \"event.invalid\"")
   end
 
+  def test_emit_rejects_dispatch_parallel_without_allowed_events_context() do
+    fixture = prepare_fixture(true)
+    result = emit_without_allowed_events(fixture, "tasks.ready.parallel", "- implement config parsing", "loop.start")
+
+    Assert.refute(Map.get(result, :exit_code, 0) == 0, "dispatch parallel should fail closed without allowed-next-event context")
+    Assert.assert_contains(Map.get(result, :output, ""), "invalid event `tasks.ready.parallel`")
+    Assert.assert_contains(read_journal(fixture), "\"topic\": \"event.invalid\"")
+  end
+
   def test_emit_rejects_parallel_topics_when_disabled() do
     fixture = prepare_fixture(false)
     result = emit_with_env(fixture, "explore.parallel", "- compare two plans", "review.ready,build.blocked", "tasks.ready")
@@ -83,6 +92,17 @@ defmodule ParallelEmitTest do
       " MINILOOPS_RECENT_EVENT=" <> shell_quote(recent_event) <>
       " MINILOOPS_ALLOWED_ROLES='planner,builder'" <>
       " MINILOOPS_ALLOWED_EVENTS=" <> shell_quote(allowed_events) <>
+      " " <> shell_quote(Map.get(fixture, :tool_path, "")) <> " emit " <> shell_quote(topic) <> " " <> shell_quote(payload) <> " 2>&1"
+    )
+  end
+
+  defp emit_without_allowed_events(fixture, topic, payload, recent_event) do
+    System.run(
+      "cd " <> shell_quote(Map.get(fixture, :project_dir, "")) <>
+      " && " <> clean_miniloops_env() <>
+      " env MINILOOPS_ITERATION=1" <>
+      " MINILOOPS_RECENT_EVENT=" <> shell_quote(recent_event) <>
+      " MINILOOPS_ALLOWED_ROLES='planner,builder'" <>
       " " <> shell_quote(Map.get(fixture, :tool_path, "")) <> " emit " <> shell_quote(topic) <> " " <> shell_quote(payload) <> " 2>&1"
     )
   end
