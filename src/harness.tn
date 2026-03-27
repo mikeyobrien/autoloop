@@ -184,15 +184,17 @@ defmodule LoopHarness do
     append_backend_start(loop, iter)
     verbose_log(loop, "backend start command=" <> backend_command(loop))
 
+    start_epoch = epoch_seconds()
     result = System.run(build_backend_command(loop, iter), %{stream: true, timeout_ms: backend_timeout_ms(loop)})
+    elapsed_s = epoch_seconds() - start_epoch
     output = Map.get(result, :output, "")
     exit_code = Map.get(result, :exit_code, 1)
     timed_out = Map.get(result, :timed_out, false)
 
     append_backend_finish(loop, iter, output, exit_code, timed_out)
-    append_iteration_finish(loop, iter, output, exit_code, timed_out)
+    append_iteration_finish(loop, iter, output, exit_code, timed_out, elapsed_s)
     verbose_log(loop, "iteration " <> to_string(iteration) <> " finish exit_code=" <> to_string(exit_code))
-    print_iteration_footer(iter)
+    print_iteration_footer(iter, elapsed_s)
 
     case timed_out do
       true -> stop_backend_timeout(loop, iteration, output)
@@ -330,8 +332,8 @@ defmodule LoopHarness do
     append_event(journal_file(loop), run_id(loop), iteration_string(iter), "backend.finish", json_field("exit_code", to_string(exit_code)) <> ", " <> json_field_raw("timed_out", json_bool(timed_out)) <> ", " <> json_field("output", output))
   end
 
-  defp append_iteration_finish(loop, iter, output, exit_code, timed_out) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.finish", json_field("exit_code", to_string(exit_code)) <> ", " <> json_field_raw("timed_out", json_bool(timed_out)) <> ", " <> json_field("output", output))
+  defp append_iteration_finish(loop, iter, output, exit_code, timed_out, elapsed_s) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.finish", json_field("exit_code", to_string(exit_code)) <> ", " <> json_field_raw("timed_out", json_bool(timed_out)) <> ", " <> json_field("elapsed_s", to_string(elapsed_s)) <> ", " <> json_field("output", output))
   end
 
   defp resolve_prompt(project_dir, config, prompt_override) do
@@ -1540,9 +1542,21 @@ defmodule LoopHarness do
     print_lines(["", rule, role_line, bottom_rule])
   end
 
-  defp print_iteration_footer(iter) do
-    label = "──── end iteration #{iteration(iter)} ────"
+  defp print_iteration_footer(iter, elapsed_s) do
+    label = "──── end iteration #{iteration(iter)} (#{format_elapsed(elapsed_s)}) ────"
     print_lines([label, ""])
+  end
+
+  defp format_elapsed(seconds) do
+    case seconds >= 60 do
+      true -> to_string(div(seconds, 60)) <> "m " <> to_string(rem(seconds, 60)) <> "s"
+      _ -> to_string(seconds) <> "s"
+    end
+  end
+
+  defp epoch_seconds() do
+    result = System.run("date +%s")
+    String.to_integer(String.trim(Map.get(result, :output, "0")))
   end
 
   defp print_review_banner(loop, iteration) do
