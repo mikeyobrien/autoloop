@@ -5,20 +5,20 @@ defmodule LoopConfig do
 
   def load(path) do
     case System.path_exists(path) do
-      true -> parse_lines(String.split(System.read_text(path), line_sep()), defaults())
+      true -> deep_merge(defaults(), parse_toml(System.read_text(path)))
       _ -> defaults()
     end
   end
 
   def get(config, key, fallback) do
-    case Map.get(config, key, nil) do
-      nil -> fallback
-      value -> value
+    case is_list(key) do
+      true -> get_in_path(config, key, fallback)
+      _ -> get_in_path(config, String.split(key, "."), fallback)
     end
   end
 
   def get_int(config, key, fallback) do
-    case Map.get(config, key, nil) do
+    case get(config, key, nil) do
       nil -> fallback
       value -> String.to_integer(value)
     end
@@ -28,8 +28,22 @@ defmodule LoopConfig do
     split_csv(get(config, key, ""))
   end
 
+  def put(config, key, value) do
+    case is_list(key) do
+      true -> put_in_path(config, key, value)
+      _ -> put_in_path(config, String.split(key, "."), value)
+    end
+  end
+
   def project_has_config(project_dir) do
     System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
+  end
+
+  def resolve_project_dir(project_dir_or_preset, bundle_root) do
+    case project_has_config(project_dir_or_preset) do
+      true -> project_dir_or_preset
+      _ -> resolve_bundled_preset_dir(project_dir_or_preset, bundle_root)
+    end
   end
 
   def resolve_journal_file(project_dir) do
@@ -50,6 +64,23 @@ defmodule LoopConfig do
     get(config, "core.journal_file", get(config, "core.events_file", ".miniloops/journal.jsonl"))
   end
 
+  defp resolve_bundled_preset_dir(name, bundle_root) do
+    bundle_candidate = Path.join(bundle_root, "examples/" <> name)
+    cwd_candidate = Path.join(".", "examples/" <> name)
+
+    case project_has_config(bundle_candidate) do
+      true -> bundle_candidate
+      _ -> resolve_bundled_preset_dir_cwd(cwd_candidate)
+    end
+  end
+
+  defp resolve_bundled_preset_dir_cwd(candidate) do
+    case project_has_config(candidate) do
+      true -> candidate
+      _ -> ""
+    end
+  end
+
   defp resolve_config_path(project_dir) do
     toml_path = Path.join(project_dir, "miniloops.toml")
     conf_path = Path.join(project_dir, "miniloops.conf")
@@ -61,28 +92,145 @@ defmodule LoopConfig do
   end
 
   defp defaults() do
-    Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(%{}, "event_loop.max_iterations", "3"), "event_loop.completion_promise", "LOOP_COMPLETE"), "event_loop.completion_event", "task.complete"), "event_loop.required_events", ""), "backend.kind", "pi"), "backend.command", "pi"), "backend.timeout_ms", "300000"), "core.state_dir", ".miniloops"), "core.journal_file", ".miniloops/journal.jsonl"), "core.events_file", ".miniloops/journal.jsonl"), "core.memory_file", ".miniloops/memory.jsonl")
+    event_loop = %{
+      "max_iterations" => "3",
+      "completion_promise" => "LOOP_COMPLETE",
+      "completion_event" => "task.complete",
+      "required_events" => ""
+    }
+    backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
+    core = %{
+      "state_dir" => ".miniloops",
+      "journal_file" => ".miniloops/journal.jsonl",
+      "events_file" => ".miniloops/journal.jsonl",
+      "memory_file" => ".miniloops/memory.jsonl"
+    }
+    %{"event_loop" => event_loop, "backend" => backend, "core" => core}
   end
 
-  defp parse_lines([], config) do
-    config
+  defp get_in_path(_map, [], fallback) do
+    fallback
   end
 
-  defp parse_lines([line | rest], config) do
-    trimmed = String.trim(line)
-
-    case skip_line(trimmed) do
-      true -> parse_lines(rest, config)
-      _ -> parse_assignment(String.split(trimmed, "="), rest, config)
+  defp get_in_path(map, [key], fallback) do
+    case Map.get(map, key, nil) do
+      nil -> fallback
+      value -> value
     end
   end
 
-  defp parse_assignment([key, value], rest, config) do
-    parse_lines(rest, Map.put(config, String.trim(key), normalize_value(String.trim(value))))
+  defp get_in_path(map, [key | rest], fallback) do
+    case Map.get(map, key, nil) do
+      nil -> fallback
+      inner ->
+        case is_map(inner) do
+          true -> get_in_path(inner, rest, fallback)
+          _ -> fallback
+        end
+    end
   end
 
-  defp parse_assignment(_, rest, config) do
-    parse_lines(rest, config)
+  defp put_in_path(map, [key], value) do
+    Map.put(map, key, value)
+  end
+
+  defp put_in_path(map, [key | rest], value) do
+    inner = case Map.get(map, key, nil) do
+      nil -> %{}
+      existing ->
+        case is_map(existing) do
+          true -> existing
+          _ -> %{}
+        end
+    end
+    Map.put(map, key, put_in_path(inner, rest, value))
+  end
+
+  defp deep_merge(base, override) do
+    merge_keys(Map.keys(override), base, override)
+  end
+
+  defp merge_keys([], result, _override) do
+    result
+  end
+
+  defp merge_keys([key | rest], result, override) do
+    over_val = Map.get(override, key, nil)
+    merged = merge_key_value(result, key, over_val)
+    merge_keys(rest, Map.put(result, key, merged), override)
+  end
+
+  defp merge_key_value(result, key, over_val) do
+    case Map.has_key(result, key) do
+      true -> merge_value(Map.get(result, key, nil), over_val)
+      _ -> over_val
+    end
+  end
+
+  defp merge_value(base, over) do
+    case is_map(base) and is_map(over) do
+      true -> deep_merge(base, over)
+      _ -> over
+    end
+  end
+
+  defp parse_toml(text) do
+    parse_toml_lines(String.split(text, line_sep()), "", %{})
+  end
+
+  defp parse_toml_lines([], _section, config) do
+    config
+  end
+
+  defp parse_toml_lines([line | rest], section, config) do
+    trimmed = String.trim(line)
+
+    case skip_line(trimmed) do
+      true -> parse_toml_lines(rest, section, config)
+      _ -> parse_toml_dispatch(trimmed, rest, section, config)
+    end
+  end
+
+  defp parse_toml_dispatch(line, rest, section, config) do
+    case is_section_header(line) do
+      true -> parse_toml_lines(rest, extract_section_name(line), config)
+      _ -> parse_toml_assignment(String.split(line, "="), rest, section, config)
+    end
+  end
+
+  defp is_section_header(line) do
+    String.starts_with(line, "[") and String.ends_with(line, "]")
+  end
+
+  defp extract_section_name(line) do
+    String.trim(slice_outer(line))
+  end
+
+  defp parse_toml_assignment([_single], rest, section, config) do
+    parse_toml_lines(rest, section, config)
+  end
+
+  defp parse_toml_assignment([key | value_parts], rest, section, config) do
+    value = rejoin(value_parts, "=")
+    raw_key = String.trim(key)
+    full_key = case section do
+      "" -> raw_key
+      _ -> section <> "." <> raw_key
+    end
+    path = String.split(full_key, ".")
+    parse_toml_lines(rest, section, put_in_path(config, path, normalize_value(String.trim(value))))
+  end
+
+  defp parse_toml_assignment([], rest, section, config) do
+    parse_toml_lines(rest, section, config)
+  end
+
+  defp rejoin([part], _sep) do
+    part
+  end
+
+  defp rejoin([part | rest], sep) do
+    part <> sep <> rejoin(rest, sep)
   end
 
   defp normalize_value(value) do
@@ -173,9 +321,21 @@ defmodule ConfigTest do
     Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloops")
   end
 
+  def test_defaults_accessible_via_list_path() do
+    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
+    Assert.assert_equal(LoopConfig.get(config, ["event_loop", "max_iterations"], ""), "3")
+    Assert.assert_equal(LoopConfig.get(config, ["backend", "kind"], ""), "pi")
+    Assert.assert_equal(LoopConfig.get(config, ["core", "memory_file"], ""), ".miniloops/memory.jsonl")
+  end
+
   def test_get_returns_fallback_for_missing_key() do
     config = LoopConfig.load("/nonexistent/path/that/wont/exist")
     Assert.assert_equal(LoopConfig.get(config, "nonexistent.key", "fallback_value"), "fallback_value")
+  end
+
+  def test_get_returns_fallback_for_missing_list_path() do
+    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
+    Assert.assert_equal(LoopConfig.get(config, ["no", "such", "path"], "fallback"), "fallback")
   end
 
   def test_get_int_returns_integer() do
@@ -194,6 +354,51 @@ defmodule ConfigTest do
     Assert.assert_equal(result, [])
   end
 
+  def test_put_dotted_key() do
+    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
+    updated = LoopConfig.put(config, "event_loop.max_iterations", "50")
+    Assert.assert_equal(LoopConfig.get(updated, "event_loop.max_iterations", ""), "50")
+    Assert.assert_equal(LoopConfig.get(updated, "event_loop.completion_event", ""), "task.complete")
+  end
+
+  def test_put_list_path() do
+    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
+    updated = LoopConfig.put(config, ["backend", "kind"], "command")
+    Assert.assert_equal(LoopConfig.get(updated, "backend.kind", ""), "command")
+    Assert.assert_equal(LoopConfig.get(updated, "backend.command", ""), "pi")
+  end
+
+  def test_put_creates_intermediate_maps() do
+    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
+    updated = LoopConfig.put(config, "new_section.new_key", "new_value")
+    Assert.assert_equal(LoopConfig.get(updated, "new_section.new_key", ""), "new_value")
+  end
+
+  def test_load_project_with_flat_toml() do
+    config = LoopConfig.load_project(project_dir())
+    iters = LoopConfig.get(config, "event_loop.max_iterations", "")
+    Assert.assert_equal(iters, "100")
+    Assert.assert_equal(LoopConfig.get(config, "backend.kind", ""), "pi")
+    Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloops")
+  end
+
+  def test_load_project_deep_merge_preserves_defaults() do
+    config = LoopConfig.load_project(project_dir())
+    Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_promise", "missing"), "LOOP_COMPLETE")
+  end
+
+  def test_load_project_list_path_access() do
+    config = LoopConfig.load_project(project_dir())
+    Assert.assert_equal(LoopConfig.get(config, ["event_loop", "max_iterations"], ""), "100")
+    Assert.assert_equal(LoopConfig.get(config, ["backend", "kind"], ""), "pi")
+  end
+
+  def test_load_project_required_events_list() do
+    config = LoopConfig.load_project(project_dir())
+    result = LoopConfig.get_list(config, "event_loop.required_events")
+    Assert.assert_equal(result, ["review.passed"])
+  end
+
   def test_project_has_config_true() do
     Assert.assert(LoopConfig.project_has_config(project_dir()), "project should have config")
   end
@@ -204,5 +409,25 @@ defmodule ConfigTest do
 
   def test_project_has_config_false() do
     Assert.refute(LoopConfig.project_has_config("/tmp"), "/tmp should not have config")
+  end
+
+  def test_resolve_project_dir_returns_explicit_config_path() do
+    resolved = LoopConfig.resolve_project_dir(project_dir(), "/tmp")
+    Assert.assert_equal(resolved, project_dir())
+  end
+
+  def test_resolve_project_dir_resolves_bundled_preset_name() do
+    resolved = LoopConfig.resolve_project_dir("autocode", project_dir())
+    Assert.assert_equal(resolved, Path.join(project_dir(), "examples/autocode"))
+  end
+
+  def test_resolve_project_dir_resolves_autosimplify_preset_name() do
+    resolved = LoopConfig.resolve_project_dir("autosimplify", project_dir())
+    Assert.assert_equal(resolved, Path.join(project_dir(), "examples/autosimplify"))
+  end
+
+  def test_resolve_project_dir_returns_empty_for_unknown_preset() do
+    resolved = LoopConfig.resolve_project_dir("definitely-not-a-preset", project_dir())
+    Assert.assert_equal(resolved, "")
   end
 end

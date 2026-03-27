@@ -1,19 +1,18 @@
-# Context: Add iteration-37 review note to loop memory
+# Context: Implement pending .agents/tasks
 
 ## Objective
-Record the requested review summary as a durable loop learning via `./.miniloops/miniloops memory add learning ...`.
+Implement the 16 pending code-task specs in `.agents/tasks/tonic-loops/`. All are currently unimplemented. Work proceeds one slice at a time in dependency order.
 
-## Requested Learning
-`Review iteration 37: Loop completing on schedule. 8/8 areas scanned+analyzed+reviewed, final synthesis pending. 24 total suggestions (21 in report, #22-#24 awaiting synthesis). Routing correct: analysis.validated → synthesizer. Completion at iter 37-38 matches iter-29 projection exactly. Cadence recovered in final areas: Area 8 took 5 iters (33-37), consistent with Areas 4 and 7. No routing errors, no blocked events, no intervention needed. Loop should emit task.complete after this synthesis.`
+## Current State
+- Core harness, config, memory, chains, topology, PI adapter, JSON, and utils modules are implemented in `src/*.tn`.
+- Tests exist in `test/config_test.tn` and `test/memory_test.tn`.
+- Chain definitions in `chains.toml` with 6 example chains.
+- Preset resolution uses bundled `examples/` directories.
+- Config uses flat dotted-key strings parsed from `miniloops.toml`.
+- No structured logging, no regex event matching, no store-backed state, no run isolation.
 
 ## Constraints
-- Do not change product code.
-- Keep the run limited to the requested memory entry and shared-workfile refresh.
-- Verify using the full requested text.
-- The worktree already has many unrelated changes; commit only slice files.
-
-## Likely Changed Files
-- `./.miniloops/memory.jsonl`
-- `context.md`
-- `plan.md`
-- `progress.md`
+- One concrete slice at a time.
+- Each slice committed before handoff.
+- Verification mandatory before review.
+- Prefer small, verifiable changes.
