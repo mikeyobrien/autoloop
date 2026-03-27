@@ -5,8 +5,40 @@ defmodule Demo do
     dispatch(args, argv)
   end
 
+  defp dispatch(["--help"], _argv) do
+    print_usage()
+  end
+
+  defp dispatch(["-h"], _argv) do
+    print_usage()
+  end
+
+  defp dispatch(["emit"], _argv) do
+    print_emit_usage()
+  end
+
+  defp dispatch(["emit", "--help"], _argv) do
+    print_emit_usage()
+  end
+
+  defp dispatch(["emit", "-h"], _argv) do
+    print_emit_usage()
+  end
+
   defp dispatch(["emit", topic | rest], _argv) do
     LoopHarness.emit(resolve_runtime_project_dir(), topic, join_tokens(rest))
+  end
+
+  defp dispatch(["inspect"], _argv) do
+    print_inspect_usage()
+  end
+
+  defp dispatch(["inspect", "--help"], _argv) do
+    print_inspect_usage()
+  end
+
+  defp dispatch(["inspect", "-h"], _argv) do
+    print_inspect_usage()
   end
 
   defp dispatch(["inspect" | rest], _argv) do
@@ -17,6 +49,22 @@ defmodule Demo do
     LoopPiAdapter.run(rest)
   end
 
+  defp dispatch(["memory"], _argv) do
+    print_memory_usage()
+  end
+
+  defp dispatch(["memory", "--help"], _argv) do
+    print_memory_usage()
+  end
+
+  defp dispatch(["memory", "add"], _argv) do
+    print_memory_add_usage()
+  end
+
+  defp dispatch(["memory", "add", "--help"], _argv) do
+    print_memory_add_usage()
+  end
+
   defp dispatch(["memory", "list"], _argv) do
     IO.puts(LoopMemory.list_project(resolve_runtime_project_dir()))
   end
@@ -25,16 +73,32 @@ defmodule Demo do
     IO.puts(LoopMemory.list_project(project_dir))
   end
 
+  defp dispatch(["memory", "add", "learning", "--help"], _argv) do
+    IO.puts("Usage: miniloops memory add learning <text...>")
+  end
+
   defp dispatch(["memory", "add", "learning" | rest], _argv) do
     LoopMemory.add_learning(resolve_runtime_project_dir(), join_tokens(rest), "manual")
+  end
+
+  defp dispatch(["memory", "add", "preference", "--help"], _argv) do
+    IO.puts("Usage: miniloops memory add preference <category> <text...>")
   end
 
   defp dispatch(["memory", "add", "preference", category | rest], _argv) do
     LoopMemory.add_preference(resolve_runtime_project_dir(), category, join_tokens(rest))
   end
 
+  defp dispatch(["memory", "add", "meta", "--help"], _argv) do
+    IO.puts("Usage: miniloops memory add meta <key> <value...>")
+  end
+
   defp dispatch(["memory", "add", "meta", key | rest], _argv) do
     LoopMemory.add_meta(resolve_runtime_project_dir(), key, join_tokens(rest))
+  end
+
+  defp dispatch(["memory", "remove", "--help"], _argv) do
+    IO.puts("Usage: miniloops memory remove <id> [reason...]")
   end
 
   defp dispatch(["memory", "remove", id], _argv) do
@@ -43,6 +107,10 @@ defmodule Demo do
 
   defp dispatch(["memory", "remove", id | rest], _argv) do
     LoopMemory.remove(resolve_runtime_project_dir(), id, join_tokens(rest))
+  end
+
+  defp dispatch(["memory" | _rest], _argv) do
+    print_memory_usage()
   end
 
   defp dispatch(["chain", "list"], _argv) do
@@ -62,8 +130,15 @@ defmodule Demo do
   end
 
   defp dispatch(args, argv) do
-    options = parse_run_args(args)
+    options = parse_run_args(args, resolve_bundle_root(argv))
 
+    case Map.get(options, :usage_error, false) do
+      true -> :ok
+      _ -> dispatch_run_options(options, argv)
+    end
+  end
+
+  defp dispatch_run_options(options, argv) do
     case Map.get(options, :chain, nil) do
       nil -> LoopHarness.run(Map.get(options, :project_dir, "."), normalize_prompt(Map.get(options, :prompt, nil)), self_command(argv), options)
       chain_csv -> run_inline_chain(chain_csv, Map.get(options, :project_dir, "."), self_command(argv), options)
@@ -298,58 +373,102 @@ defmodule Demo do
     []
   end
 
-  defp parse_run_args(["run" | rest]) do
-    parse_run_args(rest)
+  defp parse_run_args(args, bundle_root) do
+    finalize_run_args(parse_run_tokens(args, bundle_root, default_run_options()), bundle_root)
   end
 
-  defp parse_run_args(["--verbose" | rest]) do
-    Map.put(parse_run_args(rest), :verbose, true)
+  defp parse_run_tokens(["run" | rest], bundle_root, options) do
+    parse_run_tokens(rest, bundle_root, options)
   end
 
-  defp parse_run_args(["-v" | rest]) do
-    Map.put(parse_run_args(rest), :verbose, true)
+  defp parse_run_tokens(["--verbose" | rest], bundle_root, options) do
+    parse_run_tokens(rest, bundle_root, Map.put(options, :verbose, true))
   end
 
-  defp parse_run_args(["-b"]) do
+  defp parse_run_tokens(["-v" | rest], bundle_root, options) do
+    parse_run_tokens(rest, bundle_root, Map.put(options, :verbose, true))
+  end
+
+  defp parse_run_tokens(["-b"], _bundle_root, _options) do
     backend_usage_error("missing backend after -b")
   end
 
-  defp parse_run_args(["--backend"]) do
+  defp parse_run_tokens(["--backend"], _bundle_root, _options) do
     backend_usage_error("missing backend after --backend")
   end
 
-  defp parse_run_args(["-b", backend | rest]) do
-    attach_backend_override(parse_run_args(rest), backend_override_spec(backend))
+  defp parse_run_tokens(["-b", backend | rest], bundle_root, options) do
+    parse_run_tokens(rest, bundle_root, attach_backend_override(options, backend_override_spec(backend)))
   end
 
-  defp parse_run_args(["--backend", backend | rest]) do
-    attach_backend_override(parse_run_args(rest), backend_override_spec(backend))
+  defp parse_run_tokens(["--backend", backend | rest], bundle_root, options) do
+    parse_run_tokens(rest, bundle_root, attach_backend_override(options, backend_override_spec(backend)))
   end
 
-  defp parse_run_args(["--chain"]) do
+  defp parse_run_tokens(["-p"], _bundle_root, _options) do
+    preset_usage_error("missing preset after -p")
+  end
+
+  defp parse_run_tokens(["--preset"], _bundle_root, _options) do
+    preset_usage_error("missing preset after --preset")
+  end
+
+  defp parse_run_tokens(["-p", preset | rest], bundle_root, options) do
+    next = attach_preset_override(options, preset, bundle_root)
+    parse_run_tokens(rest, bundle_root, next)
+  end
+
+  defp parse_run_tokens(["--preset", preset | rest], bundle_root, options) do
+    next = attach_preset_override(options, preset, bundle_root)
+    parse_run_tokens(rest, bundle_root, next)
+  end
+
+  defp parse_run_tokens(["--chain"], _bundle_root, _options) do
     IO.puts("missing chain after --chain")
-    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false}
+    Map.put(default_run_options(), :usage_error, true)
   end
 
-  defp parse_run_args(["--chain", chain_csv | rest]) do
-    Map.put(parse_run_args(rest), :chain, chain_csv)
+  defp parse_run_tokens(["--chain", chain_csv | rest], bundle_root, options) do
+    parse_run_tokens(rest, bundle_root, Map.put(options, :chain, chain_csv))
   end
 
-  defp parse_run_args([]) do
-    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false}
+  defp parse_run_tokens([], _bundle_root, options) do
+    options
   end
 
-  defp parse_run_args([arg]) do
-    case looks_like_project_dir(arg) do
-      true -> %{project_dir: arg, prompt: nil, backend_override: %{}, verbose: false}
-      _ -> %{project_dir: ".", prompt: arg, backend_override: %{}, verbose: false}
+  defp parse_run_tokens([token | rest], bundle_root, options) do
+    parse_run_tokens(rest, bundle_root, push_positional(options, token))
+  end
+
+  defp finalize_run_args(options, bundle_root) do
+    positionals = Enum.reverse(Map.get(options, :positionals, []))
+
+    case Map.get(options, :preset_explicit, false) do
+      true -> strip_run_parse_fields(Map.put(options, :prompt, join_tokens(positionals)))
+      _ -> finalize_run_args_positionals(positionals, options, bundle_root)
     end
   end
 
-  defp parse_run_args([first | rest]) do
+  defp finalize_run_args_positionals([], options, _bundle_root) do
+    case Map.get(options, :chain, nil) do
+      nil -> missing_preset_error()
+      _ -> strip_run_parse_fields(options)
+    end
+  end
+
+  defp finalize_run_args_positionals([first | rest], options, bundle_root) do
+    bundled_preset = LoopConfig.resolve_project_dir(first, bundle_root)
+
     case looks_like_project_dir(first) do
-      true -> %{project_dir: first, prompt: join_tokens(rest), backend_override: %{}, verbose: false}
-      _ -> %{project_dir: ".", prompt: join_tokens([first] ++ rest), backend_override: %{}, verbose: false}
+      true -> strip_run_parse_fields(Map.put(Map.put(options, :project_dir, first), :prompt, join_tokens(rest)))
+      _ -> finalize_run_args_unresolved(first, rest, bundled_preset, options)
+    end
+  end
+
+  defp finalize_run_args_unresolved(first, rest, bundled_preset, options) do
+    case bundled_preset do
+      "" -> unknown_preset_error(first)
+      preset_dir -> strip_run_parse_fields(Map.put(Map.put(options, :project_dir, preset_dir), :prompt, join_tokens(rest)))
     end
   end
 
@@ -380,8 +499,29 @@ defmodule Demo do
     prompt
   end
 
+  defp default_run_options() do
+    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false, chain: nil, preset_explicit: false, positionals: [], usage_error: false}
+  end
+
+  defp push_positional(options, token) do
+    Map.put(options, :positionals, [token] ++ Map.get(options, :positionals, []))
+  end
+
+  defp strip_run_parse_fields(options) do
+    options
+  end
+
   defp attach_backend_override(options, override) do
     Map.put(options, :backend_override, override)
+  end
+
+  defp attach_preset_override(options, preset, bundle_root) do
+    resolved = LoopConfig.resolve_project_dir(preset, bundle_root)
+
+    case resolved do
+      "" -> preset_usage_error("preset `" <> preset <> "` not found")
+      preset_dir -> Map.put(Map.put(options, :project_dir, preset_dir), :preset_explicit, true)
+    end
   end
 
   defp backend_override_spec("pi") do
@@ -405,7 +545,36 @@ defmodule Demo do
 
   defp backend_usage_error(message) do
     IO.puts(message)
-    %{project_dir: ".", prompt: nil, backend_override: %{}, verbose: false}
+    Map.put(default_run_options(), :usage_error, true)
+  end
+
+  defp preset_usage_error(message) do
+    IO.puts(message)
+    Map.put(default_run_options(), :usage_error, true)
+  end
+
+  defp missing_preset_error() do
+    IO.puts("error: missing required preset argument")
+    IO.puts("")
+    IO.puts("Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    IO.puts("")
+    IO.puts("Examples:")
+    IO.puts("  miniloops run autocode")
+    IO.puts("  miniloops run autocode \"Fix the login bug\"")
+    IO.puts("  miniloops run examples/autoqa \"QA recent changes\"")
+    IO.puts("  miniloops run . \"Run from current directory\"")
+    Map.put(default_run_options(), :usage_error, true)
+  end
+
+  defp unknown_preset_error(name) do
+    IO.puts("error: preset `" <> name <> "` not found")
+    IO.puts("")
+    IO.puts("The argument `" <> name <> "` is not a valid preset name or directory.")
+    IO.puts("A preset must be a directory containing miniloops.toml (or miniloops.conf),")
+    IO.puts("or a bundled preset name like `autocode`, `autoqa`, etc.")
+    IO.puts("")
+    IO.puts("Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    Map.put(default_run_options(), :usage_error, true)
   end
 
   defp looks_like_project_dir(path) do
@@ -413,6 +582,17 @@ defmodule Demo do
       true -> LoopConfig.project_has_config(path)
       _ -> false
     end
+  end
+
+  defp resolve_bundle_root([command, "run", harness_project | _rest]) do
+    case is_tonic_command(command) do
+      true -> absolute_path(harness_project)
+      _ -> "."
+    end
+  end
+
+  defp resolve_bundle_root(_argv) do
+    "."
   end
 
   defp self_command([command, "run", harness_project | _rest]) do
@@ -467,6 +647,63 @@ defmodule Demo do
 
   defp cli_command(_value) do
     false
+  end
+
+  defp print_usage() do
+    IO.puts("miniloops — autonomous LLM loop harness")
+    IO.puts("")
+    IO.puts("Usage:")
+    IO.puts("  miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    IO.puts("  miniloops emit <topic> [summary]")
+    IO.puts("  miniloops inspect <artifact> --format <md|text|json>")
+    IO.puts("  miniloops memory <list|add|remove> [args]")
+    IO.puts("  miniloops chain <list|run> [args]")
+    IO.puts("")
+    IO.puts("The preset argument is required for `run`. It must be a bundled preset")
+    IO.puts("name (e.g. autocode, autoqa) or a path to a directory containing")
+    IO.puts("miniloops.toml. Use `.` to run from the current directory.")
+    IO.puts("")
+    IO.puts("Flags:")
+    IO.puts("  -h, --help       Show this help")
+    IO.puts("  -v, --verbose    Verbose output")
+    IO.puts("  -b, --backend    Override backend command")
+    IO.puts("  -p, --preset     Resolve a bundled preset name or custom preset dir")
+    IO.puts("  --chain          Run an inline chain (comma-separated presets)")
+  end
+
+  defp print_chain_usage() do
+    IO.puts("Usage:")
+    IO.puts("  miniloops chain list [project-dir]")
+    IO.puts("  miniloops chain run <name> [project-dir]")
+  end
+
+  defp print_emit_usage() do
+    IO.puts("Usage:")
+    IO.puts("  miniloops emit <topic> [summary]")
+  end
+
+  defp print_inspect_usage() do
+    IO.puts("Usage:")
+    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] --format <md|text|json>")
+    IO.puts("")
+    IO.puts("Artifacts:")
+    IO.puts("  scratchpad, prompt, output, journal, memory, coordination, chain")
+  end
+
+  defp print_memory_usage() do
+    IO.puts("Usage:")
+    IO.puts("  miniloops memory list [project-dir]")
+    IO.puts("  miniloops memory add learning <text...>")
+    IO.puts("  miniloops memory add preference <category> <text...>")
+    IO.puts("  miniloops memory add meta <key> <value...>")
+    IO.puts("  miniloops memory remove <id> [reason...]")
+  end
+
+  defp print_memory_add_usage() do
+    IO.puts("Usage:")
+    IO.puts("  miniloops memory add learning <text...>")
+    IO.puts("  miniloops memory add preference <category> <text...>")
+    IO.puts("  miniloops memory add meta <key> <value...>")
   end
 
   defp join_tokens([]) do

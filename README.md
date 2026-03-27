@@ -14,11 +14,12 @@ Pi is the first-class backend. Miniloops now runs Pi itself with `pi -p --mode j
 
 ## Workflow family
 
-Miniloops ships a family of 10 `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
+Miniloops ships a family of 11 `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
 
 | Preset | What it does | Shape |
 |--------|-------------|-------|
 | **autocode** | Code implementation — slice, build, review, gate | planner → builder → critic → finalizer |
+| **autosimplify** | Post-implementation cleanup — simplify recent changes without changing behavior | scoper → reviewer → simplifier → verifier |
 | **autoideas** | Repo survey — scan, deep-dive, validate, report | scanner → analyst → reviewer → synthesizer |
 | **autoresearch** | Experiment loop — hypothesize, implement, measure, keep/discard | strategist → implementer → benchmarker → evaluator |
 | **autoqa** | Zero-dependency validation — inspect domain, plan checks, execute, report | inspector → planner → executor → reporter |
@@ -29,9 +30,9 @@ Miniloops ships a family of 10 `auto*` preset workflows. Each is a self-containe
 | **autosec** | Security audit — scan vulns, confirm, harden, report | scanner → analyst → hardener → reporter |
 | **autoperf** | Performance optimization — profile, optimize, measure, keep/discard | profiler → optimizer → measurer → judge |
 
-**Choosing a preset:** Use `autocode` for feature work. Use `autoideas` for improvement surveys. Use `autoresearch` for hypothesis-driven experiments. Use `autoqa` to validate with native surfaces. Use `autotest` to write new tests. Use `autofix` for bug reports. Use `autoreview` for PR review. Use `autodoc` for documentation gaps. Use `autosec` for security audits. Use `autoperf` for performance optimization.
+**Choosing a preset:** Use `autocode` for feature work. Use `autosimplify` to clean up recent changes without changing behavior. Use `autoideas` for improvement surveys. Use `autoresearch` for hypothesis-driven experiments. Use `autoqa` to validate with native surfaces. Use `autotest` to write new tests. Use `autofix` for bug reports. Use `autoreview` for PR review. Use `autodoc` for documentation gaps. Use `autosec` for security audits. Use `autoperf` for performance optimization.
 
-Across the `auto*` family, the intended posture is skeptical and fail-closed: checker/judge/verifier/reporter/finalizer roles should challenge claims, require evidence, and reject weak proof instead of rubber-stamping.
+Across the `auto*` family, the intended posture is skeptical and fail-closed: checker/judge/verifier/reporter/finalizer roles should challenge claims, require evidence, and reject weak proof instead of rubber-stamping. In autocode specifically, the critic is expected to independently run a manual smoke test that exercises the builder's changed code path whenever the repo exposes a practical manual surface.
 
 See [`docs/auto-workflows.md`](docs/auto-workflows.md) for the full taxonomy, naming guidance, and chooser table.
 
@@ -49,6 +50,10 @@ name = "code-and-qa"
 steps = ["autocode", "autoqa"]
 
 [[chain]]
+name = "code-simplify-qa"
+steps = ["autocode", "autosimplify", "autoqa"]
+
+[[chain]]
 name = "full-cycle"
 steps = ["autocode", "autoqa", "autoresearch", "autocode"]
 ```
@@ -59,6 +64,7 @@ Run a named chain:
 
 ```bash
 miniloops chain run code-and-qa .
+miniloops chain run code-simplify-qa .
 miniloops chain list .
 ```
 
@@ -392,7 +398,7 @@ tonic run . /path/to/your/miniloops-project "Write a tiny checklist"
 For temporary command-mode experiments, you can override the configured backend at launch time:
 
 ```bash
-./bin/miniloops -b claude examples/autocode "Add a --verbose flag to the CLI"
+./bin/miniloops -b claude -p autocode "Add a --verbose flag to the CLI"
 ```
 
 Notes:
@@ -414,7 +420,8 @@ ln -sf "$(pwd)/bin/miniloops" ~/.local/bin/miniloops
 Then:
 
 ```bash
-miniloops run
+miniloops run autocode
+miniloops run autocode "Add OAuth login"
 miniloops run /path/to/project
 miniloops inspect scratchpad /path/to/project --format md
 ```

@@ -32,24 +32,31 @@ The `bin/miniloops` launcher is a thin shell wrapper that calls `tonic run` with
 Start a loop.
 
 ```bash
-miniloops run [project-dir] [prompt...] [flags]
+miniloops run <preset-name|preset-dir> [prompt...] [flags]
 ```
 
-If `project-dir` is omitted it defaults to `.`. A positional argument is treated as a project directory only if it is an existing directory that contains `miniloops.toml` (or `miniloops.conf`); otherwise it is treated as a prompt.
+The preset argument is required. It must be one of:
+- A bundled preset name (e.g. `autocode`, `autoqa`) — resolved to `examples/<name>/` under the installed project.
+- An explicit path to a directory containing `miniloops.toml` (or `miniloops.conf`).
+- `.` to run from the current directory.
+
+If the preset argument is missing, the CLI exits with a usage error. If the argument does not resolve to a valid preset directory or bundled preset name, the CLI exits with a resolution error. Unknown arguments are never silently reinterpreted as prompt text.
 
 **Flags:**
 
 | Flag | Description |
 |------|-------------|
 | `-b <backend>`, `--backend <backend>` | Override the backend. `pi` selects the built-in Pi adapter. `claude` (or a path ending in `/claude`) adds `-p --dangerously-skip-permissions`. Any other value is treated as a shell command. |
+| `-p <preset>`, `--preset <preset>` | Resolve a bundled preset name (for example `autocode`) or use an explicit custom preset directory. Useful when you want the prompt to start with path-like text or avoid positional ambiguity. |
 | `-v`, `--verbose` | Enable verbose logging. |
 | `--chain <steps>` | Run an inline chain instead of a single loop. `steps` is a comma-separated list of preset names (e.g. `autocode,autoqa,autoresearch`). |
 
 **Examples:**
 
 ```bash
-miniloops run .
-miniloops run examples/autocode
+miniloops run autocode
+miniloops run autocode "Fix the login bug"
+miniloops run --preset autocode "Fix the login bug"
 miniloops run . "Fix the login bug" -b pi
 miniloops run . --chain autocode,autoqa
 ```
