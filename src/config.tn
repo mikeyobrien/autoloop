@@ -1,0 +1,164 @@
+defmodule LoopConfig do
+  def load_project(project_dir) do
+    load(resolve_config_path(project_dir))
+  end
+
+  def load(path) do
+    case System.path_exists(path) do
+      true -> parse_lines(String.split(System.read_text(path), line_sep()), defaults())
+      _ -> defaults()
+    end
+  end
+
+  def get(config, key, fallback) do
+    case Map.get(config, key, nil) do
+      nil -> fallback
+      value -> value
+    end
+  end
+
+  def get_int(config, key, fallback) do
+    case Map.get(config, key, nil) do
+      nil -> fallback
+      value -> String.to_integer(value)
+    end
+  end
+
+  def get_list(config, key) do
+    split_csv(get(config, key, ""))
+  end
+
+  def project_has_config(project_dir) do
+    System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
+  end
+
+  def resolve_journal_file(project_dir) do
+    config = load_project(project_dir)
+    Path.join(project_dir, journal_path(config))
+  end
+
+  def resolve_events_file(project_dir) do
+    resolve_journal_file(project_dir)
+  end
+
+  def resolve_memory_file(project_dir) do
+    config = load_project(project_dir)
+    Path.join(project_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+  end
+
+  defp journal_path(config) do
+    get(config, "core.journal_file", get(config, "core.events_file", ".miniloops/journal.jsonl"))
+  end
+
+  defp resolve_config_path(project_dir) do
+    toml_path = Path.join(project_dir, "miniloops.toml")
+    conf_path = Path.join(project_dir, "miniloops.conf")
+
+    case System.path_exists(toml_path) do
+      true -> toml_path
+      _ -> conf_path
+    end
+  end
+
+  defp defaults() do
+    Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(%{}, "event_loop.max_iterations", "3"), "event_loop.completion_promise", "LOOP_COMPLETE"), "event_loop.completion_event", "task.complete"), "event_loop.required_events", ""), "backend.kind", "pi"), "backend.command", "pi"), "backend.timeout_ms", "300000"), "core.state_dir", ".miniloops"), "core.journal_file", ".miniloops/journal.jsonl"), "core.events_file", ".miniloops/journal.jsonl"), "core.memory_file", ".miniloops/memory.jsonl")
+  end
+
+  defp parse_lines([], config) do
+    config
+  end
+
+  defp parse_lines([line | rest], config) do
+    trimmed = String.trim(line)
+
+    case skip_line(trimmed) do
+      true -> parse_lines(rest, config)
+      _ -> parse_assignment(String.split(trimmed, "="), rest, config)
+    end
+  end
+
+  defp parse_assignment([key, value], rest, config) do
+    parse_lines(rest, Map.put(config, String.trim(key), normalize_value(String.trim(value))))
+  end
+
+  defp parse_assignment(_, rest, config) do
+    parse_lines(rest, config)
+  end
+
+  defp normalize_value(value) do
+    case is_array_literal(value) do
+      true -> join_csv(parse_array(value))
+      _ -> strip_quotes(value)
+    end
+  end
+
+  defp is_array_literal(value) do
+    String.starts_with(value, "[") and String.ends_with(value, "]")
+  end
+
+  defp parse_array(value) do
+    inner = String.trim(slice_outer(value))
+
+    case inner do
+      "" -> []
+      _ -> split_csv_parts(String.split(inner, ","), [])
+    end
+  end
+
+  defp slice_outer(text) do
+    String.slice(text, 1, String.length(text) - 2)
+  end
+
+  defp strip_quotes(value) do
+    case is_quoted(value) do
+      true -> slice_outer(value)
+      _ -> value
+    end
+  end
+
+  defp is_quoted(value) do
+    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
+  end
+
+  defp split_csv(text) do
+    split_csv_parts(String.split(text, ","), [])
+  end
+
+  defp split_csv_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp split_csv_parts([part | rest], acc) do
+    trimmed = strip_quotes(String.trim(part))
+
+    case trimmed do
+      "" -> split_csv_parts(rest, acc)
+      _ -> split_csv_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp join_csv([]) do
+    ""
+  end
+
+  defp join_csv([item]) do
+    item
+  end
+
+  defp join_csv([item | rest]) do
+    item <> "," <> join_csv(rest)
+  end
+
+  defp skip_line("") do
+    true
+  end
+
+  defp skip_line(line) do
+    String.starts_with(line, "#")
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end

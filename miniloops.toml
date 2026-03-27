@@ -1,0 +1,28 @@
+# Bare-minimal miniloops config
+
+event_loop.max_iterations = 100
+event_loop.completion_event = "task.complete"
+event_loop.completion_promise = "LOOP_COMPLETE"
+event_loop.required_events = ["review.passed"]
+# event_loop.prompt = "Write a tiny checklist"
+# event_loop.prompt_file = "prompt.txt"
+
+backend.kind = "pi"
+backend.command = "pi"
+backend.timeout_ms = 300000
+# backend.args = ["--model", "anthropic/claude-sonnet-4"]
+
+review.enabled = false
+review.timeout_ms = 300000
+# By default this falls back to the number of roles/personas in topology.toml.
+review.every_iterations = 0
+
+memory.prompt_budget_chars = 1600
+
+harness.instructions_file = "harness.md"
+
+core.state_dir = ".miniloops"
+core.journal_file = ".miniloops/journal.jsonl"
+core.memory_file = ".miniloops/memory.jsonl"
+# legacy alias still accepted:
+# core.events_file = ".miniloops/journal.jsonl"

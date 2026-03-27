@@ -1,0 +1,1447 @@
+defmodule LoopHarness do
+  def run(project_dir, prompt_override, self_command) do
+    loop = build_loop_context(project_dir, prompt_override, self_command)
+    live_loop = reload_loop(loop)
+
+    ensure_layout(state_dir(live_loop))
+    install_runtime_tools(live_loop)
+    append_loop_start(live_loop)
+
+    summary = iterate(live_loop, 1)
+    print_summary(summary, live_loop)
+  end
+
+  def emit(project_dir, topic, payload) do
+    journal_file = resolve_emit_journal_file(project_dir)
+    ensure_layout(Path.join(project_dir, ".miniloops"))
+
+    validation = emit_validation_context(journal_file)
+
+    case invalid_event(topic, Map.get(validation, :allowed_events, [])) do
+      true -> reject_emit(journal_file, topic, validation)
+      _ -> accept_emit(journal_file, topic, payload, validation)
+    end
+  end
+
+  def render_scratchpad(project_dir) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    run_id = ensure_render_run_id(journal_file)
+    print_text(empty_fallback(render_run_scratchpad(read_run_lines(journal_file, run_id))))
+  end
+
+  def render_prompt(project_dir, iteration) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    run_id = ensure_render_run_id(journal_file)
+    prompt = iteration_field_for_run(journal_file, run_id, iteration, "iteration.start", "prompt")
+
+    case prompt do
+      "" -> print_text("missing prompt projection for iteration #{iteration}")
+      value -> print_text(value)
+    end
+  end
+
+  def render_output(project_dir, iteration) do
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    run_id = ensure_render_run_id(journal_file)
+    output = iteration_field_for_run(journal_file, run_id, iteration, "iteration.finish", "output")
+
+    case output do
+      "" -> print_text("missing output projection for iteration #{iteration}")
+      value -> print_text(value)
+    end
+  end
+
+  def render_journal(project_dir) do
+    print_text(read_if_exists(LoopConfig.resolve_journal_file(project_dir)))
+  end
+
+  defp build_loop_context(project_dir, prompt_override, self_command) do
+    config = LoopConfig.load_project(project_dir)
+    topology = LoopTopology.load(project_dir)
+    state_dir = Path.join(project_dir, LoopConfig.get(config, "core.state_dir", ".miniloops"))
+    journal_file = LoopConfig.resolve_journal_file(project_dir)
+    memory_file = LoopConfig.resolve_memory_file(project_dir)
+    run_id = next_run_id(journal_file)
+
+    %{paths: %{project_dir: project_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override}}
+    |> reload_loop()
+  end
+
+  defp reload_loop(loop) do
+    project_dir = project_dir(loop)
+    config = LoopConfig.load_project(project_dir)
+    topology = LoopTopology.load(project_dir)
+    prompt_override = prompt_override(loop)
+    backend_command = LoopConfig.get(config, "backend.command", "pi")
+    backend_kind = resolve_process_kind(LoopConfig.get(config, "backend.kind", ""), backend_command)
+    backend_args = config_list_with_fallback(config, "backend.args", [])
+    backend_prompt_mode = normalize_prompt_mode(LoopConfig.get(config, "backend.prompt_mode", "arg"))
+    max_iterations = LoopConfig.get_int(config, "event_loop.max_iterations", 3)
+    completion_promise = LoopConfig.get(config, "event_loop.completion_promise", "LOOP_COMPLETE")
+    completion_event = LoopTopology.completion_event(topology, LoopConfig.get(config, "event_loop.completion_event", "task.complete"))
+    required_events = LoopConfig.get_list(config, "event_loop.required_events")
+    objective = resolve_prompt(project_dir, config, prompt_override)
+    memory_budget_chars = LoopConfig.get_int(config, "memory.prompt_budget_chars", 1600)
+    review_every = resolve_review_every(config, topology)
+    review_enabled = truthy_setting(LoopConfig.get(config, "review.enabled", "true"))
+    backend_timeout_ms = LoopConfig.get_int(config, "backend.timeout_ms", 300000)
+    review_timeout_ms = LoopConfig.get_int(config, "review.timeout_ms", backend_timeout_ms)
+    review_command = LoopConfig.get(config, "review.command", backend_command)
+    review_kind = resolve_process_kind(LoopConfig.get(config, "review.kind", backend_kind), review_command)
+    review_args = config_list_with_fallback(config, "review.args", backend_args)
+    review_prompt_mode = normalize_prompt_mode(LoopConfig.get(config, "review.prompt_mode", backend_prompt_mode))
+    harness_text = read_optional_project_file(project_dir, LoopConfig.get(config, "harness.instructions_file", "harness.md"))
+    review_text = resolve_review_prompt(project_dir, config)
+
+    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override}}
+  end
+
+  defp iterate(loop, iteration) do
+    live_loop = reload_loop(loop)
+    install_runtime_tools(live_loop)
+    reviewed_loop = maybe_run_hyperagent_review(live_loop, iteration)
+
+    case iteration > max_iterations(reviewed_loop) do
+      true -> stop_max_iterations(reviewed_loop)
+      _ -> run_iteration(reviewed_loop, iteration)
+    end
+  end
+
+  defp maybe_run_hyperagent_review(loop, iteration) do
+    case should_run_hyperagent_review(loop, iteration) do
+      true -> review_and_reload(loop, iteration)
+      _ -> loop
+    end
+  end
+
+  defp review_and_reload(loop, iteration) do
+    run_hyperagent_review(loop, iteration)
+    reload_loop(loop)
+  end
+
+  defp should_run_hyperagent_review(loop, iteration) do
+    review_enabled(loop) and iteration > 1 and divisible_by(iteration - 1, review_every(loop))
+  end
+
+  defp run_hyperagent_review(loop, iteration) do
+    run_lines = read_run_lines(journal_file(loop), run_id(loop))
+    review_prompt = render_review_prompt_text(loop, iteration, run_lines)
+
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.start", "\"kind\": " <> json_string("hyperagent") <> ", \"backend_kind\": " <> json_string(review_kind(loop)) <> ", \"command\": " <> json_string(review_command(loop)) <> ", \"prompt_mode\": " <> json_string(review_prompt_mode(loop)) <> ", \"prompt\": " <> json_string(review_prompt) <> ", \"timeout_ms\": " <> json_string(to_string(review_timeout_ms(loop))))
+
+    result = System.run(build_review_command(loop, iteration, review_prompt), %{stream: true, timeout_ms: review_timeout_ms(loop)})
+    output = Map.get(result, :output, "")
+    exit_code = Map.get(result, :exit_code, 1)
+    timed_out = Map.get(result, :timed_out, false)
+
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.finish", "\"kind\": " <> json_string("hyperagent") <> ", \"exit_code\": " <> json_string(to_string(exit_code)) <> ", \"timed_out\": " <> json_bool(timed_out) <> ", \"output\": " <> json_string(output))
+  end
+
+  defp divisible_by(value, divisor) do
+    case divisor <= 0 do
+      true -> false
+      _ -> divisible_by_remainder(value, divisor)
+    end
+  end
+
+  defp divisible_by_remainder(0, _divisor) do
+    true
+  end
+
+  defp divisible_by_remainder(value, _divisor) when value < 0 do
+    false
+  end
+
+  defp divisible_by_remainder(value, divisor) do
+    divisible_by_remainder(value - divisor, divisor)
+  end
+
+  defp run_iteration(loop, iteration) do
+    iter = build_iteration_context(loop, iteration)
+
+    append_iteration_start(loop, iter)
+    append_backend_start(loop, iter)
+
+    result = System.run(build_backend_command(loop, iter), %{stream: true, timeout_ms: backend_timeout_ms(loop)})
+    output = Map.get(result, :output, "")
+    exit_code = Map.get(result, :exit_code, 1)
+    timed_out = Map.get(result, :timed_out, false)
+
+    append_backend_finish(loop, iter, output, exit_code, timed_out)
+    append_iteration_finish(loop, iter, output, exit_code, timed_out)
+
+    case timed_out do
+      true -> stop_backend_timeout(loop, iteration)
+      _ -> case exit_code do
+        0 -> finish_iteration(loop, iter, output)
+        _ -> stop_backend_failed(loop, iteration)
+      end
+    end
+  end
+
+  defp build_iteration_context(loop, iteration) do
+    run_lines = read_run_lines(journal_file(loop), run_id(loop))
+    scratchpad_text = render_run_scratchpad(run_lines)
+    recent_event = routing_event_from_lines(run_lines, "loop.start")
+    allowed_roles = LoopTopology.suggested_roles(topology(loop), recent_event)
+    allowed_events = LoopTopology.allowed_events(topology(loop), recent_event)
+    backpressure = latest_invalid_note(run_lines, "")
+    memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
+
+    %{iteration: iteration, recent_event: recent_event, allowed_roles: allowed_roles, allowed_events: allowed_events, backpressure: backpressure, scratchpad_text: scratchpad_text, memory_text: memory_text, prompt: render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, scratchpad_text, memory_text)}
+  end
+
+  defp finish_iteration(loop, iter, output) do
+    run_lines = read_run_lines(journal_file(loop), run_id(loop))
+    all_topics = topics_from_lines(run_lines)
+    turn_topics = topics_for_iteration(run_lines, iteration_string(iter))
+    emitted_topic = latest_agent_event(turn_topics)
+
+    case invalid_event(emitted_topic, allowed_events(iter)) do
+      true -> reject_invalid_and_continue(loop, iter, emitted_topic)
+      _ -> continue_after_valid_turn(loop, iteration(iter), output, all_topics)
+    end
+  end
+
+  defp continue_after_valid_turn(loop, iteration, output, all_topics) do
+    case completed_via_event(all_topics, completion_event(loop), required_events(loop)) do
+      true -> complete_loop(loop, iteration, "completion_event")
+      _ -> continue_after_completion_check(loop, iteration, output)
+    end
+  end
+
+  defp continue_after_completion_check(loop, iteration, output) do
+    case completed_via_promise(output, completion_promise(loop)) do
+      true -> complete_loop(loop, iteration, "completion_promise")
+      _ -> iterate(loop, iteration + 1)
+    end
+  end
+
+  defp reject_invalid_and_continue(loop, iter, emitted_topic) do
+    append_invalid_event(journal_file(loop), run_id(loop), iteration_string(iter), recent_event(iter), emitted_topic, allowed_roles(iter), allowed_events(iter))
+
+    iterate(loop, iteration(iter) + 1)
+  end
+
+  defp invalid_event("", _allowed_events) do
+    false
+  end
+
+  defp invalid_event(_emitted_topic, []) do
+    false
+  end
+
+  defp invalid_event(emitted_topic, allowed_events) do
+    not list_contains(allowed_events, emitted_topic)
+  end
+
+  defp completed_via_event(topics, completion_event, required_events) do
+    list_contains(topics, completion_event) and all_required_events_seen(topics, required_events)
+  end
+
+  defp completed_via_promise(_output, "") do
+    false
+  end
+
+  defp completed_via_promise(output, completion_promise) do
+    String.contains(output, completion_promise)
+  end
+
+  defp all_required_events_seen(_topics, []) do
+    true
+  end
+
+  defp all_required_events_seen(topics, [event | rest]) do
+    case list_contains(topics, event) do
+      true -> all_required_events_seen(topics, rest)
+      _ -> false
+    end
+  end
+
+  defp stop_max_iterations(loop) do
+    append_event(journal_file(loop), run_id(loop), "", "loop.stop", "\"reason\": " <> json_string("max_iterations"))
+
+    %{iterations: max_iterations(loop), stop_reason: "max_iterations"}
+  end
+
+  defp stop_backend_failed(loop, iteration) do
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_failed") <> ", \"iteration\": " <> json_string(to_string(iteration)))
+
+    %{iterations: iteration, stop_reason: "backend_failed"}
+  end
+
+  defp stop_backend_timeout(loop, iteration) do
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", "\"reason\": " <> json_string("backend_timeout") <> ", \"iteration\": " <> json_string(to_string(iteration)))
+
+    %{iterations: iteration, stop_reason: "backend_timeout"}
+  end
+
+  defp complete_loop(loop, iteration, reason) do
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.complete", "\"reason\": " <> json_string(reason))
+
+    %{iterations: iteration, stop_reason: reason}
+  end
+
+  defp append_loop_start(loop) do
+    append_event(journal_file(loop), run_id(loop), "", "loop.start", "\"max_iterations\": " <> json_string(to_string(max_iterations(loop))) <> ", " <> "\"completion_promise\": " <> json_string(completion_promise(loop)) <> ", " <> "\"completion_event\": " <> json_string(completion_event(loop)) <> ", " <> "\"review_every\": " <> json_string(to_string(review_every(loop))) <> ", " <> "\"objective\": " <> json_string(objective(loop)))
+  end
+
+  defp append_iteration_start(loop, iter) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.start", "\"recent_event\": " <> json_string(recent_event(iter)) <> ", " <> "\"suggested_roles\": " <> json_string(join_csv(allowed_roles(iter))) <> ", " <> "\"allowed_events\": " <> json_string(join_csv(allowed_events(iter))) <> ", " <> "\"backpressure\": " <> json_string(backpressure(iter)) <> ", " <> "\"prompt\": " <> json_string(prompt_text(iter)))
+  end
+
+  defp append_backend_start(loop, iter) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "backend.start", "\"backend_kind\": " <> json_string(backend_kind(loop)) <> ", " <> "\"command\": " <> json_string(backend_command(loop)) <> ", " <> "\"prompt_mode\": " <> json_string(backend_prompt_mode(loop)) <> ", " <> "\"timeout_ms\": " <> json_string(to_string(backend_timeout_ms(loop))))
+  end
+
+  defp append_backend_finish(loop, iter, output, exit_code, timed_out) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "backend.finish", "\"exit_code\": " <> json_string(to_string(exit_code)) <> ", " <> "\"timed_out\": " <> json_bool(timed_out) <> ", " <> "\"output\": " <> json_string(output))
+  end
+
+  defp append_iteration_finish(loop, iter, output, exit_code, timed_out) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "iteration.finish", "\"exit_code\": " <> json_string(to_string(exit_code)) <> ", " <> "\"timed_out\": " <> json_bool(timed_out) <> ", " <> "\"output\": " <> json_string(output))
+  end
+
+  defp resolve_prompt(project_dir, config, prompt_override) do
+    case prompt_override do
+      nil -> prompt_from_config(project_dir, config)
+      prompt -> prompt
+    end
+  end
+
+  defp prompt_from_config(project_dir, config) do
+    inline_prompt = LoopConfig.get(config, "event_loop.prompt", "")
+
+    case inline_prompt do
+      "" -> prompt_from_file(project_dir, config)
+      _ -> inline_prompt
+    end
+  end
+
+  defp prompt_from_file(project_dir, config) do
+    prompt_file = LoopConfig.get(config, "event_loop.prompt_file", "")
+
+    case prompt_file do
+      "" -> "Do the task and publish the completion event when finished."
+      _ -> read_prompt_file(project_dir, prompt_file)
+    end
+  end
+
+  defp read_prompt_file(project_dir, prompt_file) do
+    full_path = Path.join(project_dir, prompt_file)
+
+    case System.path_exists(full_path) do
+      true -> System.read_text(full_path)
+      _ -> "Do the task and publish the completion event when finished."
+    end
+  end
+
+  defp resolve_review_prompt(project_dir, config) do
+    inline_prompt = LoopConfig.get(config, "review.prompt", "")
+
+    case inline_prompt do
+      "" -> read_optional_project_file(project_dir, LoopConfig.get(config, "review.prompt_file", "hyperagent.md"))
+      _ -> inline_prompt
+    end
+  end
+
+  defp read_optional_project_file(_project_dir, "") do
+    ""
+  end
+
+  defp read_optional_project_file(project_dir, relative_path) do
+    full_path = Path.join(project_dir, relative_path)
+
+    case System.path_exists(full_path) do
+      true -> System.read_text(full_path)
+      _ -> ""
+    end
+  end
+
+  defp resolve_review_every(config, topology) do
+    configured = LoopConfig.get_int(config, "review.every_iterations", 0)
+
+    case configured > 0 do
+      true -> configured
+      _ -> default_review_every(topology)
+    end
+  end
+
+  defp default_review_every(topology) do
+    count = LoopTopology.role_count(topology)
+
+    case count > 0 do
+      true -> count
+      _ -> 1
+    end
+  end
+
+  defp truthy_setting("false") do
+    false
+  end
+
+  defp truthy_setting("0") do
+    false
+  end
+
+  defp truthy_setting("") do
+    false
+  end
+
+  defp truthy_setting(_value) do
+    true
+  end
+
+  defp ensure_layout(state_dir) do
+    System.ensure_dir(state_dir)
+  end
+
+  defp install_runtime_tools(loop) do
+    install_emit_tool(loop)
+    install_pi_adapter_tool(loop)
+  end
+
+  defp install_emit_tool(loop) do
+    System.write_text(tool_path(loop), emit_tool_script(loop))
+    System.run("chmod +x " <> shell_quote(tool_path(loop)))
+  end
+
+  defp install_pi_adapter_tool(loop) do
+    System.write_text(pi_adapter_path(loop), pi_adapter_script(loop))
+    System.run("chmod +x " <> shell_quote(pi_adapter_path(loop)))
+  end
+
+  defp emit_tool_script(loop) do
+    "#!/bin/sh\n" <> "set -eu\n" <> "export MINILOOPS_PROJECT_DIR=" <> shell_quote(project_dir(loop)) <> "\n" <> "export MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_EVENTS_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <> "export MINILOOPS_MEMORY_FILE=" <> shell_quote(memory_file(loop)) <> "\n" <> "export MINILOOPS_RUN_ID=" <> shell_quote(run_id(loop)) <> "\n" <> "export MINILOOPS_COMPLETION_EVENT=" <> shell_quote(completion_event(loop)) <> "\n" <> "export MINILOOPS_REQUIRED_EVENTS=" <> shell_quote(join_csv(required_events(loop))) <> "\n" <> "export MINILOOPS_BIN=" <> shell_quote(tool_path(loop)) <> "\n" <> "exec " <> self_command(loop) <> " \"$@\"\n"
+  end
+
+  defp pi_adapter_script(loop) do
+    "#!/bin/sh\n" <> "set -eu\n" <> "exec " <> self_command(loop) <> " pi-adapter \"$@\"\n"
+  end
+
+  defp render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, scratchpad_text, memory_text) do
+    "You are inside a bare-minimal miniloops harness.\n\n" <>
+    harness_instructions_text(loop) <>
+    backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
+    memory_text_block(memory_text) <>
+    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Suggested next roles now: #{list_text(allowed_roles)}\n" <> "Allowed next events now: #{list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish progress and completion.\n" <> "Examples:\n" <>
+    tool_path(loop) <> " emit task.progress \"brief update\"\n" <>
+    tool_path(loop) <> " emit " <> completion_event(loop) <> " \"brief completion summary\"\n" <>
+    tool_path(loop) <> " memory add learning \"durable lesson\"\n" <>
+    tool_path(loop) <> " memory add preference Workflow \"short preference note\"\n\n" <> "Backpressure rule: if you emit an event outside the allowed next-event set, the loop will reject that handoff and ask you to re-route.\n" <> "Prompt/output/scratchpad/memory are projections or stores you can inspect with `" <> tool_path(loop) <> " inspect prompt #{iteration} --format md`, `" <> tool_path(loop) <> " inspect scratchpad --format md`, and `" <> tool_path(loop) <> " inspect memory --format md`.\n" <> "Plain text alone does not publish an event. Prefer the event tool over the stdout completion promise.\n"
+  end
+
+  defp harness_instructions_text(loop) do
+    case harness_instructions(loop) do
+      "" -> ""
+      text -> "Live harness instructions:\n" <> text <> "\n\n"
+    end
+  end
+
+  defp review_instructions_text(loop) do
+    case review_prompt(loop) do
+      "" -> ""
+      text -> "Additional hyperagent instructions:\n" <> text <> "\n\n"
+    end
+  end
+
+  defp memory_text_block("") do
+    ""
+  end
+
+  defp memory_text_block(text) do
+    text <> "\n"
+  end
+
+  defp max_review_prompt_iteration(run_lines) do
+    latest_prompt_iteration_from_lines(run_lines, 1)
+  end
+
+  defp latest_prompt_iteration_from_lines([], current) do
+    current
+  end
+
+  defp latest_prompt_iteration_from_lines([line | rest], current) do
+    next =
+    case extract_topic(line) do
+      "iteration.start" -> max_iteration_value(current, extract_iteration(line))
+      _ -> current
+    end
+
+    latest_prompt_iteration_from_lines(rest, next)
+  end
+
+  defp max_iteration_value(current, "") do
+    current
+  end
+
+  defp max_iteration_value(current, value) do
+    parsed = String.to_integer(value)
+
+    case parsed > current do
+      true -> parsed
+      _ -> current
+    end
+  end
+
+  defp backpressure_text("") do
+    ""
+  end
+
+  defp backpressure_text(text) do
+    "Backpressure:\n" <> text <> "\n\n"
+  end
+
+  defp required_events_text([]) do
+    "(none)"
+  end
+
+  defp required_events_text(required_events) do
+    join_csv(required_events)
+  end
+
+  defp empty_fallback("") do
+    "(empty)"
+  end
+
+  defp empty_fallback(text) do
+    text
+  end
+
+  defp build_backend_command(loop, iter) do
+    build_process_command(loop, backend_spec(loop), prompt_text(iter), runtime_env_lines(loop, iteration_string(iter), recent_event(iter), join_csv(allowed_roles(iter)), join_csv(allowed_events(iter)), ""))
+  end
+
+  defp build_review_command(loop, iteration, review_prompt) do
+    build_process_command(loop, review_spec(loop), review_prompt, runtime_env_lines(loop, to_string(iteration), "loop.start", "review", "__hyperreview_disabled__", "hyperagent"))
+  end
+
+  defp build_process_command(loop, spec, prompt, runtime_env) do
+    env_lines = runtime_env <> "export MINILOOPS_PROMPT=" <> shell_quote(prompt) <> "\n"
+
+    case process_kind(spec) do
+      "pi" -> env_lines <> build_pi_adapter_invocation(loop, spec)
+      _ -> env_lines <> build_command_invocation(spec, prompt)
+    end
+  end
+
+  defp build_pi_adapter_invocation(loop, spec) do
+    shell_words([pi_adapter_path(loop), process_command(spec)] ++ process_args(spec))
+  end
+
+  defp build_command_invocation(spec, prompt) do
+    argv = shell_words([process_command(spec)] ++ process_args(spec))
+
+    case process_prompt_mode(spec) do
+      "stdin" -> "printf '%s' " <> shell_quote(prompt) <> " | " <> argv
+      _ -> shell_words([process_command(spec)] ++ process_args(spec) ++ [prompt])
+    end
+  end
+
+  defp runtime_env_lines(loop, iteration, recent_event, allowed_roles, allowed_events, review_mode) do
+    "export MINILOOPS_RUN_ID=" <> shell_quote(run_id(loop)) <> "\n" <>
+    "export MINILOOPS_ITERATION=" <> shell_quote(iteration) <> "\n" <>
+    runtime_env_line("MINILOOPS_REVIEW_MODE", review_mode) <>
+    "export MINILOOPS_COMPLETION_PROMISE=" <> shell_quote(completion_promise(loop)) <> "\n" <>
+    "export MINILOOPS_COMPLETION_EVENT=" <> shell_quote(completion_event(loop)) <> "\n" <>
+    "export MINILOOPS_STATE_DIR=" <> shell_quote(state_dir(loop)) <> "\n" <>
+    "export MINILOOPS_PROJECT_DIR=" <> shell_quote(project_dir(loop)) <> "\n" <>
+    "export MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <>
+    "export MINILOOPS_EVENTS_FILE=" <> shell_quote(journal_file(loop)) <> "\n" <>
+    "export MINILOOPS_MEMORY_FILE=" <> shell_quote(memory_file(loop)) <> "\n" <>
+    "export MINILOOPS_REQUIRED_EVENTS=" <> shell_quote(join_csv(required_events(loop))) <> "\n" <>
+    "export MINILOOPS_RECENT_EVENT=" <> shell_quote(recent_event) <> "\n" <>
+    "export MINILOOPS_ALLOWED_ROLES=" <> shell_quote(allowed_roles) <> "\n" <>
+    "export MINILOOPS_ALLOWED_EVENTS=" <> shell_quote(allowed_events) <> "\n" <>
+    "export MINILOOPS_BIN=" <> shell_quote(tool_path(loop)) <> "\n"
+  end
+
+  defp runtime_env_line(_name, "") do
+    ""
+  end
+
+  defp runtime_env_line(name, value) do
+    "export " <> name <> "=" <> shell_quote(value) <> "\n"
+  end
+
+  defp shell_words([]) do
+    ""
+  end
+
+  defp shell_words([part]) do
+    shell_quote(part)
+  end
+
+  defp shell_words([part | rest]) do
+    shell_quote(part) <> " " <> shell_words(rest)
+  end
+
+  defp render_review_prompt_text(loop, iteration, run_lines) do
+    scratchpad_text = render_run_scratchpad(run_lines)
+    memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
+    recent_event = routing_event_from_lines(run_lines, "loop.start")
+    latest_iteration = to_string(max_review_prompt_iteration(run_lines)) "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "This harness hot-reloads miniloops.toml, topology.toml, roles/*.md, harness.md, hyperagent.md, and loop memory on every iteration, so runtime file edits take effect on the next task iteration.\n" <> "Prefer modifying runtime files over changing the Tonic source unless the engine itself is clearly the bottleneck.\n" <> "Store durable findings with `" <> tool_path(loop) <> " memory add ...`.\n" <> "Do not emit normal loop events during review.\n\n" <>
+    review_instructions_text(loop) <>
+    memory_text_block(memory_text) <> "Review trigger iteration: #{iteration}\n" <> "Latest routing event: " <> recent_event <> "\n\n" <>
+    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Useful commands:\n" <>
+    tool_path(loop) <> " inspect scratchpad --format md\n" <>
+    tool_path(loop) <> " inspect memory --format md\n" <>
+    tool_path(loop) <> " inspect prompt " <> latest_iteration <> " --format md\n" <>
+    tool_path(loop) <> " inspect output " <> latest_iteration <> " --format text\n\n" <> "If no runtime changes are needed, store a short learning explaining why and exit cleanly.\n"
+  end
+
+  defp resolve_emit_journal_file(project_dir) do
+    case System.env("MINILOOPS_JOURNAL_FILE") do
+      nil -> resolve_emit_journal_file_from_events_env(project_dir)
+      path -> resolve_emit_journal_file_value(project_dir, path)
+    end
+  end
+
+  defp resolve_emit_journal_file_from_events_env(project_dir) do
+    case System.env("MINILOOPS_EVENTS_FILE") do
+      nil -> LoopConfig.resolve_journal_file(project_dir)
+      path -> resolve_emit_journal_file_value(project_dir, path)
+    end
+  end
+
+  defp resolve_emit_journal_file_value(project_dir, "") do
+    LoopConfig.resolve_journal_file(project_dir)
+  end
+
+  defp resolve_emit_journal_file_value(_project_dir, path) do
+    path
+  end
+
+  defp accept_emit(journal_file, topic, payload, validation) do
+    append_agent_event(journal_file, Map.get(validation, :run_id, ""), Map.get(validation, :iteration, ""), topic, payload)
+    IO.puts("emitted #{topic}")
+    System.run("true")
+  end
+
+  defp reject_emit(journal_file, topic, validation) do
+    message = invalid_emit_message(topic, validation)
+    append_invalid_event(journal_file, Map.get(validation, :run_id, ""), Map.get(validation, :iteration, ""), Map.get(validation, :recent_event, "loop.start"), topic, Map.get(validation, :allowed_roles, []), Map.get(validation, :allowed_events, []))
+    System.run("printf '%s\\n' " <> shell_quote(message) <> " >&2; false")
+  end
+
+  defp invalid_emit_message(topic, validation) do
+    "invalid event `" <> topic <> "`; recent event: `" <> Map.get(validation, :recent_event, "loop.start") <> "`; suggested roles: " <> list_text(Map.get(validation, :allowed_roles, [])) <> "; allowed next events: " <> list_text(Map.get(validation, :allowed_events, []))
+  end
+
+  defp emit_validation_context(journal_file) do
+    run_id = resolve_emit_run_id(journal_file)
+
+    %{run_id: run_id, iteration: resolve_emit_iteration(journal_file, run_id), recent_event: emit_recent_event(), allowed_roles: env_csv_list("MINILOOPS_ALLOWED_ROLES"), allowed_events: env_csv_list("MINILOOPS_ALLOWED_EVENTS")}
+  end
+
+  defp resolve_emit_run_id(journal_file) do
+    case System.env("MINILOOPS_RUN_ID") do
+      nil -> latest_run_id(journal_file) "" -> latest_run_id(journal_file)
+      value -> value
+    end
+  end
+
+  defp resolve_emit_iteration(journal_file, run_id) do
+    case System.env("MINILOOPS_ITERATION") do
+      nil -> latest_iteration_for_run(journal_file, run_id) "" -> latest_iteration_for_run(journal_file, run_id)
+      value -> value
+    end
+  end
+
+  defp emit_recent_event() do
+    case System.env("MINILOOPS_RECENT_EVENT") do
+      nil -> "loop.start" "" -> "loop.start"
+      value -> value
+    end
+  end
+
+  defp env_csv_list(name) do
+    case System.env(name) do
+      nil -> [] "" -> []
+      value -> split_csv(value)
+    end
+  end
+
+  defp append_invalid_event(journal_file, run_id, iteration, recent_event, emitted_topic, allowed_roles, allowed_events) do
+    append_event(journal_file, run_id, iteration, "event.invalid", "\"recent_event\": " <> json_string(recent_event) <> ", " <> "\"emitted\": " <> json_string(emitted_topic) <> ", " <> "\"suggested_roles\": " <> json_string(join_csv(allowed_roles)) <> ", " <> "\"allowed_events\": " <> json_string(join_csv(allowed_events)))
+  end
+
+  defp ensure_render_run_id(journal_file) do
+    run_id = render_run_id(journal_file)
+
+    case run_id do
+      "" -> ""
+      value -> value
+    end
+  end
+
+  defp render_run_id(journal_file) do
+    case System.env("MINILOOPS_RUN_ID") do
+      nil -> latest_run_id(journal_file) "" -> latest_run_id(journal_file)
+      value -> value
+    end
+  end
+
+  defp latest_invalid_note([], note) do
+    note
+  end
+
+  defp latest_invalid_note([line | rest], note) do
+    topic = extract_topic(line)
+
+    case topic do
+      "event.invalid" -> latest_invalid_note(rest, invalid_note_from_line(line))
+      _ -> latest_invalid_note(rest, clear_note_after_valid_emit(topic, note))
+    end
+  end
+
+  defp clear_note_after_valid_emit(topic, note) do
+    case system_topic(topic) do
+      true -> note
+      _ -> ""
+    end
+  end
+
+  defp invalid_note_from_line(line) do
+    "Emitted `" <> extract_field(line, "emitted") <> "` after `" <> extract_field(line, "recent_event") <> "`.\n" <> "Suggested roles: " <> empty_list_text(extract_field(line, "suggested_roles")) <> "\n" <> "Allowed next events: " <> empty_list_text(extract_field(line, "allowed_events"))
+  end
+
+  defp empty_list_text("") do
+    "(none)"
+  end
+
+  defp empty_list_text(text) do
+    text
+  end
+
+  defp iteration_field_for_run(journal_file, run_id, iteration, topic, field) do
+    find_iteration_field(read_run_lines(journal_file, run_id), iteration, topic, field, "")
+  end
+
+  defp find_iteration_field([], _iteration, _topic, _field, current) do
+    current
+  end
+
+  defp find_iteration_field([line | rest], iteration, topic, field, current) do
+    next =
+    case extract_topic(line) do
+      ^ topic -> match_iteration_field(line, iteration, field, current)
+      _ -> current
+    end
+
+    find_iteration_field(rest, iteration, topic, field, next)
+  end
+
+  defp match_iteration_field(line, iteration, field, current) do
+    case extract_iteration(line) == iteration do
+      true -> extract_field(line, field)
+      _ -> current
+    end
+  end
+
+  defp read_run_lines(path, run_id) do
+    filter_run_lines(read_lines(path), run_id, [])
+  end
+
+  defp filter_run_lines([], _run_id, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp filter_run_lines([line | rest], run_id, acc) do
+    case extract_run(line) == run_id do
+      true -> filter_run_lines(rest, run_id, [line] ++ acc)
+      _ -> filter_run_lines(rest, run_id, acc)
+    end
+  end
+
+  defp read_lines(path) do
+    collect_lines(String.split(read_if_exists(path), line_sep()), [])
+  end
+
+  defp collect_lines([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_lines([line | rest], acc) do
+    trimmed = String.trim(line)
+
+    case trimmed do
+      "" -> collect_lines(rest, acc)
+      _ -> collect_lines(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp topics_from_lines(lines) do
+    collect_topics(lines, [])
+  end
+
+  defp collect_topics([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_topics([line | rest], acc) do
+    topic = extract_topic(line)
+
+    case topic do
+      "" -> collect_topics(rest, acc)
+      _ -> collect_topics(rest, [topic] ++ acc)
+    end
+  end
+
+  defp topics_for_iteration(lines, iteration) do
+    collect_iteration_topics(lines, iteration, [])
+  end
+
+  defp collect_iteration_topics([], _iteration, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_iteration_topics([line | rest], iteration, acc) do
+    topic = extract_topic(line)
+
+    case extract_iteration(line) == iteration do
+      true -> collect_iteration_topics(rest, iteration, [topic] ++ acc)
+      _ -> collect_iteration_topics(rest, iteration, acc)
+    end
+  end
+
+  defp render_run_scratchpad(lines) do
+    scratchpad_from_lines(lines, "")
+  end
+
+  defp scratchpad_from_lines([], acc) do
+    acc
+  end
+
+  defp scratchpad_from_lines([line | rest], acc) do
+    next =
+    case extract_topic(line) do
+      "iteration.finish" -> acc <> scratchpad_entry(line)
+      _ -> acc
+    end
+
+    scratchpad_from_lines(rest, next)
+  end
+
+  defp scratchpad_entry(line) do
+    "## Iteration " <> extract_iteration(line) <> "\n\n" <> "exit_code=" <> extract_field(line, "exit_code") <> "\n\n" <>
+    extract_field(line, "output") <> "\n"
+  end
+
+  defp latest_run_id(path) do
+    latest_loop_start_run(read_lines(path), "")
+  end
+
+  defp latest_loop_start_run([], current) do
+    current
+  end
+
+  defp latest_loop_start_run([line | rest], current) do
+    next =
+    case extract_topic(line) do
+      "loop.start" -> nonempty_or(extract_run(line), current)
+      _ -> current
+    end
+
+    latest_loop_start_run(rest, next)
+  end
+
+  defp next_run_id(path) do
+    "run-" <> to_string(count_topic(read_lines(path), "loop.start", 0) + 1)
+  end
+
+  defp count_topic([], _topic, count) do
+    count
+  end
+
+  defp count_topic([line | rest], topic, count) do
+    case extract_topic(line) == topic do
+      true -> count_topic(rest, topic, count + 1)
+      _ -> count_topic(rest, topic, count)
+    end
+  end
+
+  defp latest_iteration_for_run(path, run_id) do
+    latest_iteration_from_lines(read_run_lines(path, run_id), "")
+  end
+
+  defp latest_iteration_from_lines([], current) do
+    current
+  end
+
+  defp latest_iteration_from_lines([line | rest], current) do
+    next =
+    case extract_topic(line) do
+      "iteration.start" -> nonempty_or(extract_iteration(line), current)
+      _ -> current
+    end
+
+    latest_iteration_from_lines(rest, next)
+  end
+
+  defp nonempty_or("", fallback) do
+    fallback
+  end
+
+  defp nonempty_or(value, _fallback) do
+    value
+  end
+
+  defp extract_run(line) do
+    extract_field(line, "run")
+  end
+
+  defp extract_iteration(line) do
+    extract_field(line, "iteration")
+  end
+
+  defp extract_field(line, key) do
+    marker = "\"" <> key <> "\": "
+    decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
+  end
+
+  defp first_after_marker([]) do
+    ""
+  end
+
+  defp first_after_marker([_only]) do
+    ""
+  end
+
+  defp first_after_marker([_prefix | rest]) do
+    first_or_empty(rest)
+  end
+
+  defp extract_topic(line) do
+    decode_json_value(first_quoted_value(first_after_marker(String.split(line, "\"topic\": "))))
+  end
+
+  defp first_quoted_value(text) do
+    first_quoted_value_parts(String.split(text, "\""))
+  end
+
+  defp first_quoted_value_parts([]) do
+    ""
+  end
+
+  defp first_quoted_value_parts([part | rest]) do
+    case part do
+      "" -> first_or_empty(rest)
+      _ -> first_quoted_value_parts(rest)
+    end
+  end
+
+  defp first_or_empty([]) do
+    ""
+  end
+
+  defp first_or_empty([item | _rest]) do
+    item
+  end
+
+  defp latest_agent_event([]) do
+    ""
+  end
+
+  defp latest_agent_event(topics) do
+    latest_agent_event_from_list(Enum.reverse(topics))
+  end
+
+  defp latest_agent_event_from_list([]) do
+    ""
+  end
+
+  defp latest_agent_event_from_list([topic | rest]) do
+    case system_topic(topic) do
+      true -> latest_agent_event_from_list(rest)
+      _ -> topic
+    end
+  end
+
+  defp routing_event_from_lines([], current) do
+    current
+  end
+
+  defp routing_event_from_lines([line | rest], current) do
+    topic = extract_topic(line)
+
+    case topic do
+      "event.invalid" -> routing_event_from_lines(rest, invalid_recent_event(line, current))
+      _ -> route_with_topic(rest, current, topic)
+    end
+  end
+
+  defp route_with_topic(rest, current, topic) do
+    case routing_topic(topic) do
+      true -> routing_event_from_lines(rest, topic)
+      _ -> routing_event_from_lines(rest, current)
+    end
+  end
+
+  defp invalid_recent_event(line, current) do
+    extracted = extract_field(line, "recent_event")
+
+    case extracted do
+      "" -> current
+      value -> value
+    end
+  end
+
+  defp routing_topic("iteration.start") do
+    false
+  end
+
+  defp routing_topic("iteration.finish") do
+    false
+  end
+
+  defp routing_topic("loop.complete") do
+    false
+  end
+
+  defp routing_topic("loop.stop") do
+    false
+  end
+
+  defp routing_topic("review.start") do
+    false
+  end
+
+  defp routing_topic("review.finish") do
+    false
+  end
+
+  defp routing_topic("backend.start") do
+    false
+  end
+
+  defp routing_topic("backend.finish") do
+    false
+  end
+
+  defp routing_topic("event.invalid") do
+    false
+  end
+
+  defp routing_topic("") do
+    false
+  end
+
+  defp routing_topic(_topic) do
+    true
+  end
+
+  defp system_topic("iteration.start") do
+    true
+  end
+
+  defp system_topic("iteration.finish") do
+    true
+  end
+
+  defp system_topic("loop.start") do
+    true
+  end
+
+  defp system_topic("loop.complete") do
+    true
+  end
+
+  defp system_topic("loop.stop") do
+    true
+  end
+
+  defp system_topic("review.start") do
+    true
+  end
+
+  defp system_topic("review.finish") do
+    true
+  end
+
+  defp system_topic("backend.start") do
+    true
+  end
+
+  defp system_topic("backend.finish") do
+    true
+  end
+
+  defp system_topic("event.invalid") do
+    true
+  end
+
+  defp system_topic(_topic) do
+    false
+  end
+
+  defp list_contains([], _needle) do
+    false
+  end
+
+  defp list_contains([item | rest], needle) do
+    case item == needle do
+      true -> true
+      _ -> list_contains(rest, needle)
+    end
+  end
+
+  defp list_text([]) do
+    "(none)"
+  end
+
+  defp list_text([item]) do
+    item
+  end
+
+  defp list_text([item | rest]) do
+    item <> ", " <> list_text(rest)
+  end
+
+  defp split_csv(text) do
+    split_csv_parts(String.split(text, ","), [])
+  end
+
+  defp split_csv_parts([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp split_csv_parts([part | rest], acc) do
+    trimmed = String.trim(part)
+
+    case trimmed do
+      "" -> split_csv_parts(rest, acc)
+      _ -> split_csv_parts(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp join_csv([]) do
+    ""
+  end
+
+  defp join_csv([item]) do
+    item
+  end
+
+  defp join_csv([item | rest]) do
+    item <> "," <> join_csv(rest)
+  end
+
+  defp append_event(path, run_id, iteration, topic, fields_json) do
+    append_text(path, event_line(run_id, iteration, topic, fields_json))
+  end
+
+  defp append_agent_event(path, run_id, iteration, topic, payload) do
+    append_text(path, emitted_event_line(run_id, iteration, topic, payload))
+  end
+
+  defp append_text(path, content) do
+    System.write_text(path, read_if_exists(path) <> content)
+  end
+
+  defp event_line(run_id, iteration, topic, fields_json) do
+    "{" <>
+    record_prefix(run_id, iteration) <> "\"topic\": " <> json_string(topic) <> ", " <> "\"fields\": {" <> fields_json <> "}}\n"
+  end
+
+  defp emitted_event_line(run_id, iteration, topic, payload) do
+    "{" <>
+    record_prefix(run_id, iteration) <> "\"topic\": " <> json_string(topic) <> ", " <> "\"payload\": " <> json_string(payload) <> ", " <> "\"source\": " <> json_string("agent") <> "}\n"
+  end
+
+  defp record_prefix(run_id, "") do
+    "\"run\": " <> json_string(run_id) <> ", "
+  end
+
+  defp record_prefix(run_id, iteration) do
+    "\"run\": " <> json_string(run_id) <> ", " <> "\"iteration\": " <> json_string(iteration) <> ", "
+  end
+
+  defp json_string(text) do
+    "\"" <> encode_json_value(text) <> "\""
+  end
+
+  defp json_bool(true) do
+    "true"
+  end
+
+  defp json_bool(_value) do
+    "false"
+  end
+
+  defp encode_json_value(text) do
+    escaped_backslash = String.replace(text, "\\", "\\u005c")
+    escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
+    escaped_newline = String.replace(escaped_quote, line_sep(), "\\u000a")
+    escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
+    String.replace(escaped_return, "\t", "\\u0009")
+  end
+
+  defp decode_json_value(text) do
+    restored_newline = String.replace(text, "\\u000a", line_sep())
+    restored_return = String.replace(restored_newline, "\\u000d", "\r")
+    restored_tab = String.replace(restored_return, "\\u0009", "\t")
+    restored_quote = String.replace(restored_tab, "\\u0022", "\"")
+    String.replace(restored_quote, "\\u005c", "\\")
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
+  end
+
+  defp read_if_exists(path) do
+    case System.path_exists(path) do
+      true -> System.read_text(path)
+      _ -> ""
+    end
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+
+  defp print_summary(summary, loop) do
+    stop_reason = Map.get(summary, :stop_reason, "unknown")
+
+    print_lines(["miniloops summary", "===================","run_id: #{run_id(loop)}","iterations: #{Map.get(summary, :iterations, 0)}","stop_reason: #{stop_reason}","journal: #{journal_file(loop)}","memory: #{memory_file(loop)}","review_every: #{review_every(loop)}","inspect scratchpad: #{tool_path(loop)} inspect scratchpad --format md"])
+  end
+
+  defp print_text(text) do
+    IO.puts(text)
+  end
+
+  defp print_lines([]) do
+    :ok
+  end
+
+  defp print_lines([line | rest]) do
+    case IO.puts(line) do
+      _ -> print_lines(rest)
+    end
+  end
+
+  defp objective(loop) do
+    Map.get(loop, :objective, "")
+  end
+
+  defp topology(loop) do
+    Map.get(loop, :topology, %{})
+  end
+
+  defp max_iterations(loop) do
+    Map.get(Map.get(loop, :limits, %{}), :max_iterations, 0)
+  end
+
+  defp completion_promise(loop) do
+    Map.get(Map.get(loop, :completion, %{}), :promise, "")
+  end
+
+  defp completion_event(loop) do
+    Map.get(Map.get(loop, :completion, %{}), :event, "")
+  end
+
+  defp required_events(loop) do
+    Map.get(Map.get(loop, :completion, %{}), :required_events, [])
+  end
+
+  defp backend_spec(loop) do
+    Map.get(loop, :backend, %{})
+  end
+
+  defp backend_kind(loop) do
+    Map.get(backend_spec(loop), :kind, "command")
+  end
+
+  defp backend_command(loop) do
+    Map.get(backend_spec(loop), :command, "")
+  end
+
+  defp backend_args(loop) do
+    Map.get(backend_spec(loop), :args, [])
+  end
+
+  defp backend_prompt_mode(loop) do
+    Map.get(backend_spec(loop), :prompt_mode, "arg")
+  end
+
+  defp backend_timeout_ms(loop) do
+    Map.get(backend_spec(loop), :timeout_ms, 300000)
+  end
+
+  defp review_spec(loop) do
+    Map.get(loop, :review, %{})
+  end
+
+  defp review_enabled(loop) do
+    case Map.get(review_spec(loop), :enabled, true) do
+      false -> false
+      _ -> true
+    end
+  end
+
+  defp review_every(loop) do
+    Map.get(review_spec(loop), :every, 1)
+  end
+
+  defp review_kind(loop) do
+    Map.get(review_spec(loop), :kind, backend_kind(loop))
+  end
+
+  defp review_command(loop) do
+    Map.get(review_spec(loop), :command, backend_command(loop))
+  end
+
+  defp review_args(loop) do
+    Map.get(review_spec(loop), :args, backend_args(loop))
+  end
+
+  defp review_prompt_mode(loop) do
+    Map.get(review_spec(loop), :prompt_mode, backend_prompt_mode(loop))
+  end
+
+  defp review_prompt(loop) do
+    Map.get(review_spec(loop), :prompt, "")
+  end
+
+  defp review_timeout_ms(loop) do
+    Map.get(review_spec(loop), :timeout_ms, backend_timeout_ms(loop))
+  end
+
+  defp process_kind(spec) do
+    Map.get(spec, :kind, "command")
+  end
+
+  defp process_command(spec) do
+    Map.get(spec, :command, "")
+  end
+
+  defp process_args(spec) do
+    Map.get(spec, :args, [])
+  end
+
+  defp process_prompt_mode(spec) do
+    Map.get(spec, :prompt_mode, "arg")
+  end
+
+  defp resolve_process_kind("pi", _command) do
+    "pi"
+  end
+
+  defp resolve_process_kind("command", _command) do
+    "command"
+  end
+
+  defp resolve_process_kind("passthrough", command) do
+    resolve_process_kind("", command)
+  end
+
+  defp resolve_process_kind("", command) do
+    case pi_binary(command) do
+      true -> "pi"
+      _ -> "command"
+    end
+  end
+
+  defp resolve_process_kind(_value, command) do
+    resolve_process_kind("", command)
+  end
+
+  defp pi_binary("pi") do
+    true
+  end
+
+  defp pi_binary(command) do
+    String.ends_with(command, "/pi")
+  end
+
+  defp normalize_prompt_mode("stdin") do
+    "stdin"
+  end
+
+  defp normalize_prompt_mode(_value) do
+    "arg"
+  end
+
+  defp config_list_with_fallback(config, key, fallback) do
+    marker = "__missing__"
+    raw = LoopConfig.get(config, key, marker)
+
+    case raw == marker do
+      true -> fallback
+      _ -> split_csv(raw)
+    end
+  end
+
+  defp memory_budget_chars(loop) do
+    Map.get(Map.get(loop, :memory, %{}), :budget_chars, 1600)
+  end
+
+  defp harness_instructions(loop) do
+    Map.get(Map.get(loop, :harness, %{}), :instructions, "")
+  end
+
+  defp project_dir(loop) do
+    Map.get(Map.get(loop, :paths, %{}), :project_dir, ".")
+  end
+
+  defp state_dir(loop) do
+    Map.get(Map.get(loop, :paths, %{}), :state_dir, ".miniloops")
+  end
+
+  defp journal_file(loop) do
+    Map.get(Map.get(loop, :paths, %{}), :journal_file, ".miniloops/journal.jsonl")
+  end
+
+  defp memory_file(loop) do
+    Map.get(Map.get(loop, :paths, %{}), :memory_file, ".miniloops/memory.jsonl")
+  end
+
+  defp tool_path(loop) do
+    Map.get(Map.get(loop, :paths, %{}), :tool_path, ".miniloops/miniloops")
+  end
+
+  defp pi_adapter_path(loop) do
+    Map.get(Map.get(loop, :paths, %{}), :pi_adapter_path, ".miniloops/pi-adapter")
+  end
+
+  defp run_id(loop) do
+    Map.get(Map.get(loop, :runtime, %{}), :run_id, "")
+  end
+
+  defp self_command(loop) do
+    Map.get(Map.get(loop, :runtime, %{}), :self_command, "'miniloops'")
+  end
+
+  defp prompt_override(loop) do
+    Map.get(Map.get(loop, :runtime, %{}), :prompt_override, nil)
+  end
+
+  defp iteration(iter) do
+    Map.get(iter, :iteration, 0)
+  end
+
+  defp iteration_string(iter) do
+    to_string(iteration(iter))
+  end
+
+  defp recent_event(iter) do
+    Map.get(iter, :recent_event, "loop.start")
+  end
+
+  defp allowed_roles(iter) do
+    Map.get(iter, :allowed_roles, [])
+  end
+
+  defp allowed_events(iter) do
+    Map.get(iter, :allowed_events, [])
+  end
+
+  defp backpressure(iter) do
+    Map.get(iter, :backpressure, "")
+  end
+
+  defp prompt_text(iter) do
+    Map.get(iter, :prompt, "")
+  end
+end

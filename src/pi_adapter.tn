@@ -1,0 +1,390 @@
+defmodule LoopPiAdapter do
+  def run(args) do
+    prompt = resolve_prompt()
+
+    case prompt do
+      "" -> finish_failure("missing projected prompt")
+      _ -> run_with_prompt(args, prompt)
+    end
+  end
+
+  defp run_with_prompt(args, prompt) do
+    result = System.run(build_pi_command(resolve_pi_command(args), resolve_pi_args(args), prompt) <> " 2>&1")
+    raw_output = Map.get(result, :output, "")
+    exit_code = Map.get(result, :exit_code, 1)
+    parsed = parse_output(raw_output)
+
+    write_stream_log(raw_output)
+
+    case pi_run_failed(exit_code, parsed) do
+      true -> finish_failure(failure_output(raw_output, parsed))
+      _ -> finish_success(success_output(raw_output, parsed))
+    end
+  end
+
+  defp resolve_prompt() do
+    prompt = env_value("MINILOOPS_PROMPT")
+
+    case prompt do
+      "" -> projected_prompt()
+      value -> value
+    end
+  end
+
+  defp projected_prompt() do
+    bin = env_value("MINILOOPS_BIN")
+    iteration = env_value("MINILOOPS_ITERATION")
+
+    case bin == "" or iteration == "" do
+      true -> prompt_from_path()
+      _ -> projected_prompt_from_tool(bin, iteration)
+    end
+  end
+
+  defp projected_prompt_from_tool(bin, iteration) do
+    result = System.run(shell_words([bin, "inspect", "prompt", iteration, "--format", "md"]))
+    output = Map.get(result, :output, "")
+
+    case output do
+      "" -> prompt_from_path()
+      value -> value
+    end
+  end
+
+  defp prompt_from_path() do
+    path = env_value("MINILOOPS_PROMPT_PATH")
+
+    case path == "" or not System.path_exists(path) do
+      true -> ""
+      _ -> System.read_text(path)
+    end
+  end
+
+  defp resolve_pi_command([command | _rest]) do
+    command
+  end
+
+  defp resolve_pi_command([]) do
+    "pi"
+  end
+
+  defp resolve_pi_args([_command | rest]) do
+    rest
+  end
+
+  defp resolve_pi_args([]) do
+    []
+  end
+
+  defp build_pi_command(command, extra_args, prompt) do
+    shell_words([command] ++ default_pi_args() ++ extra_args ++ [prompt])
+  end
+
+  defp default_pi_args() do
+    ["-p", "--mode", "json", "--no-session"]
+  end
+
+  defp parse_output(output) do
+    parse_lines(String.split(output, line_sep()), %{text: "", fallback_text: "", saw_turn_end: false, saw_agent_end: false, error: ""})
+  end
+
+  defp parse_lines([], state) do
+    state
+  end
+
+  defp parse_lines([line | rest], state) do
+    next = parse_line(String.trim(line), state)
+    parse_lines(rest, next)
+  end
+
+  defp parse_line("", state) do
+    state
+  end
+
+  defp parse_line(line, state) do
+    case json_string_after(line, "\"type\":\"") do
+      "message_update" -> parse_message_update(line, state)
+      "tool_execution_end" -> parse_tool_execution_end(line, state)
+      "turn_end" -> parse_turn_end(line, state)
+      "agent_end" -> parse_agent_end(line, state)
+      _ -> state
+    end
+  end
+
+  defp parse_message_update(line, state) do
+    case json_string_after(line, "\"assistantMessageEvent\":{\"type\":\"") do
+      "text_delta" -> append_text(state, json_string_after(line, "\"delta\":\""))
+      "error" -> put_error(state, json_string_after(line, "\"reason\":\""))
+      _ -> state
+    end
+  end
+
+  defp parse_tool_execution_end(line, state) do
+    case String.contains(line, "\"isError\":true") do
+      true -> put_error(state, nonempty_or(last_json_string_after(line, "\"type\":\"text\",\"text\":\""), Map.get(state, :error, "")))
+      _ -> state
+    end
+  end
+
+  defp parse_turn_end(line, state) do
+    fallback = nonempty_or(Map.get(state, :fallback_text, ""), last_json_string_after(line, "\"type\":\"text\",\"text\":\""))
+    %{text: Map.get(state, :text, ""), fallback_text: fallback, saw_turn_end: true, saw_agent_end: Map.get(state, :saw_agent_end, false), error: Map.get(state, :error, "")}
+  end
+
+  defp parse_agent_end(line, state) do
+    fallback = nonempty_or(Map.get(state, :fallback_text, ""), last_json_string_after(line, "\"type\":\"text\",\"text\":\""))
+    %{text: Map.get(state, :text, ""), fallback_text: fallback, saw_turn_end: Map.get(state, :saw_turn_end, false), saw_agent_end: true, error: Map.get(state, :error, "")}
+  end
+
+  defp append_text(state, text) do
+    %{text: Map.get(state, :text, "") <> text, fallback_text: Map.get(state, :fallback_text, ""), saw_turn_end: Map.get(state, :saw_turn_end, false), saw_agent_end: Map.get(state, :saw_agent_end, false), error: Map.get(state, :error, "")}
+  end
+
+  defp put_error(state, "") do
+    state
+  end
+
+  defp put_error(state, error) do
+    %{text: Map.get(state, :text, ""), fallback_text: Map.get(state, :fallback_text, ""), saw_turn_end: Map.get(state, :saw_turn_end, false), saw_agent_end: Map.get(state, :saw_agent_end, false), error: error}
+  end
+
+  defp pi_run_failed(exit_code, parsed) do
+    exit_code != 0 or incomplete_stream(parsed) or Map.get(parsed, :error, "") != ""
+  end
+
+  defp incomplete_stream(parsed) do
+    turn_end = Map.get(parsed, :saw_turn_end, false)
+    agent_end = Map.get(parsed, :saw_agent_end, false)
+
+    case turn_end do
+      true -> false
+      _ -> case agent_end do
+        true -> false
+        _ -> true
+      end
+    end
+  end
+
+  defp success_output(_raw_output, parsed) do
+    text = Map.get(parsed, :text, "")
+
+    case text do
+      "" -> Map.get(parsed, :fallback_text, "")
+      value -> value
+    end
+  end
+
+  defp failure_output(raw_output, parsed) do
+    extracted = success_output(raw_output, parsed)
+    error = Map.get(parsed, :error, "")
+
+    case extracted do
+      "" -> nonempty_or(raw_output, error)
+      value -> case error do
+        "" -> value
+        _ -> value <> "\n\npi error: " <> error
+      end
+    end
+  end
+
+  defp finish_success("") do
+    System.run("true")
+  end
+
+  defp finish_success(output) do
+    IO.puts(output)
+    System.run("true")
+  end
+
+  defp finish_failure("") do
+    System.run("false")
+  end
+
+  defp finish_failure(output) do
+    IO.puts(output)
+    System.run("false")
+  end
+
+  defp write_stream_log(raw_output) do
+    state_dir = env_value("MINILOOPS_STATE_DIR")
+
+    case state_dir do
+      "" -> System.run("true")
+      _ -> write_stream_log_file(Path.join(state_dir, stream_log_name()), raw_output)
+    end
+  end
+
+  defp write_stream_log_file(path, raw_output) do
+    System.ensure_dir(Path.dirname(path))
+    System.write_text(path, raw_output)
+  end
+
+  defp stream_log_name() do
+    prefix = stream_log_prefix(env_value("MINILOOPS_REVIEW_MODE"))
+    iteration = env_value("MINILOOPS_ITERATION")
+
+    case iteration do
+      "" -> prefix <> ".jsonl"
+      value -> prefix <> "." <> value <> ".jsonl"
+    end
+  end
+
+  defp stream_log_prefix("hyperagent") do
+    "pi-review"
+  end
+
+  defp stream_log_prefix(_mode) do
+    "pi-stream"
+  end
+
+  defp env_value(name) do
+    case System.env(name) do
+      nil -> ""
+      value -> value
+    end
+  end
+
+  defp json_string_after(text, marker) do
+    parse_json_string(first_after_marker(String.split(text, marker)), "", false)
+  end
+
+  defp last_json_string_after(text, marker) do
+    parse_json_string(last_after_marker(String.split(text, marker)), "", false)
+  end
+
+  defp parse_json_string("", acc, _escaped) do
+    acc
+  end
+
+  defp parse_json_string(text, acc, escaped) do
+    first = String.slice(text, 0, 1)
+    rest = String.slice(text, 1, String.length(text) - 1)
+
+    case escaped do
+      true -> parse_json_escape(first, rest, acc)
+      _ -> case first do
+        "\\" -> parse_json_string(rest, acc, true)
+        "\"" -> acc
+        _ -> parse_json_string(rest, acc <> first, false)
+      end
+    end
+  end
+
+  defp parse_json_escape("u", rest, acc) do
+    code = String.slice(rest, 0, 4)
+    remaining = String.slice(rest, 4, String.length(rest) - 4)
+    parse_json_string(remaining, acc <> unicode_escape_placeholder(code), false)
+  end
+
+  defp parse_json_escape(first, rest, acc) do
+    parse_json_string(rest, acc <> json_escape(first), false)
+  end
+
+  defp json_escape("n") do
+    line_sep()
+  end
+
+  defp json_escape("r") do
+    "\r"
+  end
+
+  defp json_escape("t") do
+    "\t"
+  end
+
+  defp json_escape("\"") do
+    "\""
+  end
+
+  defp json_escape("\\") do
+    "\\"
+  end
+
+  defp json_escape(value) do
+    value
+  end
+
+  defp unicode_escape_placeholder(code) do
+    case code do
+      "000a" -> line_sep()
+      "000d" -> "\r"
+      "0009" -> "\t"
+      "0022" -> "\""
+      "005c" -> "\\"
+      _ -> ""
+    end
+  end
+
+  defp first_after_marker([]) do
+    ""
+  end
+
+  defp first_after_marker([_only]) do
+    ""
+  end
+
+  defp first_after_marker([_prefix | rest]) do
+    first_or_empty(rest)
+  end
+
+  defp last_after_marker([]) do
+    ""
+  end
+
+  defp last_after_marker([_only]) do
+    ""
+  end
+
+  defp last_after_marker([_prefix | rest]) do
+    last_item(rest)
+  end
+
+  defp first_or_empty([]) do
+    ""
+  end
+
+  defp first_or_empty([item | _rest]) do
+    item
+  end
+
+  defp last_item([item]) do
+    item
+  end
+
+  defp last_item([_item | rest]) do
+    last_item(rest)
+  end
+
+  defp last_item([]) do
+    ""
+  end
+
+  defp nonempty_or("", fallback) do
+    fallback
+  end
+
+  defp nonempty_or(value, _fallback) do
+    value
+  end
+
+  defp shell_words([]) do
+    ""
+  end
+
+  defp shell_words([part]) do
+    shell_quote(part)
+  end
+
+  defp shell_words([part | rest]) do
+    shell_quote(part) <> " " <> shell_words(rest)
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end

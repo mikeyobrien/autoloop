@@ -1,0 +1,18 @@
+event_loop.max_iterations = 100
+event_loop.completion_event = "task.complete"
+event_loop.completion_promise = "LOOP_COMPLETE"
+# Require the critic and finalizer gates before completion is considered valid.
+event_loop.required_events = ["review.passed"]
+
+backend.kind = "pi"
+backend.command = "pi"
+backend.timeout_ms = 300000
+
+review.enabled = false
+
+memory.prompt_budget_chars = 1600
+harness.instructions_file = "harness.md"
+
+core.state_dir = ".miniloops"
+core.journal_file = ".miniloops/journal.jsonl"
+core.memory_file = ".miniloops/memory.jsonl"

@@ -1,0 +1,361 @@
+defmodule Demo do
+  def run() do
+    argv = System.argv()
+    args = runtime_argv(argv)
+    dispatch(args, argv)
+  end
+
+  defp dispatch(["emit", topic | rest], _argv) do
+    LoopHarness.emit(resolve_runtime_project_dir(), topic, join_tokens(rest))
+  end
+
+  defp dispatch(["inspect" | rest], _argv) do
+    handle_inspect(rest)
+  end
+
+  defp dispatch(["pi-adapter" | rest], _argv) do
+    LoopPiAdapter.run(rest)
+  end
+
+  defp dispatch(["memory", "list"], _argv) do
+    IO.puts(LoopMemory.list_project(resolve_runtime_project_dir()))
+  end
+
+  defp dispatch(["memory", "list", project_dir], _argv) do
+    IO.puts(LoopMemory.list_project(project_dir))
+  end
+
+  defp dispatch(["memory", "add", "learning" | rest], _argv) do
+    LoopMemory.add_learning(resolve_runtime_project_dir(), join_tokens(rest), "manual")
+  end
+
+  defp dispatch(["memory", "add", "preference", category | rest], _argv) do
+    LoopMemory.add_preference(resolve_runtime_project_dir(), category, join_tokens(rest))
+  end
+
+  defp dispatch(["memory", "add", "meta", key | rest], _argv) do
+    LoopMemory.add_meta(resolve_runtime_project_dir(), key, join_tokens(rest))
+  end
+
+  defp dispatch(["memory", "remove", id], _argv) do
+    LoopMemory.remove(resolve_runtime_project_dir(), id, "manual")
+  end
+
+  defp dispatch(["memory", "remove", id | rest], _argv) do
+    LoopMemory.remove(resolve_runtime_project_dir(), id, join_tokens(rest))
+  end
+
+  defp dispatch(args, argv) do
+    options = parse_run_args(args)
+
+    LoopHarness.run(Map.get(options, :project_dir, "."), normalize_prompt(Map.get(options, :prompt, nil)), self_command(argv))
+  end
+
+  defp handle_inspect(args) do
+    spec = parse_inspect_args(args)
+    artifact = Map.get(spec, :artifact, "")
+    format = Map.get(spec, :format, "")
+    project_dir = Map.get(spec, :project_dir, resolve_runtime_project_dir())
+    selector = Map.get(spec, :selector, "")
+
+    dispatch_inspect(artifact, selector, project_dir, format)
+  end
+
+  defp dispatch_inspect("scratchpad", "", project_dir, "md") do
+    LoopHarness.render_scratchpad(project_dir)
+  end
+
+  defp dispatch_inspect("memory", "", project_dir, "md") do
+    IO.puts(LoopMemory.list_project(project_dir))
+  end
+
+  defp dispatch_inspect("memory", "", project_dir, "json") do
+    IO.puts(LoopMemory.raw_project(project_dir))
+  end
+
+  defp dispatch_inspect("journal", "", project_dir, "json") do
+    LoopHarness.render_journal(project_dir)
+  end
+
+  defp dispatch_inspect("prompt", iteration, project_dir, "md") do
+    LoopHarness.render_prompt(project_dir, iteration)
+  end
+
+  defp dispatch_inspect("output", iteration, project_dir, "text") do
+    LoopHarness.render_output(project_dir, iteration)
+  end
+
+  defp dispatch_inspect(artifact, _selector, _project_dir, format) do
+    IO.puts("unsupported inspect target `" <> artifact <> "` with format `" <> format <> "`")
+  end
+
+  defp parse_inspect_args(args) do
+    format_parts = split_inspect_format(args)
+    artifact = Map.get(format_parts, :artifact, "")
+    format = Map.get(format_parts, :format, "")
+    positionals = Map.get(format_parts, :positionals, [])
+
+    parse_inspect_positionals(artifact, format, positionals)
+  end
+
+  defp split_inspect_format([artifact | rest]) do
+    split_inspect_format_rest(artifact, rest)
+  end
+
+  defp split_inspect_format([]) do
+    inspect_usage_error("inspect requires an artifact and --format")
+  end
+
+  defp split_inspect_format_rest(artifact, rest) do
+    count = list_count(rest)
+
+    case count >= 2 do
+      true -> split_inspect_format_with_count(artifact, rest, count)
+      _ -> inspect_usage_error("inspect requires --format <md|text|json>")
+    end
+  end
+
+  defp split_inspect_format_with_count(artifact, rest, count) do
+    flag = list_at(rest, count - 1)
+    format = list_at(rest, count)
+    positionals = list_take(rest, count - 2)
+
+    case flag do
+      "--format" -> %{artifact: artifact, positionals: positionals, format: format}
+      _ -> inspect_usage_error("inspect requires --format <md|text|json>")
+    end
+  end
+
+  defp parse_inspect_positionals("prompt", format, [selector]) do
+    %{artifact: "prompt", selector: selector, project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("prompt", format, [selector, project_dir]) do
+    %{artifact: "prompt", selector: selector, project_dir: project_dir, format: format}
+  end
+
+  defp parse_inspect_positionals("output", format, [selector]) do
+    %{artifact: "output", selector: selector, project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("output", format, [selector, project_dir]) do
+    %{artifact: "output", selector: selector, project_dir: project_dir, format: format}
+  end
+
+  defp parse_inspect_positionals("scratchpad", format, []) do
+    %{artifact: "scratchpad", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("scratchpad", format, [project_dir]) do
+    %{artifact: "scratchpad", selector: "", project_dir: project_dir, format: format}
+  end
+
+  defp parse_inspect_positionals("memory", format, []) do
+    %{artifact: "memory", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("memory", format, [project_dir]) do
+    %{artifact: "memory", selector: "", project_dir: project_dir, format: format}
+  end
+
+  defp parse_inspect_positionals("journal", format, []) do
+    %{artifact: "journal", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
+  end
+
+  defp parse_inspect_positionals("journal", format, [project_dir]) do
+    %{artifact: "journal", selector: "", project_dir: project_dir, format: format}
+  end
+
+  defp parse_inspect_positionals(artifact, _format, _positionals) do
+    inspect_usage_error("invalid inspect usage for `" <> artifact <> "`")
+  end
+
+  defp inspect_usage_error(message) do
+    IO.puts(message)
+    %{artifact: "", positionals: [], format: ""}
+  end
+
+  defp runtime_argv([command, "run", project_dir | rest]) do
+    case is_tonic_command(command) do
+      true -> rest
+      _ -> drop_program_name([command, "run", project_dir] ++ rest)
+    end
+  end
+
+  defp runtime_argv([first | rest]) do
+    case cli_command(first) do
+      true -> [first] ++ rest
+      _ -> drop_program_name([first] ++ rest)
+    end
+  end
+
+  defp runtime_argv([]) do
+    []
+  end
+
+  defp drop_program_name([_program | rest]) do
+    rest
+  end
+
+  defp drop_program_name([]) do
+    []
+  end
+
+  defp parse_run_args(["run" | rest]) do
+    parse_run_args(rest)
+  end
+
+  defp parse_run_args([]) do
+    %{project_dir: ".", prompt: nil}
+  end
+
+  defp parse_run_args([arg]) do
+    case looks_like_project_dir(arg) do
+      true -> %{project_dir: arg, prompt: nil}
+      _ -> %{project_dir: ".", prompt: arg}
+    end
+  end
+
+  defp parse_run_args([first | rest]) do
+    case looks_like_project_dir(first) do
+      true -> %{project_dir: first, prompt: join_tokens(rest)}
+      _ -> %{project_dir: ".", prompt: join_tokens([first] ++ rest)}
+    end
+  end
+
+  defp resolve_runtime_project_dir() do
+    case System.env("MINILOOPS_PROJECT_DIR") do
+      nil -> "."
+      path -> resolve_runtime_project_dir_value(path)
+    end
+  end
+
+  defp resolve_runtime_project_dir_value("") do
+    "."
+  end
+
+  defp resolve_runtime_project_dir_value(path) do
+    path
+  end
+
+  defp normalize_prompt(nil) do
+    nil
+  end
+
+  defp normalize_prompt("") do
+    nil
+  end
+
+  defp normalize_prompt(prompt) do
+    prompt
+  end
+
+  defp looks_like_project_dir(path) do
+    case System.is_dir(path) do
+      true -> LoopConfig.project_has_config(path)
+      _ -> false
+    end
+  end
+
+  defp self_command([command, "run", harness_project | _rest]) do
+    case is_tonic_command(command) do
+      true -> "tonic run " <> shell_quote(absolute_path(harness_project))
+      _ -> shell_quote(command)
+    end
+  end
+
+  defp self_command([command | _rest]) do
+    shell_quote(command)
+  end
+
+  defp self_command([]) do
+    "'miniloops'"
+  end
+
+  defp absolute_path(path) do
+    case String.starts_with(path, "/") do
+      true -> path
+      _ -> Path.join(System.cwd(), path)
+    end
+  end
+
+  defp is_tonic_command(command) do
+    command == "tonic" or String.ends_with(command, "/tonic")
+  end
+
+  defp cli_command("run") do
+    true
+  end
+
+  defp cli_command("emit") do
+    true
+  end
+
+  defp cli_command("inspect") do
+    true
+  end
+
+  defp cli_command("memory") do
+    true
+  end
+
+  defp cli_command("pi-adapter") do
+    true
+  end
+
+  defp cli_command(_value) do
+    false
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
+  end
+
+  defp join_tokens([]) do
+    ""
+  end
+
+  defp join_tokens([token]) do
+    token
+  end
+
+  defp join_tokens([token | rest]) do
+    token <> " " <> join_tokens(rest)
+  end
+
+  defp list_count(list) do
+    count_list(list, 0)
+  end
+
+  defp count_list([], count) do
+    count
+  end
+
+  defp count_list([_item | rest], count) do
+    count_list(rest, count + 1)
+  end
+
+  defp list_at([item | _rest], 1) do
+    item
+  end
+
+  defp list_at([_item | rest], index) do
+    list_at(rest, index - 1)
+  end
+
+  defp list_at([], _index) do
+    ""
+  end
+
+  defp list_take(_list, count) when count <= 0 do
+    []
+  end
+
+  defp list_take([item | rest], count) do
+    [item] ++ list_take(rest, count - 1)
+  end
+
+  defp list_take([], _count) do
+    []
+  end
+end

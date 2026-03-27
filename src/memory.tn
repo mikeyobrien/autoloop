@@ -1,0 +1,330 @@
+defmodule LoopMemory do
+  def resolve_file(project_dir) do
+    config = LoopConfig.load_project(project_dir)
+    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+  end
+
+  def render_project(project_dir, budget_chars) do
+    render_file(resolve_file(project_dir), budget_chars)
+  end
+
+  def render_file(path, budget_chars) do
+    text = render_materialized(materialize(read_lines(path)))
+    truncate_text(text, budget_chars)
+  end
+
+  def list_project(project_dir) do
+    render_materialized(materialize(read_lines(resolve_file(project_dir))))
+  end
+
+  def raw_project(project_dir) do
+    read_if_exists(resolve_file(project_dir))
+  end
+
+  def add_learning(project_dir, text, source) do
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "learning", "\"text\": " <> json_string(text) <> ", \"source\": " <> json_string(source) <> ", \"created\": " <> json_string(current_time())))
+
+    IO.puts("stored learning")
+  end
+
+  def add_preference(project_dir, category, text) do
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "mem"), "preference", "\"category\": " <> json_string(category) <> ", \"text\": " <> json_string(text) <> ", \"created\": " <> json_string(current_time())))
+
+    IO.puts("stored preference")
+  end
+
+  def add_meta(project_dir, key, value) do
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "meta"), "meta", "\"key\": " <> json_string(key) <> ", \"value\": " <> json_string(value) <> ", \"created\": " <> json_string(current_time())))
+
+    IO.puts("stored meta")
+  end
+
+  def remove(project_dir, id, reason) do
+    append_memory_entry(resolve_file(project_dir), memory_line(next_id(resolve_file(project_dir), "ts"), "tombstone", "\"target_id\": " <> json_string(id) <> ", \"reason\": " <> json_string(reason) <> ", \"created\": " <> json_string(current_time())))
+
+    IO.puts("removed #{id}")
+  end
+
+  defp render_materialized(memory) do
+    preferences = Map.get(memory, :preferences, [])
+    learnings = Map.get(memory, :learnings, [])
+    meta = Map.get(memory, :meta, [])
+
+    case preferences == [] and learnings == [] and meta == [] do
+      true -> ""
+      _ ->
+        "Loop memory:\n" <>
+        render_preferences(preferences) <>
+        render_learnings(learnings) <>
+        render_meta(meta)
+    end
+  end
+
+  defp render_preferences([]) do
+    ""
+  end
+
+  defp render_preferences(entries) do
+    "Preferences:\n" <> render_preference_lines(entries)
+  end
+
+  defp render_preference_lines([]) do
+    ""
+  end
+
+  defp render_preference_lines([entry | rest]) do
+    "- [" <> extract_field(entry, "category") <> "] " <> extract_field(entry, "text") <> "\n" <> render_preference_lines(rest)
+  end
+
+  defp render_learnings([]) do
+    ""
+  end
+
+  defp render_learnings(entries) do
+    "Learnings:\n" <> render_learning_lines(entries)
+  end
+
+  defp render_learning_lines([]) do
+    ""
+  end
+
+  defp render_learning_lines([entry | rest]) do
+    source = extract_field(entry, "source")
+    prefix = learning_prefix(source) "- " <> prefix <> extract_field(entry, "text") <> "\n" <> render_learning_lines(rest)
+  end
+
+  defp learning_prefix("") do
+    ""
+  end
+
+  defp learning_prefix(source) do
+    "(" <> source <> ") "
+  end
+
+  defp render_meta([]) do
+    ""
+  end
+
+  defp render_meta(entries) do
+    "Meta:\n" <> render_meta_lines(entries)
+  end
+
+  defp render_meta_lines([]) do
+    ""
+  end
+
+  defp render_meta_lines([entry | rest]) do
+    "- " <> extract_field(entry, "key") <> ": " <> extract_field(entry, "value") <> "\n" <> render_meta_lines(rest)
+  end
+
+  defp truncate_text(text, budget_chars) do
+    case budget_chars <= 0 do
+      true -> text
+      _ -> truncate_text_with_budget(text, budget_chars)
+    end
+  end
+
+  defp truncate_text_with_budget(text, budget_chars) do
+    case String.length(text) <= budget_chars do
+      true -> text
+      _ -> String.slice(text, 0, budget_chars) <> "\n..."
+    end
+  end
+
+  defp materialize(lines) do
+    reversed = Enum.reverse(lines)
+    collect_materialized(reversed, %{seen: [], tombstoned: [], preferences: [], learnings: [], meta: []})
+  end
+
+  defp collect_materialized([], acc) do
+    %{preferences: Enum.reverse(Map.get(acc, :preferences, [])), learnings: Enum.reverse(Map.get(acc, :learnings, [])), meta: Enum.reverse(Map.get(acc, :meta, []))}
+  end
+
+  defp collect_materialized([line | rest], acc) do
+    type = extract_field(line, "type")
+    id = extract_field(line, "id")
+
+    next =
+    case type do
+      "tombstone" -> add_tombstone(acc, extract_field(line, "target_id"))
+      _ -> add_entry(acc, type, id, line)
+    end
+
+    collect_materialized(rest, next)
+  end
+
+  defp add_tombstone(acc, target_id) do
+    Map.put(acc, :tombstoned, [target_id] ++ Map.get(acc, :tombstoned, []))
+  end
+
+  defp add_entry(acc, _type, "", _line) do
+    acc
+  end
+
+  defp add_entry(acc, _type, id, _line) when id == "" do
+    acc
+  end
+
+  defp add_entry(acc, _type, id, _line) do
+    case list_contains(Map.get(acc, :tombstoned, []), id) or list_contains(Map.get(acc, :seen, []), id) do
+      true -> acc
+      _ -> add_entry_to_collection(acc, id, _type, _line)
+    end
+  end
+
+  defp add_entry_to_collection(acc, id, type, line) do
+    seen = Map.put(acc, :seen, [id] ++ Map.get(acc, :seen, []))
+
+    case type do
+      "preference" -> Map.put(seen, :preferences, [line] ++ Map.get(seen, :preferences, [])) "learning" -> Map.put(seen, :learnings, [line] ++ Map.get(seen, :learnings, [])) "meta" -> put_meta_entry(seen, line)
+      _ -> seen
+    end
+  end
+
+  defp put_meta_entry(acc, line) do
+    key = extract_field(line, "key")
+    existing = Map.get(acc, :meta, [])
+
+    case meta_key_seen(existing, key) do
+      true -> acc
+      _ -> Map.put(acc, :meta, [line] ++ existing)
+    end
+  end
+
+  defp meta_key_seen([], _key) do
+    false
+  end
+
+  defp meta_key_seen([line | rest], key) do
+    case extract_field(line, "key") == key do
+      true -> true
+      _ -> meta_key_seen(rest, key)
+    end
+  end
+
+  defp read_lines(path) do
+    collect_lines(String.split(read_if_exists(path), line_sep()), [])
+  end
+
+  defp collect_lines([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_lines([line | rest], acc) do
+    trimmed = String.trim(line)
+
+    case trimmed do
+      "" -> collect_lines(rest, acc)
+      _ -> collect_lines(rest, [trimmed] ++ acc)
+    end
+  end
+
+  defp append_memory_entry(path, content) do
+    System.ensure_dir(Path.dirname(path))
+    System.write_text(path, read_if_exists(path) <> content)
+  end
+
+  defp next_id(path, prefix) do
+    prefix <> "-" <> to_string(count_lines(read_lines(path), 0) + 1)
+  end
+
+  defp count_lines([], count) do
+    count
+  end
+
+  defp count_lines([_line | rest], count) do
+    count_lines(rest, count + 1)
+  end
+
+  defp current_time() do
+    result = System.run("date -u +%Y-%m-%dT%H:%M:%SZ")
+    String.trim(Map.get(result, :output, "unknown"))
+  end
+
+  defp memory_line(id, type, fields_json) do
+    "{" <> "\"id\": " <> json_string(id) <> ", \"type\": " <> json_string(type) <> ", " <> fields_json <> "}\n"
+  end
+
+  defp json_string(text) do
+    "\"" <> encode_json_value(text) <> "\""
+  end
+
+  defp encode_json_value(text) do
+    escaped_backslash = String.replace(text, "\\", "\\u005c")
+    escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
+    escaped_newline = String.replace(escaped_quote, line_sep(), "\\u000a")
+    escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
+    String.replace(escaped_return, "\t", "\\u0009")
+  end
+
+  defp decode_json_value(text) do
+    restored_newline = String.replace(text, "\\u000a", line_sep())
+    restored_return = String.replace(restored_newline, "\\u000d", "\r")
+    restored_tab = String.replace(restored_return, "\\u0009", "\t")
+    restored_quote = String.replace(restored_tab, "\\u0022", "\"")
+    String.replace(restored_quote, "\\u005c", "\\")
+  end
+
+  defp extract_field(line, key) do
+    marker = "\"" <> key <> "\": "
+    decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
+  end
+
+  defp first_after_marker([]) do
+    ""
+  end
+
+  defp first_after_marker([_only]) do
+    ""
+  end
+
+  defp first_after_marker([_prefix | rest]) do
+    first_or_empty(rest)
+  end
+
+  defp first_quoted_value(text) do
+    first_quoted_value_parts(String.split(text, "\""))
+  end
+
+  defp first_quoted_value_parts([]) do
+    ""
+  end
+
+  defp first_quoted_value_parts([part | rest]) do
+    case part do
+      "" -> first_or_empty(rest)
+      _ -> first_quoted_value_parts(rest)
+    end
+  end
+
+  defp first_or_empty([]) do
+    ""
+  end
+
+  defp first_or_empty([item | _rest]) do
+    item
+  end
+
+  defp list_contains([], _needle) do
+    false
+  end
+
+  defp list_contains([item | rest], needle) do
+    case item == needle do
+      true -> true
+      _ -> list_contains(rest, needle)
+    end
+  end
+
+  defp read_if_exists(path) do
+    case System.path_exists(path) do
+      true -> System.read_text(path)
+      _ -> ""
+    end
+  end
+
+  defp line_sep() do
+    """
+"""
+  end
+end
