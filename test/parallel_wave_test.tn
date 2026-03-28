@@ -1,0 +1,231 @@
+defmodule ParallelWaveTest do
+  def test_parallel_dispatch_wave_creates_artifacts_and_builder_branch_context() do
+    project_dir = prepare_fixture(500)
+    result = run_fixture(project_dir, "dispatch-fixture")
+    journal = read_journal(project_dir)
+    wave_dir = latest_wave_dir(project_dir)
+    branch_result = System.read_text(Path.join(wave_dir, "branches/branch-1/result.md"))
+    spec = System.read_text(Path.join(wave_dir, "spec.md"))
+    join = System.read_text(Path.join(wave_dir, "join.md"))
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "stop_reason: parallel_wave_complete")
+    Assert.assert_contains(journal, "\"topic\": \"wave.start\"")
+    Assert.assert_contains(journal, "\"topic\": \"wave.branch.start\"")
+    Assert.assert_contains(journal, "\"topic\": \"wave.branch.finish\"")
+    Assert.assert_contains(journal, "\"topic\": \"wave.join.start\"")
+    Assert.assert_contains(spec, "Trigger: `tasks.ready.parallel`")
+    Assert.assert_contains(join, "# Parallel Join")
+    Assert.assert_contains(branch_result, "Routing event: `tasks.ready`")
+    Assert.assert_contains(branch_result, "Allowed events: review.ready, build.blocked")
+    Assert.assert_contains(branch_result, "branch recent=tasks.ready")
+  end
+
+  def test_parallel_explore_wave_reuses_opening_routing_context() do
+    project_dir = prepare_fixture(500)
+    result = run_fixture(project_dir, "explore-fixture")
+    wave_dir = latest_wave_dir(project_dir)
+    branch_result = System.read_text(Path.join(wave_dir, "branches/branch-1/result.md"))
+    spec = System.read_text(Path.join(wave_dir, "spec.md"))
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "stop_reason: parallel_wave_complete")
+    Assert.assert_contains(spec, "Trigger: `explore.parallel`")
+    Assert.assert_contains(branch_result, "Routing event: `loop.start`")
+    Assert.assert_contains(branch_result, "Allowed events: tasks.ready, explore.parallel")
+    Assert.assert_contains(branch_result, "branch recent=loop.start")
+  end
+
+  def test_parallel_wave_rejects_malformed_payloads_without_starting_branches() do
+    project_dir = prepare_fixture(500)
+    result = run_fixture(project_dir, "invalid-payload-fixture")
+    journal = read_journal(project_dir)
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "stop_reason: parallel_wave_invalid")
+    Assert.assert_contains(journal, "\"topic\": \"wave.invalid\"")
+    Assert.assert_contains(journal, "invalid_branch_list")
+    Assert.refute(String.contains(journal, "\"topic\": \"wave.start\""), "invalid payload should fail before wave start")
+    Assert.assert_equal(latest_wave_dir(project_dir), "")
+  end
+
+  def test_parallel_wave_rejects_second_active_wave() do
+    project_dir = prepare_fixture(500)
+    active_marker = Path.join(project_dir, ".miniloop/waves/active")
+
+    System.run("mkdir -p " <> shell_quote(Path.dirname(active_marker)))
+    System.write_text(active_marker, "wave-existing")
+
+    result = run_fixture(project_dir, "dispatch-fixture")
+    journal = read_journal(project_dir)
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "stop_reason: parallel_wave_invalid")
+    Assert.assert_contains(journal, "active_wave_exists")
+    Assert.refute(String.contains(journal, "\"topic\": \"wave.start\""), "active-wave rejection should fail before a new wave starts")
+  end
+
+  def test_parallel_wave_records_timeout_when_branch_hits_timeout_budget() do
+    project_dir = prepare_fixture(1)
+    result = run_fixture(project_dir, "timeout-fixture")
+    journal = read_journal(project_dir)
+    wave_dir = latest_wave_dir(project_dir)
+    branch_result = System.read_text(Path.join(wave_dir, "branches/branch-1/result.md"))
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "stop_reason: parallel_wave_timeout")
+    Assert.assert_contains(journal, "\"topic\": \"wave.timeout\"")
+    Assert.assert_contains(journal, "backend_timeout")
+    Assert.assert_contains(branch_result, "Stop reason: `backend_timeout`")
+  end
+
+  defp prepare_fixture(branch_timeout_ms) do
+    project_dir = fixture_dir()
+    roles_dir = Path.join(project_dir, "roles")
+    backend_path = Path.join(project_dir, "backend.sh")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(roles_dir))
+    System.write_text(Path.join(project_dir, "miniloops.toml"), miniloops_toml(branch_timeout_ms, backend_path))
+    System.write_text(Path.join(project_dir, "topology.toml"), topology_toml())
+    System.write_text(Path.join(project_dir, "harness.md"), "parallel wave test harness\n")
+    System.write_text(Path.join(roles_dir, "planner.md"), "You are the planner.\n")
+    System.write_text(Path.join(roles_dir, "builder.md"), "You are the builder.\n")
+    System.write_text(backend_path, backend_script())
+    System.run("chmod +x " <> shell_quote(backend_path))
+
+    project_dir
+  end
+
+  defp run_fixture(project_dir, prompt) do
+    System.run(
+      "cd " <> shell_quote(project_dir) <>
+      " && " <> clean_miniloops_env() <>
+      " tonic run " <> shell_quote(repo_root()) <> " " <> shell_quote(project_dir) <> " " <> shell_quote(prompt)
+    )
+  end
+
+  defp latest_wave_dir(project_dir) do
+    result = System.run(
+      "find " <> shell_quote(Path.join(project_dir, ".miniloop/waves")) <>
+      " -maxdepth 1 -mindepth 1 -type d -name 'wave-*' 2>/dev/null | head -n 1"
+    )
+
+    String.trim(Map.get(result, :output, ""))
+  end
+
+  defp read_journal(project_dir) do
+    path = Path.join(project_dir, ".miniloop/journal.jsonl")
+
+    case System.path_exists(path) do
+      true -> System.read_text(path)
+      _ -> ""
+    end
+  end
+
+  defp miniloops_toml(branch_timeout_ms, backend_path) do
+    "event_loop.max_iterations = 3\n" <>
+    "event_loop.completion_event = \"task.complete\"\n" <>
+    "backend.kind = \"command\"\n" <>
+    "backend.command = \"" <> backend_path <> "\"\n" <>
+    "backend.timeout_ms = 10000\n" <>
+    "review.enabled = false\n" <>
+    "parallel.enabled = true\n" <>
+    "parallel.max_branches = 3\n" <>
+    "parallel.branch_timeout_ms = " <> to_string(branch_timeout_ms) <> "\n" <>
+    "memory.prompt_budget_chars = 8000\n" <>
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+  end
+
+  defp topology_toml() do
+    "name = \"parallel-wave-check\"\n" <>
+    "completion = \"task.complete\"\n\n" <>
+    "[[role]]\n" <>
+    "id = \"planner\"\n" <>
+    "emits = [\"tasks.ready\", \"explore.parallel\"]\n" <>
+    "prompt_file = \"roles/planner.md\"\n\n" <>
+    "[[role]]\n" <>
+    "id = \"builder\"\n" <>
+    "emits = [\"review.ready\", \"build.blocked\"]\n" <>
+    "prompt_file = \"roles/builder.md\"\n\n" <>
+    "[handoff]\n" <>
+    "\"loop.start\" = [\"planner\"]\n" <>
+    "\"tasks.ready\" = [\"builder\"]\n"
+  end
+
+  defp backend_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "prompt=${1:-}\n" <>
+    "state=${MINILOOPS_STATE_DIR:-}\n" <>
+    "if printf '%s' \"$state\" | grep -q '/waves/'; then\n" <>
+    "  if printf '%s' \"$prompt\" | grep -q 'slow branch'; then\n" <>
+    "    python3 - <<'PY'\n" <>
+    "import time\n" <>
+    "time.sleep(2)\n" <>
+    "PY\n" <>
+    "  fi\n" <>
+    "  printf 'branch recent=%s\\n' \"${MINILOOPS_RECENT_EVENT:-}\"\n" <>
+    "  printf 'branch allowed=%s\\n' \"${MINILOOPS_ALLOWED_EVENTS:-}\"\n" <>
+    "  first_event=$(printf '%s' \"${MINILOOPS_ALLOWED_EVENTS:-}\" | awk -F, '{print $1}')\n" <>
+    "  if [ -n \"$first_event\" ] && [ -n \"${MINILOOPS_BIN:-}\" ]; then\n" <>
+    "    \"$MINILOOPS_BIN\" emit \"$first_event\" \"branch done\"\n" <>
+    "  fi\n" <>
+    "  exit 0\n" <>
+    "fi\n" <>
+    "if printf '%s' \"$prompt\" | grep -q 'dispatch-fixture'; then\n" <>
+    "  payload=$(printf '%s\\n%s\\n' '- first branch' '- second branch')\n" <>
+    "  \"$MINILOOPS_BIN\" emit tasks.ready.parallel \"$payload\"\n" <>
+    "  exit 0\n" <>
+    "fi\n" <>
+    "if printf '%s' \"$prompt\" | grep -q 'explore-fixture'; then\n" <>
+    "  payload=$(printf '%s\\n%s\\n' '- compare option A' '- compare option B')\n" <>
+    "  \"$MINILOOPS_BIN\" emit explore.parallel \"$payload\"\n" <>
+    "  exit 0\n" <>
+    "fi\n" <>
+    "if printf '%s' \"$prompt\" | grep -q 'invalid-payload-fixture'; then\n" <>
+    "  \"$MINILOOPS_BIN\" emit tasks.ready.parallel 'not a list'\n" <>
+    "  exit 0\n" <>
+    "fi\n" <>
+    "if printf '%s' \"$prompt\" | grep -q 'timeout-fixture'; then\n" <>
+    "  payload=$(printf '%s\\n' '- slow branch')\n" <>
+    "  \"$MINILOOPS_BIN\" emit tasks.ready.parallel \"$payload\"\n" <>
+    "  exit 0\n" <>
+    "fi\n" <>
+    "printf 'unexpected backend prompt\\n'\n"
+  end
+
+  defp clean_miniloops_env() do
+    "env" <>
+    " -u COLUMNS" <>
+    " -u MINILOOPS_ALLOWED_EVENTS" <>
+    " -u MINILOOPS_ALLOWED_ROLES" <>
+    " -u MINILOOPS_BIN" <>
+    " -u MINILOOPS_COMPLETION_EVENT" <>
+    " -u MINILOOPS_COMPLETION_PROMISE" <>
+    " -u MINILOOPS_EVENTS_FILE" <>
+    " -u MINILOOPS_ITERATION" <>
+    " -u MINILOOPS_JOURNAL_FILE" <>
+    " -u MINILOOPS_MEMORY_FILE" <>
+    " -u MINILOOPS_PROJECT_DIR" <>
+    " -u MINILOOPS_PROMPT" <>
+    " -u MINILOOPS_RECENT_EVENT" <>
+    " -u MINILOOPS_REQUIRED_EVENTS" <>
+    " -u MINILOOPS_RUN_ID" <>
+    " -u MINILOOPS_STATE_DIR" <>
+    " -u MINILOOPS_WIDTH"
+  end
+
+  defp repo_root() do
+    "/Users/rook/projects/tonic-loops"
+  end
+
+  defp fixture_dir() do
+    "/tmp/miniloops-parallel-wave-fixture"
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
+  end
+end

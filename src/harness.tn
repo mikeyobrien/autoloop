@@ -144,8 +144,25 @@ defmodule LoopHarness do
     review_prompt_mode = normalize_prompt_mode(LoopConfig.get(config, "review.prompt_mode", backend_prompt_mode))
     harness_text = read_optional_project_file(project_dir, LoopConfig.get(config, "harness.instructions_file", "harness.md"))
     review_text = resolve_review_prompt(project_dir, config)
+    branch_mode = branch_mode(loop)
 
-    %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, parallel: %{enabled: parallel_enabled, max_branches: parallel_max_branches, branch_timeout_ms: parallel_branch_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, log_level: log_level(loop)}, store: store(loop)}
+    live_loop = %{objective: objective, topology: topology, limits: %{max_iterations: max_iterations}, completion: %{promise: completion_promise, event: completion_event, required_events: required_events}, backend: %{kind: backend_kind, command: backend_command, args: backend_args, prompt_mode: backend_prompt_mode, timeout_ms: backend_timeout_ms}, review: %{enabled: review_enabled, every: review_every, kind: review_kind, command: review_command, args: review_args, prompt_mode: review_prompt_mode, prompt: review_text, timeout_ms: review_timeout_ms}, parallel: %{enabled: parallel_enabled, max_branches: parallel_max_branches, branch_timeout_ms: parallel_branch_timeout_ms}, memory: %{budget_chars: memory_budget_chars}, harness: %{instructions: harness_text}, paths: %{project_dir: project_dir, work_dir: work_dir(loop), state_dir: state_dir(loop), journal_file: journal_file(loop), memory_file: memory_file(loop), tool_path: tool_path(loop), pi_adapter_path: pi_adapter_path(loop)}, runtime: %{run_id: run_id(loop), self_command: self_command(loop), prompt_override: prompt_override, backend_override: backend_override, log_level: log_level(loop), branch_mode: branch_mode}, store: store(loop)}
+
+    apply_runtime_mode_overrides(live_loop)
+  end
+
+  defp apply_runtime_mode_overrides(loop) do
+    case branch_mode(loop) do
+      true -> apply_branch_mode_overrides(loop)
+      _ -> loop
+    end
+  end
+
+  defp apply_branch_mode_overrides(loop) do
+    loop = Map.put(loop, :limits, %{max_iterations: 1})
+    loop = Map.put(loop, :review, Map.put(review_spec(loop), :enabled, false))
+    loop = Map.put(loop, :parallel, %{enabled: false, max_branches: parallel_max_branches(loop), branch_timeout_ms: parallel_branch_timeout_ms(loop)})
+    Map.put(loop, :backend, Map.put(backend_spec(loop), :timeout_ms, min_timeout(backend_timeout_ms(loop), parallel_branch_timeout_ms(loop))))
   end
 
   defp iterate(loop, iteration) do
@@ -256,16 +273,25 @@ defmodule LoopHarness do
   defp finish_iteration(loop, iter, output) do
     run_lines = read_run_lines(journal_file(loop), run_id(loop))
     all_topics = topics_from_lines(run_lines)
-    turn_topics = topics_for_iteration(run_lines, iteration_string(iter))
-    emitted_topic = latest_agent_event(turn_topics)
+    turn_lines = lines_for_iteration(run_lines, iteration_string(iter))
+    emitted = latest_agent_event_record(turn_lines)
+    emitted_topic = Map.get(emitted, :topic, "")
+    emitted_payload = Map.get(emitted, :payload, "")
 
     case invalid_event(emitted_topic, allowed_events(iter), parallel_enabled(loop), completion_event(loop)) do
       true -> reject_invalid_and_continue(loop, iter, emitted_topic)
-      _ -> continue_after_valid_turn(loop, iteration(iter), output, all_topics)
+      _ -> continue_after_valid_turn(loop, iter, output, all_topics, emitted_topic, emitted_payload)
     end
   end
 
-  defp continue_after_valid_turn(loop, iteration, output, all_topics) do
+  defp continue_after_valid_turn(loop, iter, output, all_topics, emitted_topic, emitted_payload) do
+    case parallel_trigger_topic(emitted_topic) do
+      true -> finish_parallel_iteration(loop, iter, emitted_topic, emitted_payload)
+      _ -> continue_after_valid_turn_nonparallel(loop, iteration(iter), output, all_topics)
+    end
+  end
+
+  defp continue_after_valid_turn_nonparallel(loop, iteration, output, all_topics) do
     case completed_via_event(all_topics, completion_event(loop), required_events(loop)) do
       true -> complete_loop(loop, iteration, "completion_event")
       _ -> continue_after_completion_check(loop, iteration, output)
@@ -277,6 +303,24 @@ defmodule LoopHarness do
       true -> complete_loop(loop, iteration, "completion_promise")
       _ -> iterate(loop, iteration + 1)
     end
+  end
+
+  defp finish_parallel_iteration(loop, iter, emitted_topic, emitted_payload) do
+    result = execute_parallel_wave(loop, iter, emitted_topic, emitted_payload)
+    reason = Map.get(result, :reason, "parallel_wave_complete")
+    wave_id = Map.get(result, :wave_id, "")
+    fields = LoopJson.json_field("reason", reason) <> ", " <> LoopJson.json_field("iteration", iteration_string(iter)) <> parallel_stop_wave_fields(wave_id)
+
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "loop.stop", fields)
+    %{iterations: iteration(iter), stop_reason: reason}
+  end
+
+  defp parallel_stop_wave_fields("") do
+    ""
+  end
+
+  defp parallel_stop_wave_fields(wave_id) do
+    ", " <> LoopJson.json_field("wave_id", wave_id)
   end
 
   defp reject_invalid_and_continue(loop, iter, emitted_topic) do
@@ -389,6 +433,397 @@ defmodule LoopHarness do
 
   defp parallel_topic(topic) do
     parallel_trigger_topic(topic) or reserved_parallel_joined_topic(topic)
+  end
+
+  defp execute_parallel_wave(loop, iter, emitted_topic, emitted_payload) do
+    marker_path = active_wave_marker_path(loop)
+
+    case active_wave_present(marker_path) do
+      true -> reject_active_parallel_wave(loop, iter, emitted_topic, marker_path)
+      _ -> execute_parallel_wave_without_active(loop, iter, emitted_topic, emitted_payload, marker_path)
+    end
+  end
+
+  defp execute_parallel_wave_without_active(loop, iter, emitted_topic, emitted_payload, marker_path) do
+    parse_result = parse_parallel_objectives(emitted_payload, parallel_max_branches(loop))
+
+    case Map.get(parse_result, :ok, false) do
+      true -> execute_parallel_wave_with_objectives(loop, iter, emitted_topic, Map.get(parse_result, :objectives, []), marker_path)
+      _ -> reject_parallel_payload(loop, iter, emitted_topic, Map.get(parse_result, :reason, "invalid_payload"))
+    end
+  end
+
+  defp reject_active_parallel_wave(loop, iter, emitted_topic, marker_path) do
+    active_wave_id = read_if_exists(marker_path)
+    append_wave_invalid(loop, iter, emitted_topic, "active_wave_exists", active_wave_id)
+    %{reason: "parallel_wave_invalid", wave_id: active_wave_id}
+  end
+
+  defp reject_parallel_payload(loop, iter, emitted_topic, reason) do
+    append_wave_invalid(loop, iter, emitted_topic, reason, "")
+    %{reason: "parallel_wave_invalid", wave_id: ""}
+  end
+
+  defp execute_parallel_wave_with_objectives(loop, iter, emitted_topic, objectives, marker_path) do
+    wave_id = next_wave_id()
+    wave_dir = wave_dir_path(loop, wave_id)
+    branches_dir = Path.join(wave_dir, "branches")
+    opening_roles = allowed_roles(iter)
+    opening_events = allowed_events(iter)
+
+    System.ensure_dir(branches_dir)
+    write_active_wave_marker(marker_path, wave_id)
+    write_wave_spec(wave_dir, wave_id, emitted_topic, iter, objectives)
+    append_wave_start(loop, iter, wave_id, emitted_topic, objectives)
+
+    branch_results = run_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, objectives, 1, [])
+    write_wave_join(wave_dir, wave_id, emitted_topic, objectives, branch_results, recent_event(iter), opening_roles, opening_events)
+    append_wave_join_start(loop, iter, wave_id, emitted_topic, objectives, branch_results)
+    clear_active_wave_marker(marker_path)
+
+    finalize_parallel_wave(loop, iter, wave_id, branch_results)
+  end
+
+  defp finalize_parallel_wave(loop, iter, wave_id, branch_results) do
+    timed_out = collect_branch_ids_with_status(branch_results, "backend_timeout", [])
+    failed = collect_failed_branch_ids(branch_results, [])
+
+    case timed_out do
+      [] -> finalize_parallel_wave_without_timeout(loop, iter, wave_id, failed)
+      _ -> finalize_parallel_wave_timeout(loop, iter, wave_id, timed_out)
+    end
+  end
+
+  defp finalize_parallel_wave_without_timeout(loop, iter, wave_id, []) do
+    %{reason: "parallel_wave_complete", wave_id: wave_id}
+  end
+
+  defp finalize_parallel_wave_without_timeout(loop, iter, wave_id, failed) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.failed", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("failed_branches", LoopUtils.join_csv(failed)))
+    %{reason: "parallel_wave_failed", wave_id: wave_id}
+  end
+
+  defp finalize_parallel_wave_timeout(loop, iter, wave_id, timed_out) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.timeout", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("timed_out_branches", LoopUtils.join_csv(timed_out)))
+    %{reason: "parallel_wave_timeout", wave_id: wave_id}
+  end
+
+  defp collect_branch_ids_with_status([], _status, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_branch_ids_with_status([branch | rest], status, acc) do
+    branch_status = Map.get(branch, :stop_reason, "")
+
+    case branch_status == status do
+      true -> collect_branch_ids_with_status(rest, status, [Map.get(branch, :branch_id, "")] ++ acc)
+      _ -> collect_branch_ids_with_status(rest, status, acc)
+    end
+  end
+
+  defp collect_failed_branch_ids([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_failed_branch_ids([branch | rest], acc) do
+    branch_status = Map.get(branch, :stop_reason, "")
+
+    case branch_success_status(branch_status) do
+      true -> collect_failed_branch_ids(rest, acc)
+      _ -> collect_failed_branch_ids(rest, [Map.get(branch, :branch_id, "")] ++ acc)
+    end
+  end
+
+  defp branch_success_status("max_iterations") do
+    true
+  end
+
+  defp branch_success_status("completion_event") do
+    true
+  end
+
+  defp branch_success_status("completion_promise") do
+    true
+  end
+
+  defp branch_success_status(_status) do
+    false
+  end
+
+  defp run_parallel_branches(_loop, _iter, _wave_id, _wave_dir, _emitted_topic, [], _index, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp run_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, [objective | rest], index, acc) do
+    branch_id = "branch-" <> to_string(index)
+    branch_dir = Path.join(Path.join(wave_dir, "branches"), branch_id)
+    routing_event = branch_routing_event(iter, emitted_topic)
+    branch_roles = LoopTopology.suggested_roles(topology(loop), routing_event)
+    branch_events = LoopTopology.allowed_events(topology(loop), routing_event)
+
+    System.ensure_dir(branch_dir)
+    System.write_text(Path.join(branch_dir, "objective.md"), render_branch_objective(objective, emitted_topic, routing_event, branch_roles, branch_events))
+    append_wave_branch_start(loop, iter, wave_id, branch_id, objective, routing_event, branch_roles, branch_events)
+
+    result = run_parallel_branch(loop, branch_dir, objective, emitted_topic, routing_event, branch_roles, branch_events)
+    branch_result = Map.put(result, :branch_id, branch_id)
+
+    append_wave_branch_finish(loop, iter, wave_id, branch_id, branch_result)
+
+    run_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, rest, index + 1, [branch_result] ++ acc)
+  end
+
+  defp run_parallel_branch(loop, branch_dir, objective, emitted_topic, routing_event, branch_roles, branch_events) do
+    branch_prompt = render_branch_prompt(loop, objective, emitted_topic, routing_event, branch_roles, branch_events)
+    branch_loop = build_branch_loop(loop, branch_dir, branch_prompt)
+    seeded_branch_loop = seed_branch_context(branch_loop, routing_event)
+    started_ms = epoch_milliseconds()
+    summary = iterate(seeded_branch_loop, 1)
+    elapsed_ms = epoch_milliseconds() - started_ms
+    output = iteration_field_for_run(journal_file(seeded_branch_loop), run_id(seeded_branch_loop), "1", "iteration.finish", "output")
+    stop_reason = branch_stop_reason(Map.get(summary, :stop_reason, "unknown"), elapsed_ms, parallel_branch_timeout_ms(loop))
+    result = %{objective: objective, stop_reason: stop_reason, output: output, routing_event: routing_event, allowed_roles: branch_roles, allowed_events: branch_events, branch_dir: branch_dir, elapsed_ms: elapsed_ms}
+
+    System.write_text(Path.join(branch_dir, "result.md"), render_branch_result(result))
+    result
+  end
+
+  defp branch_stop_reason("backend_timeout", _elapsed_ms, _timeout_ms) do
+    "backend_timeout"
+  end
+
+  defp branch_stop_reason(stop_reason, elapsed_ms, timeout_ms) do
+    case elapsed_ms > timeout_ms do
+      true -> "backend_timeout"
+      _ -> stop_reason
+    end
+  end
+
+  defp build_branch_loop(loop, branch_dir, branch_prompt) do
+    branch_loop = build_loop_context(project_dir(loop), branch_prompt, self_command(loop), %{work_dir: branch_dir, backend_override: backend_override(loop), log_level: log_level(loop)})
+    branch_loop = reload_loop(branch_loop)
+    branch_loop = init_store(branch_loop)
+    branch_loop = Map.put(branch_loop, :runtime, Map.put(Map.get(branch_loop, :runtime, %{}), :branch_mode, true))
+    branch_loop = apply_runtime_mode_overrides(branch_loop)
+
+    ensure_layout(state_dir(branch_loop))
+    install_runtime_tools(branch_loop)
+    append_loop_start(branch_loop)
+    branch_loop
+  end
+
+  defp seed_branch_context(branch_loop, "loop.start") do
+    branch_loop
+  end
+
+  defp seed_branch_context(branch_loop, routing_event) do
+    append_agent_event(journal_file(branch_loop), run_id(branch_loop), "", routing_event, "branch routing seed")
+    branch_loop
+  end
+
+  defp branch_routing_event(iter, "explore.parallel") do
+    recent_event(iter)
+  end
+
+  defp branch_routing_event(_iter, emitted_topic) do
+    parallel_dispatch_base(emitted_topic)
+  end
+
+  defp min_timeout(left, right) do
+    case left <= right do
+      true -> left
+      _ -> right
+    end
+  end
+
+  defp parse_parallel_objectives(payload, max_branches) do
+    lines = collect_lines(String.split(payload, LoopUtils.line_sep()), [])
+    parsed = collect_parallel_objectives(lines, [], false)
+    objectives = Map.get(parsed, :objectives, [])
+
+    case Map.get(parsed, :invalid, false) do
+      true -> %{ok: false, reason: "invalid_branch_list"}
+      _ -> validate_parallel_objective_count(objectives, max_branches)
+    end
+  end
+
+  defp collect_parallel_objectives([], objectives, invalid) do
+    %{objectives: Enum.reverse(objectives), invalid: invalid}
+  end
+
+  defp collect_parallel_objectives([line | rest], objectives, invalid) do
+    objective = parse_parallel_objective_line(line)
+
+    case objective do
+      "" -> collect_parallel_objectives(rest, objectives, true)
+      _ -> collect_parallel_objectives(rest, [objective] ++ objectives, invalid)
+    end
+  end
+
+  defp parse_parallel_objective_line(line) do
+    bullet = bullet_parallel_objective(line)
+
+    case bullet do
+      "" -> numbered_parallel_objective(line)
+      _ -> bullet
+    end
+  end
+
+  defp bullet_parallel_objective(line) do
+    trimmed = String.trim(line)
+
+    case String.starts_with(trimmed, "- ") or String.starts_with(trimmed, "* ") do
+      true -> String.trim(String.slice(trimmed, 2, String.length(trimmed) - 2))
+      _ -> ""
+    end
+  end
+
+  defp numbered_parallel_objective(line) do
+    trimmed = String.trim(line)
+    parts = String.split(trimmed, ". ")
+
+    case parts do
+      [prefix | rest] -> finalize_numbered_parallel_objective(prefix, rest)
+      _ -> ""
+    end
+  end
+
+  defp finalize_numbered_parallel_objective(prefix, []) do
+    ""
+  end
+
+  defp finalize_numbered_parallel_objective(prefix, rest) do
+    case digits_only(prefix) do
+      true -> String.trim(rejoin_with_separator(rest, ". "))
+      _ -> ""
+    end
+  end
+
+  defp digits_only(text) do
+    case Integer.parse(text) do
+      {_value, ""} -> true
+      _ -> false
+    end
+  end
+
+  defp validate_parallel_objective_count([], _max_branches) do
+    %{ok: false, reason: "empty_branch_list"}
+  end
+
+  defp validate_parallel_objective_count(objectives, max_branches) do
+    count = list_length(objectives, 0)
+
+    case count > max_branches do
+      true -> %{ok: false, reason: "too_many_branches"}
+      _ -> %{ok: true, objectives: objectives}
+    end
+  end
+
+  defp rejoin_with_separator([], _separator) do
+    ""
+  end
+
+  defp rejoin_with_separator([part], _separator) do
+    part
+  end
+
+  defp rejoin_with_separator([part | rest], separator) do
+    part <> separator <> rejoin_with_separator(rest, separator)
+  end
+
+  defp next_wave_id() do
+    LoopUtils.generate_compact_id("wave")
+  end
+
+  defp wave_dir_path(loop, wave_id) do
+    Path.join(Path.join(state_dir(loop), "waves"), wave_id)
+  end
+
+  defp active_wave_marker_path(loop) do
+    Path.join(Path.join(state_dir(loop), "waves"), "active")
+  end
+
+  defp active_wave_present(marker_path) do
+    System.path_exists(marker_path)
+  end
+
+  defp write_active_wave_marker(marker_path, wave_id) do
+    System.ensure_dir(Path.dirname(marker_path))
+    System.write_text(marker_path, wave_id)
+  end
+
+  defp clear_active_wave_marker(marker_path) do
+    System.run("rm -f " <> LoopUtils.shell_quote(marker_path))
+  end
+
+  defp append_wave_invalid(loop, iter, emitted_topic, reason, active_wave_id) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.invalid", LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("reason", reason) <> ", " <> LoopJson.json_field("active_wave_id", active_wave_id) <> ", " <> LoopJson.json_field("opening_recent_event", recent_event(iter)))
+  end
+
+  defp append_wave_start(loop, iter, wave_id, emitted_topic, objectives) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.start", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("branch_count", to_string(list_length(objectives, 0))) <> ", " <> LoopJson.json_field("opening_recent_event", recent_event(iter)) <> ", " <> LoopJson.json_field("opening_roles", LoopUtils.join_csv(allowed_roles(iter))) <> ", " <> LoopJson.json_field("opening_events", LoopUtils.join_csv(allowed_events(iter))) <> ", " <> LoopJson.json_field("objectives", LoopUtils.join_csv(objectives)))
+  end
+
+  defp append_wave_branch_start(loop, iter, wave_id, branch_id, objective, routing_event, branch_roles, branch_events) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.branch.start", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("branch_id", branch_id) <> ", " <> LoopJson.json_field("objective", objective) <> ", " <> LoopJson.json_field("routing_event", routing_event) <> ", " <> LoopJson.json_field("branch_roles", LoopUtils.join_csv(branch_roles)) <> ", " <> LoopJson.json_field("branch_events", LoopUtils.join_csv(branch_events)))
+  end
+
+  defp append_wave_branch_finish(loop, iter, wave_id, branch_id, branch_result) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.branch.finish", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("branch_id", branch_id) <> ", " <> LoopJson.json_field("stop_reason", Map.get(branch_result, :stop_reason, "unknown")) <> ", " <> LoopJson.json_field("output", Map.get(branch_result, :output, "")))
+  end
+
+  defp append_wave_join_start(loop, iter, wave_id, emitted_topic, objectives, branch_results) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.join.start", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("branch_count", to_string(list_length(objectives, 0))) <> ", " <> LoopJson.json_field("branch_outcomes", render_branch_outcomes_csv(branch_results)))
+  end
+
+  defp render_branch_outcomes_csv([]) do
+    ""
+  end
+
+  defp render_branch_outcomes_csv([branch]) do
+    Map.get(branch, :branch_id, "") <> ":" <> Map.get(branch, :stop_reason, "")
+  end
+
+  defp render_branch_outcomes_csv([branch | rest]) do
+    Map.get(branch, :branch_id, "") <> ":" <> Map.get(branch, :stop_reason, "") <> "," <> render_branch_outcomes_csv(rest)
+  end
+
+  defp write_wave_spec(wave_dir, wave_id, emitted_topic, iter, objectives) do
+    content = "# Parallel Wave " <> wave_id <> "\n\n" <> "Trigger: `" <> emitted_topic <> "`\n" <> "Opening recent event: `" <> recent_event(iter) <> "`\n" <> "Opening roles: " <> LoopUtils.list_text(allowed_roles(iter)) <> "\n" <> "Opening events: " <> LoopUtils.list_text(allowed_events(iter)) <> "\n\n" <> "## Branch Objectives\n" <> render_wave_objectives(objectives)
+    System.write_text(Path.join(wave_dir, "spec.md"), content)
+  end
+
+  defp write_wave_join(wave_dir, wave_id, emitted_topic, objectives, branch_results, opening_recent_event, opening_roles, opening_events) do
+    content = "# Parallel Join " <> wave_id <> "\n\n" <> "Trigger: `" <> emitted_topic <> "`\n" <> "Opening recent event: `" <> opening_recent_event <> "`\n" <> "Opening roles: " <> LoopUtils.list_text(opening_roles) <> "\n" <> "Opening events: " <> LoopUtils.list_text(opening_events) <> "\n\n" <> "## Objectives\n" <> render_wave_objectives(objectives) <> "\n## Branch Results\n" <> render_wave_branch_results(branch_results)
+    System.write_text(Path.join(wave_dir, "join.md"), content)
+  end
+
+  defp render_wave_objectives([]) do
+    ""
+  end
+
+  defp render_wave_objectives([objective | rest]) do
+    "- " <> objective <> "\n" <> render_wave_objectives(rest)
+  end
+
+  defp render_wave_branch_results([]) do
+    ""
+  end
+
+  defp render_wave_branch_results([branch | rest]) do
+    "- `" <> Map.get(branch, :branch_id, "") <> "`: " <> Map.get(branch, :stop_reason, "") <> "\n" <> render_wave_branch_results(rest)
+  end
+
+  defp render_branch_objective(objective, emitted_topic, routing_event, branch_roles, branch_events) do
+    "# Branch Objective\n\n" <> "Trigger: `" <> emitted_topic <> "`\n" <> "Routing event: `" <> routing_event <> "`\n" <> "Roles: " <> LoopUtils.list_text(branch_roles) <> "\n" <> "Allowed events: " <> LoopUtils.list_text(branch_events) <> "\n\n" <> objective <> "\n"
+  end
+
+  defp render_branch_prompt(loop, objective, emitted_topic, routing_event, branch_roles, branch_events) do
+    "Parallel branch objective:\n" <> objective <> "\n\n" <> "Parent objective:\n" <> objective(loop) <> "\n\n" <> "Wave trigger: `" <> emitted_topic <> "`\n" <> "Branch routing event: `" <> routing_event <> "`\n" <> "Suggested roles: " <> LoopUtils.list_text(branch_roles) <> "\n" <> "Allowed events: " <> LoopUtils.list_text(branch_events) <> "\n" <> "Work only on this branch objective. Branch state is isolated; do not assume you can control parent routing directly.\n"
+  end
+
+  defp render_branch_result(result) do
+    "# Branch Result\n\n" <> "Stop reason: `" <> Map.get(result, :stop_reason, "unknown") <> "`\n" <> "Routing event: `" <> Map.get(result, :routing_event, "") <> "`\n" <> "Allowed events: " <> LoopUtils.list_text(Map.get(result, :allowed_events, [])) <> "\n\n" <> "## Output\n\n" <> Map.get(result, :output, "") <> "\n"
   end
 
   defp completed_via_event(topics, completion_event, required_events) do
@@ -1066,6 +1501,42 @@ defmodule LoopHarness do
     end
   end
 
+  defp lines_for_iteration(lines, iteration) do
+    collect_iteration_lines(lines, iteration, [])
+  end
+
+  defp collect_iteration_lines([], _iteration, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp collect_iteration_lines([line | rest], iteration, acc) do
+    case extract_iteration(line) == iteration do
+      true -> collect_iteration_lines(rest, iteration, [line] ++ acc)
+      _ -> collect_iteration_lines(rest, iteration, acc)
+    end
+  end
+
+  defp latest_agent_event_record([]) do
+    %{topic: "", payload: ""}
+  end
+
+  defp latest_agent_event_record(lines) do
+    latest_agent_event_record_from_list(Enum.reverse(lines))
+  end
+
+  defp latest_agent_event_record_from_list([]) do
+    %{topic: "", payload: ""}
+  end
+
+  defp latest_agent_event_record_from_list([line | rest]) do
+    topic = extract_topic(line)
+
+    case system_topic(topic) do
+      true -> latest_agent_event_record_from_list(rest)
+      _ -> %{topic: topic, payload: extract_field(line, "payload")}
+    end
+  end
+
   def render_run_scratchpad_full(lines) do
     render_scratchpad_entries(collect_scratchpad_entries(lines, []))
   end
@@ -1606,8 +2077,8 @@ defmodule LoopHarness do
     true
   end
 
-  defp core_system_topic(_topic) do
-    false
+  defp core_system_topic(topic) do
+    String.starts_with(topic, "wave.")
   end
 
   defp coordination_topic("issue.discovered") do
@@ -1724,6 +2195,11 @@ defmodule LoopHarness do
 
   defp epoch_seconds() do
     result = System.run("date +%s")
+    String.to_integer(String.trim(Map.get(result, :output, "0")))
+  end
+
+  defp epoch_milliseconds() do
+    result = System.run("python3 -c 'import time; print(int(time.time() * 1000))'")
     String.to_integer(String.trim(Map.get(result, :output, "0")))
   end
 
@@ -2046,6 +2522,13 @@ defmodule LoopHarness do
 
   defp log_level(loop) do
     Map.get(Map.get(loop, :runtime, %{}), :log_level, "info")
+  end
+
+  defp branch_mode(loop) do
+    case Map.get(Map.get(loop, :runtime, %{}), :branch_mode, false) do
+      false -> false
+      _ -> true
+    end
   end
 
   defp log(loop, level, message) do
