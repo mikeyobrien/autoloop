@@ -48,6 +48,23 @@ defmodule ParallelWaveTest do
     Assert.assert_contains(branch_result, "branch recent=loop.start")
   end
 
+  def test_parallel_metaprompt_is_parent_only_during_wave_runs() do
+    project_dir = prepare_fixture(500)
+    result = run_fixture(project_dir, "dispatch-fixture")
+    wave_dir = latest_wave_dir(project_dir)
+    branch_dir = Path.join(wave_dir, "branches/branch-1")
+    parent_prompt = inspect_prompt(project_dir, 1)
+    branch_prompt = inspect_prompt(branch_dir, 1)
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(parent_prompt, "Structured parallelism:")
+    Assert.assert_contains(parent_prompt, "`explore.parallel` is available")
+    Assert.assert_contains(parent_prompt, "`tasks.ready.parallel`")
+    Assert.assert_contains(branch_prompt, "Parallel branch objective:")
+    Assert.refute(String.contains(branch_prompt, "Structured parallelism:"), "branch child prompts should stay free of the parent parallel metaprompt")
+    Assert.refute(String.contains(branch_prompt, "Dispatch fan-out is available now via `<allowed-event>.parallel`"), "branch child prompts should not advertise parent dispatch fan-out options")
+  end
+
   def test_parallel_wave_rejects_malformed_payloads_without_starting_branches() do
     project_dir = prepare_fixture(500)
     result = run_fixture(project_dir, "invalid-payload-fixture")
@@ -123,6 +140,17 @@ defmodule ParallelWaveTest do
     )
 
     String.trim(Map.get(result, :output, ""))
+  end
+
+  defp inspect_prompt(project_dir, iteration) do
+    tool = Path.join(project_dir, ".miniloop/miniloops")
+    result = System.run(
+      "cd " <> shell_quote(project_dir) <>
+      " && " <> clean_miniloops_env() <> " " <> shell_quote(tool) <> " inspect prompt " <> to_string(iteration) <> " --format md"
+    )
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
   end
 
   defp read_journal(project_dir) do

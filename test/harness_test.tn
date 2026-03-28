@@ -32,6 +32,17 @@ defmodule HarnessTest do
     Assert.assert_contains(scratchpad, "## Iteration 6")
   end
 
+  def test_parallel_metaprompt_renders_for_normal_parent_prompts() do
+    project_dir = prepare_parallel_prompt_fixture()
+    prompt = inspect_prompt(project_dir, 1)
+
+    Assert.assert_contains(prompt, "Structured parallelism:")
+    Assert.assert_contains(prompt, "`explore.parallel` is available")
+    Assert.assert_contains(prompt, "`tasks.ready.parallel`")
+    Assert.assert_contains(prompt, "1..2 distinct branch objectives")
+    Assert.assert_contains(prompt, "only the harness may emit `*.parallel.joined`")
+  end
+
   def test_metrics_json_emits_numbers_and_booleans_without_quotes() do
     project_dir = prepare_fixture()
     metrics = inspect_metrics_json(project_dir)
@@ -114,6 +125,26 @@ defmodule HarnessTest do
     System.write_text(Path.join(project_dir, "topology.toml"), topology_toml())
     System.write_text(Path.join(project_dir, "harness.md"), "scratchpad verification harness\n")
     System.write_text(Path.join(roles_dir, "worker.md"), "You are the worker. Emit the allowed event.\n")
+
+    run_result = run_repo_command(project_dir, ".")
+    Assert.assert_equal(Map.get(run_result, :exit_code, 1), 0)
+
+    project_dir
+  end
+
+  defp prepare_parallel_prompt_fixture() do
+    project_dir = parallel_prompt_fixture_dir()
+    backend_path = Path.join(project_dir, "backend.sh")
+    roles_dir = Path.join(project_dir, "roles")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(roles_dir))
+
+    System.write_text(backend_path, parallel_prompt_backend_script())
+    System.run("chmod +x " <> shell_quote(backend_path))
+    System.write_text(Path.join(project_dir, "miniloops.toml"), parallel_prompt_miniloops_toml(backend_path))
+    System.write_text(Path.join(project_dir, "topology.toml"), parallel_prompt_topology_toml())
+    System.write_text(Path.join(project_dir, "harness.md"), "parallel prompt verification harness\n")
+    System.write_text(Path.join(roles_dir, "planner.md"), "You are the planner.\n")
 
     run_result = run_repo_command(project_dir, ".")
     Assert.assert_equal(Map.get(run_result, :exit_code, 1), 0)
@@ -211,6 +242,12 @@ defmodule HarnessTest do
     "fi\n"
   end
 
+  defp parallel_prompt_backend_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "printf 'LOOP_COMPLETE\\n'\n"
+  end
+
   defp miniloops_toml(backend_path) do
     "event_loop.max_iterations = 6\n" <>
     "event_loop.completion_event = \"task.complete\"\n" <>
@@ -218,6 +255,23 @@ defmodule HarnessTest do
     "backend.command = \"" <> backend_path <> "\"\n" <>
     "backend.timeout_ms = 10000\n" <>
     "review.enabled = false\n" <>
+    "memory.prompt_budget_chars = 1600\n" <>
+    "harness.instructions_file = \"harness.md\"\n" <>
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+  end
+
+  defp parallel_prompt_miniloops_toml(backend_path) do
+    "event_loop.max_iterations = 1\n" <>
+    "event_loop.completion_event = \"task.complete\"\n" <>
+    "backend.kind = \"command\"\n" <>
+    "backend.command = \"" <> backend_path <> "\"\n" <>
+    "backend.timeout_ms = 10000\n" <>
+    "review.enabled = false\n" <>
+    "parallel.enabled = true\n" <>
+    "parallel.max_branches = 2\n" <>
+    "parallel.branch_timeout_ms = 5000\n" <>
     "memory.prompt_budget_chars = 1600\n" <>
     "harness.instructions_file = \"harness.md\"\n" <>
     "core.state_dir = \".miniloop\"\n" <>
@@ -237,8 +291,23 @@ defmodule HarnessTest do
     "\"loop.next\" = [\"worker\"]\n"
   end
 
+  defp parallel_prompt_topology_toml() do
+    "name = \"parallel-prompt-check\"\n" <>
+    "completion = \"task.complete\"\n\n" <>
+    "[[role]]\n" <>
+    "id = \"planner\"\n" <>
+    "emits = [\"tasks.ready\"]\n" <>
+    "prompt_file = \"roles/planner.md\"\n\n" <>
+    "[handoff]\n" <>
+    "\"loop.start\" = [\"planner\"]\n"
+  end
+
   defp fixture_dir() do
     "/tmp/miniloops-scratchpad-fixture"
+  end
+
+  defp parallel_prompt_fixture_dir() do
+    "/tmp/miniloops-parallel-prompt-fixture"
   end
 
   defp metrics_summary_fixture_dir() do

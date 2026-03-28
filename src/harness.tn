@@ -1228,11 +1228,70 @@ defmodule LoopHarness do
     context_pressure_text(memory_stats, invalid_count) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
-    LoopTopology.render_with_context(topology(loop), recent_event, allowed_roles, allowed_events) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Log level: #{log_level_name(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Loop-owned working files belong under: #{state_dir(loop)}\n" <> "Do not leave loop-owned artifacts at the repo root. Use paths under #{state_dir(loop)} such as #{state_dir(loop)}/progress.md or #{state_dir(loop)}/logs/.\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
+    LoopTopology.render_with_context(topology(loop), recent_event, allowed_roles, allowed_events) <> "\n" <>
+    parallel_prompt_text(loop, allowed_events) <>
+    "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Log level: #{log_level_name(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Loop-owned working files belong under: #{state_dir(loop)}\n" <> "Do not leave loop-owned artifacts at the repo root. Use paths under #{state_dir(loop)} such as #{state_dir(loop)}/progress.md or #{state_dir(loop)}/logs/.\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
     tool_path(loop) <> " emit <allowed-topic> \"brief handoff summary\"\n" <>
     tool_path(loop) <> " emit " <> completion_event(loop) <> " \"brief completion summary\"\n" <>
     tool_path(loop) <> " memory add learning \"durable lesson\"\n" <>
     tool_path(loop) <> " memory add preference Workflow \"short preference note\"\n\n" <> "Backpressure rule: if you emit an event outside the allowed next-event set, the loop will reject that handoff and ask you to re-route.\n" <> "Prompt/output/scratchpad/memory are projections or stores you can inspect with `" <> tool_path(loop) <> " inspect prompt #{iteration} --format md`, `" <> tool_path(loop) <> " inspect scratchpad --format md`, and `" <> tool_path(loop) <> " inspect memory --format md`.\n" <> "Plain text alone does not publish an event. Prefer the event tool over the stdout completion promise.\n"
+  end
+
+  defp parallel_prompt_text(loop, allowed_events) do
+    case parallel_prompt_enabled(loop) do
+      true -> render_parallel_prompt(loop, allowed_events)
+      _ -> ""
+    end
+  end
+
+  defp parallel_prompt_enabled(loop) do
+    parallel_enabled(loop) and not branch_mode(loop)
+  end
+
+  defp render_parallel_prompt(loop, allowed_events) do
+    dispatch_events = parallel_dispatch_prompt_events(allowed_events, completion_event(loop), [])
+
+    "Structured parallelism:\n" <>
+    "- `explore.parallel` is available for exploratory self-loop fan-out before you choose the real next event.\n" <>
+    parallel_dispatch_prompt_line(dispatch_events) <>
+    "- Payloads must be a markdown bullet list or numbered list with 1.." <> to_string(parallel_max_branches(loop)) <> " distinct branch objectives.\n" <>
+    "- Use fan-out only when branches are concrete, independently useful, and worth the barrier cost; keep one active wave at a time.\n" <>
+    "- Branches run in isolated state under `" <> state_dir(loop) <> "/waves/`; only the harness may emit `*.parallel.joined` to resume the parent after the join barrier.\n\n"
+  end
+
+  defp parallel_dispatch_prompt_events([], _completion_event, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp parallel_dispatch_prompt_events([event | rest], completion_event, acc) do
+    case parallel_dispatch_prompt_candidate(event, completion_event) do
+      true -> parallel_dispatch_prompt_events(rest, completion_event, [event <> ".parallel"] ++ acc)
+      _ -> parallel_dispatch_prompt_events(rest, completion_event, acc)
+    end
+  end
+
+  defp parallel_dispatch_prompt_candidate(event, completion_event) do
+    not (event == completion_event or coordination_topic(event) or core_system_topic(event) or parallel_topic(event))
+  end
+
+  defp parallel_dispatch_prompt_line([]) do
+    "- Dispatch fan-out is available as `<allowed-event>.parallel` for currently allowed normal handoff events.\n"
+  end
+
+  defp parallel_dispatch_prompt_line(dispatch_events) do
+    "- Dispatch fan-out is available now via `<allowed-event>.parallel`: " <> render_parallel_prompt_events(dispatch_events) <> ".\n"
+  end
+
+  defp render_parallel_prompt_events([]) do
+    "(none)"
+  end
+
+  defp render_parallel_prompt_events([event]) do
+    "`" <> event <> "`"
+  end
+
+  defp render_parallel_prompt_events([event | rest]) do
+    "`" <> event <> "`, " <> render_parallel_prompt_events(rest)
   end
 
   defp harness_instructions_text(loop) do
