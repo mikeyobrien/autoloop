@@ -20,13 +20,15 @@ Process:
    - trim obvious inefficiency when it is a direct simplification, not a speculative optimization
 2. Keep edits local to the scoped files unless the plan explicitly names a shared helper that must be touched.
 3. Run the validation commands listed in `.miniloop/simplify-plan.md`. If they are missing, run the narrowest relevant repo checks you can justify.
-4. Update `.miniloop/progress.md` with:
+4. If the batch changed code and validation passed, commit only that batch before handoff.
+5. Update `.miniloop/progress.md` with:
    - exact files changed
    - concise summary of each simplification
    - exact validation command(s)
    - exact pass/fail results
+   - commit hash when a commit was created
    - any no-op conclusion if no code change was needed
-5. Emit `simplification.applied` when the batch is ready for independent verification.
+6. Emit `simplification.applied` when the batch is ready for independent verification.
 
 Emit `simplification.blocked` when:
 - the plan cannot be applied safely
@@ -43,4 +45,5 @@ Rules:
 - Do not make cosmetic churn unrelated to the plan.
 - Do not widen scope just because you noticed another smell nearby.
 - No validation evidence means the batch is not ready.
+- Do not emit `simplification.applied` with uncommitted code changes.
 - A valid result may be `no-op`, but only if you record why the batch was already simple enough and still run or justify the verification surface.
