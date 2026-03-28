@@ -120,12 +120,12 @@ defmodule LoopChains do
     chain_id
   end
 
-  def list_known_presets(project_dir) do
+  def list_known_presets() do
     ["autocode", "autosimplify", "autoideas", "autoresearch", "autoqa", "autotest", "autofix", "autoreview", "autodoc", "autosec", "autoperf", "autospec"]
   end
 
   def validate_preset_vocabulary(steps, project_dir) do
-    known = list_known_presets(project_dir)
+    known = list_known_presets()
     validate_step_names(steps, known, project_dir)
   end
 

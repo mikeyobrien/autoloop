@@ -742,7 +742,7 @@ defmodule Demo do
     IO.puts("")
     IO.puts(reason)
     IO.puts("")
-    IO.puts("Known presets: " <> LoopUtils.join_csv(LoopChains.list_known_presets(".")))
+    IO.puts("Known presets: " <> LoopUtils.join_csv(LoopChains.list_known_presets()))
     :ok
   end
 

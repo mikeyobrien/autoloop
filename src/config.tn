@@ -161,38 +161,6 @@ defmodule LoopConfig do
     %{"event_loop" => event_loop, "backend" => backend, "parallel" => parallel, "memory" => memory, "core" => core}
   end
 
-  # --- Path traversal helpers ---
-
-  defp get_in_path(_map, [], fallback) do
-    fallback
-  end
-
-  defp get_in_path(map, [key], fallback) do
-    case Map.get(map, key, nil) do
-      nil -> fallback
-      value -> value
-    end
-  end
-
-  defp get_in_path(map, [key | rest], fallback) do
-    case Map.get(map, key, nil) do
-      nil -> fallback
-      inner -> get_in_path(inner, rest, fallback)
-    end
-  end
-
-  defp put_in_path(map, [key], value) do
-    Map.put(map, key, value)
-  end
-
-  defp put_in_path(map, [key | rest], value) do
-    inner = case Map.get(map, key, nil) do
-      nil -> %{}
-      existing -> existing
-    end
-    Map.put(map, key, put_in_path(inner, rest, value))
-  end
-
   # --- Deep merge ---
 
   defp deep_merge(base, override) do
@@ -270,7 +238,7 @@ defmodule LoopConfig do
       _ -> section <> "." <> raw_key
     end
     path = String.split(full_key, ".")
-    parse_toml_lines(rest, section, put_in_path(config, path, normalize_value(String.trim(value))))
+    parse_toml_lines(rest, section, put(config, path, normalize_value(String.trim(value))))
   end
 
   defp parse_toml_assignment([], rest, section, config) do
