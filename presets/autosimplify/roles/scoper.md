@@ -25,6 +25,7 @@ On first activation:
 
 On later activations (`simplification.verified` or `review.blocked`):
 - Re-read the shared files and check remaining batches.
+- If `.miniloop/progress.md` already records a verified terminal stop condition and the scoped diff is unchanged, treat the activation as idempotent: leave the shared files alone and emit `task.complete` immediately with a concise completion summary.
 - If the active batch is done, advance to the next unfinished batch.
 - If no batches remain, emit `task.complete` with a concise completion summary.
 - Otherwise emit `scope.ready` with the next batch.
@@ -36,3 +37,5 @@ Rules:
 - Record out-of-scope temptations in `.miniloop/progress.md` instead of silently expanding the work.
 - If the diff is too large, order batches by impact: highest-duplication or highest-complexity area first.
 - Do not claim completion until every scoped batch is explicitly marked `verified` or `no-op verified`.
+- Do not treat a dirty uncommitted simplify batch as complete. Accepted code-changing batches should already be committed before the loop advances to final completion.
+- Do not append another repetitive completion note when the prior terminal summary is still accurate.

@@ -10,12 +10,14 @@ Global rules:
 - Prefer deleting code, reusing existing helpers, reducing nesting, and making control flow plainer over introducing new abstractions.
 - Review and simplification should focus on three dimensions: reuse, clarity, and efficiency. Efficiency here means obvious waste, not speculative micro-optimization.
 - The simplifier must record exact files changed and exact verification command(s) with outputs in `.miniloop/progress.md` before claiming success.
+- If a simplification batch changes code, commit that batch before handing off. Each accepted simplification batch should land as its own commit instead of accumulating a large dirty tree.
 - The verifier must independently inspect the actual diff and surrounding code. Another role's summary is not proof.
 - Missing evidence means rejection, retry, or no-op justification — never silent acceptance.
 - `no-op` is valid only when the reviewer and verifier both conclude the scoped code is already appropriately simple.
 - Use `./.miniloop/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside scoper → reviewer → simplifier → verifier.
 - Only the scoper may emit `task.complete`.
+- Once `.miniloop/progress.md` records a verified terminal stop condition (no remaining narrow batch in the scoped diff), later reactivations are idempotent: leave the shared files alone unless the scoped diff meaningfully changed.
 
 State files:
 - `.miniloop/simplify-context.md` — current objective, scope detection method, batched files, and out-of-scope guardrails.
