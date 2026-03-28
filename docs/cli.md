@@ -84,7 +84,7 @@ miniloops emit task.complete "All documentation gaps addressed"
 Read projected artifacts from the journal and state directory.
 
 ```bash
-miniloops inspect <artifact> [selector] [project-dir] --format <md|text|json>
+miniloops inspect <artifact> [selector] [project-dir] --format <md|terminal|text|json|csv>
 ```
 
 The `--format` flag is required.
@@ -93,20 +93,21 @@ The `--format` flag is required.
 
 | Artifact | Selector | Formats | Description |
 |----------|----------|---------|-------------|
-| `scratchpad` | — | `md` | Rich scratchpad projection for the current run. Prompt/review rendering uses a more compact view. |
-| `prompt` | `<iteration>` | `md` | The full prompt that was sent to the backend for a given iteration. |
+| `scratchpad` | — | `md`, `terminal` | Rich scratchpad projection for the current run. Prompt/review rendering uses a more compact view. `terminal` pretty-renders the markdown for a terminal. |
+| `prompt` | `<iteration>` | `md`, `terminal` | The full prompt that was sent to the backend for a given iteration. `terminal` pretty-renders the markdown for a terminal. |
 | `output` | `<iteration>` | `text` | The raw output returned by the backend for a given iteration. |
 | `journal` | — | `json` | The full journal file contents. |
-| `memory` | — | `md`, `json` | Materialized memory (`md`) or raw JSONL (`json`). |
-| `metrics` | `[run_id]` | `md`, `csv`, `json` | Per-iteration metrics table: role, event, elapsed time, exit code, outcome. Optional `run_id` selector filters to a specific run. |
-| `coordination` | — | `md` | Coordination events from the current run. |
-| `chain` | — | `md` | Chain state — steps, outcomes, lineage. |
+| `memory` | — | `md`, `terminal`, `json` | Materialized memory (`md`), terminal-rendered markdown (`terminal`), or raw JSONL (`json`). |
+| `metrics` | `[run_id]` | `md`, `terminal`, `csv`, `json` | Per-iteration metrics table: role, event, elapsed time, exit code, outcome. Optional `run_id` selector filters to a specific run. `terminal` pretty-renders the markdown table for a terminal. |
+| `coordination` | — | `md`, `terminal` | Coordination events from the current run. `terminal` pretty-renders the markdown for a terminal. |
+| `chain` | — | `md`, `terminal` | Chain state — steps, outcomes, lineage. `terminal` pretty-renders the markdown for a terminal. |
 
 **Metrics output formats:**
 
 The `metrics` artifact produces a per-iteration table with columns: `iteration`, `role`, `event`, `elapsed_s`, `exit_code`, `timed_out`, `outcome`.
 
 - **`md`** — Markdown table followed by a summary line: total iterations, total elapsed seconds, and count of distinct events.
+- **`terminal`** — The same markdown table rendered for terminal display with ANSI styling.
 - **`csv`** — RFC 4180 CSV with header row. Fields containing commas, quotes, or newlines are double-quoted.
 - **`json`** — JSON array of objects. Numeric fields (`iteration`, `elapsed_s`, `exit_code`) are numbers or `null`. `timed_out` is a boolean.
 
@@ -116,13 +117,19 @@ When no metrics data exists, `md` outputs `"No metrics data available."`, `csv` 
 
 ```bash
 miniloops inspect scratchpad --format md
+miniloops inspect scratchpad --format terminal
 miniloops inspect prompt 5 --format md
+miniloops inspect prompt 5 --format terminal
 miniloops inspect output 3 --format text
 miniloops inspect journal --format json
 miniloops inspect memory --format md
+miniloops inspect memory --format terminal
 miniloops inspect coordination --format md
+miniloops inspect coordination --format terminal
 miniloops inspect chain --format md
+miniloops inspect chain --format terminal
 miniloops inspect metrics --format md
+miniloops inspect metrics --format terminal
 miniloops inspect metrics --format csv
 miniloops inspect metrics --format json
 miniloops inspect metrics run-mn9d3uk0-xi0m --format md

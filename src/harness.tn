@@ -42,19 +42,27 @@ defmodule LoopHarness do
   end
 
   def render_scratchpad(project_dir) do
+    render_scratchpad_format(project_dir, "md")
+  end
+
+  def render_scratchpad_format(project_dir, format) do
     journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
-    print_text(empty_fallback(render_run_scratchpad_full(read_run_lines(journal_file, run_id))))
+    print_projected_markdown(empty_fallback(render_run_scratchpad_full(read_run_lines(journal_file, run_id))), format)
   end
 
   def render_prompt(project_dir, iteration) do
+    render_prompt_format(project_dir, iteration, "md")
+  end
+
+  def render_prompt_format(project_dir, iteration, format) do
     journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
     prompt = iteration_field_for_run(journal_file, run_id, iteration, "iteration.start", "prompt")
 
     case prompt do
       "" -> print_text("missing prompt projection for iteration #{iteration}")
-      value -> print_text(value)
+      value -> print_projected_markdown(value, format)
     end
   end
 
@@ -74,10 +82,14 @@ defmodule LoopHarness do
   end
 
   def render_coordination(project_dir) do
+    render_coordination_format(project_dir, "md")
+  end
+
+  def render_coordination_format(project_dir, format) do
     journal_file = resolve_emit_journal_file(project_dir)
     run_id = ensure_render_run_id(journal_file)
     lines = read_run_lines(journal_file, run_id)
-    print_text(empty_fallback(coordination_from_lines(lines, %{issues: [], slices: [], commits: [], archives: []})))
+    print_projected_markdown(empty_fallback(coordination_from_lines(lines, %{issues: [], slices: [], commits: [], archives: []})), format)
   end
 
   def render_metrics(project_dir, format) do
@@ -85,14 +97,14 @@ defmodule LoopHarness do
     run_id = ensure_render_run_id(journal_file)
     lines = read_run_lines(journal_file, run_id)
     rows = collect_metrics_rows(lines, [])
-    print_text(format_metrics(rows, format))
+    print_projected_text(format_metrics(rows, format), format)
   end
 
   def render_metrics_for_run(project_dir, run_id, format) do
     journal_file = resolve_emit_journal_file(project_dir)
     lines = read_run_lines(journal_file, run_id)
     rows = collect_metrics_rows(lines, [])
-    print_text(format_metrics(rows, format))
+    print_projected_text(format_metrics(rows, format), format)
   end
 
   defp build_loop_context(project_dir, prompt_override, self_command, run_options) do
@@ -2425,6 +2437,22 @@ defmodule LoopHarness do
     IO.puts(text)
   end
 
+  defp print_projected_markdown(text, "terminal") do
+    print_text(host_call(:io_render_markdown, text))
+  end
+
+  defp print_projected_markdown(text, _format) do
+    print_text(text)
+  end
+
+  defp print_projected_text(text, "terminal") do
+    print_text(host_call(:io_render_markdown, text))
+  end
+
+  defp print_projected_text(text, _format) do
+    print_text(text)
+  end
+
   defp print_lines([]) do
     :ok
   end
@@ -3024,6 +3052,10 @@ defmodule LoopHarness do
 
   defp format_metrics(rows, "json") do
     format_metrics_json(rows)
+  end
+
+  defp format_metrics(rows, "terminal") do
+    format_metrics_md(rows)
   end
 
   defp format_metrics(rows, _format) do

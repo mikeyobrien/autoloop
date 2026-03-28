@@ -32,6 +32,24 @@ defmodule HarnessTest do
     Assert.assert_contains(scratchpad, "## Iteration 6")
   end
 
+  def test_inspect_terminal_renders_markdown_without_changing_raw_md() do
+    project_dir = prepare_fixture()
+    raw = inspect_scratchpad(project_dir)
+    pretty = inspect_scratchpad_terminal(project_dir)
+
+    Assert.assert_contains(raw, "## Iteration 1")
+    Assert.assert_contains(pretty, "Iteration 1")
+    Assert.refute(String.contains(pretty, "## Iteration 1"), "terminal format should not dump raw markdown headings")
+    Assert.assert_not_equal(pretty, raw)
+  end
+
+  def test_inspect_help_mentions_terminal_format() do
+    project_dir = prepare_fixture()
+    help = inspect_help(project_dir)
+
+    Assert.assert_contains(help, "--format <md|terminal|text|json|csv>")
+  end
+
   def test_parallel_metaprompt_renders_for_normal_parent_prompts() do
     project_dir = prepare_parallel_prompt_fixture()
     prompt = inspect_prompt(project_dir, 1)
@@ -160,6 +178,18 @@ defmodule HarnessTest do
 
   defp inspect_scratchpad(project_dir) do
     result = run_repo_command(project_dir, "inspect scratchpad --format md")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_scratchpad_terminal(project_dir) do
+    result = run_repo_command(project_dir, "inspect scratchpad --format terminal")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_help(project_dir) do
+    result = run_repo_command(project_dir, "inspect --help")
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
     Map.get(result, :output, "")
   end

@@ -355,7 +355,10 @@ Inspect the latest scratchpad:
 
 ```bash
 miniloops inspect scratchpad --format md
+miniloops inspect scratchpad --format terminal
 ```
+
+Use `--format md` when you want the raw markdown projection. Use `--format terminal` when you want the same markdown pretty-rendered for terminal display.
 
 This inspect view stays richer than the prompt-injected scratchpad so operators can debug long runs without reading raw journal JSON.
 
@@ -363,6 +366,7 @@ Inspect memory:
 
 ```bash
 miniloops inspect memory --format md
+miniloops inspect memory --format terminal
 miniloops inspect memory --format json
 ```
 
@@ -370,6 +374,7 @@ Inspect a specific iteration prompt:
 
 ```bash
 miniloops inspect prompt 1 --format md
+miniloops inspect prompt 1 --format terminal
 ```
 
 Inspect a specific iteration output:
@@ -388,18 +393,21 @@ Inspect coordination state (issues, slices, commits from journal):
 
 ```bash
 miniloops inspect coordination --format md
+miniloops inspect coordination --format terminal
 ```
 
 Inspect chain state:
 
 ```bash
 miniloops inspect chain --format md
+miniloops inspect chain --format terminal
 ```
 
 Inspect metrics (per-iteration timing, roles, events, outcomes):
 
 ```bash
 miniloops inspect metrics --format md          # markdown table with summary line
+miniloops inspect metrics --format terminal    # terminal-rendered markdown table
 miniloops inspect metrics --format csv         # RFC 4180 CSV
 miniloops inspect metrics --format json        # JSON array of objects
 miniloops inspect metrics run-1 --format md    # filter to a specific run

@@ -210,11 +210,19 @@ defmodule Demo do
   end
 
   defp dispatch_inspect("scratchpad", "", project_dir, "md") do
-    LoopHarness.render_scratchpad(project_dir)
+    LoopHarness.render_scratchpad_format(project_dir, "md")
+  end
+
+  defp dispatch_inspect("scratchpad", "", project_dir, "terminal") do
+    LoopHarness.render_scratchpad_format(project_dir, "terminal")
   end
 
   defp dispatch_inspect("memory", "", project_dir, "md") do
     IO.puts(LoopMemory.list_project(project_dir))
+  end
+
+  defp dispatch_inspect("memory", "", project_dir, "terminal") do
+    IO.puts(host_call(:io_render_markdown, LoopMemory.list_project(project_dir)))
   end
 
   defp dispatch_inspect("memory", "", project_dir, "json") do
@@ -226,23 +234,59 @@ defmodule Demo do
   end
 
   defp dispatch_inspect("coordination", "", project_dir, "md") do
-    LoopHarness.render_coordination(project_dir)
+    LoopHarness.render_coordination_format(project_dir, "md")
   end
 
-  defp dispatch_inspect("metrics", "", project_dir, format) do
-    LoopHarness.render_metrics(project_dir, format)
+  defp dispatch_inspect("coordination", "", project_dir, "terminal") do
+    LoopHarness.render_coordination_format(project_dir, "terminal")
   end
 
-  defp dispatch_inspect("metrics", run_id, project_dir, format) do
-    LoopHarness.render_metrics_for_run(project_dir, run_id, format)
+  defp dispatch_inspect("metrics", "", project_dir, "md") do
+    LoopHarness.render_metrics(project_dir, "md")
+  end
+
+  defp dispatch_inspect("metrics", "", project_dir, "terminal") do
+    LoopHarness.render_metrics(project_dir, "terminal")
+  end
+
+  defp dispatch_inspect("metrics", "", project_dir, "csv") do
+    LoopHarness.render_metrics(project_dir, "csv")
+  end
+
+  defp dispatch_inspect("metrics", "", project_dir, "json") do
+    LoopHarness.render_metrics(project_dir, "json")
+  end
+
+  defp dispatch_inspect("metrics", run_id, project_dir, "md") do
+    LoopHarness.render_metrics_for_run(project_dir, run_id, "md")
+  end
+
+  defp dispatch_inspect("metrics", run_id, project_dir, "terminal") do
+    LoopHarness.render_metrics_for_run(project_dir, run_id, "terminal")
+  end
+
+  defp dispatch_inspect("metrics", run_id, project_dir, "csv") do
+    LoopHarness.render_metrics_for_run(project_dir, run_id, "csv")
+  end
+
+  defp dispatch_inspect("metrics", run_id, project_dir, "json") do
+    LoopHarness.render_metrics_for_run(project_dir, run_id, "json")
   end
 
   defp dispatch_inspect("chain", "", project_dir, "md") do
     IO.puts(LoopChains.render_chain_state(project_dir))
   end
 
+  defp dispatch_inspect("chain", "", project_dir, "terminal") do
+    IO.puts(host_call(:io_render_markdown, LoopChains.render_chain_state(project_dir)))
+  end
+
   defp dispatch_inspect("prompt", iteration, project_dir, "md") do
-    LoopHarness.render_prompt(project_dir, iteration)
+    LoopHarness.render_prompt_format(project_dir, iteration, "md")
+  end
+
+  defp dispatch_inspect("prompt", iteration, project_dir, "terminal") do
+    LoopHarness.render_prompt_format(project_dir, iteration, "terminal")
   end
 
   defp dispatch_inspect("output", iteration, project_dir, "text") do
@@ -275,7 +319,7 @@ defmodule Demo do
 
     case count >= 2 do
       true -> split_inspect_format_with_count(artifact, rest, count)
-      _ -> inspect_usage_error("inspect requires --format <md|text|json>")
+      _ -> inspect_usage_error("inspect requires --format <md|terminal|text|json|csv>")
     end
   end
 
@@ -286,7 +330,7 @@ defmodule Demo do
 
     case flag do
       "--format" -> %{artifact: artifact, positionals: positionals, format: format}
-      _ -> inspect_usage_error("inspect requires --format <md|text|json>")
+      _ -> inspect_usage_error("inspect requires --format <md|terminal|text|json|csv>")
     end
   end
 
@@ -675,7 +719,7 @@ defmodule Demo do
     IO.puts("Usage:")
     IO.puts("  miniloops run <preset-name|preset-dir> [prompt...] [flags]")
     IO.puts("  miniloops emit <topic> [summary]")
-    IO.puts("  miniloops inspect <artifact> --format <md|text|json>")
+    IO.puts("  miniloops inspect <artifact> --format <md|terminal|text|json|csv>")
     IO.puts("  miniloops memory <list|add|remove> [args]")
     IO.puts("  miniloops chain <list|run> [args]")
     IO.puts("")
@@ -704,7 +748,7 @@ defmodule Demo do
 
   defp print_inspect_usage() do
     IO.puts("Usage:")
-    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] --format <md|text|json>")
+    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] --format <md|terminal|text|json|csv>")
     IO.puts("")
     IO.puts("Artifacts:")
     IO.puts("  scratchpad, prompt, output, journal, memory, coordination, chain, metrics")
