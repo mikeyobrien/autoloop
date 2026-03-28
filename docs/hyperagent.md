@@ -1,6 +1,6 @@
 # Hyperagent Review Loop
 
-The hyperagent is a meta-level review pass that runs periodically between normal loop iterations. Its job is to improve loop hygiene — consolidating stale context, trimming noisy working files, and storing durable learnings — without directly advancing the task.
+The hyperagent is a meta-level review pass that runs periodically between normal loop iterations. Its job is to improve loop hygiene — consolidating stale context, trimming noisy working files, and storing durable learnings — without directly advancing the task. In addition to raw memory and scratchpad state, the review prompt also carries a small **context pressure** summary so the hyperagent can react to memory bloat and routing instability directly.
 
 ## When it runs
 
@@ -55,7 +55,9 @@ You are the loop's meta agent.
 Review the journal, topology, roles, harness instructions, loop memory, and shared working files.
 
 Your job is to improve loop hygiene, not to finish the task directly.
-You may modify runtime-facing files on disk when that will make the next iterations better.
+You may modify runtime-facing loop files on disk when that will make the next iterations better.
+Prefer bounded hygiene edits to `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, `.miniloop/logs/`, and `.miniloop/docs/*.md`.
+Do not edit app/product source code, tests, package manifests, `.miniloop/` state, or journal history during review.
 ```
 
 This file is optional. If it does not exist, the review runs with only the built-in system prompt.
@@ -65,13 +67,18 @@ This file is optional. If it does not exist, the review runs with only the built
 Regardless of the custom prompt, every review invocation receives a system prompt that includes:
 
 - A role statement: *"You are the hyperagent meta-reviewer for this loop."*
-- A constraint: *"Do not modify files on disk. Store all feedback, recommendations, and durable findings exclusively via `miniloops memory add ...` commands."*
+- A bounded-permissions instruction allowing hygiene edits to runtime-facing loop files such as `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, `.miniloop/logs/`, and `.miniloop/docs/*.md`.
+- A constraint forbidding edits to app/product source code, tests, package manifests, generated `.miniloop/` state, or journal history during review.
+- A constraint explaining that the scratchpad is projected from journal history and cannot be edited directly; the hyperagent should instead tighten prompts, trim working files, or archive stale context.
 - A constraint: *"Do not emit normal loop events during review."*
+- Guidance to use `miniloops memory add ...` for short durable lessons or operator notes that should persist across turns.
 - The custom review instructions (if any), under **"Additional hyperagent instructions:"**.
+- A **Context pressure** block summarizing current memory usage vs budget, active memory entry counts, and the number of invalid emits seen in the run so far.
+- The latest backpressure note, if the loop recently rejected an invalid event.
 - The current loop memory (subject to `memory.prompt_budget_chars`).
 - The review trigger iteration number and latest routing event.
 - The full topology rendering (same format as normal iterations).
-- The current scratchpad.
+- The current scratchpad, rendered in the compact prompt-facing form used to keep long runs under control.
 - Useful `miniloops inspect` commands for the latest iteration.
 - A fallback instruction: *"If no improvements are needed, store a short learning explaining why and exit cleanly."*
 
@@ -91,7 +98,8 @@ Normal iterations set `MINILOOPS_REVIEW_MODE` to an empty string. The `pi-adapte
 The review backend receives `__hyperreview_disabled__` as its allowed-events set and `review` as its allowed-roles set. This means:
 
 - The hyperagent **cannot** emit normal loop events — any attempt would be rejected by backpressure validation.
-- The only sanctioned output channel is `miniloops memory add ...` commands.
+- Review output may still include bounded hygiene edits to runtime-facing loop files plus `miniloops memory add ...` commands for durable notes.
+- It still must not edit app/product code, tests, manifests, `.miniloop/` state, or journal history during review.
 
 ## Journal events
 
@@ -125,7 +133,7 @@ Each review pass produces two journal entries:
 
 ## Hot-reload after review
 
-After the review process finishes, the harness calls `reload_loop` — re-reading `miniloops.toml`, `topology.toml`, and the review prompt file from disk. This means the hyperagent can modify configuration, topology, or its own instructions, and those changes take effect on the very next iteration.
+After the review process finishes, the harness calls `reload_loop` — re-reading runtime config, topology, harness instructions, and review prompt inputs from disk before the next task turn. This means the hyperagent can modify loop-facing instructions and configuration, and those changes take effect on the very next iteration.
 
 ## Disabling the review loop
 

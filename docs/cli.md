@@ -92,7 +92,7 @@ The `--format` flag is required.
 
 | Artifact | Selector | Formats | Description |
 |----------|----------|---------|-------------|
-| `scratchpad` | — | `md` | Scratchpad projection — concatenated outputs from the current run. |
+| `scratchpad` | — | `md` | Rich scratchpad projection for the current run. Prompt/review rendering uses a more compact view. |
 | `prompt` | `<iteration>` | `md` | The full prompt that was sent to the backend for a given iteration. |
 | `output` | `<iteration>` | `text` | The raw output returned by the backend for a given iteration. |
 | `journal` | — | `json` | The full journal file contents. |
@@ -182,7 +182,7 @@ Run a named chain.
 miniloops chain run <name> [project-dir]
 ```
 
-The chain must be defined in `chains.toml`. Each step runs as an isolated loop in `.miniloops/chains/<chain-run-id>/step-<n>/`.
+The chain must be defined in `chains.toml`. Each step runs as an isolated loop in `.miniloop/chains/<chain-run-id>/step-<n>/`.
 
 ### `pi-adapter`
 
@@ -192,7 +192,7 @@ Run the Pi backend adapter directly. This is normally called by the harness, not
 miniloops pi-adapter [pi-command] [extra-args...]
 ```
 
-The adapter resolves the prompt from `MINILOOPS_PROMPT`, then falls back to projecting it via `miniloops inspect prompt`, then falls back to reading `MINILOOPS_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.miniloops/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
+The adapter resolves the prompt from `MINILOOPS_PROMPT`, then falls back to projecting it via `miniloops inspect prompt`, then falls back to reading `MINILOOPS_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.miniloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
 
 ## `bin/miniloops` launcher
 

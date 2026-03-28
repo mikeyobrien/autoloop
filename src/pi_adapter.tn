@@ -178,13 +178,33 @@ defmodule LoopPiAdapter do
     extracted = success_output(raw_output, parsed)
     error = Map.get(parsed, :error, "")
 
-    case extracted do
-      "" -> LoopUtils.nonempty_or(raw_output, error)
-      value -> case error do
-        "" -> value
-        _ -> value <> "\n\npi error: " <> error
-      end
+    case verbose_pi_errors() do
+      true -> verbose_failure_output(raw_output, extracted, error)
+      _ -> quiet_failure_output(raw_output, extracted, error)
     end
+  end
+
+  defp verbose_failure_output(raw_output, "", error) do
+    LoopUtils.nonempty_or(raw_output, error)
+  end
+
+  defp verbose_failure_output(_raw_output, value, "") do
+    value
+  end
+
+  defp verbose_failure_output(_raw_output, value, error) do
+    value <> "\n\npi error: " <> error
+  end
+
+  defp quiet_failure_output(raw_output, "", error) do
+    case error do
+      "" -> LoopUtils.nonempty_or(raw_output, "pi failed")
+      _ -> "pi failed (run with -v for details)"
+    end
+  end
+
+  defp quiet_failure_output(_raw_output, value, _error) do
+    value
   end
 
   defp finish_success("") do
@@ -212,6 +232,10 @@ defmodule LoopPiAdapter do
       "" -> System.run("true")
       _ -> write_stream_log_file(Path.join(state_dir, stream_log_name()), raw_output)
     end
+  end
+
+  defp verbose_pi_errors() do
+    env_value("MINILOOPS_LOG_LEVEL") == "debug"
   end
 
   defp write_stream_log_file(path, raw_output) do

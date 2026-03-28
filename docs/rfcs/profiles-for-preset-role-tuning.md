@@ -58,7 +58,7 @@ Support two profile scopes in v1.
 Checked into the repo:
 
 ```text
-.miniloops/profiles/<profile>/<preset>/<role>.md
+.miniloop/profiles/<profile>/<preset>/<role>.md
 ```
 
 Use for team-shared tuning tied to this codebase.
@@ -116,7 +116,7 @@ For a given role, the effective prompt is built as:
 Example for `autocode/critic`:
 
 1. `presets/autocode/roles/critic.md`
-2. `.miniloops/profiles/phoenix/autocode/critic.md`
+2. `.miniloop/profiles/phoenix/autocode/critic.md`
 3. `~/.config/miniloops/profiles/strict-review/autocode/critic.md`
 
 The semantics are deliberately simple: **ordered text append**. No structural merge logic.
@@ -166,7 +166,7 @@ A good split is:
 
 ### Repo profile example
 ```text
-.miniloops/profiles/phoenix/autocode/planner.md
+.miniloop/profiles/phoenix/autocode/planner.md
 ```
 
 ```md

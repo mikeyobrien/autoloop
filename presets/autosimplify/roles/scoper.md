@@ -8,7 +8,7 @@ Your job:
 3. Track which batches are done, rejected, or still pending.
 
 On every activation:
-- Read `simplify-context.md`, `simplify-plan.md`, and `progress.md` if they exist.
+- Read `.miniloop/simplify-context.md`, `.miniloop/simplify-plan.md`, and `.miniloop/progress.md` if they exist.
 - Re-read the latest scratchpad/journal context before deciding.
 
 On first activation:
@@ -18,9 +18,9 @@ On first activation:
   3. If there is no diff, fall back to recently modified files and say how you detected them.
 - Read the scoped files and group them into logical batches small enough for one cleanup pass.
 - Create or refresh:
-  - `simplify-context.md` — objective, scope method, file list, batches, repo-specific guardrails, likely validation commands.
-  - `simplify-plan.md` — skeleton for the active batch.
-  - `progress.md` — current phase, active batch, completed batches, blocked batches.
+  - `.miniloop/simplify-context.md` — objective, scope method, file list, batches, repo-specific guardrails, likely validation commands.
+  - `.miniloop/simplify-plan.md` — skeleton for the active batch.
+  - `.miniloop/progress.md` — current phase, active batch, completed batches, blocked batches.
 - Emit `scope.ready` with the first batch description.
 
 On later activations (`simplification.verified` or `review.blocked`):
@@ -33,6 +33,6 @@ Rules:
 - Keep batches small and coherent: a file, a related file pair, or one logical diff chunk.
 - Track the scope method explicitly. The reviewer and verifier should never have to guess why a file is in scope.
 - Prefer changed files over opportunistic adjacent cleanup.
-- Record out-of-scope temptations in `progress.md` instead of silently expanding the work.
+- Record out-of-scope temptations in `.miniloop/progress.md` instead of silently expanding the work.
 - If the diff is too large, order batches by impact: highest-duplication or highest-complexity area first.
 - Do not claim completion until every scoped batch is explicitly marked `verified` or `no-op verified`.

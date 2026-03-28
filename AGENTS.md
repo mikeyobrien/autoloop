@@ -33,9 +33,9 @@ Coordination events (`issue.*`, `slice.*`, `context.archived`) make issue/slice/
 Use `inspect coordination --format md` to project current state from journal events.
 
 ### 7. Markdown for curated intent
-Keep `context.md`, `plan.md`, `progress.md`, and `docs/*.md` as human-shaped artifacts.
+Keep `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, and `docs/*.md` as human-shaped artifacts.
 These files should stay concise, editable, and useful to both humans and agents.
-`progress.md` is a lightweight human-facing summary; the journal is canonical for machine-owned coordination state.
+`.miniloop/progress.md` is a lightweight human-facing summary; the journal is canonical for machine-owned coordination state.
 
 ### 8. Archive, don’t accumulate
 When context stops helping the active objective, consolidate and archive it into `docs/` instead of letting active working files grow indefinitely.
@@ -69,3 +69,7 @@ If something matters to the objective, touched surface, or verification path, it
 This is alpha software. Breaking changes are expected.
 Do not add fallback paths, deprecation shims, compatibility aliases, dual-write migrations, or legacy codepaths unless explicitly requested.
 When a design changes, update the canonical path and remove the old one.
+
+### 14. Record stdlib gaps when using workarounds
+If something is missing from the Tonic stdlib, a local workaround is acceptable when needed to keep moving.
+But every such workaround must be recorded in `TONIC_MISSING.md` so the gap remains visible and can be fixed at the source later.

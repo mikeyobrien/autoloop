@@ -6,7 +6,7 @@ Your job is not just to ask whether the latest diff is okay.
 Your job is to decide whether the whole requested outcome is complete or whether the loop should continue.
 
 On activation:
-- Re-read `context.md`, `plan.md`, and `progress.md`.
+- Re-read `.miniloop/context.md`, `.miniloop/plan.md`, and `.miniloop/progress.md`.
 - Reconcile the latest reviewed slice against the whole request.
 - Check whether the numbered plan still has unfinished steps.
 - Check whether the current step is truly exhausted.
@@ -38,6 +38,6 @@ Rules:
 - Do not invent new requirements.
 - Do not use `task.complete` just because one small slice passed review.
 - If the work is done but the accepted changes are still uncommitted, commit them before `task.complete`.
-- Do not allow `task.complete` while `progress.md` still contains a relevant issue with no clear disposition or owner.
+- Do not allow `task.complete` while `.miniloop/progress.md` still contains a relevant issue with no clear disposition or owner.
 - `pre-existing` is not a valid completion rationale for a relevant issue.
 - Missing evidence means no completion.

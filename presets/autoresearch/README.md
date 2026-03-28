@@ -8,7 +8,7 @@ Shape:
 - benchmarker — runs measurements and captures metrics
 - evaluator — skeptically judges keep/discard, optionally using LLM-as-judge
 
-State lives in `autoresearch.md`, `experiments.jsonl`, and `progress.md`.
+State lives in `.miniloop/autoresearch.md`, `.miniloop/experiments.jsonl`, and `.miniloop/progress.md`.
 
 ## Fail-closed contract
 

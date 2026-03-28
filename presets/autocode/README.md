@@ -8,7 +8,7 @@ Shape:
 - critic
 - finalizer
 
-Shared state lives in project files plus the miniloops journal. One active step is tracked in `progress.md`.
+Shared state lives in project files plus the miniloops journal. One active step is tracked in `.miniloop/progress.md`.
 
 ## Fail-closed contract
 
@@ -34,10 +34,10 @@ Success is evidence-based, not prose-based. Only the finalizer may emit `task.co
 ## Shared working files created by the loop
 
 The planner is expected to create and maintain:
-- `context.md`
-- `plan.md`
-- `progress.md`
-- `logs/`
+- `.miniloop/context.md`
+- `.miniloop/plan.md`
+- `.miniloop/progress.md`
+- `.miniloop/logs/`
 
 ## Backend
 

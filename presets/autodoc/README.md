@@ -13,7 +13,7 @@ Shape:
 ## How it works
 
 1. **Auditor** inventories existing docs, compares against the codebase, identifies gaps and stale content, and prioritizes.
-2. **Writer** writes or updates documentation for the highest-priority gap, matching the project's existing style, and leaves a claim-level verification checklist in `progress.md`.
+2. **Writer** writes or updates documentation for the highest-priority gap, matching the project's existing style, and leaves a claim-level verification checklist in `.miniloop/progress.md`.
 3. **Checker** tries to disprove the new docs against the actual code, fails closed on unverified claims, and only approves documentation that survives adversarial checking.
 4. **Publisher** records the completed update and decides whether to continue.
 
@@ -29,9 +29,9 @@ Shape:
 
 ## Shared working files created by the loop
 
-- `doc-plan.md` — audit results, gaps, staleness, prioritized list
-- `doc-report.md` — compiled report of documentation changes
-- `progress.md` — current gap tracking plus the writer's claim-level verification checklist for the checker
+- `.miniloop/doc-plan.md` — audit results, gaps, staleness, prioritized list
+- `.miniloop/doc-report.md` — compiled report of documentation changes
+- `.miniloop/progress.md` — current gap tracking plus the writer's claim-level verification checklist for the checker
 
 ## Run
 

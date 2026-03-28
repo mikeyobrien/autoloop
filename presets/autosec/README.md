@@ -38,9 +38,9 @@ AutoSec should prefer open risks over fake certainty.
 
 ## Shared working files created by the loop
 
-- `sec-findings.md` — raw candidate findings with location, type, severity, evidence
-- `sec-report.md` — compiled security report with fixes and open risks
-- `progress.md` — current finding tracking
+- `.miniloop/sec-findings.md` — raw candidate findings with location, type, severity, evidence
+- `.miniloop/sec-report.md` — compiled security report with fixes and open risks
+- `.miniloop/progress.md` — current finding tracking
 
 ## Run
 

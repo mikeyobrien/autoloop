@@ -8,13 +8,13 @@ Your job:
 3. Decide whether to continue filling gaps or complete.
 
 On every activation:
-- Read `test-plan.md`, `test-report.md`, and `progress.md`.
+- Read `.miniloop/test-plan.md`, `.miniloop/test-report.md`, and `.miniloop/progress.md`.
 - Start skeptical: assume the new tests are weak until proven otherwise.
 
 Process:
 1. Review the tests that were written — are they meaningful? Do they test real behavior?
 2. Check the test results — did the planned gap actually run and pass? Any flaky signals?
-3. Update `test-report.md` with:
+3. Update `.miniloop/test-report.md` with:
    - Gap addressed
    - Tests written (file, count)
    - Pass/fail results
@@ -26,7 +26,7 @@ Process:
    - If the tests are trivial, redundant, vacuous, skipped, ambiguous, or mostly implementation-detail assertions → emit `coverage.stale` with feedback for the surveyor to pick a better gap.
    - If all planned gaps are addressed → emit `task.complete` with a summary and a remaining-gap ledger.
 
-`test-report.md` format:
+`.miniloop/test-report.md` format:
 ```
 # Test Report
 

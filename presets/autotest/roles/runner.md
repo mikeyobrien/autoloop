@@ -8,7 +8,7 @@ Your job:
 3. Hand results to the assessor.
 
 On every activation:
-- Read `test-plan.md` and `progress.md` to know which tests were written.
+- Read `.miniloop/test-plan.md` and `.miniloop/progress.md` to know which tests were written.
 
 Process:
 1. Run the test suite (or the specific new tests if the framework supports targeted runs).
@@ -19,7 +19,7 @@ Process:
    - which new test files were discovered or executed
    - failure messages and stack traces for any failures
    - coverage delta if a coverage tool is configured
-3. Record results in `progress.md`.
+3. Record results in `.miniloop/progress.md`.
 4. If all new tests pass and real tests actually ran → emit `tests.passed`.
 5. If any new tests fail, zero tests ran, all tests were skipped, or discovery is ambiguous → emit `tests.failed` with failure details.
 

@@ -43,10 +43,10 @@ defmodule PresetConfig do
     }
     backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
     core = %{
-      "state_dir" => ".miniloops",
-      "journal_file" => ".miniloops/journal.jsonl",
-      "events_file" => ".miniloops/journal.jsonl",
-      "memory_file" => ".miniloops/memory.jsonl"
+      "state_dir" => ".miniloop",
+      "journal_file" => ".miniloop/journal.jsonl",
+      "events_file" => ".miniloop/journal.jsonl",
+      "memory_file" => ".miniloop/memory.jsonl"
     }
     %{"event_loop" => event_loop, "backend" => backend, "core" => core}
   end
@@ -589,6 +589,17 @@ defmodule PresetTest do
     assert_all_prompts_nonempty(rest, preset_dir)
   end
 
+  defp role_prompt_by_id([], _role_id) do
+    ""
+  end
+
+  defp role_prompt_by_id([role | rest], role_id) do
+    case Map.get(role, :id, "") == role_id do
+      true -> Map.get(role, :prompt, "")
+      _ -> role_prompt_by_id(rest, role_id)
+    end
+  end
+
   defp assert_all_in([], _haystack, _msg) do
     true
   end
@@ -634,7 +645,14 @@ defmodule PresetTest do
   end
 
   def test_preset_autoqa() do
-    validate_preset(Path.join(presets_dir(), "autoqa"))
+    preset_dir = Path.join(presets_dir(), "autoqa")
+    validate_preset(preset_dir)
+
+    topology = PresetTopology.load(preset_dir)
+    reporter_prompt = role_prompt_by_id(PresetTopology.get_roles(topology), "reporter")
+    Assert.assert_contains(reporter_prompt, "emit `qa.continue`")
+    Assert.assert_contains(reporter_prompt, "Do not tell the executor to run a new step directly from the reporter turn.")
+    Assert.assert_contains(reporter_prompt, "Reporter handoffs are limited to `qa.continue`, `qa.failed`, or `task.complete`.")
   end
 
   def test_preset_autoresearch() do

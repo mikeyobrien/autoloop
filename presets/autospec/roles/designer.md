@@ -8,7 +8,7 @@ Your job:
 3. Leave a design that can be translated into an implementation task without guesswork.
 
 On every activation:
-- Read `spec-brief.md`, `spec-research.md`, and `progress.md`.
+- Read `.miniloop/spec-brief.md`, `.miniloop/spec-research.md`, and `.miniloop/progress.md`.
 - Read the current design doc if it already exists.
 - Re-read the latest scratchpad/journal context before deciding.
 
@@ -27,11 +27,11 @@ Process:
    - `## Implementation Notes`
 3. In `## Implementation Notes`, include the exact cross-link line:
    - `Code task: \`<task path>\``
-4. Update `progress.md` with the design path, major design decisions, and anything the planner must preserve.
+4. Update `.miniloop/progress.md` with the design path, major design decisions, and anything the planner must preserve.
 5. Emit `design.ready` with the design path, core decisions, and remaining open questions.
 
 Rules:
 - Prefer a lightweight RFC over a bloated process document.
 - Explain tradeoffs and boundaries, not just a restatement of requirements.
-- Keep terminology, names, and paths consistent with `spec-brief.md`.
+- Keep terminology, names, and paths consistent with `.miniloop/spec-brief.md`.
 - If something remains unresolved, make it explicit in `## Open Questions` instead of pretending it is settled.

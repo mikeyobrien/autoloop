@@ -10,7 +10,7 @@ Your job:
 3. Allow completion only when the pair is aligned, durable, and actionable.
 
 On every activation:
-- Read `spec-brief.md`, `spec-research.md`, and `progress.md`.
+- Read `.miniloop/spec-brief.md`, `.miniloop/spec-research.md`, and `.miniloop/progress.md`.
 - Read the design doc and the code task at their chosen paths.
 - Re-read the latest scratchpad/journal context before deciding.
 

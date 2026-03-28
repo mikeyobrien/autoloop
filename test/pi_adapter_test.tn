@@ -1,0 +1,56 @@
+defmodule PiAdapterTest do
+  def test_pi_adapter_hides_detailed_tool_errors_without_verbose() do
+    fixture = prepare_fixture("tool mismatch detail")
+    result = run_pi_adapter(fixture, "info")
+    output = Map.get(result, :output, "")
+
+    Assert.refute(Map.get(result, :exit_code, 0) == 0, "pi-adapter should fail on tool errors")
+    Assert.assert_contains(output, "pi failed (run with -v for details)")
+    Assert.refute(String.contains(output, "tool mismatch detail"), "non-verbose output should hide detailed tool errors")
+  end
+
+  def test_pi_adapter_shows_detailed_tool_errors_in_verbose_mode() do
+    fixture = prepare_fixture("tool mismatch detail")
+    result = run_pi_adapter(fixture, "debug")
+    output = Map.get(result, :output, "")
+
+    Assert.refute(Map.get(result, :exit_code, 0) == 0, "pi-adapter should fail on tool errors")
+    Assert.assert_contains(output, "tool mismatch detail")
+  end
+
+  defp prepare_fixture(detail) do
+    dir = "/tmp/miniloops-pi-adapter-fixture"
+    script = Path.join(dir, "mock-pi.sh")
+
+    System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(dir))
+    System.write_text(script, mock_pi_script(detail))
+    System.run("chmod +x " <> shell_quote(script))
+
+    %{dir: dir, script: script}
+  end
+
+  defp run_pi_adapter(fixture, log_level) do
+    System.run(
+      "cd " <> shell_quote(Map.get(fixture, :dir, "")) <>
+      " && env -u MINILOOPS_LOG_LEVEL -u MINILOOPS_PROMPT -u MINILOOPS_STATE_DIR" <>
+      " MINILOOPS_LOG_LEVEL=" <> shell_quote(log_level) <>
+      " MINILOOPS_PROMPT='pi adapter test prompt'" <>
+      " MINILOOPS_STATE_DIR=" <> shell_quote(Map.get(fixture, :dir, "")) <>
+      " tonic run " <> shell_quote(repo_root()) <> " pi-adapter " <> shell_quote(Map.get(fixture, :script, ""))
+    )
+  end
+
+  defp mock_pi_script(detail) do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "printf '%s\\n' '{\"type\":\"tool_execution_end\",\"toolExecutionResponseEvent\":{\"isError\":true,\"output\":[{\"type\":\"text\",\"text\":\"" <> detail <> "\"}]}}'\n"
+  end
+
+  defp repo_root() do
+    "/Users/rook/projects/tonic-loops"
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
+  end
+end

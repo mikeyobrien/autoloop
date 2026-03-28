@@ -40,11 +40,11 @@ defmodule LoopConfig do
 
   def resolve_memory_file(project_dir) do
     config = load_project(project_dir)
-    Path.join(project_dir, get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+    Path.join(project_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
   end
 
   defp journal_path(config) do
-    get(config, "core.journal_file", get(config, "core.events_file", ".miniloops/journal.jsonl"))
+    get(config, "core.journal_file", get(config, "core.events_file", ".miniloop/journal.jsonl"))
   end
 
   defp resolve_config_path(project_dir) do
@@ -58,7 +58,7 @@ defmodule LoopConfig do
   end
 
   defp defaults() do
-    Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(%{}, "event_loop.max_iterations", "3"), "event_loop.completion_promise", "LOOP_COMPLETE"), "event_loop.completion_event", "task.complete"), "event_loop.required_events", ""), "backend.kind", "pi"), "backend.command", "pi"), "backend.timeout_ms", "300000"), "core.state_dir", ".miniloops"), "core.journal_file", ".miniloops/journal.jsonl"), "core.events_file", ".miniloops/journal.jsonl"), "core.memory_file", ".miniloops/memory.jsonl")
+    Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(%{}, "event_loop.max_iterations", "3"), "event_loop.completion_promise", "LOOP_COMPLETE"), "event_loop.completion_event", "task.complete"), "event_loop.required_events", ""), "backend.kind", "pi"), "backend.command", "pi"), "backend.timeout_ms", "300000"), "core.state_dir", ".miniloop"), "core.journal_file", ".miniloop/journal.jsonl"), "core.events_file", ".miniloop/journal.jsonl"), "core.memory_file", ".miniloop/memory.jsonl")
   end
 
   defp parse_lines([], config) do
@@ -163,7 +163,7 @@ end
 defmodule LoopMemory do
   def resolve_file(project_dir) do
     config = LoopConfig.load_project(project_dir)
-    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloop/memory.jsonl"))
   end
 
   def render_project(project_dir, budget_chars) do
@@ -503,6 +503,6 @@ defmodule MemoryTest do
 
   def test_resolve_file_uses_config() do
     path = LoopMemory.resolve_file("/nonexistent/project")
-    Assert.assert_contains(path, ".miniloops/memory.jsonl")
+    Assert.assert_contains(path, ".miniloop/memory.jsonl")
   end
 end

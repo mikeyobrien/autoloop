@@ -1,7 +1,21 @@
 #!/bin/sh
 set -eu
 
-REPO_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+SCRIPT_PATH="$0"
+case "$SCRIPT_PATH" in
+  /*) ;;
+  *) SCRIPT_PATH="$(pwd)/$SCRIPT_PATH" ;;
+esac
+
+while [ -L "$SCRIPT_PATH" ]; do
+  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+  case "$LINK_TARGET" in
+    /*) SCRIPT_PATH="$LINK_TARGET" ;;
+    *) SCRIPT_PATH="$(dirname "$SCRIPT_PATH")/$LINK_TARGET" ;;
+  esac
+done
+
+REPO_DIR="$(CDPATH= cd -- "$(dirname "$SCRIPT_PATH")/.." && pwd -P)"
 
 tonic run "$REPO_DIR" "$@" &
 child=$!

@@ -43,9 +43,9 @@ AutoFix should reject weak fixes.
 
 ## Shared working files created by the loop
 
-- `bug-report.md` — symptom, reproduction steps, root cause analysis
-- `fix-log.md` — log of fixes applied with verification results
-- `progress.md` — current bug tracking
+- `.miniloop/bug-report.md` — symptom, reproduction steps, root cause analysis
+- `.miniloop/fix-log.md` — log of fixes applied with verification results
+- `.miniloop/progress.md` — current bug tracking
 
 ## Run
 

@@ -46,9 +46,9 @@ backend.timeout_ms = 180000
 
 review.enabled = false
 
-core.state_dir = ".miniloops"
-core.journal_file = ".miniloops/journal.jsonl"
-core.memory_file = ".miniloops/memory.jsonl"
+core.state_dir = ".miniloop"
+core.journal_file = ".miniloop/journal.jsonl"
+core.memory_file = ".miniloop/memory.jsonl"
 EOF
 
 cat > "$tmpdir/topology.toml" <<'EOF'
@@ -82,8 +82,8 @@ run_output="$tmpdir/run.out"
   run_miniloops_clean timeout 240 tonic run "$repo_dir" . 'Smoke test: print exactly hello, then emit task.complete with payload hello-done.'
 ) | tee "$run_output"
 
-journal="$tmpdir/.miniloops/journal.jsonl"
-stream="$tmpdir/.miniloops/pi-stream.1.jsonl"
+journal="$tmpdir/.miniloop/journal.jsonl"
+stream="$tmpdir/.miniloop/pi-stream.1.jsonl"
 output_text="$(cd "$tmpdir" && run_miniloops_clean tonic run "$repo_dir" inspect output 1 . --format text)"
 
 [[ -f "$journal" ]] || { echo "missing journal: $journal" >&2; exit 1; }

@@ -8,23 +8,23 @@ Your job:
 3. Hand off exactly one experiment to the implementer.
 
 On every activation:
-- Read `autoresearch.md`, `experiments.jsonl`, and `progress.md` if they exist.
+- Read `.miniloop/autoresearch.md`, `.miniloop/experiments.jsonl`, and `.miniloop/progress.md` if they exist.
 - Re-read the latest scratchpad/journal context before deciding.
 
 On first activation:
 - Create or refresh:
-  - `autoresearch.md` — goal, metric to optimize, direction (higher/lower is better), constraints, baseline measurement instructions.
-  - `experiments.jsonl` — empty file (will be appended to by the evaluator).
-  - `progress.md` — current experiment status.
+  - `.miniloop/autoresearch.md` — goal, metric to optimize, direction (higher/lower is better), constraints, baseline measurement instructions.
+  - `.miniloop/experiments.jsonl` — empty file (will be appended to by the evaluator).
+  - `.miniloop/progress.md` — current experiment status.
 - Establish a baseline: describe how the benchmarker should capture the initial metric.
-- Write experiment #1's hypothesis and plan into `progress.md`.
+- Write experiment #1's hypothesis and plan into `.miniloop/progress.md`.
 - Emit `experiment.planned` with the hypothesis and what files to change.
 
 On later activations (`experiment.evaluated` or `experiment.discarded`):
 - Re-read the shared working files and the experiment log.
 - Analyze what worked and what didn't across all experiments so far.
 - If the goal is met or no more productive experiments remain, emit `task.complete` only with a log-backed rationale.
-- Otherwise, write the next experiment's hypothesis and plan into `progress.md` and emit `experiment.planned`.
+- Otherwise, write the next experiment's hypothesis and plan into `.miniloop/progress.md` and emit `experiment.planned`.
 
 Every experiment plan must include:
 - exact benchmark command

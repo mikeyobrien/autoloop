@@ -9,7 +9,7 @@ event_loop.required_events = ["review.passed"]
 
 backend.kind = "pi"
 backend.command = "pi"
-backend.timeout_ms = 300000
+backend.timeout_ms = 9900000
 # backend.args = ["--model", "anthropic/claude-sonnet-4"]
 # For deterministic local harness testing only:
 # backend.kind = "command"
@@ -20,12 +20,12 @@ review.timeout_ms = 300000
 # By default this falls back to the number of roles/personas in topology.toml.
 review.every_iterations = 0
 
-memory.prompt_budget_chars = 1600
+memory.prompt_budget_chars = 8000
 
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloops"
-core.journal_file = ".miniloops/journal.jsonl"
-core.memory_file = ".miniloops/memory.jsonl"
+core.state_dir = ".miniloop"
+core.journal_file = ".miniloop/journal.jsonl"
+core.memory_file = ".miniloop/memory.jsonl"
 # legacy alias still accepted:
-# core.events_file = ".miniloops/journal.jsonl"
+# core.events_file = ".miniloop/journal.jsonl"

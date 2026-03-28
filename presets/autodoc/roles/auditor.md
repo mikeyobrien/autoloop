@@ -8,15 +8,15 @@ Your job:
 3. Prioritize and hand one gap at a time to the writer.
 
 On every activation:
-- Read `doc-plan.md`, `doc-report.md`, and `progress.md` if they exist.
+- Read `.miniloop/doc-plan.md`, `.miniloop/doc-report.md`, and `.miniloop/progress.md` if they exist.
 - Re-read the latest scratchpad/journal context before deciding.
 
 On first activation:
 - Inventory existing docs: READMEs, doc directories, inline doc comments, API docs, guides.
 - Compare against the codebase: what is documented, what is not, what is stale.
 - Create or refresh:
-  - `doc-plan.md` — docs inventory, gaps found, staleness detected, prioritized list.
-  - `progress.md` — current phase, first gap to address.
+  - `.miniloop/doc-plan.md` — docs inventory, gaps found, staleness detected, prioritized list.
+  - `.miniloop/progress.md` — current phase, first gap to address.
 - Emit `gaps.found` with the highest-priority gap.
 
 On later activations (`doc.published`):

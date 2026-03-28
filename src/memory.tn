@@ -1,7 +1,15 @@
 defmodule LoopMemory do
   def resolve_file(project_dir) do
+    case System.env("MINILOOPS_MEMORY_FILE") do
+      nil -> resolve_project_file(project_dir)
+      "" -> resolve_project_file(project_dir)
+      path -> path
+    end
+  end
+
+  defp resolve_project_file(project_dir) do
     config = LoopConfig.load_project(project_dir)
-    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloops/memory.jsonl"))
+    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloop/memory.jsonl"))
   end
 
   def render_project(project_dir, budget_chars) do
@@ -11,6 +19,20 @@ defmodule LoopMemory do
   def render_file(path, budget_chars) do
     text = render_materialized(materialize(read_lines(path)))
     truncate_text(text, budget_chars)
+  end
+
+  def stats_project(project_dir, budget_chars) do
+    stats_file(resolve_file(project_dir), budget_chars)
+  end
+
+  def stats_file(path, budget_chars) do
+    memory = materialize(read_lines(path))
+    preferences = count_entries(Map.get(memory, :preferences, []), 0)
+    learnings = count_entries(Map.get(memory, :learnings, []), 0)
+    meta = count_entries(Map.get(memory, :meta, []), 0)
+    rendered_chars = String.length(render_materialized(memory))
+
+    %{preferences: preferences, learnings: learnings, meta: meta, total_entries: preferences + learnings + meta, rendered_chars: rendered_chars, budget_chars: budget_chars, truncated: memory_truncated(rendered_chars, budget_chars)}
   end
 
   def list_project(project_dir) do
@@ -90,7 +112,8 @@ defmodule LoopMemory do
 
   defp render_learning_lines([entry | rest]) do
     source = extract_field(entry, "source")
-    prefix = learning_prefix(source) "- " <> prefix <> extract_field(entry, "text") <> "\n" <> render_learning_lines(rest)
+    prefix = learning_prefix(source)
+    "- " <> prefix <> extract_field(entry, "text") <> "\n" <> render_learning_lines(rest)
   end
 
   defp learning_prefix("") do
@@ -129,6 +152,22 @@ defmodule LoopMemory do
       true -> text
       _ -> String.slice(text, 0, budget_chars) <> "\n..."
     end
+  end
+
+  defp memory_truncated(_rendered_chars, budget_chars) when budget_chars <= 0 do
+    false
+  end
+
+  defp memory_truncated(rendered_chars, budget_chars) do
+    rendered_chars > budget_chars
+  end
+
+  defp count_entries([], count) do
+    count
+  end
+
+  defp count_entries([_entry | rest], count) do
+    count_entries(rest, count + 1)
   end
 
   defp materialize(lines) do
@@ -176,7 +215,9 @@ defmodule LoopMemory do
     seen = Map.put(acc, :seen, [id] ++ Map.get(acc, :seen, []))
 
     case type do
-      "preference" -> Map.put(seen, :preferences, [line] ++ Map.get(seen, :preferences, [])) "learning" -> Map.put(seen, :learnings, [line] ++ Map.get(seen, :learnings, [])) "meta" -> put_meta_entry(seen, line)
+      "preference" -> Map.put(seen, :preferences, [line] ++ Map.get(seen, :preferences, []))
+      "learning" -> Map.put(seen, :learnings, [line] ++ Map.get(seen, :learnings, []))
+      "meta" -> put_meta_entry(seen, line)
       _ -> seen
     end
   end

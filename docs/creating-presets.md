@@ -114,16 +114,16 @@ Example:
 This is a custom analysis-and-implementation loop.
 
 Global rules:
-- Shared working files are the source of truth: `tasks.md`, `progress.md`.
+- Shared working files are the source of truth: `.miniloop/tasks.md`, `.miniloop/progress.md`.
 - One task at a time. Do not start the next task before the current one is verified.
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read shared working files before acting.
-- Use `./.miniloops/miniloops memory add learning ...` for durable learnings.
+- Use `./.miniloop/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside analyst → implementer → verifier.
 
 State files:
-- `tasks.md` — task list with priorities and status.
-- `progress.md` — current task, verification results, what the next role should do.
+- `.miniloop/tasks.md` — task list with priorities and status.
+- `.miniloop/progress.md` — current task, verification results, what the next role should do.
 ```
 
 The `harness.instructions_file` key in `miniloops.toml` points to this file. It defaults to `harness.md`.
@@ -145,12 +145,12 @@ backend.timeout_ms = 3000000
 review.enabled = true
 review.timeout_ms = 300000
 
-memory.prompt_budget_chars = 1600
+memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloops"
-core.journal_file = ".miniloops/journal.jsonl"
-core.memory_file = ".miniloops/memory.jsonl"
+core.state_dir = ".miniloop"
+core.journal_file = ".miniloop/journal.jsonl"
+core.memory_file = ".miniloop/memory.jsonl"
 ```
 
 **Key settings:**

@@ -7,17 +7,17 @@ Your job:
 2. Track the overall security posture.
 
 On every activation:
-- Read `sec-findings.md`, `sec-report.md`, and `progress.md`.
+- Read `.miniloop/sec-findings.md`, `.miniloop/sec-report.md`, and `.miniloop/progress.md`.
 
 Process:
-1. Update `sec-report.md` with the latest finding result:
+1. Update `.miniloop/sec-report.md` with the latest finding result:
    - If confirmed and fixed with verification evidence → record the finding and fix.
    - If confirmed but blocked or weakly verified → record the finding as an open risk.
    - If dismissed → record the dismissal with reason.
-2. Update `progress.md`.
+2. Update `.miniloop/progress.md`.
 3. Emit `report.updated` so the scanner continues with the next category.
 
-`sec-report.md` format:
+`.miniloop/sec-report.md` format:
 ```
 # Security Report
 

@@ -10,12 +10,12 @@ Your job:
 On first activation:
 - Read the repo tree, key config files, README, and a sample of source files.
 - Create or refresh:
-  - `scan-areas.md` — a prioritized list of areas worth analyzing. Each area has: name, file paths, what kind of improvement might exist (perf, DX, correctness, extensibility, etc.), and why it looks promising.
-  - `progress.md` — current area, status, completed areas.
+  - `.miniloop/scan-areas.md` — a prioritized list of areas worth analyzing. Each area has: name, file paths, what kind of improvement might exist (perf, DX, correctness, extensibility, etc.), and why it looks promising.
+  - `.miniloop/progress.md` — current area, status, completed areas.
 - Choose the highest-priority area and emit `areas.identified`.
 
 On later activations (`report.updated`, `analysis.blocked`, `synthesis.blocked`):
-- Re-read `scan-areas.md`, `progress.md`, and `ideas-report.md` if it exists.
+- Re-read `.miniloop/scan-areas.md`, `.miniloop/progress.md`, and `.miniloop/ideas-report.md` if it exists.
 - If there are remaining unanalyzed areas, pick the next highest-priority one and emit `areas.identified`.
 - If all areas have been analyzed and the report is sufficient, emit `task.complete`.
 - If the synthesizer or analyst reported a blocker, adjust the area list and re-route.

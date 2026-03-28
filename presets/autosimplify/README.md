@@ -39,9 +39,9 @@ AutoSimplify is not a refactor free-for-all.
 
 ## Shared working files created by the loop
 
-- `simplify-context.md` — scope, batching, affected files, and guardrails
-- `simplify-plan.md` — current batch findings and concrete cleanup plan
-- `progress.md` — batch status, changes made, verification results, and next action
+- `.miniloop/simplify-context.md` — scope, batching, affected files, and guardrails
+- `.miniloop/simplify-plan.md` — current batch findings and concrete cleanup plan
+- `.miniloop/progress.md` — batch status, changes made, verification results, and next action
 
 ## Backend
 

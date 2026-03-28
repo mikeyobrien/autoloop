@@ -22,8 +22,8 @@ AutoSpec is not done when the docs merely sound plausible.
 
 ## How it works
 
-1. **Clarifier** writes `spec-brief.md` with goals, non-goals, constraints, assumptions, slug, and output paths.
-2. **Researcher** writes `spec-research.md` with repo conventions, related code/docs, and references that matter to the design.
+1. **Clarifier** writes `.miniloop/spec-brief.md` with goals, non-goals, constraints, assumptions, slug, and output paths.
+2. **Researcher** writes `.miniloop/spec-research.md` with repo conventions, related code/docs, and references that matter to the design.
 3. **Designer** drafts the RFC-style design doc.
 4. **Planner** drafts the paired `.code-task.md`.
 5. **Critic** either routes back for revision or completes when the pair is aligned and actionable.
@@ -41,16 +41,16 @@ AutoSpec is not done when the docs merely sound plausible.
 
 ## Shared working files created by the loop
 
-- `spec-brief.md` — clarified objective, title/slug, constraints, assumptions, output paths
-- `spec-research.md` — repo conventions, related docs/code, references, open gaps
-- `progress.md` — current phase, active artifact paths, critic checklist, revision log
+- `.miniloop/spec-brief.md` — clarified objective, title/slug, constraints, assumptions, output paths
+- `.miniloop/spec-research.md` — repo conventions, related docs/code, references, open gaps
+- `.miniloop/progress.md` — current phase, active artifact paths, critic checklist, revision log
 
 ## Default artifact outputs
 
 - `docs/rfcs/<slug>.md`
 - `.agents/tasks/<project-name>/<slug>.code-task.md`
 
-If the repo already has a clearly stronger planning convention, AutoSpec should follow that instead and record the decision in `spec-brief.md`.
+If the repo already has a clearly stronger planning convention, AutoSpec should follow that instead and record the decision in `.miniloop/spec-brief.md`.
 
 ## Backend
 

@@ -8,7 +8,7 @@ Shape:
 - reviewer
 - synthesizer
 
-The scanner identifies areas worth analyzing. The analyst deep-dives each area and produces concrete suggestions. The reviewer tries to kill weak ideas. The synthesizer compiles only the survivors into `ideas-report.md`.
+The scanner identifies areas worth analyzing. The analyst deep-dives each area and produces concrete suggestions. The reviewer tries to kill weak ideas. The synthesizer compiles only the survivors into `.miniloop/ideas-report.md`.
 
 ## Fail-closed contract
 
@@ -16,8 +16,8 @@ Autoideas should prefer false negatives over false positives.
 
 - A healthy run may reject many areas.
 - A healthy run may end with only a few strong ideas.
-- `ideas-report.md` should contain reviewer-validated suggestions, not every plausible thought.
-- Inspect `progress.md` if you want to see what was trimmed or rejected.
+- `.miniloop/ideas-report.md` should contain reviewer-validated suggestions, not every plausible thought.
+- Inspect `.miniloop/progress.md` if you want to see what was trimmed or rejected.
 
 ## Files
 
@@ -31,9 +31,9 @@ Autoideas should prefer false negatives over false positives.
 
 ## Shared working files created by the loop
 
-- `scan-areas.md` — prioritized list of repo areas to analyze
-- `progress.md` — current area, status, completed areas, PASS/DROP reviewer notes
-- `ideas-report.md` — the final output report
+- `.miniloop/scan-areas.md` — prioritized list of repo areas to analyze
+- `.miniloop/progress.md` — current area, status, completed areas, PASS/DROP reviewer notes
+- `.miniloop/ideas-report.md` — the final output report
 
 ## Backend
 
@@ -73,7 +73,7 @@ For a one-off Claude dogfood run without editing config:
 
 ## What it produces
 
-An `ideas-report.md` containing:
+An `.miniloop/ideas-report.md` containing:
 - Concrete suggestions organized by area
 - Only ideas that survived skeptical review
 - Enough context to understand why each surviving idea is worth doing

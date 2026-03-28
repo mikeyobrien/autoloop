@@ -42,9 +42,9 @@ AutoTest is about better tests, not prettier coverage numbers.
 
 ## Shared working files created by the loop
 
-- `test-plan.md` — coverage analysis, prioritized gaps, test framework details
-- `test-report.md` — compiled report with tests written, results, coverage deltas
-- `progress.md` — current gap tracking and regression-catch rationale
+- `.miniloop/test-plan.md` — coverage analysis, prioritized gaps, test framework details
+- `.miniloop/test-report.md` — compiled report with tests written, results, coverage deltas
+- `.miniloop/progress.md` — current gap tracking and regression-catch rationale
 
 ## Run
 

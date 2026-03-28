@@ -8,18 +8,18 @@ Your job:
 3. Hand exactly one validation step to the executor.
 
 On every activation:
-- Read `qa-plan.md`, `qa-report.md`, and `progress.md`.
+- Read `.miniloop/qa-plan.md`, `.miniloop/qa-report.md`, and `.miniloop/progress.md`.
 - Re-read the latest scratchpad/journal context.
 
 On first activation (after `surfaces.identified`):
-- Create `qa-plan.md` with:
+- Create `.miniloop/qa-plan.md` with:
   - Domain summary (one line)
   - Available validation surfaces (from inspector)
   - A coverage map: every discovered surface becomes either a planned step or an explicit skip with reason
   - Ordered validation steps, each with:
     - Step number
     - Surface being used
-    - Exact command or action to run
+    - Exact command or read-only inspection action to run
     - What a pass looks like
     - What a fail looks like
 - Order steps from fastest/cheapest to slowest/most expensive:
@@ -29,7 +29,7 @@ On first activation (after `surfaces.identified`):
   4. Existing test suite (if available)
   5. CLI smoke test (if applicable)
   6. Script probes / manual checks (if applicable)
-- Update `progress.md` with the active step.
+- Update `.miniloop/progress.md` with the active step.
 - Emit `qa.planned` with:
   - step number
   - exact command or action
@@ -42,7 +42,8 @@ On later activations (`qa.blocked` or `qa.continue`):
 
 Rules:
 - Never plan a step that requires installing something not already in the repo.
-- Never plan a step the executor cannot run with a single shell command or a short script.
+- Never plan a step the executor cannot run with a single shell command, a short script, or a short read-only inspection action.
+- Use a read-only inspection step only when the claim is structural (reachability, wiring, dead/live path) and no honest runtime command can prove it. Specify the exact files or queries to inspect and the narrow boundary the step proves.
 - Be precise: `cargo test --lib` not `run the tests`.
 - One step at a time. The executor only acts on the current step.
 - Do not quietly drop surfaces. Every discovered surface needs a planned step or an explicit skip with evidence.

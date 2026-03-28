@@ -27,7 +27,7 @@ defmodule LoopChains do
     steps = Map.get(chain_spec, :steps, [])
     config = LoopConfig.load_project(project_dir)
     chain_run_id = next_chain_run_id(project_dir, config)
-    chain_dir = Path.join(project_dir, ".miniloops/chains/" <> chain_run_id)
+    chain_dir = Path.join(chain_state_root(project_dir), chain_run_id)
     journal_file = LoopConfig.resolve_journal_file(project_dir)
 
     System.ensure_dir(chain_dir)
@@ -63,6 +63,10 @@ defmodule LoopChains do
 
   def default_budget() do
     %{max_depth: 5, max_steps: 50, max_runtime_ms: 3600000, max_children: 10, max_consecutive_failures: 3}
+  end
+
+  defp chain_state_root(project_dir) do
+    Path.join(LoopConfig.state_dir_path(project_dir), "chains")
   end
 
   def check_budget(budget, tracker) do
@@ -107,7 +111,7 @@ defmodule LoopChains do
   end
 
   def write_dynamic_spec(project_dir, spec) do
-    specs_dir = Path.join(project_dir, ".miniloops/chains/specs")
+    specs_dir = Path.join(chain_state_root(project_dir), "specs")
     System.ensure_dir(specs_dir)
     chain_id = Map.get(spec, :chain_id, "dyn-" <> to_string(count_dynamic_specs(specs_dir) + 1))
     path = Path.join(specs_dir, chain_id <> ".json")

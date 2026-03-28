@@ -8,7 +8,7 @@ Your job:
 3. Decide whether to continue optimizing.
 
 On every activation:
-- Read `perf-profile.md`, `perf-log.jsonl`, and `progress.md`.
+- Read `.miniloop/perf-profile.md`, `.miniloop/perf-log.jsonl`, and `.miniloop/progress.md`.
 - Start skeptical: assume discard until the win is proven.
 
 Process:
@@ -20,12 +20,12 @@ Process:
 2. Decide:
    - **Keep** only if the metric improved meaningfully, the improvement survives noise scrutiny, and tests pass.
    - **Discard** if the metric regressed, improvement is noise-level or weakly evidenced, or tests fail.
-3. Append to `perf-log.jsonl`:
+3. Append to `.miniloop/perf-log.jsonl`:
    ```json
    {"id": N, "target": "...", "change": "...", "metric_before": X, "metric_after": Y, "verdict": "keep|discard", "reason": "..."}
    ```
 4. If discarded: revert the optimization (git checkout the changed files).
-5. Update `progress.md`.
+5. Update `.miniloop/progress.md`.
 6. If the overall goal is met → emit `task.complete` with cumulative results.
 7. If kept → emit `optimization.kept`.
 8. If discarded → emit `optimization.discarded`.

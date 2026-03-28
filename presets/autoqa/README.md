@@ -24,7 +24,7 @@ AutoQA is adversarial toward claims of health.
 1. **Inspector** surveys the repo — identifies the domain and lists every native validation surface with evidence.
 2. **Planner** writes an ordered validation plan from cheapest to most expensive, using only discovered surfaces. Every surface becomes a step or an explicit skip.
 3. **Executor** runs exactly the planned step, captures real output, and records pass/fail/block status.
-4. **Reporter** compiles results into `qa-report.md` and decides whether to continue, fail, or complete.
+4. **Reporter** compiles results into `.miniloop/qa-report.md` and decides whether to continue, fail, or complete.
 
 ## Zero-dependency guarantee
 
@@ -42,9 +42,9 @@ AutoQA never installs frameworks, test runners, linters, or any tools. It uses o
 
 ## Shared working files created by the loop
 
-- `qa-plan.md` — validation plan with discovered surfaces and ordered steps
-- `qa-report.md` — compiled validation report with pass/fail evidence
-- `progress.md` — current step tracking plus per-surface status
+- `.miniloop/qa-plan.md` — validation plan with discovered surfaces and ordered steps
+- `.miniloop/qa-report.md` — compiled validation report with pass/fail evidence
+- `.miniloop/progress.md` — current step tracking plus per-surface status
 
 ## Backend
 

@@ -1,6 +1,6 @@
 # Journal Reference
 
-The journal is the canonical runtime source of truth for a miniloops loop. Every significant event — system lifecycle, agent actions, coordination, review, and chain execution — is appended as a single JSON line to `.miniloops/journal.jsonl`. Nothing is mutated or deleted; the file is append-only.
+The journal is the canonical runtime source of truth for a miniloops loop. Every significant event — system lifecycle, agent actions, coordination, review, and chain execution — is appended as a single JSON line to `.miniloop/journal.jsonl`. Nothing is mutated or deleted; the file is append-only.
 
 Higher-level views (scratchpad, coordination state, chain progress) are **projections** — derived by reading the journal and filtering/aggregating events.
 
@@ -76,15 +76,15 @@ loop.complete   or   loop.stop
 | `review.start` | Before a hyperagent review pass. | `kind` (`"hyperagent"`), `backend_kind`, `command`, `prompt_mode`, `prompt`, `timeout_ms` |
 | `review.finish` | After review completes. | `kind` (`"hyperagent"`), `exit_code`, `timed_out` (boolean), `output` |
 | `loop.complete` | Loop finished successfully. | `reason` (`"completion_event"` or `"completion_promise"`) |
-| `loop.stop` | Loop halted without completion. | `reason` (`"max_iterations"`, `"backend_failed"`, or `"backend_timeout"`). The `backend_failed` and `backend_timeout` variants also include `iteration` and `output_tail`. |
+| `loop.stop` | Loop halted without completion. | `reason` (`"max_iterations"`, `"backend_failed"`, or `"backend_timeout"`). The `max_iterations` variant also includes `completed_iterations`, `stopped_before_iteration`, and `max_iterations`. The `backend_failed` and `backend_timeout` variants also include `iteration` and `output_tail`. |
 
 ### Agent events (custom)
 
 Agents emit events from the role's `emits` list (defined in `topology.toml`). These are the routing events that drive the handoff map:
 
 ```bash
-./.miniloops/miniloops emit review.ready "code is ready for review"
-./.miniloops/miniloops emit task.complete "all work done"
+./.miniloop/miniloops emit review.ready "code is ready for review"
+./.miniloop/miniloops emit task.complete "all work done"
 ```
 
 Any event the agent emits is recorded with `source: "agent"` in the journal.
@@ -159,7 +159,7 @@ Required events are cumulative across the entire run, not per-iteration.
 
 The scratchpad is a markdown view projected from `iteration.finish` events. It provides a running summary of what happened each iteration.
 
-Format:
+The rich inspect format is:
 
 ```markdown
 ## Iteration 1
@@ -175,11 +175,11 @@ exit_code=0
 <iteration output>
 ```
 
-Each section is built from the `exit_code` and `output` fields of the corresponding `iteration.finish` journal entry. The scratchpad is:
+Each section is built from the `exit_code` and `output` fields of the corresponding `iteration.finish` journal entry. The scratchpad has two render targets:
 
-- Injected into every iteration prompt as "Current scratchpad"
-- Available via `miniloops inspect scratchpad --format md`
-- Scoped to the current run (filtered by `run` ID)
+- Iteration prompts and hyperagent review prompts get a compact view that keeps the most recent iterations detailed and collapses older ones to short summaries.
+- `miniloops inspect scratchpad --format md` keeps the richer view for debugging.
+- Both views are scoped to the current run (filtered by `run` ID).
 
 ## Run scoping
 

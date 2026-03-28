@@ -8,7 +8,7 @@ The default preset is an autocode-style loop:
 - critic
 - finalizer
 
-Pi is the first-class backend. Miniloops now runs Pi itself with `pi -p --mode json --no-session`, parses Pi's NDJSON stream internally, and stores the raw stream under `.miniloops/` for debugging.
+Pi is the first-class backend. Miniloops now runs Pi itself with `pi -p --mode json --no-session`, parses Pi's NDJSON stream internally, and stores the raw stream under `.miniloop/` for debugging.
 
 `examples/mock-backend.sh` remains only as a local mock backend for deterministic harness debugging.
 
@@ -77,7 +77,7 @@ miniloops run . --chain autocode,autoqa,autoresearch
 
 ### How chains work
 
-- Each step runs its preset in sequence with isolated state in `.miniloops/chains/<chain-run-id>/step-<n>/`
+- Each step runs its preset in sequence with isolated state in `.miniloop/chains/<chain-run-id>/step-<n>/`
 - Handoff artifacts (prior step summaries) and result artifacts are written between steps
 - Chain lifecycle is journaled: `chain.start`, `chain.step.start`, `chain.step.finish`, `chain.complete`
 - If a step fails (non-completion stop), the chain stops and reports the failure
@@ -95,7 +95,7 @@ Chains can be generated dynamically at runtime by a meta-level orchestrator. Dyn
 - **Budget constraints**: max depth, steps, runtime, children, consecutive failures
 - **Quality gates**: refuse spawning after repeated failures
 - **Lineage tracking**: every dynamic chain records its parent
-- **Durable specs**: chain definitions stored as JSON in `.miniloops/chains/specs/`
+- **Durable specs**: chain definitions stored as JSON in `.miniloop/chains/specs/`
 - **Preset vocabulary**: constrained to known preset names
 
 Configure budgets in `chains.toml`:
@@ -129,10 +129,10 @@ These are separate layers. Topology stays focused on roles within one loop; chai
 - `roles/*.md` — role instructions
 - `harness.md` — live harness instructions
 - `hyperagent.md` — live review instructions
-- `.miniloops/journal.jsonl` — append-only runtime journal
-- `.miniloops/memory.jsonl` — append-only loop memory
-- `.miniloops/pi-stream.<iteration>.jsonl` — raw Pi NDJSON for task turns
-- `.miniloops/pi-review.<iteration>.jsonl` — raw Pi NDJSON for hyperagent reviews
+- `.miniloop/journal.jsonl` — append-only runtime journal
+- `.miniloop/memory.jsonl` — append-only loop memory
+- `.miniloop/pi-stream.<iteration>.jsonl` — raw Pi NDJSON for task turns
+- `.miniloop/pi-review.<iteration>.jsonl` — raw Pi NDJSON for hyperagent reviews
 
 ## Runtime config
 
@@ -155,12 +155,12 @@ review.enabled = true
 review.timeout_ms = 300000
 # review.every_iterations = 0
 
-memory.prompt_budget_chars = 1600
+memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloops"
-core.journal_file = ".miniloops/journal.jsonl"
-core.memory_file = ".miniloops/memory.jsonl"
+core.state_dir = ".miniloop"
+core.journal_file = ".miniloop/journal.jsonl"
+core.memory_file = ".miniloop/memory.jsonl"
 ```
 
 Notes:
@@ -195,7 +195,7 @@ It creates a temp miniloops project, runs a one-iteration Pi-backed loop, and fa
 - the loop completes via `task.complete`
 - the journal records `backend.start`, `backend.finish`, and `loop.complete`
 - the projected iteration output is exactly `hello`
-- the raw Pi NDJSON log is written to `.miniloops/pi-stream.1.jsonl`
+- the raw Pi NDJSON log is written to `.miniloop/pi-stream.1.jsonl`
 
 ## Topology
 
@@ -247,14 +247,14 @@ Important:
 Miniloops treats the JSONL journal as the runtime source of truth.
 
 That means:
-- `loop.start`, `iteration.start`, `backend.start`, agent events, `event.invalid`, `backend.finish`, `review.start`, `review.finish`, `iteration.finish`, and `loop.complete` all land in `.miniloops/journal.jsonl`
+- `loop.start`, `iteration.start`, `backend.start`, agent events, `event.invalid`, `backend.finish`, `review.start`, `review.finish`, `iteration.finish`, and `loop.complete` all land in `.miniloop/journal.jsonl`
 - prompt text is stored in the `iteration.start` record
 - parsed backend output is stored in the `iteration.finish` record
-- raw Pi NDJSON is written separately to `.miniloops/pi-stream.*.jsonl` and `.miniloops/pi-review.*.jsonl`
-- scratchpad is projected from completed iterations
+- raw Pi NDJSON is written separately to `.miniloop/pi-stream.*.jsonl` and `.miniloop/pi-review.*.jsonl`
+- scratchpad is projected from completed iterations; prompts use a compact view while `inspect scratchpad` keeps the richer view
 
 Loop memory is separate and append-only:
-- `.miniloops/memory.jsonl`
+- `.miniloop/memory.jsonl`
 - stores learnings, preferences, and meta notes
 - is injected back into future prompts
 
@@ -267,9 +267,9 @@ By default:
 - review cadence = number of roles in `topology.toml`
 - review uses the same Pi adapter unless overridden
 - the harness re-reads runtime files before every task iteration, so edits take effect on the next turn
-- the hyperagent may make bounded hygiene edits to runtime-facing loop files (`miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `context.md`, `plan.md`, `progress.md`, `docs/*.md`) when that improves the next turn
-- the hyperagent may consolidate stale context, resolved detours, and no-longer-relevant notes into `docs/*.md` so active working files stay focused on the current objective
-- the hyperagent must not edit app/product source code, tests, manifests, or `.miniloops/` state during review
+- the hyperagent may make bounded hygiene edits to runtime-facing loop files (`miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, `.miniloop/logs/`, `.miniloop/docs/*.md`) when that improves the next turn
+- the hyperagent may consolidate stale context, resolved detours, and no-longer-relevant notes into `.miniloop/docs/*.md` so active working files stay focused on the current objective
+- the hyperagent must not edit app/product source code, tests, manifests, or `.miniloop/` state during review
 - short durable lessons still belong in loop memory; archived markdown context belongs in `docs/`
 
 ## Backpressure on hallucinated events
@@ -282,7 +282,7 @@ Miniloops uses soft routing + protocol backpressure:
 
 ## Event tool
 
-During a loop run, miniloops creates a helper command inside `.miniloops/` and tells the agent to use it.
+During a loop run, miniloops creates a helper command inside `.miniloop/` and tells the agent to use it.
 
 Important shape:
 
@@ -327,6 +327,8 @@ Inspect the latest scratchpad:
 ```bash
 miniloops inspect scratchpad --format md
 ```
+
+This inspect view stays richer than the prompt-injected scratchpad so operators can debug long runs without reading raw journal JSON.
 
 Inspect memory:
 

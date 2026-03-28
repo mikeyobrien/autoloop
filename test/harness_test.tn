@@ -1,0 +1,282 @@
+# Tests for LoopHarness scratchpad rendering: prompt view compacts long histories,
+# while inspect scratchpad keeps the richer full-history projection.
+
+defmodule HarnessTest do
+  def test_prompt_scratchpad_keeps_short_runs_full() do
+    project_dir = prepare_fixture()
+    prompt = inspect_prompt(project_dir, 4)
+
+    Assert.refute(String.contains(prompt, "## Earlier iterations (compacted)"), "short runs should not use compact scratchpad header")
+    Assert.assert_contains(prompt, "Loop-owned working files belong under:")
+    Assert.assert_contains(prompt, "/.miniloop")
+    Assert.assert_contains(prompt, "Do not leave loop-owned artifacts at the repo root.")
+    Assert.assert_contains(prompt, "## Iteration 1")
+    Assert.assert_contains(prompt, "detail line for iteration 1 with enough text to make the scratchpad visibly grow")
+    Assert.assert_contains(prompt, "## Iteration 3")
+  end
+
+  def test_prompt_scratchpad_compacts_older_history_and_inspect_stays_full() do
+    project_dir = prepare_fixture()
+    prompt = inspect_prompt(project_dir, 6)
+    scratchpad = inspect_scratchpad(project_dir)
+
+    Assert.assert_contains(prompt, "## Earlier iterations (compacted)")
+    Assert.assert_contains(prompt, "- Iteration 1 exit_code=0 — worker iteration 1")
+    Assert.refute(String.contains(prompt, "detail line for iteration 1 with enough text to make the scratchpad visibly grow"), "old compacted iterations should not keep full detail in prompts")
+    Assert.assert_contains(prompt, "## Iteration 5")
+    Assert.assert_contains(prompt, "detail line for iteration 5 with enough text to make the scratchpad visibly grow")
+
+    Assert.refute(String.contains(scratchpad, "## Earlier iterations (compacted)"), "inspect scratchpad should stay rich/full")
+    Assert.assert_contains(scratchpad, "## Iteration 1")
+    Assert.assert_contains(scratchpad, "detail line for iteration 1 with enough text to make the scratchpad visibly grow")
+    Assert.assert_contains(scratchpad, "## Iteration 6")
+  end
+
+  def test_metrics_json_emits_numbers_and_booleans_without_quotes() do
+    project_dir = prepare_fixture()
+    metrics = inspect_metrics_json(project_dir)
+
+    Assert.assert_contains(metrics, "\"iteration\": 1")
+    Assert.assert_contains(metrics, "\"elapsed_s\": ")
+    Assert.assert_contains(metrics, "\"exit_code\": 0")
+    Assert.assert_contains(metrics, "\"timed_out\": false")
+    Assert.refute(String.contains(metrics, "\"iteration\": \"1\""), "iteration should be a JSON number")
+    Assert.refute(String.contains(metrics, "\"exit_code\": \"0\""), "exit_code should be a JSON number")
+    Assert.refute(String.contains(metrics, "\"timed_out\": \"false\""), "timed_out should be a JSON boolean")
+  end
+
+  def test_metrics_json_escapes_backslashes_and_control_chars() do
+    project_dir = metrics_json_escape_fixture_dir()
+    journal_dir = Path.join(project_dir, ".miniloops")
+    journal_path = Path.join(journal_dir, "journal.jsonl")
+    output_path = Path.join(project_dir, "out.json")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(journal_dir))
+    System.write_text(journal_path, metrics_json_escape_journal())
+
+    metrics = inspect_metrics_json_with_env(project_dir, journal_path, "run-1")
+    System.write_text(output_path, metrics)
+
+    parsed = System.run(
+      "python3 -c " <>
+      shell_quote(
+        "import json, pathlib; " <>
+        "doc = json.loads(pathlib.Path('" <> output_path <> "').read_text()); " <>
+        "assert 'quoted' in doc[0]['role']; " <>
+        "print('ok')"
+      )
+    )
+
+    Assert.assert_equal(Map.get(parsed, :exit_code, 1), 0)
+    Assert.assert_contains(metrics, "\\u000a")
+    Assert.assert_contains(metrics, "\\u000d")
+    Assert.assert_contains(metrics, "\\u0022quoted\\u0022")
+    Assert.assert_contains(metrics, "\\u005c")
+    Assert.assert_contains(Map.get(parsed, :output, ""), "ok")
+  end
+
+  def test_iteration_banners_expand_to_width_override() do
+    project_dir = prepare_fixture()
+    output = run_repo_command_with_env(project_dir, ".", "MINILOOPS_WIDTH=92")
+    expected_rule = pad_banner("━━━ iteration 1/6 ", "━", 92)
+    expected_bottom = String.duplicate("━", 92)
+
+    Assert.assert_equal(Map.get(output, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(output, :output, ""), expected_rule)
+    Assert.assert_contains(Map.get(output, :output, ""), expected_bottom)
+  end
+
+  def test_metrics_md_summary_preserves_decimal_elapsed_precision() do
+    project_dir = metrics_summary_fixture_dir()
+    journal_dir = Path.join(project_dir, ".miniloops")
+    journal_path = Path.join(journal_dir, "journal.jsonl")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(journal_dir))
+    System.write_text(journal_path, metrics_summary_journal())
+
+    metrics = inspect_metrics_md_with_env(project_dir, journal_path, "run-1")
+
+    Assert.assert_contains(metrics, "| 1 | worker | none | 1.9 | 0 | false | continue |")
+    Assert.assert_contains(metrics, "| 2 | worker | none | 2.4 | 0 | false | continue |")
+    Assert.assert_contains(metrics, "**Summary:** 2 iterations, 4.3s total elapsed, 0 distinct events")
+  end
+
+  defp prepare_fixture() do
+    project_dir = fixture_dir()
+    backend_path = Path.join(project_dir, "backend.sh")
+    roles_dir = Path.join(project_dir, "roles")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(roles_dir))
+
+    System.write_text(backend_path, backend_script())
+    System.run("chmod +x " <> shell_quote(backend_path))
+    System.write_text(Path.join(project_dir, "miniloops.toml"), miniloops_toml(backend_path))
+    System.write_text(Path.join(project_dir, "topology.toml"), topology_toml())
+    System.write_text(Path.join(project_dir, "harness.md"), "scratchpad verification harness\n")
+    System.write_text(Path.join(roles_dir, "worker.md"), "You are the worker. Emit the allowed event.\n")
+
+    run_result = run_repo_command(project_dir, ".")
+    Assert.assert_equal(Map.get(run_result, :exit_code, 1), 0)
+
+    project_dir
+  end
+
+  defp inspect_prompt(project_dir, iteration) do
+    result = run_repo_command(project_dir, "inspect prompt " <> to_string(iteration) <> " --format md")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_scratchpad(project_dir) do
+    result = run_repo_command(project_dir, "inspect scratchpad --format md")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_metrics_json(project_dir) do
+    result = run_repo_command(project_dir, "inspect metrics --format json")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_metrics_json_with_env(project_dir, journal_path, run_id) do
+    result = System.run(
+      "cd " <> shell_quote(project_dir) <>
+      " && " <> clean_miniloops_env() <>
+      " env MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_path) <>
+      " MINILOOPS_RUN_ID=" <> shell_quote(run_id) <>
+      " tonic run " <> shell_quote(repo_root()) <> " inspect metrics --format json"
+    )
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_metrics_md_with_env(project_dir, journal_path, run_id) do
+    result = System.run(
+      "cd " <> shell_quote(project_dir) <>
+      " && " <> clean_miniloops_env() <>
+      " env MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_path) <>
+      " MINILOOPS_RUN_ID=" <> shell_quote(run_id) <>
+      " tonic run " <> shell_quote(repo_root()) <> " inspect metrics --format md"
+    )
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp run_repo_command(project_dir, args) do
+    run_repo_command_with_env(project_dir, args, "")
+  end
+
+  defp run_repo_command_with_env(project_dir, args, extra_env) do
+    extra = case extra_env do
+      "" -> ""
+      value -> value <> " "
+    end
+
+    System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_miniloops_env() <> " " <> extra <> "tonic run " <> shell_quote(repo_root()) <> " " <> args)
+  end
+
+  defp clean_miniloops_env() do
+    "env" <>
+    " -u COLUMNS" <>
+    " -u MINILOOPS_ALLOWED_EVENTS" <>
+    " -u MINILOOPS_ALLOWED_ROLES" <>
+    " -u MINILOOPS_BIN" <>
+    " -u MINILOOPS_COMPLETION_EVENT" <>
+    " -u MINILOOPS_COMPLETION_PROMISE" <>
+    " -u MINILOOPS_EVENTS_FILE" <>
+    " -u MINILOOPS_ITERATION" <>
+    " -u MINILOOPS_JOURNAL_FILE" <>
+    " -u MINILOOPS_MEMORY_FILE" <>
+    " -u MINILOOPS_PROJECT_DIR" <>
+    " -u MINILOOPS_PROMPT" <>
+    " -u MINILOOPS_RECENT_EVENT" <>
+    " -u MINILOOPS_REQUIRED_EVENTS" <>
+    " -u MINILOOPS_RUN_ID" <>
+    " -u MINILOOPS_STATE_DIR" <>
+    " -u MINILOOPS_WIDTH"
+  end
+
+  defp backend_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "first_event=$(printf '%s' \"${MINILOOPS_ALLOWED_EVENTS:-}\" | awk -F, '{print $1}')\n" <>
+    "printf 'worker iteration %s\\n' \"${MINILOOPS_ITERATION:-?}\"\n" <>
+    "printf 'detail line for iteration %s with enough text to make the scratchpad visibly grow\\n' \"${MINILOOPS_ITERATION:-?}\"\n" <>
+    "printf 'another detail line for iteration %s\\n' \"${MINILOOPS_ITERATION:-?}\"\n" <>
+    "if [ -n \"$first_event\" ] && [ -n \"${MINILOOPS_BIN:-}\" ]; then\n" <>
+    "  \"$MINILOOPS_BIN\" emit \"$first_event\" \"handoff from iteration ${MINILOOPS_ITERATION:-?}\"\n" <>
+    "fi\n"
+  end
+
+  defp miniloops_toml(backend_path) do
+    "event_loop.max_iterations = 6\n" <>
+    "event_loop.completion_event = \"task.complete\"\n" <>
+    "backend.kind = \"command\"\n" <>
+    "backend.command = \"" <> backend_path <> "\"\n" <>
+    "backend.timeout_ms = 10000\n" <>
+    "review.enabled = false\n" <>
+    "memory.prompt_budget_chars = 1600\n" <>
+    "harness.instructions_file = \"harness.md\"\n" <>
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+  end
+
+  defp topology_toml() do
+    "name = \"compact-check\"\n" <>
+    "completion = \"task.complete\"\n\n" <>
+    "[[role]]\n" <>
+    "id = \"worker\"\n" <>
+    "emits = [\"loop.next\"]\n" <>
+    "prompt_file = \"roles/worker.md\"\n\n" <>
+    "[handoff]\n" <>
+    "\"loop.start\" = [\"worker\"]\n" <>
+    "\"loop.next\" = [\"worker\"]\n"
+  end
+
+  defp fixture_dir() do
+    "/tmp/miniloops-scratchpad-fixture"
+  end
+
+  defp metrics_summary_fixture_dir() do
+    "/tmp/miniloops-metrics-summary-fixture"
+  end
+
+  defp metrics_json_escape_fixture_dir() do
+    "/tmp/miniloops-json-escape-fixture"
+  end
+
+  defp metrics_summary_journal() do
+    "{\"run\": \"run-1\", \"topic\": \"loop.start\", \"fields\": {}}\n" <>
+    "{\"run\": \"run-1\", \"iteration\": \"1\", \"topic\": \"iteration.start\", \"fields\": {\"suggested_roles\": \"worker\"}}\n" <>
+    "{\"run\": \"run-1\", \"iteration\": \"1\", \"topic\": \"iteration.finish\", \"fields\": {\"exit_code\": \"0\", \"timed_out\": false, \"elapsed_s\": \"1.9\", \"output\": \"\"}}\n" <>
+    "{\"run\": \"run-1\", \"iteration\": \"2\", \"topic\": \"iteration.start\", \"fields\": {\"suggested_roles\": \"worker\"}}\n" <>
+    "{\"run\": \"run-1\", \"iteration\": \"2\", \"topic\": \"iteration.finish\", \"fields\": {\"exit_code\": \"0\", \"timed_out\": false, \"elapsed_s\": \"2.4\", \"output\": \"\"}}\n"
+  end
+
+  defp metrics_json_escape_journal() do
+    "{\"run\": \"run-1\", \"topic\": \"loop.start\", \"fields\": {}}\n" <>
+    "{\"run\": \"run-1\", \"iteration\": \"1\", \"topic\": \"iteration.start\", \"fields\": {\"suggested_roles\": \"path \\\\temp\\u000aline2\\u000dline3 \\u0022quoted\\u0022\"}}\n" <>
+    "{\"run\": \"run-1\", \"iteration\": \"1\", \"topic\": \"iteration.finish\", \"fields\": {\"exit_code\": \"0\", \"timed_out\": false, \"elapsed_s\": \"1.2\", \"output\": \"\"}}\n"
+  end
+
+  defp repo_root() do
+    "/Users/rook/projects/tonic-loops"
+  end
+
+  defp pad_banner(text, char, width) do
+    len = String.length(text)
+
+    case len >= width do
+      true -> text
+      _ -> text <> String.duplicate(char, width - len)
+    end
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
+  end
+end

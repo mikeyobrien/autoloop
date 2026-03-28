@@ -11,7 +11,7 @@ Across the family, the intended posture is fail-closed rather than rubber-stamp:
 Code implementation loop. Takes a task description (prose, `.code-task.md` path, or existing implementation directory), breaks it into slices, builds each slice, reviews, and gates completion. The critic is expected to independently manual-smoke the builder's changed code path whenever a practical executable surface exists.
 
 **Shape:** planner → builder → critic → finalizer
-**Shared state:** `context.md`, `plan.md`, `progress.md`, `logs/`
+**Shared state:** `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, `.miniloop/logs/`
 **Example:** `presets/autocode/`
 
 ### autospec
@@ -19,7 +19,7 @@ Code implementation loop. Takes a task description (prose, `.code-task.md` path,
 Specification loop. Takes a rough idea, local note, or draft spec and turns it into a durable RFC + `.code-task.md` pair. Clarifies scope first, inspects repo conventions and adjacent code/docs, drafts the design doc, drafts the implementation task, and adversarially checks that the pair is aligned and executable.
 
 **Shape:** clarifier → researcher → designer → planner → critic
-**Shared state:** `spec-brief.md`, `spec-research.md`, `progress.md`
+**Shared state:** `.miniloop/spec-brief.md`, `.miniloop/spec-research.md`, `.miniloop/progress.md`
 **Example:** `presets/autospec/`
 
 ### autosimplify
@@ -27,7 +27,7 @@ Specification loop. Takes a rough idea, local note, or draft spec and turns it i
 Post-implementation cleanup loop. Focuses on recently modified code, identifies safe opportunities to improve reuse, clarity, and obvious efficiency, applies behavior-preserving simplifications, and independently verifies that the result is actually cleaner.
 
 **Shape:** scoper → reviewer → simplifier → verifier
-**Shared state:** `simplify-context.md`, `simplify-plan.md`, `progress.md`
+**Shared state:** `.miniloop/simplify-context.md`, `.miniloop/simplify-plan.md`, `.miniloop/progress.md`
 **Example:** `presets/autosimplify/`
 
 ### autoideas
@@ -35,7 +35,7 @@ Post-implementation cleanup loop. Focuses on recently modified code, identifies 
 Repository survey and improvement report. Scans a target repo for areas worth improving, deep-dives each area, validates suggestion quality, and compiles an actionable report.
 
 **Shape:** scanner → analyst → reviewer → synthesizer
-**Shared state:** `scan-areas.md`, `progress.md`, `ideas-report.md`
+**Shared state:** `.miniloop/scan-areas.md`, `.miniloop/progress.md`, `.miniloop/ideas-report.md`
 **Example:** `presets/autoideas/`
 
 ### autoresearch
@@ -43,7 +43,7 @@ Repository survey and improvement report. Scans a target repo for areas worth im
 Autonomous experiment loop. Hypothesize, implement, measure, keep or discard. Supports LLM-as-judge for semantic evaluation when hard metrics are insufficient.
 
 **Shape:** strategist → implementer → benchmarker → evaluator
-**Shared state:** `autoresearch.md`, `experiments.jsonl`, `progress.md`
+**Shared state:** `.miniloop/autoresearch.md`, `.miniloop/experiments.jsonl`, `.miniloop/progress.md`
 **Example:** `presets/autoresearch/`
 
 ### autoqa
@@ -51,7 +51,7 @@ Autonomous experiment loop. Hypothesize, implement, measure, keep or discard. Su
 Native, zero-dependency validation orchestration. Inspects the target repo, infers its domain, selects the idiomatic validation surface, writes a validation plan, and executes it — all without installing external test frameworks.
 
 **Shape:** inspector → planner → executor → reporter
-**Shared state:** `qa-plan.md`, `qa-report.md`, `progress.md`
+**Shared state:** `.miniloop/qa-plan.md`, `.miniloop/qa-report.md`, `.miniloop/progress.md`
 **Example:** `presets/autoqa/`
 
 ### autotest
@@ -59,7 +59,7 @@ Native, zero-dependency validation orchestration. Inspects the target repo, infe
 Formal test creation and test-suite tightening. Surveys the codebase for coverage gaps, writes new tests using the repo's existing framework and conventions, runs them, and assesses quality improvement.
 
 **Shape:** surveyor → writer → runner → assessor
-**Shared state:** `test-plan.md`, `test-report.md`, `progress.md`
+**Shared state:** `.miniloop/test-plan.md`, `.miniloop/test-report.md`, `.miniloop/progress.md`
 **Example:** `presets/autotest/`
 
 ### autofix
@@ -67,7 +67,7 @@ Formal test creation and test-suite tightening. Surveys the codebase for coverag
 Bug diagnosis and repair. Narrower than autocode — starts from a bug report or failing test rather than a feature request. Reproduces the issue, traces the root cause, implements a minimal fix, and verifies with regression checks.
 
 **Shape:** diagnoser → fixer → verifier → closer
-**Shared state:** `bug-report.md`, `fix-log.md`, `progress.md`
+**Shared state:** `.miniloop/bug-report.md`, `.miniloop/fix-log.md`, `.miniloop/progress.md`
 **Example:** `presets/autofix/`
 
 ### autoreview
@@ -75,7 +75,7 @@ Bug diagnosis and repair. Narrower than autocode — starts from a bug report or
 Code review loop. Reads a PR diff or set of changes, checks for correctness, security, style, performance, and maintainability issues, proposes concrete fixes, and produces structured review feedback with a clear verdict.
 
 **Shape:** reader → checker → suggester → summarizer
-**Shared state:** `review-context.md`, `review-findings.md`, `progress.md`
+**Shared state:** `.miniloop/review-context.md`, `.miniloop/review-findings.md`, `.miniloop/progress.md`
 **Example:** `presets/autoreview/`
 
 ### autodoc
@@ -83,7 +83,7 @@ Code review loop. Reads a PR diff or set of changes, checks for correctness, sec
 Documentation generation and maintenance. Audits existing docs against the codebase, identifies gaps and staleness, writes or updates documentation, and then adversarially verifies accuracy against the actual code before publishing.
 
 **Shape:** auditor → writer → checker → publisher
-**Shared state:** `doc-plan.md`, `doc-report.md`, `progress.md`
+**Shared state:** `.miniloop/doc-plan.md`, `.miniloop/doc-report.md`, `.miniloop/progress.md`
 **Example:** `presets/autodoc/`
 
 ### autosec
@@ -91,7 +91,7 @@ Documentation generation and maintenance. Audits existing docs against the codeb
 Security audit and hardening. Scans for OWASP top-10 vulnerabilities, dependency issues, secret leaks, and configuration weaknesses. Each finding is confirmed or dismissed with evidence, then fixed with standard security patterns.
 
 **Shape:** scanner → analyst → hardener → reporter
-**Shared state:** `sec-findings.md`, `sec-report.md`, `progress.md`
+**Shared state:** `.miniloop/sec-findings.md`, `.miniloop/sec-report.md`, `.miniloop/progress.md`
 **Example:** `presets/autosec/`
 
 ### autoperf
@@ -99,7 +99,7 @@ Security audit and hardening. Scans for OWASP top-10 vulnerabilities, dependency
 Performance profiling and optimization. Identifies hot paths, establishes baselines, implements targeted optimizations, measures results, and keeps or discards changes — similar to autoresearch but scoped to performance.
 
 **Shape:** profiler → optimizer → measurer → judge
-**Shared state:** `perf-profile.md`, `perf-log.jsonl`, `progress.md`
+**Shared state:** `.miniloop/perf-profile.md`, `.miniloop/perf-log.jsonl`, `.miniloop/progress.md`
 **Example:** `presets/autoperf/`
 
 ## Naming guidance

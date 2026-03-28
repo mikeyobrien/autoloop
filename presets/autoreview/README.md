@@ -38,9 +38,9 @@ AutoReview is skeptical by default.
 
 ## Shared working files created by the loop
 
-- `review-context.md` — diff summary, affected files, architectural context, risk map
-- `review-findings.md` — structured findings with suggestions and verdict
-- `progress.md` — review pass tracking
+- `.miniloop/review-context.md` — diff summary, affected files, architectural context, risk map
+- `.miniloop/review-findings.md` — structured findings with suggestions and verdict
+- `.miniloop/progress.md` — review pass tracking
 
 ## Run
 

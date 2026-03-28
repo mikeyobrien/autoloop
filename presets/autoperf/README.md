@@ -43,9 +43,9 @@ AutoPerf should distrust claimed wins.
 
 ## Shared working files created by the loop
 
-- `perf-profile.md` — goal, baselines, identified hot paths
-- `perf-log.jsonl` — append-only log of optimization attempts and verdicts
-- `progress.md` — current optimization tracking
+- `.miniloop/perf-profile.md` — goal, baselines, identified hot paths
+- `.miniloop/perf-log.jsonl` — append-only log of optimization attempts and verdicts
+- `.miniloop/progress.md` — current optimization tracking
 
 ## Run
 

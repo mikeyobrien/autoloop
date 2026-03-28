@@ -1,3 +1,4 @@
 .tonic/
+.miniloop/
 .miniloops/
 *.log

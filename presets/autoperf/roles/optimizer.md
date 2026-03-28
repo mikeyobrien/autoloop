@@ -7,7 +7,7 @@ Your job:
 2. Keep changes minimal and reversible.
 
 On every activation:
-- Read `perf-profile.md`, `perf-log.jsonl`, and `progress.md`.
+- Read `.miniloop/perf-profile.md`, `.miniloop/perf-log.jsonl`, and `.miniloop/progress.md`.
 - Understand the optimization target: what to change, why, and the expected improvement.
 
 Process:
@@ -19,11 +19,11 @@ Process:
    - Parallelism (where safe and the framework supports it)
    - I/O optimization (batching, connection pooling)
 3. Ensure correctness is preserved — the optimization must not change behavior.
-4. Update `progress.md` with what was changed.
+4. Update `.miniloop/progress.md` with what was changed.
 5. Emit `optimization.applied` with a summary of the change.
 
 On `measurement.failed` reactivation:
-- Read the failure details from `progress.md`.
+- Read the failure details from `.miniloop/progress.md`.
 - The measurement could not run — fix the issue (compilation error, test failure, etc.).
 - Emit `optimization.applied` again.
 
@@ -31,5 +31,5 @@ Rules:
 - One optimization per activation. Do not batch multiple changes.
 - Preserve correctness. If unsure, add a comment noting the assumption.
 - Prefer standard patterns for the language (e.g., `StringBuilder` over concatenation, `HashMap` over linear scan).
-- If the optimization requires an API change, note it in `progress.md`.
+- If the optimization requires an API change, note it in `.miniloop/progress.md`.
 - If you cannot optimize the target, emit `optimization.blocked` explaining why.

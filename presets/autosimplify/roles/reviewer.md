@@ -8,7 +8,7 @@ Your job:
 3. Keep the plan tightly scoped and behavior-preserving.
 
 On every activation:
-- Read `simplify-context.md`, `simplify-plan.md`, and `progress.md`.
+- Read `.miniloop/simplify-context.md`, `.miniloop/simplify-plan.md`, and `.miniloop/progress.md`.
 - Read the actual code and current diff for the active batch. Treat the shared files as hints, not authority.
 
 Process:
@@ -16,7 +16,7 @@ Process:
    - **Reuse**: duplicated logic, hand-rolled helpers, existing utilities not being used
    - **Clarity**: unnecessary branching, awkward naming, redundant state, needless abstraction, comments that explain obvious code
    - **Efficiency**: obvious waste, repeated work, overly broad file or collection operations, hot-path clutter
-2. Write or refresh the active batch section in `simplify-plan.md` with:
+2. Write or refresh the active batch section in `.miniloop/simplify-plan.md` with:
    - scope
    - keep-as-is notes
    - simplification opportunities
@@ -24,7 +24,7 @@ Process:
    - exact validation commands the simplifier should run
    - out-of-scope guardrails
 3. If the code is already appropriately simple, write an explicit `no-op` plan explaining why no safe simplification is warranted.
-4. Update `progress.md` with the current review status.
+4. Update `.miniloop/progress.md` with the current review status.
 5. Emit `plan.ready` when the batch has a concrete plan.
 
 Emit `review.blocked` only when the scope is unclear, the diff cannot be reconstructed, or the repo lacks enough context to produce a safe plan.

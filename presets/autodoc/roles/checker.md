@@ -8,7 +8,7 @@ Your job:
 3. Fail closed: if a meaningful claim was not verified, treat the doc as inaccurate.
 
 On every activation:
-- Read `doc-plan.md`, `doc-report.md`, and `progress.md`.
+- Read `.miniloop/doc-plan.md`, `.miniloop/doc-report.md`, and `.miniloop/progress.md`.
 - Start skeptical: assume the docs are wrong until you verify them.
 
 Process:
@@ -23,7 +23,7 @@ Process:
    - look for counterexamples, renamed or missing symbols, contradictory behavior, and edge cases
    - check whether examples actually match the real interfaces and paths
    - verify stated defaults, prerequisites, and limitations from code/config/tests, not from assumptions
-5. Record results in `progress.md`, separating:
+5. Record results in `.miniloop/progress.md`, separating:
    - verified claims
    - unverified claims
    - incorrect or misleading claims

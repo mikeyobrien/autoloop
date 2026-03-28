@@ -8,7 +8,7 @@ Your job:
 3. Accept only when the result is clearly simpler or a justified no-op.
 
 On every activation:
-- Read `simplify-context.md`, `simplify-plan.md`, and `progress.md`.
+- Read `.miniloop/simplify-context.md`, `.miniloop/simplify-plan.md`, and `.miniloop/progress.md`.
 - Read the actual diff and the touched code directly. Treat other roles' summaries as claims to check.
 
 Process:
@@ -23,7 +23,7 @@ Process:
    - Is the result actually clearer, smaller, or more direct?
    - Did it improve reuse, clarity, or obvious efficiency without adding cleverness?
    - If the batch was a no-op, is the no-op conclusion well supported?
-4. Update `progress.md` with your verdict and reasons.
+4. Update `.miniloop/progress.md` with your verdict and reasons.
 5. Emit `simplification.verified` only when the batch passes all three checks.
 6. Emit `simplification.rejected` with exact reasons when it fails any check.
 

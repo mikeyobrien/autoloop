@@ -1,6 +1,6 @@
 # Memory Reference
 
-Loop memory is a persistent, append-only store that carries learnings, preferences, and metadata across iterations and runs. It lives in `.miniloops/memory.jsonl` and is injected into each iteration prompt within a configurable character budget.
+Loop memory is a persistent, append-only store that carries learnings, preferences, and metadata across iterations and runs. It lives in `.miniloop/memory.jsonl` and is injected into each iteration prompt within a configurable character budget.
 
 Memory is **durable** — entries survive across runs. It is also **soft-deletable** — entries are never physically removed; instead, a tombstone entry marks the target as inactive.
 
@@ -109,9 +109,11 @@ Meta:
 
 Empty categories are omitted. If no entries survive materialization, the memory block is omitted entirely.
 
+Normal iteration prompts and hyperagent review prompts also include a small **Context pressure** summary derived from the same materialized memory. That summary reports rendered memory size vs budget, active entry counts by category, and whether the prompt memory is currently being truncated.
+
 ### Budget truncation
 
-The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **1600**). If the text exceeds the budget, it is sliced at the character boundary and `\n...` is appended to signal truncation. A budget of `0` disables truncation.
+The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **8000**). If the text exceeds the budget, it is sliced at the character boundary and `\n...` is appended to signal truncation. A budget of `0` disables truncation. When truncation happens, the separate **Context pressure** block still reports the full rendered size so the agent and hyperagent can tell that prompt memory is under pressure even though the visible memory block has been clipped.
 
 ## CLI commands
 
@@ -167,8 +169,8 @@ miniloops inspect memory --format json   # raw JSONL content
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `memory.prompt_budget_chars` | int | `1600` | Character budget for prompt injection. `0` disables truncation. |
-| `core.memory_file` | string | `".miniloops/memory.jsonl"` | Path to the memory file, relative to the project directory. |
+| `memory.prompt_budget_chars` | int | `8000` | Character budget for prompt injection. `0` disables truncation. |
+| `core.memory_file` | string | `".miniloop/memory.jsonl"` | Path to the memory file, relative to the project directory. |
 
 ## Environment
 
