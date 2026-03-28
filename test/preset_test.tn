@@ -104,9 +104,9 @@ defmodule PresetConfig do
   end
 
   defp merge_key_value(result, key, over_val) do
-    case Map.has_key(result, key) do
-      true -> merge_value(Map.get(result, key, nil), over_val)
-      _ -> over_val
+    case Map.get(result, key, nil) do
+      nil -> over_val
+      base_val -> merge_value(base_val, over_val)
     end
   end
 
