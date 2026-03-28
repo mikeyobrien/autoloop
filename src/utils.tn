@@ -68,6 +68,18 @@ defmodule LoopUtils do
 """
   end
 
+  def join_lines([]) do
+    ""
+  end
+
+  def join_lines([line]) do
+    line
+  end
+
+  def join_lines([line | rest]) do
+    line <> line_sep() <> join_lines(rest)
+  end
+
   def nonempty_or("", fallback) do
     fallback
   end

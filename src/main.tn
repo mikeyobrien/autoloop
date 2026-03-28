@@ -29,6 +29,16 @@ defmodule Demo do
     LoopHarness.emit(resolve_runtime_project_dir(), topic, join_tokens(rest))
   end
 
+  defp dispatch(["list"], _argv) do
+    handle_list_presets()
+  end
+
+  defp dispatch(["list", "--help"], _argv) do
+    IO.puts("Usage: miniloops list")
+    IO.puts("")
+    IO.puts("Lists all bundled presets.")
+  end
+
   defp dispatch(["inspect"], _argv) do
     print_inspect_usage()
   end
@@ -167,6 +177,20 @@ defmodule Demo do
       nil -> LoopHarness.run(Map.get(options, :project_dir, "."), normalize_prompt(Map.get(options, :prompt, nil)), self_command(argv), options)
       chain_csv -> run_inline_chain(chain_csv, Map.get(options, :project_dir, "."), self_command(argv), options)
     end
+  end
+
+  defp handle_list_presets() do
+    presets = LoopChains.list_known_presets()
+    print_preset_list(presets)
+  end
+
+  defp print_preset_list([]) do
+    :ok
+  end
+
+  defp print_preset_list([preset | rest]) do
+    IO.puts(preset)
+    print_preset_list(rest)
   end
 
   defp handle_chain_list(project_dir) do
@@ -334,6 +358,16 @@ defmodule Demo do
 
   defp dispatch_inspect(artifact, _selector, _project_dir, format) do
     IO.puts("unsupported inspect target `" <> artifact <> "` with format `" <> format <> "`")
+    IO.puts("")
+    IO.puts("Valid targets and formats:")
+    IO.puts("  scratchpad   md, terminal")
+    IO.puts("  memory       md, terminal, json")
+    IO.puts("  journal      json")
+    IO.puts("  coordination md, terminal")
+    IO.puts("  metrics      md, terminal, csv, json")
+    IO.puts("  chain        md, terminal")
+    IO.puts("  prompt       md, terminal        (requires iteration selector)")
+    IO.puts("  output       text                (requires iteration selector)")
   end
 
   defp parse_inspect_args(args) do
@@ -488,6 +522,7 @@ defmodule Demo do
 
   defp inspect_usage_error(message) do
     IO.puts(message)
+    IO.puts("Run 'miniloops inspect --help' for valid targets and usage.")
     %{artifact: "", positionals: [], format: ""}
   end
 
@@ -756,6 +791,8 @@ defmodule Demo do
     IO.puts("  miniloops run autocode \"Fix the login bug\"")
     IO.puts("  miniloops run presets/autoqa \"QA recent changes\"")
     IO.puts("  miniloops run . \"Run from current directory\"")
+    IO.puts("")
+    IO.puts("Run 'miniloops list' to see all available presets.")
     Map.put(default_run_options(), :usage_error, true)
   end
 
@@ -764,7 +801,10 @@ defmodule Demo do
     IO.puts("")
     IO.puts("The argument `" <> name <> "` is not a valid preset name or directory.")
     IO.puts("A preset must be a directory containing miniloops.toml (or miniloops.conf),")
-    IO.puts("or a bundled preset name like `autocode`, `autoqa`, etc.")
+    IO.puts("or a bundled preset name.")
+    IO.puts("")
+    IO.puts("Available presets: " <> LoopUtils.join_csv(LoopChains.list_known_presets()))
+    IO.puts("Run 'miniloops list' to see all available presets.")
     IO.puts("")
     IO.puts("Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
     Map.put(default_run_options(), :usage_error, true)
@@ -837,6 +877,10 @@ defmodule Demo do
     true
   end
 
+  defp cli_command("list") do
+    true
+  end
+
   defp cli_command("chain") do
     true
   end
@@ -861,6 +905,7 @@ defmodule Demo do
     IO.puts("  miniloops emit <topic> [summary]")
     IO.puts("  miniloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]")
     IO.puts("  miniloops memory <list|add|remove> [args]")
+    IO.puts("  miniloops list")
     IO.puts("  miniloops chain <list|run> [args]")
     IO.puts("")
     IO.puts("The preset argument is required for `run`. It must be a bundled preset")

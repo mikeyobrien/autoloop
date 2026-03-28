@@ -323,8 +323,9 @@ defmodule LoopHarness do
     memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
     memory_stats = LoopMemory.stats_file(memory_file(loop), memory_budget_chars(loop))
     invalid_count = invalid_event_count(run_lines, 0)
+    last_rejected = last_rejected_topic(run_lines, "")
 
-    %{iteration: iteration, recent_event: recent_event, allowed_roles: allowed_roles, allowed_events: allowed_events, backpressure: backpressure, scratchpad_text: scratchpad_text, memory_text: memory_text, prompt: render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, scratchpad_text, memory_text, memory_stats)}
+    %{iteration: iteration, recent_event: recent_event, allowed_roles: allowed_roles, allowed_events: allowed_events, backpressure: backpressure, last_rejected: last_rejected, scratchpad_text: scratchpad_text, memory_text: memory_text, prompt: render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, last_rejected, scratchpad_text, memory_text, memory_stats)}
   end
 
   defp iteration_routing_context(topology, run_lines) do
@@ -494,6 +495,8 @@ defmodule LoopHarness do
 
   defp reject_invalid_and_continue(loop, iter, emitted_topic) do
     append_invalid_event(journal_file(loop), run_id(loop), iteration_string(iter), recent_event(iter), emitted_topic, allowed_roles(iter), allowed_events(iter))
+
+    print_lines(["[reject] invalid event `" <> emitted_topic <> "`; recent event: `" <> recent_event(iter) <> "`; allowed next events: " <> LoopUtils.list_text(allowed_events(iter))])
 
     iterate(loop, iteration(iter) + 1)
   end
@@ -1480,6 +1483,7 @@ defmodule LoopHarness do
     completed_iterations = max_iteration_stop_count(iteration)
     limit = max_iterations(loop)
     log(loop, :warn, "loop stop reason=max_iterations completed_iterations=" <> to_string(completed_iterations) <> " max_iterations=" <> to_string(limit))
+    print_lines(["Reached iteration limit: " <> to_string(completed_iterations) <> "/" <> to_string(limit) <> " iterations completed."])
     append_event(journal_file(loop), run_id(loop), "", "loop.stop", LoopJson.json_field("reason", "max_iterations") <> ", " <> LoopJson.json_field("completed_iterations", to_string(completed_iterations)) <> ", " <> LoopJson.json_field("stopped_before_iteration", to_string(iteration)) <> ", " <> LoopJson.json_field("max_iterations", to_string(limit)))
 
     %{iterations: completed_iterations, stop_reason: "max_iterations"}
@@ -1494,7 +1498,7 @@ defmodule LoopHarness do
 
   defp stop_backend_failed(loop, iteration, output) do
     log(loop, :error, "loop stop reason=backend_failed iteration=" <> to_string(iteration))
-    print_failure_diagnostic(output)
+    print_failure_diagnostic(output, "backend_failed")
     tail = last_n_chars(output, 500)
     append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", LoopJson.json_field("reason", "backend_failed") <> ", " <> LoopJson.json_field("iteration", to_string(iteration)) <> ", " <> LoopJson.json_field("output_tail", tail))
 
@@ -1503,7 +1507,7 @@ defmodule LoopHarness do
 
   defp stop_backend_timeout(loop, iteration, output) do
     log(loop, :error, "loop stop reason=backend_timeout iteration=" <> to_string(iteration))
-    print_failure_diagnostic(output)
+    print_failure_diagnostic(output, "backend_timeout")
     tail = last_n_chars(output, 500)
     append_event(journal_file(loop), run_id(loop), to_string(iteration), "loop.stop", LoopJson.json_field("reason", "backend_timeout") <> ", " <> LoopJson.json_field("iteration", to_string(iteration)) <> ", " <> LoopJson.json_field("output_tail", tail))
 
@@ -1654,10 +1658,10 @@ defmodule LoopHarness do
     "#!/bin/sh\n" <> "set -eu\n" <> "exec " <> self_command(loop) <> " pi-adapter \"$@\"\n"
   end
 
-  defp render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, scratchpad_text, memory_text, memory_stats) do
+  defp render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, last_rejected, scratchpad_text, memory_text, memory_stats) do
     "You are inside a bare-minimal miniloops harness.\n\n" <>
     harness_instructions_text(loop) <>
-    context_pressure_text(memory_stats, invalid_count) <>
+    context_pressure_text(memory_stats, invalid_count, last_rejected) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
     LoopTopology.render_with_context(topology(loop), recent_event, allowed_roles, allowed_events) <> "\n" <>
@@ -1740,10 +1744,10 @@ defmodule LoopHarness do
     end
   end
 
-  defp context_pressure_text(memory_stats, invalid_count) do
+  defp context_pressure_text(memory_stats, invalid_count, last_rejected) do
     "Context pressure:\n" <>
     "- Memory: " <> memory_pressure_summary(memory_stats) <> "\n" <>
-    "- Invalid emits this run: " <> to_string(invalid_count) <> invalid_emit_hint(invalid_count) <> "\n" <>
+    "- Invalid emits this run: " <> to_string(invalid_count) <> invalid_emit_hint(invalid_count, last_rejected) <> "\n" <>
     context_pressure_recommendation(memory_stats, invalid_count)
   end
 
@@ -1756,7 +1760,7 @@ defmodule LoopHarness do
     meta = Map.get(memory_stats, :meta, 0)
 
     case Map.get(memory_stats, :truncated, false) do
-      true -> to_string(rendered_chars) <> "/" <> to_string(budget_chars) <> " chars across " <> to_string(total_entries) <> " entries (" <> to_string(preferences) <> " preferences, " <> to_string(learnings) <> " learnings, " <> to_string(meta) <> " meta) — truncated by " <> to_string(rendered_chars - budget_chars) <> " chars"
+      true -> to_string(rendered_chars) <> "/" <> to_string(budget_chars) <> " chars across " <> to_string(total_entries) <> " entries (" <> to_string(preferences) <> " preferences, " <> to_string(learnings) <> " learnings, " <> to_string(meta) <> " meta) — truncated by " <> to_string(rendered_chars - budget_chars) <> " chars (drop order: meta → learnings → preferences)"
       _ -> memory_pressure_summary_within_budget(rendered_chars, budget_chars, total_entries, preferences, learnings, meta)
     end
   end
@@ -1768,12 +1772,16 @@ defmodule LoopHarness do
     end
   end
 
-  defp invalid_emit_hint(0) do
+  defp invalid_emit_hint(0, _last_rejected) do
     ""
   end
 
-  defp invalid_emit_hint(_invalid_count) do
+  defp invalid_emit_hint(_invalid_count, "") do
     " — routing is currently under backpressure"
+  end
+
+  defp invalid_emit_hint(_invalid_count, last_rejected) do
+    " — routing backpressure; last rejected: `" <> last_rejected <> "`"
   end
 
   defp context_pressure_recommendation(memory_stats, invalid_count) do
@@ -1937,11 +1945,12 @@ defmodule LoopHarness do
     recent_event = Map.get(routing, :recent_event, "loop.start")
     backpressure = latest_invalid_note(run_lines, "")
     invalid_count = invalid_event_count(run_lines, 0)
+    last_rejected = last_rejected_topic(run_lines, "")
     latest_iteration = to_string(max_review_prompt_iteration(run_lines))
 
     "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" <> "Safe edit targets include `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `" <> state_dir(loop) <> "/context.md`, `" <> state_dir(loop) <> "/plan.md`, `" <> state_dir(loop) <> "/progress.md`, `" <> state_dir(loop) <> "/logs/`, and `" <> state_dir(loop) <> "/docs/*.md`.\n" <> "Keep loop-owned artifacts under `" <> state_dir(loop) <> "/`; do not leave loop-owned working files at the repo root.\n" <> "Use `" <> tool_path(loop) <> " memory add ...` for short durable lessons or operator notes that should persist across turns.\n" <> "Do not edit app/product source code, tests, package manifests, generated state under `" <> state_dir(loop) <> "/`, or journal history during review.\n" <> "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" <> "Do not emit normal loop events during review.\n\n" <>
     review_instructions_text(loop) <>
-    context_pressure_text(memory_stats, invalid_count) <>
+    context_pressure_text(memory_stats, invalid_count, last_rejected) <>
     backpressure_text(backpressure) <>
     memory_text_block(memory_text) <> "Review trigger iteration: #{iteration}\n" <> "Latest routing event: " <> recent_event <> "\n\n" <>
     LoopTopology.render_with_context(topology(loop), recent_event, Map.get(routing, :allowed_roles, []), Map.get(routing, :allowed_events, [])) <> "\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Useful commands:\n" <>
@@ -2076,6 +2085,20 @@ defmodule LoopHarness do
     end
 
     invalid_event_count(rest, next)
+  end
+
+  defp last_rejected_topic([], acc) do
+    acc
+  end
+
+  defp last_rejected_topic([line | rest], acc) do
+    next =
+    case extract_topic(line) do
+      "event.invalid" -> extract_field(line, "emitted")
+      _ -> acc
+    end
+
+    last_rejected_topic(rest, next)
   end
 
   defp clear_note_after_valid_emit(topic, note) do
@@ -2849,8 +2872,25 @@ defmodule LoopHarness do
 
   defp print_summary(summary, loop) do
     stop_reason = Map.get(summary, :stop_reason, "unknown")
+    hint = stop_reason_hint(stop_reason)
 
-    print_lines(["miniloops summary", "===================","run_id: #{run_id(loop)}","iterations: #{Map.get(summary, :iterations, 0)}","stop_reason: #{stop_reason}","journal: #{journal_file(loop)}","memory: #{memory_file(loop)}","review_every: #{review_every(loop)}","inspect scratchpad: #{tool_path(loop)} inspect scratchpad --format md"])
+    print_lines(["miniloops summary", "===================","run_id: #{run_id(loop)}","iterations: #{Map.get(summary, :iterations, 0)}","stop_reason: #{stop_reason}","journal: #{journal_file(loop)}","memory: #{memory_file(loop)}","review_every: #{review_every(loop)}","inspect scratchpad: #{tool_path(loop)} inspect scratchpad --format md"] ++ hint)
+  end
+
+  defp stop_reason_hint("backend_failed") do
+    ["Hint: check the backend output above; common causes: invalid API key, model not available, network error."]
+  end
+
+  defp stop_reason_hint("backend_timeout") do
+    ["Hint: the backend did not respond in time. Try increasing timeout or check backend availability."]
+  end
+
+  defp stop_reason_hint("max_iterations") do
+    ["Hint: loop reached the iteration limit without a completion event. Increase max_iterations or check if agents are stuck."]
+  end
+
+  defp stop_reason_hint(_reason) do
+    []
   end
 
   defp print_text(text) do
@@ -2888,9 +2928,18 @@ defmodule LoopHarness do
     width = banner_width("━━━ " <> iter_label <> " ")
     rule = pad_right("━━━ " <> iter_label <> " ", "━", width)
     role_line = "role: " <> LoopUtils.list_text(allowed_roles(iter)) <> " │ event: " <> recent_event(iter) <> " │ next: " <> LoopUtils.list_text(allowed_events(iter))
+    rejection_line = banner_rejection_line(Map.get(iter, :last_rejected, ""))
     bottom_rule = String.duplicate("━", width)
 
-    print_lines(["", rule, role_line, bottom_rule])
+    print_lines(["", rule, role_line] ++ rejection_line ++ [bottom_rule])
+  end
+
+  defp banner_rejection_line("") do
+    []
+  end
+
+  defp banner_rejection_line(last_rejected) do
+    ["↳ previous emit rejected: `" <> last_rejected <> "` — rerouting"]
   end
 
   defp print_iteration_footer(iter, elapsed_s) do
@@ -3310,12 +3359,21 @@ defmodule LoopHarness do
     log_level(loop)
   end
 
-  defp print_failure_diagnostic(output) do
+  defp print_failure_diagnostic(output, stop_reason) do
     tail = last_n_lines(output, 15)
+    header = failure_diagnostic_header(stop_reason)
     case tail do
       "" -> :ok
-      _ -> print_lines(["", "── backend output (last 15 lines) ──", tail, "──────────────────────────────────────"])
+      _ -> print_lines(["", header, tail, "──────────────────────────────────────"])
     end
+  end
+
+  defp failure_diagnostic_header("") do
+    "── backend output (last 15 lines) ──"
+  end
+
+  defp failure_diagnostic_header(stop_reason) do
+    "── backend output (last 15 lines) — stopped: " <> stop_reason <> " ──"
   end
 
   defp last_n_lines(text, n) do

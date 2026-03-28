@@ -168,15 +168,131 @@ defmodule LoopMemory do
 
     case rendered_chars <= budget_chars do
       true -> text
-      _ -> String.slice(text, 0, budget_chars) <> "\n...\n" <> truncation_footer(memory, rendered_chars, budget_chars)
+      _ -> truncate_on_line_boundary(text, budget_chars, memory)
     end
   end
 
-  defp truncation_footer(memory, rendered_chars, budget_chars) do
-    "(memory truncated: " <>
-    to_string(count_entries(Map.get(memory, :preferences, []), 0)) <> " preferences, " <>
-    to_string(count_entries(Map.get(memory, :learnings, []), 0)) <> " learnings, " <>
-    to_string(count_entries(Map.get(memory, :meta, []), 0)) <> " meta active — " <>
+  defp truncate_on_line_boundary(text, budget_chars, memory) do
+    lines = String.split(text, LoopUtils.line_sep())
+    kept = take_lines_within_budget(lines, budget_chars, 0, [])
+    kept_text = LoopUtils.join_lines(kept)
+    kept_count = count_bullet_entries(kept, 0)
+    total_count = count_bullet_entries(lines, 0)
+    dropped = total_count - kept_count
+    dropped_detail = truncation_dropped_detail(text, kept_text, memory)
+
+    kept_text <> "\n...\n" <> truncation_footer(dropped, dropped_detail, String.length(text), budget_chars)
+  end
+
+  defp take_lines_within_budget([], _budget, _used, acc) do
+    LoopUtils.reverse_list(acc)
+  end
+
+  defp take_lines_within_budget([line | rest], budget, used, acc) do
+    line_len = String.length(line) + 1
+    next_used = used + line_len
+
+    case next_used > budget do
+      true -> LoopUtils.reverse_list(acc)
+      _ -> take_lines_within_budget(rest, budget, next_used, [line] ++ acc)
+    end
+  end
+
+  defp count_bullet_entries([], count) do
+    count
+  end
+
+  defp count_bullet_entries([line | rest], count) do
+    case String.starts_with(line, "- ") do
+      true -> count_bullet_entries(rest, count + 1)
+      _ -> count_bullet_entries(rest, count)
+    end
+  end
+
+  defp truncation_dropped_detail(full_text, kept_text, memory) do
+    total_prefs = count_entries(Map.get(memory, :preferences, []), 0)
+    total_learnings = count_entries(Map.get(memory, :learnings, []), 0)
+    total_meta = count_entries(Map.get(memory, :meta, []), 0)
+    kept_prefs = count_category_in_text(kept_text, "Preferences:")
+    kept_learnings = count_category_in_text(kept_text, "Learnings:")
+    kept_meta = count_category_in_text(kept_text, "Meta:")
+    dropped_prefs = total_prefs - kept_prefs
+    dropped_learnings = total_learnings - kept_learnings
+    dropped_meta = total_meta - kept_meta
+
+    format_dropped_counts(dropped_prefs, dropped_learnings, dropped_meta)
+  end
+
+  defp count_category_in_text(text, header) do
+    case String.contains(text, header) do
+      true -> count_category_entries_after(text, header)
+      _ -> 0
+    end
+  end
+
+  defp count_category_entries_after(text, header) do
+    parts = String.split(text, header)
+    after_header = list_second(parts, "")
+    section_lines = String.split(after_header, LoopUtils.line_sep())
+    count_leading_bullets(section_lines, 0)
+  end
+
+  defp list_second([_first, second | _rest], _default) do
+    second
+  end
+
+  defp list_second(_list, default) do
+    default
+  end
+
+  defp count_leading_bullets([], count) do
+    count
+  end
+
+  defp count_leading_bullets([line | rest], count) do
+    case String.starts_with(line, "- ") do
+      true -> count_leading_bullets(rest, count + 1)
+      _ -> count_leading_bullets_check_empty(line, rest, count)
+    end
+  end
+
+  defp count_leading_bullets_check_empty("", rest, count) do
+    count
+  end
+
+  defp count_leading_bullets_check_empty(_line, _rest, count) do
+    count
+  end
+
+  defp format_dropped_counts(0, 0, 0) do
+    ""
+  end
+
+  defp format_dropped_counts(prefs, learnings, meta) do
+    parts = dropped_count_parts(prefs, "preferences", []) ++
+            dropped_count_parts(learnings, "learnings", []) ++
+            dropped_count_parts(meta, "meta", [])
+    join_dropped_parts(parts)
+  end
+
+  defp dropped_count_parts(0, _label, _acc) do
+    []
+  end
+
+  defp dropped_count_parts(count, label, _acc) do
+    [to_string(count) <> " " <> label]
+  end
+
+  defp join_dropped_parts([]) do
+    ""
+  end
+
+  defp join_dropped_parts(parts) do
+    " (" <> LoopUtils.join_csv(parts) <> " truncated)"
+  end
+
+  defp truncation_footer(dropped_entries, dropped_detail, rendered_chars, budget_chars) do
+    "(memory truncated: " <> to_string(dropped_entries) <> " entries dropped" <> dropped_detail <> " — " <>
     to_string(rendered_chars) <> "/" <> to_string(budget_chars) <> " chars)"
   end
 
