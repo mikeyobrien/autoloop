@@ -476,7 +476,29 @@ bin/install-hooks
 
 This symlinks `hooks/pre-commit` (runs `tonic check .`) and `hooks/pre-push` (runs `bin/test`) into `.git/hooks/`. The installer is idempotent. Use `git commit --no-verify` or `git push --no-verify` to bypass when needed.
 
-## Install `miniloops` as a command
+## Install `miniloops`
+
+### From GitHub Releases
+
+Download the archive for your platform from GitHub Releases, then install the bundled `miniloops` binary:
+
+```bash
+tar -xzf miniloops-v0.1.0-linux-x64.tar.gz
+chmod +x miniloops-v0.1.0-linux-x64/miniloops
+mkdir -p ~/.local/bin
+mv miniloops-v0.1.0-linux-x64/miniloops ~/.local/bin/miniloops
+```
+
+Then:
+
+```bash
+miniloops --help
+miniloops run autocode
+```
+
+Release assets are built by `.github/workflows/release.yml`. See `docs/releasing.md` for the tag-based release flow.
+
+### From a source checkout
 
 Use the launcher script:
 
@@ -495,7 +517,7 @@ miniloops run /path/to/project
 miniloops inspect scratchpad /path/to/project --format md
 ```
 
-The launcher is a thin wrapper around:
+The source launcher is a thin wrapper around:
 
 ```bash
 tonic run /path/to/this/repo ...

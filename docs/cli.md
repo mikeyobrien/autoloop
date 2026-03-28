@@ -1,16 +1,16 @@
 # CLI Reference
 
-Miniloops exposes all functionality through a single binary with subcommands. The two invocation forms are equivalent:
+Miniloops exposes all functionality through a single binary with subcommands. The public CLI can come from either a compiled release binary or the source wrapper script.
 
 ```bash
-# Via the bin wrapper (resolves the project directory automatically)
+# Via a compiled release binary or an installed source wrapper
 miniloops <subcommand> [args...]
 
-# Via the Tonic runtime
+# Via the source checkout through the Tonic runtime
 tonic run <project-dir> <subcommand> [args...]
 ```
 
-The `bin/miniloops` launcher is a thin shell wrapper that calls `tonic run` with the repo root as the project directory and forwards all arguments.
+When installed from GitHub Releases, `miniloops` is a standalone compiled binary. In a source checkout, `bin/miniloops` is a thin shell wrapper that calls `tonic run` with the repo root as the project directory and forwards all arguments.
 
 ## Environment
 
@@ -272,7 +272,7 @@ When the first argument is an existing `.tn` file, it is used as the test target
 | `--list` | List available tests without running |
 | `--format json` | Output results as JSON |
 | `--fail-fast` | Stop on first failure (default) |
-| `--timeout <ms>` | Per-test timeout in milliseconds (default: 10000) |
+| `--timeout <ms>` | Per-test timeout in milliseconds (default: 20000) |
 | `--verbose` | Verbose output |
 
 ### `bin/test-watch`
@@ -307,6 +307,8 @@ bin/dev <command>    # run a command
 | `hooks` | `bin/install-hooks` | Install git hooks | 0 = success, 1 = error |
 | `check-missing` | `bin/check-missing` | Lint for unannotated workarounds | 0 = clean, 1 = warnings |
 
+Additional release scripts live under `scripts/` and are used by `.github/workflows/release.yml`.
+
 ### `scripts/pi-smoke.sh`
 
 End-to-end Pi backend smoke test. Creates a temporary miniloops project, runs one Pi-backed iteration, and asserts that the loop completes correctly with expected journal entries.
@@ -322,3 +324,27 @@ Symlinks `hooks/pre-commit` and `hooks/pre-push` into `.git/hooks/`. Idempotent 
 ### `bin/check-missing`
 
 Scans `.tn` files for shell-out workaround patterns and cross-references them against `# TONIC_MISSING:` annotations and `TONIC_MISSING.md` entries. Warns on unannotated workarounds.
+
+### `scripts/build-release.sh`
+
+Compiles a standalone `miniloops` binary with `tonic compile` to the output path you pass in.
+
+```bash
+scripts/build-release.sh dist/miniloops
+```
+
+### `scripts/package-release.sh`
+
+Packages a compiled binary into a deterministic release archive.
+
+```bash
+scripts/package-release.sh dist/miniloops v0.1.0 linux-x64 dist
+```
+
+### `scripts/release-smoke.sh`
+
+Smoke-tests a compiled `miniloops` binary by verifying the standalone CLI bootstrap/help path. This keeps the release workflow validating shipped artifacts while native runtime gaps for full loop execution remain tracked in `TONIC_MISSING.md`.
+
+```bash
+scripts/release-smoke.sh dist/miniloops
+```

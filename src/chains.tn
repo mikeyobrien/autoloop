@@ -242,12 +242,12 @@ defmodule LoopChains do
   end
 
   defp finalize(state, project_dir) do
-    chains = Enum.reverse(push_current_chain(state))
+    chains = LoopUtils.reverse_list(push_current_chain(state))
     %{chains: resolve_all_chains(chains, project_dir, []), budget: Map.get(state, :budget, default_budget())}
   end
 
   defp resolve_all_chains([], _project_dir, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp resolve_all_chains([chain | rest], project_dir, acc) do
@@ -260,7 +260,7 @@ defmodule LoopChains do
   end
 
   defp resolve_step_list([], _project_dir, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp resolve_step_list([name | rest], project_dir, acc) do
@@ -423,7 +423,7 @@ defmodule LoopChains do
   defp render_chain_lines([], acc) do
     case acc do
       [] -> "(no chain runs found)"
-      _ -> "# Chain State\n\n" <> render_chain_entries(Enum.reverse(acc))
+      _ -> "# Chain State\n\n" <> render_chain_entries(LoopUtils.reverse_list(acc))
     end
   end
 
@@ -687,7 +687,7 @@ defmodule LoopChains do
   end
 
   defp collect_step_names([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_step_names([step | rest], acc) do
@@ -725,7 +725,7 @@ defmodule LoopChains do
   end
 
   defp split_array_parts([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp split_array_parts([part | rest], acc) do
@@ -743,7 +743,7 @@ defmodule LoopChains do
   end
 
   defp split_csv_parts([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp split_csv_parts([part | rest], acc) do
@@ -809,7 +809,7 @@ defmodule LoopChains do
   end
 
   defp collect_lines([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_lines([line | rest], acc) do

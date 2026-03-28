@@ -683,7 +683,7 @@ defmodule LoopHarness do
   end
 
   defp prepare_parallel_branches(_loop, _iter, _wave_id, _wave_dir, _emitted_topic, [], _index, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp prepare_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, [objective | rest], index, acc) do
@@ -722,7 +722,7 @@ defmodule LoopHarness do
   end
 
   defp launch_parallel_branches(_loop, [], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp launch_parallel_branches(loop, [branch | rest], acc) do
@@ -818,7 +818,7 @@ defmodule LoopHarness do
   end
 
   defp collect_parallel_branch_updates(_loop, [], ready, pending) do
-    %{ready: ready, pending: Enum.reverse(pending)}
+    %{ready: ready, pending: LoopUtils.reverse_list(pending)}
   end
 
   defp collect_parallel_branch_updates(loop, [branch | rest], ready, pending) do
@@ -1097,7 +1097,7 @@ defmodule LoopHarness do
 
   defp branch_sort_index(branch) do
     branch_id = Map.get(branch, :branch_id, "")
-    parse_int_or_zero(String.replace(branch_id, "branch-", ""))
+    parse_int_or_zero(LoopUtils.replace_all(branch_id, "branch-", ""))
   end
 
   defp finalize_parallel_wave(loop, iter, wave_id, branch_results) do
@@ -1125,7 +1125,7 @@ defmodule LoopHarness do
   end
 
   defp collect_branch_ids_with_status([], _status, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_branch_ids_with_status([branch | rest], status, acc) do
@@ -1138,7 +1138,7 @@ defmodule LoopHarness do
   end
 
   defp collect_failed_branch_ids([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_failed_branch_ids([branch | rest], acc) do
@@ -1213,7 +1213,7 @@ defmodule LoopHarness do
   end
 
   defp collect_parallel_objectives([], objectives, invalid) do
-    %{objectives: Enum.reverse(objectives), invalid: invalid}
+    %{objectives: LoopUtils.reverse_list(objectives), invalid: invalid}
   end
 
   defp collect_parallel_objectives([line | rest], objectives, invalid) do
@@ -1417,7 +1417,7 @@ defmodule LoopHarness do
   end
 
   defp wave_branch_result_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp wave_branch_result_items([branch | rest], acc) do
@@ -1692,7 +1692,7 @@ defmodule LoopHarness do
   end
 
   defp parallel_dispatch_prompt_events([], _completion_event, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp parallel_dispatch_prompt_events([event | rest], completion_event, acc) do
@@ -2127,7 +2127,7 @@ defmodule LoopHarness do
   end
 
   defp filter_run_lines([], _run_id, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp filter_run_lines([line | rest], run_id, acc) do
@@ -2142,7 +2142,7 @@ defmodule LoopHarness do
   end
 
   defp collect_lines([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_lines([line | rest], acc) do
@@ -2159,7 +2159,7 @@ defmodule LoopHarness do
   end
 
   defp collect_topics([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_topics([line | rest], acc) do
@@ -2176,7 +2176,7 @@ defmodule LoopHarness do
   end
 
   defp collect_iteration_topics([], _iteration, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_iteration_topics([line | rest], iteration, acc) do
@@ -2193,7 +2193,7 @@ defmodule LoopHarness do
   end
 
   defp collect_iteration_lines([], _iteration, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_iteration_lines([line | rest], iteration, acc) do
@@ -2208,7 +2208,7 @@ defmodule LoopHarness do
   end
 
   defp latest_agent_event_record(lines) do
-    latest_agent_event_record_from_list(Enum.reverse(lines))
+    latest_agent_event_record_from_list(LoopUtils.reverse_list(lines))
   end
 
   defp latest_agent_event_record_from_list([]) do
@@ -2239,7 +2239,7 @@ defmodule LoopHarness do
   end
 
   defp collect_scratchpad_entries([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_scratchpad_entries([line | rest], acc) do
@@ -2272,7 +2272,7 @@ defmodule LoopHarness do
   end
 
   defp compact_scratchpad_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp compact_scratchpad_items([entry | rest], acc) do
@@ -2396,7 +2396,7 @@ defmodule LoopHarness do
   end
 
   defp update_issue_resolution([], _id, _resolution, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp update_issue_resolution([issue | rest], id, resolution, acc) do
@@ -2407,7 +2407,7 @@ defmodule LoopHarness do
   end
 
   defp update_slice_status([], _id, _status, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp update_slice_status([slice | rest], id, status, acc) do
@@ -2443,7 +2443,7 @@ defmodule LoopHarness do
   end
 
   defp issue_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp issue_items([issue | rest], acc) do
@@ -2477,7 +2477,7 @@ defmodule LoopHarness do
   end
 
   defp slice_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp slice_items([slice | rest], acc) do
@@ -2495,7 +2495,7 @@ defmodule LoopHarness do
   end
 
   defp commit_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp commit_items([commit | rest], acc) do
@@ -2512,7 +2512,7 @@ defmodule LoopHarness do
   end
 
   defp archive_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp archive_items([archive | rest], acc) do
@@ -2631,7 +2631,7 @@ defmodule LoopHarness do
   end
 
   defp latest_agent_event(topics) do
-    latest_agent_event_from_list(Enum.reverse(topics))
+    latest_agent_event_from_list(LoopUtils.reverse_list(topics))
   end
 
   defp latest_agent_event_from_list([]) do
@@ -3353,11 +3353,11 @@ defmodule LoopHarness do
   end
 
   defp take_n(_list, 0, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp take_n([], _n, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp take_n([head | rest], n, acc) do
@@ -3379,7 +3379,7 @@ defmodule LoopHarness do
   # --- Metrics collection and formatting ---
 
   defp collect_metrics_rows([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_metrics_rows([line | rest], acc) do
@@ -3495,7 +3495,7 @@ defmodule LoopHarness do
   end
 
   defp metrics_to_table_rows([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp metrics_to_table_rows([row | rest], acc) do
@@ -3529,7 +3529,7 @@ defmodule LoopHarness do
   end
 
   defp collect_elapsed_values([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_elapsed_values([row | rest], acc) do

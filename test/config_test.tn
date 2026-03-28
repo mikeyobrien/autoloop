@@ -6,7 +6,7 @@ defmodule LoopConfig do
 
   def load(path) do
     case System.path_exists(path) do
-      true -> deep_merge(defaults(), parse_toml(System.read_text(path)))
+      true -> parse_toml(System.read_text(path))
       _ -> defaults()
     end
   end
@@ -186,19 +186,36 @@ defmodule LoopConfig do
   defp merge_key_value(result, key, over_val) do
     case Map.get(result, key, nil) do
       nil -> over_val
-      base_val -> merge_value(base_val, over_val)
+      base_val -> merge_value(key, base_val, over_val)
     end
   end
 
-  defp merge_value(base, over) do
-    case is_map(base) and is_map(over) do
-      true -> deep_merge(base, over)
-      _ -> over
-    end
+  defp merge_value("event_loop", base, over) do
+    deep_merge(base, over)
+  end
+
+  defp merge_value("backend", base, over) do
+    deep_merge(base, over)
+  end
+
+  defp merge_value("parallel", base, over) do
+    deep_merge(base, over)
+  end
+
+  defp merge_value("memory", base, over) do
+    deep_merge(base, over)
+  end
+
+  defp merge_value("core", base, over) do
+    deep_merge(base, over)
+  end
+
+  defp merge_value(_key, _base, over) do
+    over
   end
 
   defp parse_toml(text) do
-    parse_toml_lines(String.split(text, line_sep()), "", %{})
+    parse_toml_lines(String.split(text, line_sep()), "", defaults())
   end
 
   defp parse_toml_lines([], _section, config) do

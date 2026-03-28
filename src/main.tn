@@ -606,7 +606,7 @@ defmodule Demo do
   end
 
   defp finalize_run_args(options, bundle_root) do
-    positionals = Enum.reverse(Map.get(options, :positionals, []))
+    positionals = LoopUtils.reverse_list(Map.get(options, :positionals, []))
 
     case Map.get(options, :preset_explicit, false) do
       true -> strip_run_parse_fields(Map.put(options, :prompt, join_tokens(positionals)))
@@ -797,18 +797,8 @@ defmodule Demo do
 
   defp self_command([command, "run", harness_project | _rest]) do
     case is_tonic_command(command) do
-      true -> compiled_self_command(command, absolute_path(harness_project))
+      true -> "tonic run " <> LoopUtils.shell_quote(absolute_path(harness_project))
       _ -> LoopUtils.shell_quote(command)
-    end
-  end
-
-  defp compiled_self_command(command, harness_project) do
-    compiled = Path.join(harness_project, ".tonic/build/miniloops-self")
-    result = System.run(LoopUtils.shell_words([command, "compile", harness_project, "--out", compiled]))
-
-    case Map.get(result, :exit_code, 1) do
-      0 -> LoopUtils.shell_quote(compiled)
-      _ -> "tonic run " <> LoopUtils.shell_quote(harness_project)
     end
   end
 

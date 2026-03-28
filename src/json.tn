@@ -20,11 +20,11 @@ defmodule LoopJson do
   end
 
   def encode_json_value(text) do
-    escaped_backslash = String.replace(text, "\\", "\\u005c")
-    escaped_quote = String.replace(escaped_backslash, "\"", "\\u0022")
-    escaped_newline = String.replace(escaped_quote, LoopUtils.line_sep(), "\\u000a")
-    escaped_return = String.replace(escaped_newline, "\r", "\\u000d")
-    escaped_tab = String.replace(escaped_return, "\t", "\\u0009")
+    escaped_backslash = LoopUtils.replace_all(text, "\\", "\\u005c")
+    escaped_quote = LoopUtils.replace_all(escaped_backslash, "\"", "\\u0022")
+    escaped_newline = LoopUtils.replace_all(escaped_quote, LoopUtils.line_sep(), "\\u000a")
+    escaped_return = LoopUtils.replace_all(escaped_newline, "\r", "\\u000d")
+    escaped_tab = LoopUtils.replace_all(escaped_return, "\t", "\\u0009")
     escape_remaining_control_chars(escaped_tab)
   end
 
@@ -34,10 +34,10 @@ defmodule LoopJson do
   end
 
   def decode_json_value(text) do
-    restored_newline = String.replace(text, "\\u000a", LoopUtils.line_sep())
-    restored_return = String.replace(restored_newline, "\\u000d", "\r")
-    restored_tab = String.replace(restored_return, "\\u0009", "\t")
-    restored_quote = String.replace(restored_tab, "\\u0022", "\"")
-    String.replace(restored_quote, "\\u005c", "\\")
+    restored_newline = LoopUtils.replace_all(text, "\\u000a", LoopUtils.line_sep())
+    restored_return = LoopUtils.replace_all(restored_newline, "\\u000d", "\r")
+    restored_tab = LoopUtils.replace_all(restored_return, "\\u0009", "\t")
+    restored_quote = LoopUtils.replace_all(restored_tab, "\\u0022", "\"")
+    LoopUtils.replace_all(restored_quote, "\\u005c", "\\")
   end
 end

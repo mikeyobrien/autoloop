@@ -107,7 +107,7 @@ defmodule LoopMemory do
   end
 
   defp preference_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp preference_items([entry | rest], acc) do
@@ -124,7 +124,7 @@ defmodule LoopMemory do
   end
 
   defp learning_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp learning_items([entry | rest], acc) do
@@ -151,7 +151,7 @@ defmodule LoopMemory do
   end
 
   defp meta_items([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp meta_items([entry | rest], acc) do
@@ -250,7 +250,7 @@ defmodule LoopMemory do
   end
 
   defp collect_matching_entries([], _pattern, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_matching_entries([entry | rest], pattern, acc) do
@@ -283,7 +283,7 @@ defmodule LoopMemory do
   end
 
   defp render_match_lines([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp render_match_lines([entry | rest], acc) do
@@ -346,12 +346,12 @@ defmodule LoopMemory do
   end
 
   defp materialize(lines) do
-    reversed = Enum.reverse(lines)
+    reversed = LoopUtils.reverse_list(lines)
     collect_materialized(reversed, %{seen: [], tombstoned: [], preferences: [], learnings: [], meta: []})
   end
 
   defp collect_materialized([], acc) do
-    %{preferences: Enum.reverse(Map.get(acc, :preferences, [])), learnings: Enum.reverse(Map.get(acc, :learnings, [])), meta: Enum.reverse(Map.get(acc, :meta, []))}
+    %{preferences: LoopUtils.reverse_list(Map.get(acc, :preferences, [])), learnings: LoopUtils.reverse_list(Map.get(acc, :learnings, [])), meta: LoopUtils.reverse_list(Map.get(acc, :meta, []))}
   end
 
   defp collect_materialized([line | rest], acc) do
@@ -419,7 +419,7 @@ defmodule LoopMemory do
   end
 
   defp collect_lines([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_lines([line | rest], acc) do

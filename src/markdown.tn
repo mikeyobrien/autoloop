@@ -159,7 +159,7 @@ defmodule Markdown do
   end
 
   defp cell_widths([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp cell_widths([cell | rest], acc) do

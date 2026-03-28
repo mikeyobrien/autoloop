@@ -17,11 +17,11 @@ defmodule LoopTopology do
   end
 
   def handoff_keys(topology) do
-    Map.keys(Map.get(topology, :handoff, %{}))
+    Map.get(topology, :handoff_keys, [])
   end
 
   def handoff_target_ids(topology) do
-    collect_handoff_targets(Map.keys(Map.get(topology, :handoff, %{})), Map.get(topology, :handoff, %{}), [])
+    collect_handoff_targets(Map.get(topology, :handoff_keys, []), Map.get(topology, :handoff, %{}), [])
   end
 
   def load(project_dir) do
@@ -42,7 +42,7 @@ defmodule LoopTopology do
 
   def suggested_roles(topology, recent_event) do
     handoff = Map.get(topology, :handoff, %{})
-    roles = collect_matching_roles(Map.keys(handoff), handoff, recent_event, [])
+    roles = collect_matching_roles(Map.get(topology, :handoff_keys, []), handoff, recent_event, [])
 
     case roles do
       [] -> role_ids(Map.get(topology, :roles, []), [])
@@ -83,7 +83,7 @@ defmodule LoopTopology do
   end
 
   defp default_topology() do
-    %{name: "", completion: "", roles: [], handoff: %{}}
+    %{name: "", completion: "", roles: [], handoff: %{}, handoff_keys: []}
   end
 
   defp render_nonempty(topology, recent_event, roles) do
@@ -97,7 +97,7 @@ defmodule LoopTopology do
   end
 
   defp initial_state() do
-    %{name: "", completion: "", roles: [], handoff: %{}, current_role: empty_role(), section: "root"}
+    %{name: "", completion: "", roles: [], handoff: %{}, handoff_keys: [], current_role: empty_role(), section: "root"}
   end
 
   defp empty_role() do
@@ -130,11 +130,11 @@ defmodule LoopTopology do
   end
 
   defp start_role(state) do
-    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), current_role: empty_role(), section: "role"}
+    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), handoff_keys: Map.get(state, :handoff_keys, []), current_role: empty_role(), section: "role"}
   end
 
   defp start_handoff(state) do
-    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), current_role: empty_role(), section: "handoff"}
+    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), handoff_keys: Map.get(state, :handoff_keys, []), current_role: empty_role(), section: "handoff"}
   end
 
   defp push_current_role(state) do
@@ -175,11 +175,20 @@ defmodule LoopTopology do
 
   defp assign_in_section("handoff", state, key, raw_value) do
     handoff = Map.get(state, :handoff, %{})
-    Map.put(state, :handoff, Map.put(handoff, key, normalize_list(raw_value)))
+    keys = Map.get(state, :handoff_keys, [])
+    updated = Map.put(state, :handoff, Map.put(handoff, key, normalize_list(raw_value)))
+    Map.put(updated, :handoff_keys, append_handoff_key(keys, key))
   end
 
   defp assign_in_section(_, state, _key, _raw_value) do
     state
+  end
+
+  defp append_handoff_key(keys, key) do
+    case LoopUtils.list_contains(keys, key) do
+      true -> keys
+      _ -> [key] ++ keys
+    end
   end
 
   defp role_put(role, "id", raw_value) do
@@ -203,13 +212,13 @@ defmodule LoopTopology do
   end
 
   defp finalize(state, project_dir) do
-    roles = Enum.reverse(push_current_role(state))
+    roles = LoopUtils.reverse_list(push_current_role(state))
 
-    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: load_role_prompts(roles, project_dir, []), handoff: Map.get(state, :handoff, %{})}
+    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: load_role_prompts(roles, project_dir, []), handoff: Map.get(state, :handoff, %{}), handoff_keys: LoopUtils.reverse_list(Map.get(state, :handoff_keys, []))}
   end
 
   defp load_role_prompts([], _project_dir, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp load_role_prompts([role | rest], project_dir, acc) do
@@ -240,7 +249,7 @@ defmodule LoopTopology do
   end
 
   defp collect_events_for_roles([], _role_ids, acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp collect_events_for_roles([role | rest], role_ids, acc) do
@@ -269,7 +278,7 @@ defmodule LoopTopology do
   end
 
   defp role_ids([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp role_ids([role | rest], acc) do
@@ -335,7 +344,7 @@ defmodule LoopTopology do
   end
 
   defp split_array_parts([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp split_array_parts([part | rest], acc) do
@@ -362,7 +371,7 @@ defmodule LoopTopology do
   end
 
   defp dedup_list([], acc) do
-    Enum.reverse(acc)
+    LoopUtils.reverse_list(acc)
   end
 
   defp dedup_list([item | rest], acc) do

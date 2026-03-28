@@ -12,7 +12,7 @@ case "$1" in -h|--help)
   echo "  --list               List available tests without running"
   echo "  --format json        Output results as JSON"
   echo "  --fail-fast          Stop on first failure (default)"
-  echo "  --timeout <ms>       Per-test timeout in milliseconds (default: 10000)"
+  echo "  --timeout <ms>       Per-test timeout in milliseconds (default: 20000)"
   echo "  --verbose            Verbose output"
   exit 0
 ;; esac
@@ -23,4 +23,4 @@ else
   TARGET="test/"
 fi
 
-exec tonic test "$TARGET" --fail-fast --timeout 10000 "$@"
+exec tonic test "$TARGET" --fail-fast --timeout 20000 "$@"

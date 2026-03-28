@@ -26,8 +26,20 @@ defmodule LoopUtils do
     split_csv_parts(String.split(text, ","), [])
   end
 
+  def reverse_list(list) do
+    reverse_list_parts(list, [])
+  end
+
+  defp reverse_list_parts([], acc) do
+    acc
+  end
+
+  defp reverse_list_parts([item | rest], acc) do
+    reverse_list_parts(rest, [item] ++ acc)
+  end
+
   def split_csv_parts([], acc) do
-    Enum.reverse(acc)
+    reverse_list(acc)
   end
 
   def split_csv_parts([part | rest], acc) do
@@ -65,7 +77,23 @@ defmodule LoopUtils do
   end
 
   def shell_quote(text) do
-    "'" <> String.replace(text, "'", "'\"'\"'") <> "'"
+    "'" <> replace_all(text, "'", "'\"'\"'") <> "'"
+  end
+
+  def replace_all(text, pattern, replacement) do
+    join_with_separator(String.split(text, pattern), replacement)
+  end
+
+  defp join_with_separator([], _separator) do
+    ""
+  end
+
+  defp join_with_separator([part], _separator) do
+    part
+  end
+
+  defp join_with_separator([part | rest], separator) do
+    part <> separator <> join_with_separator(rest, separator)
   end
 
   def shell_words([]) do
