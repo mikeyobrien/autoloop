@@ -668,7 +668,18 @@ defmodule PresetTest do
   end
 
   def test_preset_autosimplify() do
-    validate_preset(Path.join(presets_dir(), "autosimplify"))
+    preset_dir = Path.join(presets_dir(), "autosimplify")
+    validate_preset(preset_dir)
+
+    topology = PresetTopology.load(preset_dir)
+    roles = PresetTopology.get_roles(topology)
+    simplifier_prompt = role_prompt_by_id(roles, "simplifier")
+    verifier_prompt = role_prompt_by_id(roles, "verifier")
+
+    Assert.assert_contains(simplifier_prompt, "commit the batch before handoff")
+    Assert.assert_contains(simplifier_prompt, "Do not hand off a verified-but-uncommitted code change.")
+    Assert.assert_contains(verifier_prompt, "Verify commit discipline")
+    Assert.assert_contains(verifier_prompt, "Uncommitted code changes are a rejection.")
   end
 
   def test_preset_autospec() do
