@@ -49,6 +49,10 @@ defmodule Demo do
     LoopPiAdapter.run(rest)
   end
 
+  defp dispatch(["branch-run", project_dir, branch_dir], argv) do
+    LoopHarness.run_parallel_branch_cli(project_dir, branch_dir, self_command(argv))
+  end
+
   defp dispatch(["memory"], _argv) do
     print_memory_usage()
   end
@@ -142,11 +146,11 @@ defmodule Demo do
   end
 
   defp dispatch(["chain", "run", name], argv) do
-    handle_chain_run(name, resolve_runtime_project_dir(), argv)
+    handle_chain_run(name, resolve_runtime_project_dir(), nil, argv)
   end
 
-  defp dispatch(["chain", "run", name, project_dir], argv) do
-    handle_chain_run(name, project_dir, argv)
+  defp dispatch(["chain", "run", name, project_dir | prompt_tokens], argv) do
+    handle_chain_run(name, project_dir, join_tokens(prompt_tokens), argv)
   end
 
   defp dispatch(args, argv) do
@@ -204,19 +208,34 @@ defmodule Demo do
     Map.get(step, :name, "?") <> " -> " <> join_step_names(rest)
   end
 
-  defp handle_chain_run(name, project_dir, argv) do
+  defp inline_chain_step_names([]) do
+    []
+  end
+
+  defp inline_chain_step_names([step | rest]) do
+    [Map.get(step, :name, "")] ++ inline_chain_step_names(rest)
+  end
+
+  defp handle_chain_run(name, project_dir, prompt_override, argv) do
     chains = LoopChains.load(project_dir)
     chain_spec = LoopChains.resolve_chain(chains, name)
+    run_options = %{prompt: normalize_prompt(prompt_override)}
 
     case chain_spec do
       nil -> IO.puts("chain `" <> name <> "` not found in chains.toml")
-      _ -> LoopChains.run(chain_spec, project_dir, self_command(argv), %{})
+      _ -> LoopChains.run(chain_spec, project_dir, self_command(argv), run_options)
     end
   end
 
   defp run_inline_chain(chain_csv, project_dir, self_command, options) do
     chain_spec = LoopChains.parse_inline_chain(chain_csv, project_dir)
-    LoopChains.run(chain_spec, project_dir, self_command, options)
+    step_names = inline_chain_step_names(Map.get(chain_spec, :steps, []))
+
+    case LoopChains.validate_preset_vocabulary(step_names, project_dir) do
+      :ok -> LoopChains.run(chain_spec, project_dir, self_command, options)
+      {:rejected, reason} -> inline_chain_usage_error(reason)
+      _ -> inline_chain_usage_error("invalid inline chain")
+    end
   end
 
   defp handle_inspect(args) do
@@ -499,7 +518,12 @@ defmodule Demo do
   end
 
   defp parse_run_args(args, bundle_root) do
-    finalize_run_args(parse_run_tokens(args, bundle_root, default_run_options()), bundle_root)
+    options = parse_run_tokens(args, bundle_root, default_run_options())
+
+    case Map.get(options, :usage_error, false) do
+      true -> options
+      _ -> finalize_run_args(options, bundle_root)
+    end
   end
 
   defp parse_run_tokens(["run" | rest], bundle_root, options) do
@@ -557,6 +581,22 @@ defmodule Demo do
     parse_run_tokens(rest, bundle_root, Map.put(options, :chain, chain_csv))
   end
 
+  defp parse_run_tokens(["-i"], _bundle_root, _options) do
+    run_usage_error("unsupported flag `-i`; set event_loop.max_iterations in the preset config")
+  end
+
+  defp parse_run_tokens(["-i", _value | _rest], _bundle_root, _options) do
+    run_usage_error("unsupported flag `-i`; set event_loop.max_iterations in the preset config")
+  end
+
+  defp parse_run_tokens(["--iterations"], _bundle_root, _options) do
+    run_usage_error("unsupported flag `--iterations`; set event_loop.max_iterations in the preset config")
+  end
+
+  defp parse_run_tokens(["--iterations", _value | _rest], _bundle_root, _options) do
+    run_usage_error("unsupported flag `--iterations`; set event_loop.max_iterations in the preset config")
+  end
+
   defp parse_run_tokens([], _bundle_root, options) do
     options
   end
@@ -574,19 +614,33 @@ defmodule Demo do
     end
   end
 
-  defp finalize_run_args_positionals([], options, _bundle_root) do
+  defp finalize_run_args_positionals([], options, bundle_root) do
     case Map.get(options, :chain, nil) do
       nil -> missing_preset_error()
-      _ -> strip_run_parse_fields(options)
+      _ -> strip_run_parse_fields(Map.put(options, :project_dir, default_chain_project_dir(bundle_root)))
     end
   end
 
   defp finalize_run_args_positionals([first | rest], options, bundle_root) do
+    case Map.get(options, :chain, nil) do
+      nil -> finalize_single_run_positionals(first, rest, options, bundle_root)
+      _ -> finalize_chain_run_positionals(first, rest, options, bundle_root)
+    end
+  end
+
+  defp finalize_single_run_positionals(first, rest, options, bundle_root) do
     bundled_preset = LoopConfig.resolve_project_dir(first, bundle_root)
 
     case looks_like_project_dir(first) do
       true -> strip_run_parse_fields(Map.put(Map.put(options, :project_dir, first), :prompt, join_tokens(rest)))
       _ -> finalize_run_args_unresolved(first, rest, bundled_preset, options)
+    end
+  end
+
+  defp finalize_chain_run_positionals(first, rest, options, bundle_root) do
+    case looks_like_project_dir(first) do
+      true -> strip_run_parse_fields(Map.put(Map.put(options, :project_dir, first), :prompt, join_tokens(rest)))
+      _ -> strip_run_parse_fields(Map.put(Map.put(options, :project_dir, default_chain_project_dir(bundle_root)), :prompt, join_tokens([first] ++ rest)))
     end
   end
 
@@ -678,6 +732,20 @@ defmodule Demo do
     Map.put(default_run_options(), :usage_error, true)
   end
 
+  defp run_usage_error(message) do
+    IO.puts(message)
+    Map.put(default_run_options(), :usage_error, true)
+  end
+
+  defp inline_chain_usage_error(reason) do
+    IO.puts("error: invalid inline chain")
+    IO.puts("")
+    IO.puts(reason)
+    IO.puts("")
+    IO.puts("Known presets: " <> LoopUtils.join_csv(LoopChains.list_known_presets(".")))
+    :ok
+  end
+
   defp missing_preset_error() do
     IO.puts("error: missing required preset argument")
     IO.puts("")
@@ -709,6 +777,13 @@ defmodule Demo do
     end
   end
 
+  defp default_chain_project_dir(bundle_root) do
+    case looks_like_project_dir(".") do
+      true -> "."
+      _ -> bundle_root
+    end
+  end
+
   defp resolve_bundle_root([command, "run", harness_project | _rest]) do
     case is_tonic_command(command) do
       true -> absolute_path(harness_project)
@@ -722,8 +797,18 @@ defmodule Demo do
 
   defp self_command([command, "run", harness_project | _rest]) do
     case is_tonic_command(command) do
-      true -> "tonic run " <> LoopUtils.shell_quote(absolute_path(harness_project))
+      true -> compiled_self_command(command, absolute_path(harness_project))
       _ -> LoopUtils.shell_quote(command)
+    end
+  end
+
+  defp compiled_self_command(command, harness_project) do
+    compiled = Path.join(harness_project, ".tonic/build/miniloops-self")
+    result = System.run(LoopUtils.shell_words([command, "compile", harness_project, "--out", compiled]))
+
+    case Map.get(result, :exit_code, 1) do
+      0 -> LoopUtils.shell_quote(compiled)
+      _ -> "tonic run " <> LoopUtils.shell_quote(harness_project)
     end
   end
 
@@ -770,6 +855,10 @@ defmodule Demo do
     true
   end
 
+  defp cli_command("branch-run") do
+    true
+  end
+
   defp cli_command(_value) do
     false
   end
@@ -799,7 +888,7 @@ defmodule Demo do
   defp print_chain_usage() do
     IO.puts("Usage:")
     IO.puts("  miniloops chain list [project-dir]")
-    IO.puts("  miniloops chain run <name> [project-dir]")
+    IO.puts("  miniloops chain run <name> [project-dir] [prompt...]")
   end
 
   defp print_emit_usage() do
@@ -823,6 +912,8 @@ defmodule Demo do
   defp print_memory_usage() do
     IO.puts("Usage:")
     IO.puts("  miniloops memory list [project-dir]")
+    IO.puts("  miniloops memory status [project-dir]")
+    IO.puts("  miniloops memory find <pattern...>")
     IO.puts("  miniloops memory add learning <text...>")
     IO.puts("  miniloops memory add preference <category> <text...>")
     IO.puts("  miniloops memory add meta <key> <value...>")
@@ -834,6 +925,11 @@ defmodule Demo do
     IO.puts("  miniloops memory add learning <text...>")
     IO.puts("  miniloops memory add preference <category> <text...>")
     IO.puts("  miniloops memory add meta <key> <value...>")
+    IO.puts("")
+    IO.puts("Memory helpers:")
+    IO.puts("  miniloops memory status [project-dir]")
+    IO.puts("  miniloops memory find <pattern...>")
+    IO.puts("  miniloops memory remove <id> [reason...]")
   end
 
   defp join_tokens([]) do

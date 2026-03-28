@@ -117,6 +117,7 @@ Parallelism is still structured, not free-form:
 - only normal parent turns get the global `Structured parallelism` prompt block
 - branch child prompts do **not** get that global metaprompt
 - only one active wave may exist at a time
+- the parent launches all branches in that wave before joining them
 - branch state is isolated under `.miniloop/waves/<wave-id>/...`
 
 ## Prompt injection

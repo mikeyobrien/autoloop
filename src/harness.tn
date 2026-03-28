@@ -11,6 +11,50 @@ defmodule LoopHarness do
 
     summary = iterate(live_loop, 1)
     print_summary(summary, live_loop)
+    summary
+  end
+
+  def run_parallel_branch_cli(project_dir, branch_dir, self_command) do
+    launch = load_parallel_branch_launch(branch_dir)
+    branch_prompt = Map.get(launch, :prompt, "")
+    routing_event = Map.get(launch, :routing_event, "loop.start")
+    branch_roles = Map.get(launch, :allowed_roles, [])
+    branch_events = Map.get(launch, :allowed_events, [])
+    backend_override = parallel_branch_backend_override(launch)
+    log_level = parallel_branch_log_level(launch)
+    branch_loop = build_loop_context(project_dir, branch_prompt, self_command, %{work_dir: branch_dir, backend_override: backend_override, log_level: log_level})
+    branch_loop = reload_loop(branch_loop)
+    branch_loop = init_store(branch_loop)
+    branch_loop = Map.put(branch_loop, :runtime, Map.put(Map.get(branch_loop, :runtime, %{}), :branch_mode, true))
+    branch_loop = apply_runtime_mode_overrides(branch_loop)
+
+    ensure_layout(state_dir(branch_loop))
+    install_runtime_tools(branch_loop)
+    append_loop_start(branch_loop)
+
+    seeded_branch_loop = seed_branch_context(branch_loop, routing_event)
+    started_ms = epoch_milliseconds()
+    summary = iterate(seeded_branch_loop, 1)
+    finished_ms = epoch_milliseconds()
+    elapsed_ms = finished_ms - started_ms
+    output = iteration_field_for_run(journal_file(seeded_branch_loop), run_id(seeded_branch_loop), "1", "iteration.finish", "output")
+    stop_reason = branch_stop_reason(Map.get(summary, :stop_reason, "unknown"), elapsed_ms, parallel_branch_timeout_ms(seeded_branch_loop))
+    result = %{
+      branch_id: Map.get(launch, :branch_id, ""),
+      objective: Map.get(launch, :objective, ""),
+      stop_reason: stop_reason,
+      output: output,
+      routing_event: routing_event,
+      allowed_roles: branch_roles,
+      allowed_events: branch_events,
+      branch_dir: branch_dir,
+      elapsed_ms: elapsed_ms,
+      finished_at_ms: finished_ms
+    }
+
+    System.write_text(Path.join(branch_dir, "result.md"), render_branch_result(result))
+    write_parallel_branch_summary(branch_dir, result)
+    result
   end
 
   defp init_store(loop) do
@@ -418,16 +462,17 @@ defmodule LoopHarness do
     result = execute_parallel_wave(loop, iter, emitted_topic, emitted_payload)
     reason = Map.get(result, :reason, "parallel_wave_complete")
     wave_id = Map.get(result, :wave_id, "")
+    total_elapsed_ms = Map.get(result, :elapsed_ms, 0)
 
     case reason do
-      "parallel_wave_complete" -> continue_after_parallel_join(loop, iter, wave_id, emitted_topic)
+      "parallel_wave_complete" -> continue_after_parallel_join(loop, iter, wave_id, emitted_topic, total_elapsed_ms)
       _ -> stop_after_parallel_wave(loop, iter, reason, wave_id)
     end
   end
 
-  defp continue_after_parallel_join(loop, iter, wave_id, emitted_topic) do
+  defp continue_after_parallel_join(loop, iter, wave_id, emitted_topic, total_elapsed_ms) do
     joined_topic = parallel_joined_topic(emitted_topic)
-    append_wave_join_finish(loop, iter, wave_id, emitted_topic, joined_topic)
+    append_wave_join_finish(loop, iter, wave_id, emitted_topic, joined_topic, total_elapsed_ms)
     append_harness_event(journal_file(loop), run_id(loop), iteration_string(iter), joined_topic, wave_id)
     iterate(loop, iteration(iter) + 1)
   end
@@ -617,18 +662,442 @@ defmodule LoopHarness do
     branches_dir = Path.join(wave_dir, "branches")
     opening_roles = allowed_roles(iter)
     opening_events = allowed_events(iter)
+    wave_started_ms = epoch_milliseconds()
 
     System.ensure_dir(branches_dir)
     write_active_wave_marker(marker_path, wave_id)
     write_wave_spec(wave_dir, wave_id, emitted_topic, iter, objectives)
     append_wave_start(loop, iter, wave_id, emitted_topic, objectives)
 
-    branch_results = run_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, objectives, 1, [])
-    write_wave_join(wave_dir, wave_id, emitted_topic, objectives, branch_results, recent_event(iter), opening_roles, opening_events)
-    append_wave_join_start(loop, iter, wave_id, emitted_topic, objectives, branch_results)
+    branch_specs = prepare_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, objectives, 1, [])
+    launched_branches = launch_parallel_branches(loop, branch_specs, [])
+    branch_results = join_parallel_branches(loop, iter, wave_id, launched_branches, [])
+    ordered_results = sort_branch_results_by_branch_id(branch_results, [])
+    total_elapsed_ms = epoch_milliseconds() - wave_started_ms
+
+    write_wave_join(wave_dir, wave_id, emitted_topic, objectives, ordered_results, recent_event(iter), opening_roles, opening_events, total_elapsed_ms)
+    append_wave_join_start(loop, iter, wave_id, emitted_topic, objectives, ordered_results, total_elapsed_ms)
     clear_active_wave_marker(marker_path)
 
-    finalize_parallel_wave(loop, iter, wave_id, branch_results)
+    Map.put(finalize_parallel_wave(loop, iter, wave_id, ordered_results), :elapsed_ms, total_elapsed_ms)
+  end
+
+  defp prepare_parallel_branches(_loop, _iter, _wave_id, _wave_dir, _emitted_topic, [], _index, acc) do
+    Enum.reverse(acc)
+  end
+
+  defp prepare_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, [objective | rest], index, acc) do
+    branch_id = "branch-" <> to_string(index)
+    branch_dir = Path.join(Path.join(wave_dir, "branches"), branch_id)
+    routing_event = branch_routing_event(iter, emitted_topic)
+    branch_roles = LoopTopology.suggested_roles(topology(loop), routing_event)
+    branch_events = LoopTopology.allowed_events(topology(loop), routing_event)
+    branch_prompt = render_branch_prompt(loop, objective, emitted_topic, routing_event, branch_roles, branch_events)
+    branch = %{
+      branch_id: branch_id,
+      wave_id: wave_id,
+      objective: objective,
+      emitted_topic: emitted_topic,
+      routing_event: routing_event,
+      allowed_roles: branch_roles,
+      allowed_events: branch_events,
+      prompt: branch_prompt,
+      branch_dir: branch_dir,
+      launch_file: Path.join(branch_dir, "launch.json"),
+      summary_file: Path.join(branch_dir, "summary.json"),
+      stdout_file: Path.join(branch_dir, "stdout.log"),
+      stderr_file: Path.join(branch_dir, "stderr.log"),
+      status_file: Path.join(branch_dir, "status.txt"),
+      pid_file: Path.join(branch_dir, "pid.txt"),
+      supervisor_file: Path.join(branch_dir, "supervisor.sh"),
+      launch_ms: 0
+    }
+
+    System.ensure_dir(branch_dir)
+    System.write_text(Path.join(branch_dir, "objective.md"), render_branch_objective(objective, emitted_topic, routing_event, branch_roles, branch_events))
+    write_parallel_branch_launch(branch, backend_override(loop), log_level_name(loop))
+    append_wave_branch_start(loop, iter, wave_id, branch_id, objective, routing_event, branch_roles, branch_events)
+
+    prepare_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, rest, index + 1, [branch] ++ acc)
+  end
+
+  defp launch_parallel_branches(_loop, [], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp launch_parallel_branches(loop, [branch | rest], acc) do
+    launched = launch_parallel_branch(loop, branch)
+    launch_parallel_branches(loop, rest, [launched] ++ acc)
+  end
+
+  defp launch_parallel_branch(loop, branch) do
+    launch_ms = epoch_milliseconds()
+    branch_dir = Map.get(branch, :branch_dir, "")
+    stdout_file = Map.get(branch, :stdout_file, "")
+    stderr_file = Map.get(branch, :stderr_file, "")
+    status_file = Map.get(branch, :status_file, "")
+    pid_file = Map.get(branch, :pid_file, "")
+    supervisor_file = Map.get(branch, :supervisor_file, "")
+
+    write_parallel_branch_supervisor(loop, branch)
+    System.run("chmod +x " <> LoopUtils.shell_quote(supervisor_file))
+
+    command =
+      "rm -f " <> LoopUtils.shell_quote(stdout_file) <> " " <> LoopUtils.shell_quote(stderr_file) <> " " <> LoopUtils.shell_quote(status_file) <> " " <> LoopUtils.shell_quote(pid_file) <> " ; " <>
+      "nohup sh " <> LoopUtils.shell_quote(supervisor_file) <> " >/dev/null 2>&1 & printf '%s' \"$!\" > " <> LoopUtils.shell_quote(pid_file)
+
+    launch_result = System.run(command)
+    launched = Map.put(branch, :launch_ms, launch_ms)
+
+    case String.trim(read_if_exists(pid_file)) do
+      "" -> record_parallel_launch_failure(launched, branch_dir, status_file, launch_ms, launch_result)
+      _ -> launched
+    end
+  end
+
+  defp record_parallel_launch_failure(branch, branch_dir, status_file, launch_ms, launch_result) do
+    finished_ms = epoch_milliseconds()
+    output = parallel_launch_failure_output(branch, launch_result)
+    failed = parallel_branch_result_from_branch(branch, "branch_process_failed", output, finished_ms - launch_ms, finished_ms)
+    System.write_text(status_file, "1")
+    System.write_text(branch_result_path(branch_dir), render_branch_result(failed))
+    write_parallel_branch_summary(branch_dir, failed)
+    branch
+  end
+
+  defp write_parallel_branch_supervisor(loop, branch) do
+    branch_dir = Map.get(branch, :branch_dir, "")
+    stdout_file = Map.get(branch, :stdout_file, "")
+    stderr_file = Map.get(branch, :stderr_file, "")
+    status_file = Map.get(branch, :status_file, "")
+    command = self_command(loop) <> " branch-run " <> LoopUtils.shell_quote(project_dir(loop)) <> " " <> LoopUtils.shell_quote(branch_dir)
+    content =
+      "#!/bin/sh\n" <>
+      "set -eu\n" <>
+      "child=''\n" <>
+      "cleanup() {\n" <>
+      "  if [ -n \"$child\" ]; then\n" <>
+      "    kill \"$child\" 2>/dev/null || true\n" <>
+      "    wait \"$child\" 2>/dev/null || true\n" <>
+      "  fi\n" <>
+      "  exit 130\n" <>
+      "}\n" <>
+      "trap cleanup INT TERM\n" <>
+      command <> " >" <> LoopUtils.shell_quote(stdout_file) <> " 2>" <> LoopUtils.shell_quote(stderr_file) <> " &\n" <>
+      "child=$!\n" <>
+      "wait \"$child\"\n" <>
+      "status=$?\n" <>
+      "printf '%s' \"$status\" > " <> LoopUtils.shell_quote(status_file) <> "\n"
+
+    System.write_text(Map.get(branch, :supervisor_file, ""), content)
+  end
+
+  defp join_parallel_branches(_loop, _iter, _wave_id, [], acc) do
+    acc
+  end
+
+  defp join_parallel_branches(loop, iter, wave_id, pending, acc) do
+    polled = collect_parallel_branch_updates(loop, pending, [], [])
+    ready = sort_branch_results_by_finished_at(Map.get(polled, :ready, []), [])
+    still_pending = Map.get(polled, :pending, [])
+
+    case ready do
+      [] -> join_parallel_branches_wait(loop, iter, wave_id, still_pending, acc)
+      _ -> join_parallel_branches_continue(loop, iter, wave_id, still_pending, acc, ready)
+    end
+  end
+
+  defp join_parallel_branches_wait(loop, iter, wave_id, still_pending, acc) do
+    sleep_parallel_branch_poll()
+    join_parallel_branches(loop, iter, wave_id, still_pending, acc)
+  end
+
+  defp join_parallel_branches_continue(loop, iter, wave_id, still_pending, acc, ready) do
+    append_wave_branch_finishes(loop, iter, wave_id, ready)
+    join_parallel_branches(loop, iter, wave_id, still_pending, acc ++ ready)
+  end
+
+  defp collect_parallel_branch_updates(_loop, [], ready, pending) do
+    %{ready: ready, pending: Enum.reverse(pending)}
+  end
+
+  defp collect_parallel_branch_updates(loop, [branch | rest], ready, pending) do
+    polled = poll_parallel_branch(loop, branch)
+
+    case Map.get(polled, :state, "pending") do
+      "ready" -> collect_parallel_branch_updates(loop, rest, [Map.get(polled, :result, %{})] ++ ready, pending)
+      _ -> collect_parallel_branch_updates(loop, rest, ready, [branch] ++ pending)
+    end
+  end
+
+  defp poll_parallel_branch(loop, branch) do
+    case System.path_exists(Map.get(branch, :summary_file, "")) do
+      true -> %{state: "ready", result: load_parallel_branch_summary_result(branch)}
+      _ -> poll_parallel_branch_status(loop, branch)
+    end
+  end
+
+  defp poll_parallel_branch_status(loop, branch) do
+    case System.path_exists(Map.get(branch, :status_file, "")) do
+      true -> %{state: "ready", result: ensure_parallel_branch_result(branch, "branch_process_failed", epoch_milliseconds())}
+      _ -> poll_parallel_branch_timeout(loop, branch)
+    end
+  end
+
+  defp poll_parallel_branch_timeout(loop, branch) do
+    case parallel_branch_timed_out(loop, branch) do
+      true -> poll_parallel_branch_timeout_ready(branch)
+      _ -> %{state: "pending"}
+    end
+  end
+
+  defp poll_parallel_branch_timeout_ready(branch) do
+    terminate_parallel_branch(branch)
+    %{state: "ready", result: ensure_parallel_branch_result(branch, "backend_timeout", epoch_milliseconds())}
+  end
+
+  defp ensure_parallel_branch_result(branch, fallback_stop_reason, finished_ms) do
+    case System.path_exists(Map.get(branch, :summary_file, "")) do
+      true -> load_parallel_branch_summary_result(branch)
+      _ -> write_parallel_branch_result_fallback(branch, fallback_stop_reason, finished_ms)
+    end
+  end
+
+  defp write_parallel_branch_result_fallback(branch, fallback_stop_reason, finished_ms) do
+    result = parallel_branch_result_from_branch(branch, fallback_stop_reason, parallel_branch_combined_output(branch), finished_ms - Map.get(branch, :launch_ms, finished_ms), finished_ms)
+    System.write_text(branch_result_path(Map.get(branch, :branch_dir, "")), render_branch_result(result))
+    write_parallel_branch_summary(Map.get(branch, :branch_dir, ""), result)
+    result
+  end
+
+  defp parallel_branch_result_from_branch(branch, stop_reason, output, elapsed_ms, finished_ms) do
+    %{
+      branch_id: Map.get(branch, :branch_id, ""),
+      objective: Map.get(branch, :objective, ""),
+      stop_reason: stop_reason,
+      output: output,
+      routing_event: Map.get(branch, :routing_event, ""),
+      allowed_roles: Map.get(branch, :allowed_roles, []),
+      allowed_events: Map.get(branch, :allowed_events, []),
+      branch_dir: Map.get(branch, :branch_dir, ""),
+      elapsed_ms: elapsed_ms,
+      finished_at_ms: finished_ms
+    }
+  end
+
+  defp load_parallel_branch_summary_result(branch) do
+    branch_dir = Map.get(branch, :branch_dir, "")
+    line = read_if_exists(Map.get(branch, :summary_file, ""))
+
+    %{
+      branch_id: extract_field(line, "branch_id"),
+      objective: extract_field(line, "objective"),
+      stop_reason: extract_field(line, "stop_reason"),
+      output: extract_field(line, "output"),
+      routing_event: extract_field(line, "routing_event"),
+      allowed_roles: csv_field_list(line, "allowed_roles"),
+      allowed_events: csv_field_list(line, "allowed_events"),
+      branch_dir: branch_dir,
+      elapsed_ms: parse_int_or_zero(extract_field(line, "elapsed_ms")),
+      finished_at_ms: parse_int_or_zero(extract_field(line, "finished_at_ms"))
+    }
+  end
+
+  defp write_parallel_branch_launch(branch, backend_override, log_level) do
+    fields =
+      LoopJson.json_field("branch_id", Map.get(branch, :branch_id, "")) <> ", " <>
+      LoopJson.json_field("objective", Map.get(branch, :objective, "")) <> ", " <>
+      LoopJson.json_field("emitted_topic", Map.get(branch, :emitted_topic, "")) <> ", " <>
+      LoopJson.json_field("routing_event", Map.get(branch, :routing_event, "")) <> ", " <>
+      LoopJson.json_field("allowed_roles", LoopUtils.join_csv(Map.get(branch, :allowed_roles, []))) <> ", " <>
+      LoopJson.json_field("allowed_events", LoopUtils.join_csv(Map.get(branch, :allowed_events, []))) <> ", " <>
+      LoopJson.json_field("prompt", Map.get(branch, :prompt, "")) <> ", " <>
+      LoopJson.json_field("backend_kind", Map.get(backend_override, :kind, "")) <> ", " <>
+      LoopJson.json_field("backend_command", Map.get(backend_override, :command, "")) <> ", " <>
+      LoopJson.json_field("backend_args", LoopUtils.join_csv(Map.get(backend_override, :args, []))) <> ", " <>
+      LoopJson.json_field("backend_prompt_mode", Map.get(backend_override, :prompt_mode, "")) <> ", " <>
+      LoopJson.json_field("log_level", log_level)
+
+    System.write_text(Map.get(branch, :launch_file, ""), "{" <> fields <> "}\n")
+  end
+
+  defp load_parallel_branch_launch(branch_dir) do
+    line = read_if_exists(Path.join(branch_dir, "launch.json"))
+
+    %{
+      branch_id: extract_field(line, "branch_id"),
+      objective: extract_field(line, "objective"),
+      emitted_topic: extract_field(line, "emitted_topic"),
+      routing_event: extract_field(line, "routing_event"),
+      allowed_roles: csv_field_list(line, "allowed_roles"),
+      allowed_events: csv_field_list(line, "allowed_events"),
+      prompt: extract_field(line, "prompt"),
+      backend_kind: extract_field(line, "backend_kind"),
+      backend_command: extract_field(line, "backend_command"),
+      backend_args: csv_field_list(line, "backend_args"),
+      backend_prompt_mode: extract_field(line, "backend_prompt_mode"),
+      log_level: extract_field(line, "log_level")
+    }
+  end
+
+  defp parallel_branch_backend_override(launch) do
+    override = %{}
+    override = maybe_put_parallel_branch_override(override, :kind, Map.get(launch, :backend_kind, ""))
+    override = maybe_put_parallel_branch_override(override, :command, Map.get(launch, :backend_command, ""))
+    override = maybe_put_parallel_branch_override_list(override, :args, Map.get(launch, :backend_args, []))
+    maybe_put_parallel_branch_override(override, :prompt_mode, Map.get(launch, :backend_prompt_mode, ""))
+  end
+
+  defp maybe_put_parallel_branch_override(override, _key, "") do
+    override
+  end
+
+  defp maybe_put_parallel_branch_override(override, key, value) do
+    Map.put(override, key, value)
+  end
+
+  defp maybe_put_parallel_branch_override_list(override, _key, []) do
+    override
+  end
+
+  defp maybe_put_parallel_branch_override_list(override, key, value) do
+    Map.put(override, key, value)
+  end
+
+  defp parallel_branch_log_level(launch) do
+    case Map.get(launch, :log_level, "") do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp write_parallel_branch_summary(branch_dir, result) do
+    fields =
+      LoopJson.json_field("branch_id", Map.get(result, :branch_id, "")) <> ", " <>
+      LoopJson.json_field("objective", Map.get(result, :objective, "")) <> ", " <>
+      LoopJson.json_field("stop_reason", Map.get(result, :stop_reason, "unknown")) <> ", " <>
+      LoopJson.json_field("output", Map.get(result, :output, "")) <> ", " <>
+      LoopJson.json_field("routing_event", Map.get(result, :routing_event, "")) <> ", " <>
+      LoopJson.json_field("allowed_roles", LoopUtils.join_csv(Map.get(result, :allowed_roles, []))) <> ", " <>
+      LoopJson.json_field("allowed_events", LoopUtils.join_csv(Map.get(result, :allowed_events, []))) <> ", " <>
+      LoopJson.json_field("elapsed_ms", to_string(Map.get(result, :elapsed_ms, 0))) <> ", " <>
+      LoopJson.json_field("finished_at_ms", to_string(Map.get(result, :finished_at_ms, 0)))
+
+    System.write_text(Path.join(branch_dir, "summary.json"), "{" <> fields <> "}\n")
+  end
+
+  defp branch_result_path(branch_dir) do
+    Path.join(branch_dir, "result.md")
+  end
+
+  defp parallel_launch_failure_output(branch, launch_result) do
+    stderr = Map.get(launch_result, :output, "")
+    base = "branch launch failed for `" <> Map.get(branch, :branch_id, "") <> "`"
+
+    case String.trim(stderr) do
+      "" -> base
+      value -> base <> LoopUtils.line_sep() <> LoopUtils.line_sep() <> value
+    end
+  end
+
+  defp parallel_branch_combined_output(branch) do
+    stdout = String.trim(read_if_exists(Map.get(branch, :stdout_file, "")))
+    stderr = String.trim(read_if_exists(Map.get(branch, :stderr_file, "")))
+
+    case stdout == "" do
+      true -> parallel_branch_combined_output_stderr(stderr)
+      _ -> parallel_branch_combined_output_stdout(stdout, stderr)
+    end
+  end
+
+  defp parallel_branch_combined_output_stderr("") do
+    ""
+  end
+
+  defp parallel_branch_combined_output_stderr(stderr) do
+    stderr
+  end
+
+  defp parallel_branch_combined_output_stdout(stdout, "") do
+    stdout
+  end
+
+  defp parallel_branch_combined_output_stdout(stdout, stderr) do
+    stdout <> LoopUtils.line_sep() <> LoopUtils.line_sep() <> "stderr:" <> LoopUtils.line_sep() <> stderr
+  end
+
+  defp parallel_branch_timed_out(loop, branch) do
+    epoch_milliseconds() - Map.get(branch, :launch_ms, epoch_milliseconds()) > parallel_branch_timeout_ms(loop)
+  end
+
+  defp terminate_parallel_branch(branch) do
+    pid = String.trim(read_if_exists(Map.get(branch, :pid_file, "")))
+
+    case pid do
+      "" -> :ok
+      value -> System.run("kill " <> LoopUtils.shell_quote(value) <> " 2>/dev/null || true")
+    end
+  end
+
+  defp sleep_parallel_branch_poll() do
+    System.run("sleep 0.1")
+  end
+
+  defp append_wave_branch_finishes(_loop, _iter, _wave_id, []) do
+    :ok
+  end
+
+  defp append_wave_branch_finishes(loop, iter, wave_id, [branch | rest]) do
+    append_wave_branch_finish(loop, iter, wave_id, Map.get(branch, :branch_id, ""), branch)
+    append_wave_branch_finishes(loop, iter, wave_id, rest)
+  end
+
+  defp sort_branch_results_by_branch_id([], acc) do
+    acc
+  end
+
+  defp sort_branch_results_by_branch_id([branch | rest], acc) do
+    sort_branch_results_by_branch_id(rest, insert_branch_result_by_branch_id(branch, acc))
+  end
+
+  defp insert_branch_result_by_branch_id(branch, []) do
+    [branch]
+  end
+
+  defp insert_branch_result_by_branch_id(branch, [current | rest]) do
+    case branch_sort_index(branch) <= branch_sort_index(current) do
+      true -> [branch, current] ++ rest
+      _ -> [current] ++ insert_branch_result_by_branch_id(branch, rest)
+    end
+  end
+
+  defp sort_branch_results_by_finished_at([], acc) do
+    acc
+  end
+
+  defp sort_branch_results_by_finished_at([branch | rest], acc) do
+    sort_branch_results_by_finished_at(rest, insert_branch_result_by_finished_at(branch, acc))
+  end
+
+  defp insert_branch_result_by_finished_at(branch, []) do
+    [branch]
+  end
+
+  defp insert_branch_result_by_finished_at(branch, [current | rest]) do
+    branch_finished = Map.get(branch, :finished_at_ms, 0)
+    current_finished = Map.get(current, :finished_at_ms, 0)
+    branch_index = branch_sort_index(branch)
+    current_index = branch_sort_index(current)
+
+    case branch_finished < current_finished or (branch_finished == current_finished and branch_index <= current_index) do
+      true -> [branch, current] ++ rest
+      _ -> [current] ++ insert_branch_result_by_finished_at(branch, rest)
+    end
+  end
+
+  defp branch_sort_index(branch) do
+    branch_id = Map.get(branch, :branch_id, "")
+    parse_int_or_zero(String.replace(branch_id, "branch-", ""))
   end
 
   defp finalize_parallel_wave(loop, iter, wave_id, branch_results) do
@@ -697,44 +1166,6 @@ defmodule LoopHarness do
     false
   end
 
-  defp run_parallel_branches(_loop, _iter, _wave_id, _wave_dir, _emitted_topic, [], _index, acc) do
-    Enum.reverse(acc)
-  end
-
-  defp run_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, [objective | rest], index, acc) do
-    branch_id = "branch-" <> to_string(index)
-    branch_dir = Path.join(Path.join(wave_dir, "branches"), branch_id)
-    routing_event = branch_routing_event(iter, emitted_topic)
-    branch_roles = LoopTopology.suggested_roles(topology(loop), routing_event)
-    branch_events = LoopTopology.allowed_events(topology(loop), routing_event)
-
-    System.ensure_dir(branch_dir)
-    System.write_text(Path.join(branch_dir, "objective.md"), render_branch_objective(objective, emitted_topic, routing_event, branch_roles, branch_events))
-    append_wave_branch_start(loop, iter, wave_id, branch_id, objective, routing_event, branch_roles, branch_events)
-
-    result = run_parallel_branch(loop, branch_dir, objective, emitted_topic, routing_event, branch_roles, branch_events)
-    branch_result = Map.put(result, :branch_id, branch_id)
-
-    append_wave_branch_finish(loop, iter, wave_id, branch_id, branch_result)
-
-    run_parallel_branches(loop, iter, wave_id, wave_dir, emitted_topic, rest, index + 1, [branch_result] ++ acc)
-  end
-
-  defp run_parallel_branch(loop, branch_dir, objective, emitted_topic, routing_event, branch_roles, branch_events) do
-    branch_prompt = render_branch_prompt(loop, objective, emitted_topic, routing_event, branch_roles, branch_events)
-    branch_loop = build_branch_loop(loop, branch_dir, branch_prompt)
-    seeded_branch_loop = seed_branch_context(branch_loop, routing_event)
-    started_ms = epoch_milliseconds()
-    summary = iterate(seeded_branch_loop, 1)
-    elapsed_ms = epoch_milliseconds() - started_ms
-    output = iteration_field_for_run(journal_file(seeded_branch_loop), run_id(seeded_branch_loop), "1", "iteration.finish", "output")
-    stop_reason = branch_stop_reason(Map.get(summary, :stop_reason, "unknown"), elapsed_ms, parallel_branch_timeout_ms(loop))
-    result = %{objective: objective, stop_reason: stop_reason, output: output, routing_event: routing_event, allowed_roles: branch_roles, allowed_events: branch_events, branch_dir: branch_dir, elapsed_ms: elapsed_ms}
-
-    System.write_text(Path.join(branch_dir, "result.md"), render_branch_result(result))
-    result
-  end
-
   defp branch_stop_reason("backend_timeout", _elapsed_ms, _timeout_ms) do
     "backend_timeout"
   end
@@ -744,19 +1175,6 @@ defmodule LoopHarness do
       true -> "backend_timeout"
       _ -> stop_reason
     end
-  end
-
-  defp build_branch_loop(loop, branch_dir, branch_prompt) do
-    branch_loop = build_loop_context(project_dir(loop), branch_prompt, self_command(loop), %{work_dir: branch_dir, backend_override: backend_override(loop), log_level: log_level(loop)})
-    branch_loop = reload_loop(branch_loop)
-    branch_loop = init_store(branch_loop)
-    branch_loop = Map.put(branch_loop, :runtime, Map.put(Map.get(branch_loop, :runtime, %{}), :branch_mode, true))
-    branch_loop = apply_runtime_mode_overrides(branch_loop)
-
-    ensure_layout(state_dir(branch_loop))
-    install_runtime_tools(branch_loop)
-    append_loop_start(branch_loop)
-    branch_loop
   end
 
   defp seed_branch_context(branch_loop, "loop.start") do
@@ -916,20 +1334,20 @@ defmodule LoopHarness do
   end
 
   defp append_wave_branch_finish(loop, iter, wave_id, branch_id, branch_result) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.branch.finish", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("branch_id", branch_id) <> ", " <> LoopJson.json_field("stop_reason", Map.get(branch_result, :stop_reason, "unknown")) <> ", " <> LoopJson.json_field("output", Map.get(branch_result, :output, "")))
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.branch.finish", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("branch_id", branch_id) <> ", " <> LoopJson.json_field("stop_reason", Map.get(branch_result, :stop_reason, "unknown")) <> ", " <> LoopJson.json_field("elapsed_ms", to_string(Map.get(branch_result, :elapsed_ms, 0))) <> ", " <> LoopJson.json_field("output", Map.get(branch_result, :output, "")))
   end
 
-  defp append_wave_join_start(loop, iter, wave_id, emitted_topic, objectives, branch_results) do
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.join.start", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("branch_count", to_string(list_length(objectives, 0))) <> ", " <> LoopJson.json_field("branch_outcomes", render_branch_outcomes_csv(branch_results)))
+  defp append_wave_join_start(loop, iter, wave_id, emitted_topic, objectives, branch_results, total_elapsed_ms) do
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.join.start", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("branch_count", to_string(list_length(objectives, 0))) <> ", " <> LoopJson.json_field("elapsed_ms", to_string(total_elapsed_ms)) <> ", " <> LoopJson.json_field("branch_outcomes", render_branch_outcomes_csv(branch_results)))
   end
 
-  defp append_wave_join_finish(loop, iter, wave_id, emitted_topic, joined_topic) do
+  defp append_wave_join_finish(loop, iter, wave_id, emitted_topic, joined_topic, total_elapsed_ms) do
     routing_basis = joined_resume_routing_basis(loop, iter, emitted_topic)
     resume_recent_event = joined_resume_recent_event(iter, emitted_topic, joined_topic)
     resume_roles = joined_resume_roles(loop, iter, emitted_topic, routing_basis)
     resume_events = joined_resume_events(loop, iter, emitted_topic, routing_basis)
 
-    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.join.finish", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("joined_topic", joined_topic) <> ", " <> LoopJson.json_field("routing_basis", routing_basis) <> ", " <> LoopJson.json_field("resume_recent_event", resume_recent_event) <> ", " <> LoopJson.json_field("resume_roles", LoopUtils.join_csv(resume_roles)) <> ", " <> LoopJson.json_field("resume_events", LoopUtils.join_csv(resume_events)))
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.join.finish", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("joined_topic", joined_topic) <> ", " <> LoopJson.json_field("routing_basis", routing_basis) <> ", " <> LoopJson.json_field("resume_recent_event", resume_recent_event) <> ", " <> LoopJson.json_field("resume_roles", LoopUtils.join_csv(resume_roles)) <> ", " <> LoopJson.json_field("resume_events", LoopUtils.join_csv(resume_events)) <> ", " <> LoopJson.json_field("elapsed_ms", to_string(total_elapsed_ms)))
   end
 
   defp joined_resume_routing_basis(_loop, iter, "explore.parallel") do
@@ -986,12 +1404,13 @@ defmodule LoopHarness do
     System.write_text(Path.join(wave_dir, "spec.md"), content)
   end
 
-  defp write_wave_join(wave_dir, wave_id, emitted_topic, objectives, branch_results, opening_recent_event, opening_roles, opening_events) do
+  defp write_wave_join(wave_dir, wave_id, emitted_topic, objectives, branch_results, opening_recent_event, opening_roles, opening_events, total_elapsed_ms) do
     content = Markdown.heading(1, "Parallel Join " <> wave_id) <> "\n\n" <>
       "Trigger: " <> Markdown.code(emitted_topic) <> "\n" <>
       "Opening recent event: " <> Markdown.code(opening_recent_event) <> "\n" <>
       "Opening roles: " <> LoopUtils.list_text(opening_roles) <> "\n" <>
-      "Opening events: " <> LoopUtils.list_text(opening_events) <> "\n\n" <>
+      "Opening events: " <> LoopUtils.list_text(opening_events) <> "\n" <>
+      "Total wave elapsed: " <> Markdown.code(to_string(total_elapsed_ms) <> "ms") <> "\n\n" <>
       Markdown.heading(2, "Objectives") <> "\n" <> Markdown.bullet_list(objectives) <> "\n\n" <>
       Markdown.heading(2, "Branch Results") <> "\n" <> Markdown.bullet_list(wave_branch_result_items(branch_results, []))
     System.write_text(Path.join(wave_dir, "join.md"), content)
@@ -1002,7 +1421,7 @@ defmodule LoopHarness do
   end
 
   defp wave_branch_result_items([branch | rest], acc) do
-    text = Markdown.code(Map.get(branch, :branch_id, "")) <> ": " <> Map.get(branch, :stop_reason, "")
+    text = Markdown.code(Map.get(branch, :branch_id, "")) <> ": " <> Map.get(branch, :stop_reason, "") <> " (" <> to_string(Map.get(branch, :elapsed_ms, 0)) <> "ms)"
     wave_branch_result_items(rest, [text] ++ acc)
   end
 
@@ -1028,6 +1447,7 @@ defmodule LoopHarness do
   defp render_branch_result(result) do
     Markdown.heading(1, "Branch Result") <> "\n\n" <>
       "Stop reason: " <> Markdown.code(Map.get(result, :stop_reason, "unknown")) <> "\n" <>
+      "Elapsed: " <> Markdown.code(to_string(Map.get(result, :elapsed_ms, 0)) <> "ms") <> "\n" <>
       "Routing event: " <> Markdown.code(Map.get(result, :routing_event, "")) <> "\n" <>
       "Allowed events: " <> LoopUtils.list_text(Map.get(result, :allowed_events, [])) <> "\n\n" <>
       Markdown.heading(2, "Output") <> "\n\n" <> Map.get(result, :output, "") <> "\n"

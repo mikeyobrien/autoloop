@@ -22,6 +22,9 @@ defmodule ParallelWaveTest do
     Assert.assert_contains(journal, "\"source\": \"harness\"")
     Assert.assert_contains(spec, "Trigger: `tasks.ready.parallel`")
     Assert.assert_contains(join, "# Parallel Join")
+    Assert.assert_contains(join, "Total wave elapsed: `")
+    Assert.assert_contains(journal, "\"elapsed_ms\":")
+    Assert.assert_contains(branch_result, "Elapsed: `")
     Assert.assert_contains(branch_result, "Routing event: `tasks.ready`")
     Assert.assert_contains(branch_result, "Allowed events: review.ready, build.blocked")
     Assert.assert_contains(branch_result, "branch recent=tasks.ready")
@@ -106,6 +109,28 @@ defmodule ParallelWaveTest do
     Assert.assert_contains(journal, "\"topic\": \"wave.timeout\"")
     Assert.assert_contains(journal, "backend_timeout")
     Assert.assert_contains(branch_result, "Stop reason: `backend_timeout`")
+  end
+
+  def test_parallel_wave_launches_slow_branches_concurrently() do
+    project_dir = prepare_fixture(5000)
+    started_ms = epoch_milliseconds()
+    result = run_fixture(project_dir, "concurrent-fixture")
+    elapsed_ms = epoch_milliseconds() - started_ms
+    journal = read_journal(project_dir)
+    wave_dir = latest_wave_dir(project_dir)
+    join = System.read_text(Path.join(wave_dir, "join.md"))
+    first_branch = System.read_text(Path.join(wave_dir, "branches/branch-1/result.md"))
+    second_branch = System.read_text(Path.join(wave_dir, "branches/branch-2/result.md"))
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_equal(elapsed_ms < 5500, true)
+    Assert.assert_contains(join, "branch-1")
+    Assert.assert_contains(join, "branch-2")
+    Assert.assert_contains(join, "Total wave elapsed: `")
+    Assert.assert_contains(first_branch, "Elapsed: `")
+    Assert.assert_contains(second_branch, "Elapsed: `")
+    Assert.assert_contains(journal, "\"topic\": \"wave.branch.finish\"")
+    Assert.assert_contains(journal, "\"elapsed_ms\":")
   end
 
   defp prepare_fixture(branch_timeout_ms) do
@@ -240,6 +265,11 @@ defmodule ParallelWaveTest do
     "  \"$MINILOOPS_BIN\" emit tasks.ready.parallel \"$payload\"\n" <>
     "  exit 0\n" <>
     "fi\n" <>
+    "if printf '%s' \"$prompt\" | grep -q 'concurrent-fixture'; then\n" <>
+    "  payload=$(printf '%s\\n%s\\n' '- slow branch one' '- slow branch two')\n" <>
+    "  \"$MINILOOPS_BIN\" emit tasks.ready.parallel \"$payload\"\n" <>
+    "  exit 0\n" <>
+    "fi\n" <>
     "printf 'unexpected backend prompt\\n'\n"
   end
 
@@ -262,6 +292,11 @@ defmodule ParallelWaveTest do
     " -u MINILOOPS_RUN_ID" <>
     " -u MINILOOPS_STATE_DIR" <>
     " -u MINILOOPS_WIDTH"
+  end
+
+  defp epoch_milliseconds() do
+    result = System.run("python3 -c 'import time; print(int(time.time() * 1000))'")
+    String.to_integer(String.trim(Map.get(result, :output, "0")))
   end
 
   defp repo_root() do

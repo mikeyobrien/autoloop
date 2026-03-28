@@ -66,13 +66,14 @@ Run a named chain:
 ```bash
 miniloops chain run code-and-qa .
 miniloops chain run code-simplify-qa .
+miniloops chain run code-simplify-qa . "Implement the approved spec, then simplify and QA it"
 miniloops chain list .
 ```
 
 Run an ad hoc chain:
 
 ```bash
-miniloops run . --chain autocode,autoqa,autoresearch
+miniloops run . --chain autocode,autoqa,autoresearch "Implement the approved change and validate it"
 ```
 
 ### How chains work
@@ -256,9 +257,10 @@ When `parallel.enabled = true`, normal parent turns get a small global `Structur
 Rules:
 - only one wave may be active at a time
 - payloads must be a markdown bullet list or numbered list with 1..`parallel.max_branches` branch objectives
-- branches run in isolated state under `.miniloop/waves/<wave-id>/...`
+- branches run as concurrent child jobs in isolated state under `.miniloop/waves/<wave-id>/...`
 - only the harness may emit `*.parallel.joined`
 - branch child prompts do **not** get the global parallelism block
+- `wave.branch.finish`, `wave.join.start`, `wave.join.finish`, branch `result.md`, and `join.md` surface elapsed timing so overlap stays inspectable
 
 Topology can route joined dispatch events explicitly:
 
@@ -344,6 +346,8 @@ Loop memory commands:
 
 ```bash
 miniloops memory list
+miniloops memory status
+miniloops memory find "verify role"
 miniloops memory add learning "The verify role should summarize test failures"
 miniloops memory add preference Workflow "Keep role prompts short and explicit"
 miniloops memory remove mem-3 "stale"
@@ -354,60 +358,63 @@ miniloops memory remove mem-3 "stale"
 Inspect the latest scratchpad:
 
 ```bash
+miniloops inspect scratchpad                   # defaults to terminal
 miniloops inspect scratchpad --format md
 miniloops inspect scratchpad --format terminal
 ```
 
-Use `--format md` when you want the raw markdown projection. Use `--format terminal` when you want the same markdown pretty-rendered for terminal display.
+Markdown-capable inspect views now default to `terminal`. Use `--format md` when you want the raw markdown projection.
 
 This inspect view stays richer than the prompt-injected scratchpad so operators can debug long runs without reading raw journal JSON.
 
 Inspect memory:
 
 ```bash
+miniloops inspect memory                       # defaults to terminal
 miniloops inspect memory --format md
-miniloops inspect memory --format terminal
 miniloops inspect memory --format json
 ```
 
 Inspect a specific iteration prompt:
 
 ```bash
+miniloops inspect prompt 1                     # defaults to terminal
 miniloops inspect prompt 1 --format md
-miniloops inspect prompt 1 --format terminal
 ```
 
 Inspect a specific iteration output:
 
 ```bash
+miniloops inspect output 1                     # defaults to text
 miniloops inspect output 1 --format text
 ```
 
 Inspect the raw journal:
 
 ```bash
+miniloops inspect journal                      # defaults to json
 miniloops inspect journal --format json
 ```
 
 Inspect coordination state (issues, slices, commits from journal):
 
 ```bash
+miniloops inspect coordination                 # defaults to terminal
 miniloops inspect coordination --format md
-miniloops inspect coordination --format terminal
 ```
 
 Inspect chain state:
 
 ```bash
+miniloops inspect chain                        # defaults to terminal
 miniloops inspect chain --format md
-miniloops inspect chain --format terminal
 ```
 
 Inspect metrics (per-iteration timing, roles, events, outcomes):
 
 ```bash
+miniloops inspect metrics                      # terminal-rendered markdown table
 miniloops inspect metrics --format md          # markdown table with summary line
-miniloops inspect metrics --format terminal    # terminal-rendered markdown table
 miniloops inspect metrics --format csv         # RFC 4180 CSV
 miniloops inspect metrics --format json        # JSON array of objects
 miniloops inspect metrics run-1 --format md    # filter to a specific run
@@ -416,10 +423,10 @@ miniloops inspect metrics run-1 --format md    # filter to a specific run
 Against another project directory:
 
 ```bash
-miniloops inspect scratchpad /path/to/project --format md
-miniloops inspect memory /path/to/project --format md
-miniloops inspect prompt 2 /path/to/project --format md
-miniloops inspect output 2 /path/to/project --format text
+miniloops inspect scratchpad /path/to/project
+miniloops inspect memory /path/to/project
+miniloops inspect prompt 2 /path/to/project
+miniloops inspect output 2 /path/to/project
 ```
 
 ## Run

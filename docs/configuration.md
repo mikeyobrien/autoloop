@@ -86,8 +86,8 @@ Rules and behavior:
 - only the harness may emit `*.parallel.joined`
 - normal parent turns get the global `Structured parallelism` prompt block when parallelism is enabled
 - branch child prompts do **not** get that global metaprompt
-- only one active wave is allowed at a time
-- wave artifacts are written under `core.state_dir/waves/<wave-id>/...` (default `.miniloop/waves/<wave-id>/...`)
+- one wave may be active at a time, but branches inside that wave launch as concurrent child jobs before the parent joins
+- wave artifacts are written under `core.state_dir/waves/<wave-id>/...` (default `.miniloop/waves/<wave-id>/...`), including per-branch logs/results plus `join.md` timing summaries
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
