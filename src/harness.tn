@@ -259,15 +259,112 @@ defmodule LoopHarness do
   defp build_iteration_context(loop, iteration) do
     run_lines = read_run_lines(journal_file(loop), run_id(loop))
     scratchpad_text = render_run_scratchpad_prompt(run_lines)
-    recent_event = routing_event_from_lines(run_lines, "loop.start")
-    allowed_roles = LoopTopology.suggested_roles(topology(loop), recent_event)
-    allowed_events = LoopTopology.allowed_events(topology(loop), recent_event)
+    routing = iteration_routing_context(topology(loop), run_lines)
+    recent_event = Map.get(routing, :recent_event, "loop.start")
+    allowed_roles = Map.get(routing, :allowed_roles, [])
+    allowed_events = Map.get(routing, :allowed_events, [])
     backpressure = latest_invalid_note(run_lines, "")
     memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
     memory_stats = LoopMemory.stats_file(memory_file(loop), memory_budget_chars(loop))
     invalid_count = invalid_event_count(run_lines, 0)
 
     %{iteration: iteration, recent_event: recent_event, allowed_roles: allowed_roles, allowed_events: allowed_events, backpressure: backpressure, scratchpad_text: scratchpad_text, memory_text: memory_text, prompt: render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, scratchpad_text, memory_text, memory_stats)}
+  end
+
+  defp iteration_routing_context(topology, run_lines) do
+    recent_event = routing_event_from_lines(run_lines, "loop.start")
+
+    case reserved_parallel_joined_topic(recent_event) do
+      true -> joined_iteration_routing_context(topology, run_lines, recent_event)
+      _ -> %{recent_event: recent_event, allowed_roles: LoopTopology.suggested_roles(topology, recent_event), allowed_events: LoopTopology.allowed_events(topology, recent_event)}
+    end
+  end
+
+  defp joined_iteration_routing_context(topology, run_lines, joined_topic) do
+    join_line = latest_wave_join_finish_line(run_lines, joined_topic, "")
+    routing_basis = joined_routing_basis(join_line, joined_topic)
+    recent_event = joined_recent_event(join_line, joined_topic)
+    fallback_roles = LoopTopology.suggested_roles(topology, routing_basis)
+    fallback_events = LoopTopology.allowed_events(topology, routing_basis)
+    restored_roles = csv_field_list(join_line, "resume_roles")
+    restored_events = csv_field_list(join_line, "resume_events")
+    allowed_roles = fallback_csv_list(restored_roles, fallback_roles)
+    allowed_events = fallback_csv_list(restored_events, fallback_events)
+
+    %{recent_event: recent_event, allowed_roles: allowed_roles, allowed_events: allowed_events}
+  end
+
+  defp latest_wave_join_finish_line([], _joined_topic, current) do
+    current
+  end
+
+  defp latest_wave_join_finish_line([line | rest], joined_topic, current) do
+    next =
+    case extract_topic(line) do
+      "wave.join.finish" -> latest_wave_join_finish_line_value(line, joined_topic, current)
+      _ -> current
+    end
+
+    latest_wave_join_finish_line(rest, joined_topic, next)
+  end
+
+  defp latest_wave_join_finish_line_value(line, joined_topic, current) do
+    case extract_field(line, "joined_topic") == joined_topic do
+      true -> line
+      _ -> current
+    end
+  end
+
+  defp joined_routing_basis("", joined_topic) do
+    default_joined_routing_basis(joined_topic)
+  end
+
+  defp joined_routing_basis(join_line, joined_topic) do
+    case extract_field(join_line, "routing_basis") do
+      "" -> default_joined_routing_basis(joined_topic)
+      value -> value
+    end
+  end
+
+  defp default_joined_routing_basis("explore.parallel.joined") do
+    "loop.start"
+  end
+
+  defp default_joined_routing_basis(joined_topic) do
+    case dispatch_parallel_joined_topic(joined_topic) do
+      true -> String.slice(joined_topic, 0, String.length(joined_topic) - String.length(".parallel.joined"))
+      _ -> joined_topic
+    end
+  end
+
+  defp joined_recent_event("", joined_topic) do
+    joined_topic
+  end
+
+  defp joined_recent_event(join_line, joined_topic) do
+    case extract_field(join_line, "resume_recent_event") do
+      "" -> joined_topic
+      value -> value
+    end
+  end
+
+  defp csv_field_list("", _field) do
+    []
+  end
+
+  defp csv_field_list(line, field) do
+    case extract_field(line, field) do
+      "" -> []
+      value -> LoopUtils.split_csv(value)
+    end
+  end
+
+  defp fallback_csv_list([], fallback) do
+    fallback
+  end
+
+  defp fallback_csv_list(values, _fallback) do
+    values
   end
 
   defp finish_iteration(loop, iter, output) do
@@ -309,6 +406,21 @@ defmodule LoopHarness do
     result = execute_parallel_wave(loop, iter, emitted_topic, emitted_payload)
     reason = Map.get(result, :reason, "parallel_wave_complete")
     wave_id = Map.get(result, :wave_id, "")
+
+    case reason do
+      "parallel_wave_complete" -> continue_after_parallel_join(loop, iter, wave_id, emitted_topic)
+      _ -> stop_after_parallel_wave(loop, iter, reason, wave_id)
+    end
+  end
+
+  defp continue_after_parallel_join(loop, iter, wave_id, emitted_topic) do
+    joined_topic = parallel_joined_topic(emitted_topic)
+    append_wave_join_finish(loop, iter, wave_id, emitted_topic, joined_topic)
+    append_harness_event(journal_file(loop), run_id(loop), iteration_string(iter), joined_topic, wave_id)
+    iterate(loop, iteration(iter) + 1)
+  end
+
+  defp stop_after_parallel_wave(loop, iter, reason, wave_id) do
     fields = LoopJson.json_field("reason", reason) <> ", " <> LoopJson.json_field("iteration", iteration_string(iter)) <> parallel_stop_wave_fields(wave_id)
 
     append_event(journal_file(loop), run_id(loop), iteration_string(iter), "loop.stop", fields)
@@ -411,6 +523,21 @@ defmodule LoopHarness do
     end
   end
 
+  defp dispatch_parallel_join_base("explore.parallel.joined") do
+    "loop.start"
+  end
+
+  defp dispatch_parallel_join_base(topic) do
+    case dispatch_parallel_joined_topic(topic) do
+      true -> String.slice(topic, 0, String.length(topic) - String.length(".parallel.joined"))
+      _ -> topic
+    end
+  end
+
+  defp parallel_joined_topic(topic) do
+    topic <> ".joined"
+  end
+
   defp dispatch_parallel_topic("explore.parallel") do
     false
   end
@@ -425,6 +552,14 @@ defmodule LoopHarness do
 
   defp parallel_trigger_topic(topic) do
     dispatch_parallel_topic(topic)
+  end
+
+  defp dispatch_parallel_joined_topic("explore.parallel.joined") do
+    false
+  end
+
+  defp dispatch_parallel_joined_topic(topic) do
+    String.ends_with(topic, ".parallel.joined")
   end
 
   defp reserved_parallel_joined_topic(topic) do
@@ -776,6 +911,47 @@ defmodule LoopHarness do
     append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.join.start", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("branch_count", to_string(list_length(objectives, 0))) <> ", " <> LoopJson.json_field("branch_outcomes", render_branch_outcomes_csv(branch_results)))
   end
 
+  defp append_wave_join_finish(loop, iter, wave_id, emitted_topic, joined_topic) do
+    routing_basis = joined_resume_routing_basis(loop, iter, emitted_topic)
+    resume_recent_event = joined_resume_recent_event(iter, emitted_topic, joined_topic)
+    resume_roles = joined_resume_roles(loop, iter, emitted_topic, routing_basis)
+    resume_events = joined_resume_events(loop, iter, emitted_topic, routing_basis)
+
+    append_event(journal_file(loop), run_id(loop), iteration_string(iter), "wave.join.finish", LoopJson.json_field("wave_id", wave_id) <> ", " <> LoopJson.json_field("trigger_topic", emitted_topic) <> ", " <> LoopJson.json_field("joined_topic", joined_topic) <> ", " <> LoopJson.json_field("routing_basis", routing_basis) <> ", " <> LoopJson.json_field("resume_recent_event", resume_recent_event) <> ", " <> LoopJson.json_field("resume_roles", LoopUtils.join_csv(resume_roles)) <> ", " <> LoopJson.json_field("resume_events", LoopUtils.join_csv(resume_events)))
+  end
+
+  defp joined_resume_routing_basis(_loop, iter, "explore.parallel") do
+    recent_event(iter)
+  end
+
+  defp joined_resume_routing_basis(_loop, _iter, emitted_topic) do
+    parallel_dispatch_base(emitted_topic)
+  end
+
+  defp joined_resume_recent_event(iter, "explore.parallel", _joined_topic) do
+    recent_event(iter)
+  end
+
+  defp joined_resume_recent_event(_iter, _emitted_topic, joined_topic) do
+    joined_topic
+  end
+
+  defp joined_resume_roles(_loop, iter, "explore.parallel", _routing_basis) do
+    allowed_roles(iter)
+  end
+
+  defp joined_resume_roles(loop, _iter, _emitted_topic, routing_basis) do
+    LoopTopology.suggested_roles(topology(loop), routing_basis)
+  end
+
+  defp joined_resume_events(_loop, iter, "explore.parallel", _routing_basis) do
+    allowed_events(iter)
+  end
+
+  defp joined_resume_events(loop, _iter, _emitted_topic, routing_basis) do
+    LoopTopology.allowed_events(topology(loop), routing_basis)
+  end
+
   defp render_branch_outcomes_csv([]) do
     ""
   end
@@ -1052,7 +1228,7 @@ defmodule LoopHarness do
     context_pressure_text(memory_stats, invalid_count) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
     memory_text_block(memory_text) <>
-    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Log level: #{log_level_name(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Loop-owned working files belong under: #{state_dir(loop)}\n" <> "Do not leave loop-owned artifacts at the repo root. Use paths under #{state_dir(loop)} such as #{state_dir(loop)}/progress.md or #{state_dir(loop)}/logs/.\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
+    LoopTopology.render_with_context(topology(loop), recent_event, allowed_roles, allowed_events) <> "\n" <> "Iteration: #{iteration}/#{max_iterations(loop)}\n" <> "Log level: #{log_level_name(loop)}\n" <> "Completion event: #{completion_event(loop)}\n" <> "Completion promise fallback: #{completion_promise(loop)}\n" <> "Required events: #{required_events_text(required_events(loop))}\n" <> "Loop-owned working files belong under: #{state_dir(loop)}\n" <> "Do not leave loop-owned artifacts at the repo root. Use paths under #{state_dir(loop)} such as #{state_dir(loop)}/progress.md or #{state_dir(loop)}/logs/.\n" <> "Suggested next roles now: #{LoopUtils.list_text(allowed_roles)}\n" <> "Allowed next events now: #{LoopUtils.list_text(allowed_events)}\n" <> "Event tool: " <> tool_path(loop) <> "\n\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Use the event tool to publish your allowed handoff or completion event.\n" <> "Examples:\n" <>
     tool_path(loop) <> " emit <allowed-topic> \"brief handoff summary\"\n" <>
     tool_path(loop) <> " emit " <> completion_event(loop) <> " \"brief completion summary\"\n" <>
     tool_path(loop) <> " memory add learning \"durable lesson\"\n" <>
@@ -1266,7 +1442,8 @@ defmodule LoopHarness do
     scratchpad_text = render_run_scratchpad_prompt(run_lines)
     memory_text = LoopMemory.render_file(memory_file(loop), memory_budget_chars(loop))
     memory_stats = LoopMemory.stats_file(memory_file(loop), memory_budget_chars(loop))
-    recent_event = routing_event_from_lines(run_lines, "loop.start")
+    routing = iteration_routing_context(topology(loop), run_lines)
+    recent_event = Map.get(routing, :recent_event, "loop.start")
     backpressure = latest_invalid_note(run_lines, "")
     invalid_count = invalid_event_count(run_lines, 0)
     latest_iteration = to_string(max_review_prompt_iteration(run_lines))
@@ -1276,7 +1453,7 @@ defmodule LoopHarness do
     context_pressure_text(memory_stats, invalid_count) <>
     backpressure_text(backpressure) <>
     memory_text_block(memory_text) <> "Review trigger iteration: #{iteration}\n" <> "Latest routing event: " <> recent_event <> "\n\n" <>
-    LoopTopology.render(topology(loop), recent_event) <> "\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Useful commands:\n" <>
+    LoopTopology.render_with_context(topology(loop), recent_event, Map.get(routing, :allowed_roles, []), Map.get(routing, :allowed_events, [])) <> "\n" <> "Current scratchpad:\n" <> empty_fallback(scratchpad_text) <> "\n\n" <> "Useful commands:\n" <>
     tool_path(loop) <> " inspect scratchpad --format md\n" <>
     tool_path(loop) <> " inspect memory --format md\n" <>
     tool_path(loop) <> " inspect prompt " <> latest_iteration <> " --format md\n" <>
@@ -2138,7 +2315,15 @@ defmodule LoopHarness do
   end
 
   defp append_agent_event(path, run_id, iteration, topic, payload) do
-    append_text(path, emitted_event_line(run_id, iteration, topic, payload))
+    append_emitted_event(path, run_id, iteration, topic, payload, "agent")
+  end
+
+  defp append_harness_event(path, run_id, iteration, topic, payload) do
+    append_emitted_event(path, run_id, iteration, topic, payload, "harness")
+  end
+
+  defp append_emitted_event(path, run_id, iteration, topic, payload, source) do
+    append_text(path, emitted_event_line(run_id, iteration, topic, payload, source))
   end
 
   defp append_text(path, content) do
@@ -2150,9 +2335,9 @@ defmodule LoopHarness do
     record_prefix(run_id, iteration) <> LoopJson.json_field("topic", topic) <> ", " <> "\"fields\": {" <> fields_json <> "}}\n"
   end
 
-  defp emitted_event_line(run_id, iteration, topic, payload) do
+  defp emitted_event_line(run_id, iteration, topic, payload, source) do
     "{" <>
-    record_prefix(run_id, iteration) <> LoopJson.json_field("topic", topic) <> ", " <> LoopJson.json_field("payload", payload) <> ", " <> LoopJson.json_field("source", "agent") <> "}\n"
+    record_prefix(run_id, iteration) <> LoopJson.json_field("topic", topic) <> ", " <> LoopJson.json_field("payload", payload) <> ", " <> LoopJson.json_field("source", source) <> "}\n"
   end
 
   defp record_prefix(run_id, "") do

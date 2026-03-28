@@ -1,7 +1,8 @@
 defmodule ParallelWaveTest do
-  def test_parallel_dispatch_wave_creates_artifacts_and_builder_branch_context() do
+  def test_parallel_dispatch_wave_resumes_parent_through_joined_event() do
     project_dir = prepare_fixture(500)
     result = run_fixture(project_dir, "dispatch-fixture")
+    output = Map.get(result, :output, "")
     journal = read_journal(project_dir)
     wave_dir = latest_wave_dir(project_dir)
     branch_result = System.read_text(Path.join(wave_dir, "branches/branch-1/result.md"))
@@ -9,11 +10,16 @@ defmodule ParallelWaveTest do
     join = System.read_text(Path.join(wave_dir, "join.md"))
 
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
-    Assert.assert_contains(Map.get(result, :output, ""), "stop_reason: parallel_wave_complete")
+    Assert.assert_contains(output, "stop_reason: completion_promise")
+    Assert.assert_contains(output, "parent resumed recent=tasks.ready.parallel.joined")
+    Assert.assert_contains(output, "parent resumed allowed=review.ready,build.blocked")
     Assert.assert_contains(journal, "\"topic\": \"wave.start\"")
     Assert.assert_contains(journal, "\"topic\": \"wave.branch.start\"")
     Assert.assert_contains(journal, "\"topic\": \"wave.branch.finish\"")
     Assert.assert_contains(journal, "\"topic\": \"wave.join.start\"")
+    Assert.assert_contains(journal, "\"topic\": \"wave.join.finish\"")
+    Assert.assert_contains(journal, "\"topic\": \"tasks.ready.parallel.joined\"")
+    Assert.assert_contains(journal, "\"source\": \"harness\"")
     Assert.assert_contains(spec, "Trigger: `tasks.ready.parallel`")
     Assert.assert_contains(join, "# Parallel Join")
     Assert.assert_contains(branch_result, "Routing event: `tasks.ready`")
@@ -21,15 +27,21 @@ defmodule ParallelWaveTest do
     Assert.assert_contains(branch_result, "branch recent=tasks.ready")
   end
 
-  def test_parallel_explore_wave_reuses_opening_routing_context() do
+  def test_parallel_explore_wave_reuses_opening_routing_context_after_join() do
     project_dir = prepare_fixture(500)
     result = run_fixture(project_dir, "explore-fixture")
+    output = Map.get(result, :output, "")
+    journal = read_journal(project_dir)
     wave_dir = latest_wave_dir(project_dir)
     branch_result = System.read_text(Path.join(wave_dir, "branches/branch-1/result.md"))
     spec = System.read_text(Path.join(wave_dir, "spec.md"))
 
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
-    Assert.assert_contains(Map.get(result, :output, ""), "stop_reason: parallel_wave_complete")
+    Assert.assert_contains(output, "stop_reason: completion_promise")
+    Assert.assert_contains(output, "parent resumed recent=loop.start")
+    Assert.assert_contains(output, "parent resumed allowed=tasks.ready,explore.parallel")
+    Assert.assert_contains(journal, "\"topic\": \"wave.join.finish\"")
+    Assert.assert_contains(journal, "\"topic\": \"explore.parallel.joined\"")
     Assert.assert_contains(spec, "Trigger: `explore.parallel`")
     Assert.assert_contains(branch_result, "Routing event: `loop.start`")
     Assert.assert_contains(branch_result, "Allowed events: tasks.ready, explore.parallel")
@@ -159,6 +171,7 @@ defmodule ParallelWaveTest do
     "set -eu\n" <>
     "prompt=${1:-}\n" <>
     "state=${MINILOOPS_STATE_DIR:-}\n" <>
+    "iteration=${MINILOOPS_ITERATION:-1}\n" <>
     "if printf '%s' \"$state\" | grep -q '/waves/'; then\n" <>
     "  if printf '%s' \"$prompt\" | grep -q 'slow branch'; then\n" <>
     "    python3 - <<'PY'\n" <>
@@ -172,6 +185,12 @@ defmodule ParallelWaveTest do
     "  if [ -n \"$first_event\" ] && [ -n \"${MINILOOPS_BIN:-}\" ]; then\n" <>
     "    \"$MINILOOPS_BIN\" emit \"$first_event\" \"branch done\"\n" <>
     "  fi\n" <>
+    "  exit 0\n" <>
+    "fi\n" <>
+    "if [ \"$iteration\" != \"1\" ]; then\n" <>
+    "  printf 'parent resumed recent=%s\\n' \"${MINILOOPS_RECENT_EVENT:-}\"\n" <>
+    "  printf 'parent resumed allowed=%s\\n' \"${MINILOOPS_ALLOWED_EVENTS:-}\"\n" <>
+    "  printf 'LOOP_COMPLETE\\n'\n" <>
     "  exit 0\n" <>
     "fi\n" <>
     "if printf '%s' \"$prompt\" | grep -q 'dispatch-fixture'; then\n" <>

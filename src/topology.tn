@@ -67,6 +67,15 @@ defmodule LoopTopology do
     end
   end
 
+  def render_with_context(topology, recent_event, suggested, allowed) do
+    roles = Map.get(topology, :roles, [])
+
+    case roles do
+      [] -> ""
+      _ -> render_nonempty_with_context(recent_event, suggested, allowed, roles)
+    end
+  end
+
   defp load_existing(path, project_dir) do
     lines = String.split(System.read_text(path), LoopUtils.line_sep())
     state = parse_lines(lines, initial_state())
@@ -80,6 +89,10 @@ defmodule LoopTopology do
   defp render_nonempty(topology, recent_event, roles) do
     suggested = suggested_roles(topology, recent_event)
     allowed = allowed_events(topology, recent_event)
+    render_nonempty_with_context(recent_event, suggested, allowed, roles)
+  end
+
+  defp render_nonempty_with_context(recent_event, suggested, allowed, roles) do
     "Topology (advisory):\n" <> "Recent routing event: " <> recent_event <> "\n" <> "Suggested next roles: " <> LoopUtils.list_text(suggested) <> "\n" <> "Allowed next events: " <> LoopUtils.list_text(allowed) <> "\n\n" <> "Role deck:\n" <> render_roles(roles)
   end
 
