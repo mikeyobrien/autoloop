@@ -30,7 +30,7 @@ On later activations (`queue.advance` or `build.blocked`):
 - Re-read the shared working files.
 - If the current step still has unfinished work, hand the next smallest slice in the same step.
 - If the current step is complete, mark it complete in `.miniloop/progress.md`, advance to the next numbered step, and emit the next `tasks.ready`.
-- If the full plan is genuinely complete, emit `task.complete` instead of inventing more work.
+- Do not emit `task.complete`; whole-task completion belongs to the finalizer after review.
 
 Rules:
 - One active slice only.

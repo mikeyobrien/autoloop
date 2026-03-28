@@ -21,5 +21,6 @@ Use `.miniloop/docs/*.md` for archived context that should remain available but 
 
 Prioritize fixing active-file drift when you see it:
 - if `.miniloop/context.md`, `.miniloop/plan.md`, or `.miniloop/progress.md` still describe an old objective after the loop has narrowed, archive the stale material into `.miniloop/docs/*.md` and rewrite the active files for the current slice
+- when `.miniloop/simplify-context.md` or `.miniloop/simplify-plan.md` exist, compare them against `.miniloop/context.md` and `.miniloop/plan.md`; if the active batch, route, or next role drifted, rewrite the generic files to match the live simplification handoff
 - make sure `.miniloop/progress.md` includes a `Relevant Issues` section with explicit dispositions when the harness requires it
 - when scratchpad errors show filename drift (`.miniloop/qa-report.md` vs `qa_report.md`, etc.), normalize the canonical path in the active working files

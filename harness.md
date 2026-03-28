@@ -14,20 +14,13 @@ Global rules:
 - Maintain a `Relevant Issues` section in `.miniloop/progress.md`. Every relevant issue must have an explicit disposition: `fix-now`, `fix-next`, `deferred`, or `out-of-scope`.
 - Use `./.miniloop/miniloops memory add learning ...` for durable repo/process learnings.
 - Do not invent extra phases. Stay inside planner → builder → critic → finalizer.
+- Emit only from the allowed next-event set shown in the prompt. This loop stays on the normal workflow events unless topology/prompt explicitly allows extra side-channel emits; until then, keep `slice.*`, `issue.*`, and `context.archived` facts in `.miniloop/progress.md`.
 - If the prompt is a path to a `.code-task.md` file or an existing implementation directory, use that as source material instead of treating it like plain prose.
 
 State ownership split:
-- **Journal** = machine-owned runtime facts (use coordination events below)
+- **Journal** = machine-owned runtime facts from the routed workflow events that actually occurred
 - **Markdown** = curated intent (`.miniloop/context.md`, `.miniloop/plan.md`, concise `.miniloop/progress.md` summary)
 - **Docs** = archived reference material (`.miniloop/docs/*.md`)
 - **Memory** = durable lessons, preferences, meta notes
 
-Coordination events (emit these alongside normal workflow events):
-- `issue.discovered "id=<id>; summary=<text>; disposition=<fix-now|fix-next|deferred|out-of-scope>; owner=<role>"` — record a relevant issue
-- `issue.resolved "id=<id>; resolution=<text>"` — mark an issue resolved
-- `slice.started "id=<id>; description=<text>"` — mark slice work beginning
-- `slice.verified "id=<id>; method=<text>"` — mark slice verified
-- `slice.committed "id=<id>; commit_hash=<hash>"` — record slice commit
-- `context.archived "source_file=<path>; dest_file=<path>; reason=<text>"` — record context archival
-
-Inspect coordination state: `./.miniloop/miniloops inspect coordination --format md`
+Until topology explicitly supports additional coordination events, record slice start/verification/commit facts and issue dispositions in `.miniloop/progress.md`, commit messages, and review/finalizer handoffs rather than separate `slice.*` or `issue.*` emits.

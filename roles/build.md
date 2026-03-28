@@ -5,20 +5,23 @@ Implement exactly the active slice from the latest `tasks.ready` handoff.
 On every activation:
 - Re-read `.miniloop/context.md`, `.miniloop/plan.md`, and `.miniloop/progress.md`.
 - Re-read the source files named in the current slice.
-- Update `.miniloop/progress.md` with what you are doing and how you will verify it.
+- Re-check the routing context in your prompt and emit only an allowed workflow event (`review.ready` or `build.blocked`).
+- Update `.miniloop/progress.md` with the slice start, what you verified, the slice commit hash, and any relevant issue dispositions.
 
 Process:
 1. Understand the active slice and its acceptance criteria.
-2. Emit `slice.started "id=<slice-id>; description=<brief>"` at the start.
+2. Record the slice start in `.miniloop/progress.md` before editing.
 3. Prefer test-first work when the repo has a test harness for the area.
 4. Make the smallest code change that satisfies the slice.
 5. Run the strongest focused verification you can for that slice.
-6. Emit `slice.verified "id=<slice-id>; method=<what you checked>"` after verification.
-7. Commit the completed slice before handoff. Each completed slice should land as its own commit.
-8. Emit `slice.committed "id=<slice-id>; commit_hash=<hash>"` after committing.
-9. Record concise evidence in `.miniloop/progress.md` and longer output in `.miniloop/logs/` when useful.
-10. If you discover a relevant issue, emit `issue.discovered "id=<issue-id>; summary=<text>; disposition=<fix-now|fix-next|deferred|out-of-scope>; owner=<role>"`.
-11. Emit `review.ready` with:
+6. If the slice touches runtime modules, harness logic, or CLI dispatch, `tonic check .` after your final edit set is a required gate before handoff.
+7. Before `review.ready`, confirm every runtime helper you call exists in non-test sources; do not ship references that exist only in `test/*.tn`.
+8. Record concise verification evidence in `.miniloop/progress.md` and longer output in `.miniloop/logs/` when useful.
+9. If the slice changes prompt composition, prompt injection, or routing advisories, inspect the rendered prompt/artifacts directly (for example `./.miniloop/miniloops inspect prompt <iteration> --format md` or fixture-local branch artifacts) and record the proof path in `.miniloop/progress.md`; tests alone are not enough.
+10. Commit the completed slice before handoff. Each completed slice should land as its own commit.
+11. Record the commit hash in `.miniloop/progress.md`.
+12. If you discover a relevant issue, record it in the `Relevant Issues` section in `.miniloop/progress.md` with an explicit disposition (`fix-now`, `fix-next`, `deferred`, or `out-of-scope`).
+13. Emit `review.ready` with:
    - what changed
    - what was verified
    - the slice commit hash
@@ -33,5 +36,6 @@ Rules:
 - No opportunistic side quests.
 - No final completion decisions.
 - No fake verification.
+- Do not emit extra coordination events unless the prompt explicitly allows them.
 - Do not emit `review.ready` for an uncommitted completed slice.
 - If confidence is shaky, choose the narrower, more reversible change and document why.
