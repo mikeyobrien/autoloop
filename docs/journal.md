@@ -73,7 +73,7 @@ loop.complete   or   loop.stop
 | `iteration.start` | Start of each iteration. | `recent_event`, `suggested_roles`, `allowed_events`, `backpressure`, `prompt` |
 | `backend.start` | Before invoking the backend. | `backend_kind`, `command`, `prompt_mode`, `timeout_ms` |
 | `backend.finish` | After backend returns. | `exit_code`, `timed_out` (boolean), `output` |
-| `iteration.finish` | End of each iteration. | `exit_code`, `timed_out` (boolean), `output` |
+| `iteration.finish` | End of each iteration. | `exit_code`, `timed_out` (boolean), `elapsed_s` (integer seconds), `output` |
 | `review.start` | Before a hyperagent review pass. | `kind` (`"hyperagent"`), `backend_kind`, `command`, `prompt_mode`, `prompt`, `timeout_ms` |
 | `review.finish` | After review completes. | `kind` (`"hyperagent"`), `exit_code`, `timed_out` (boolean), `output` |
 | `loop.complete` | Loop finished successfully. | `reason` (`"completion_event"` or `"completion_promise"`) |
@@ -105,6 +105,20 @@ Coordination events are structured bookkeeping events that bypass backpressure v
 | `chain.spawn` | `chain_id`, `parent_id`, `steps`, `justification` | A dynamic sub-chain was spawned from within a running loop. |
 
 Coordination payload fields use `key=value;` encoding inside the `payload` string.
+
+### Wave lifecycle events (structured parallelism)
+
+When `parallel.enabled = true`, the harness records wave events for parallel branch execution. These use the system event shape.
+
+| Topic | Fields | Description |
+|-------|--------|-------------|
+| `wave.start` | `wave_id`, `trigger_topic`, `branch_count`, `opening_recent_event`, `opening_roles`, `opening_events`, `objectives` | A parallel wave was opened. |
+| `wave.branch.start` | `wave_id`, `branch_id`, `objective`, `routing_event`, `branch_roles`, `branch_events` | A branch within a wave began execution. |
+| `wave.branch.finish` | `wave_id`, `branch_id`, `stop_reason`, `output` | A branch completed. |
+| `wave.join.start` | `wave_id`, `trigger_topic`, `branch_count`, `branch_outcomes` | All branches finished; join phase began. |
+| `wave.failed` | `wave_id`, `failed_branches` | One or more branches failed (non-timeout). |
+| `wave.timeout` | `wave_id`, `timed_out_branches` | One or more branches exceeded `parallel.branch_timeout_ms`. |
+| `wave.invalid` | `trigger_topic`, `reason`, `active_wave_id`, `opening_recent_event` | A `.parallel` trigger was rejected (e.g. wave already active, parallelism disabled). |
 
 ### Chain events
 
@@ -216,6 +230,9 @@ The journal and its projections can be inspected via CLI:
 miniloops inspect journal --format json       # raw JSONL
 miniloops inspect scratchpad --format md       # iteration summaries
 miniloops inspect coordination --format md     # issues, slices, commits, archives
+miniloops inspect metrics --format md          # per-iteration metrics table with summary
+miniloops inspect metrics --format csv         # metrics as RFC 4180 CSV
+miniloops inspect metrics --format json        # metrics as JSON array
 miniloops inspect prompt 3 --format md         # iteration 3 prompt
 miniloops inspect output 3 --format text       # iteration 3 output
 miniloops inspect chain --format md            # chain execution state

@@ -396,6 +396,15 @@ Inspect chain state:
 miniloops inspect chain --format md
 ```
 
+Inspect metrics (per-iteration timing, roles, events, outcomes):
+
+```bash
+miniloops inspect metrics --format md          # markdown table with summary line
+miniloops inspect metrics --format csv         # RFC 4180 CSV
+miniloops inspect metrics --format json        # JSON array of objects
+miniloops inspect metrics run-1 --format md    # filter to a specific run
+```
+
 Against another project directory:
 
 ```bash

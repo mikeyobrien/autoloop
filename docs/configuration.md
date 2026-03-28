@@ -123,6 +123,7 @@ parallel.branch_timeout_ms = 180000
 | `core.journal_file` | string | `".miniloop/journal.jsonl"` | Path to the journal file. |
 | `core.memory_file` | string | `".miniloop/memory.jsonl"` | Path to the memory file. |
 | `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. Still accepted; prefer `journal_file`. |
+| `core.log_level` | string | `"info"` | Log verbosity. Valid levels: `debug`, `info`, `warn`, `error`, `none`. Overridden by `-v`/`--verbose` (sets `debug`). Exported as `MINILOOPS_LOG_LEVEL`. |
 | `core.run_id_format` | string | `"compact"` | Run ID format: `"compact"` for timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
 
 ## Full example
@@ -152,6 +153,7 @@ harness.instructions_file = "harness.md"
 core.state_dir = ".miniloop"
 core.journal_file = ".miniloop/journal.jsonl"
 core.memory_file = ".miniloop/memory.jsonl"
+# core.log_level = "info"
 ```
 
 ## Mock backend mode

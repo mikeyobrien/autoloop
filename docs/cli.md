@@ -22,6 +22,7 @@ The `bin/miniloops` launcher is a thin shell wrapper that calls `tonic run` with
 | `MINILOOPS_PROMPT` | Override the prompt sent to the backend |
 | `MINILOOPS_PROMPT_PATH` | Fallback prompt file path when `MINILOOPS_PROMPT` is unset |
 | `MINILOOPS_BIN` | Path to the miniloops binary — used by the Pi adapter for prompt projection |
+| `MINILOOPS_LOG_LEVEL` | Current log level — exported by the harness. One of `debug`, `info`, `warn`, `error`, `none`. |
 | `MINILOOPS_REVIEW_MODE` | Set to `hyperagent` during review turns — changes the Pi stream log prefix |
 | `MINILOOPS_MEMORY_FILE` | Exported by the harness so agents can locate the memory file |
 
@@ -97,8 +98,19 @@ The `--format` flag is required.
 | `output` | `<iteration>` | `text` | The raw output returned by the backend for a given iteration. |
 | `journal` | — | `json` | The full journal file contents. |
 | `memory` | — | `md`, `json` | Materialized memory (`md`) or raw JSONL (`json`). |
+| `metrics` | `[run_id]` | `md`, `csv`, `json` | Per-iteration metrics table: role, event, elapsed time, exit code, outcome. Optional `run_id` selector filters to a specific run. |
 | `coordination` | — | `md` | Coordination events from the current run. |
 | `chain` | — | `md` | Chain state — steps, outcomes, lineage. |
+
+**Metrics output formats:**
+
+The `metrics` artifact produces a per-iteration table with columns: `iteration`, `role`, `event`, `elapsed_s`, `exit_code`, `timed_out`, `outcome`.
+
+- **`md`** — Markdown table followed by a summary line: total iterations, total elapsed seconds, and count of distinct events.
+- **`csv`** — RFC 4180 CSV with header row. Fields containing commas, quotes, or newlines are double-quoted.
+- **`json`** — JSON array of objects. Numeric fields (`iteration`, `elapsed_s`, `exit_code`) are numbers or `null`. `timed_out` is a boolean.
+
+When no metrics data exists, `md` outputs `"No metrics data available."`, `csv` outputs the header row only, and `json` outputs `[]`.
 
 **Examples:**
 
@@ -110,6 +122,10 @@ miniloops inspect journal --format json
 miniloops inspect memory --format md
 miniloops inspect coordination --format md
 miniloops inspect chain --format md
+miniloops inspect metrics --format md
+miniloops inspect metrics --format csv
+miniloops inspect metrics --format json
+miniloops inspect metrics run-mn9d3uk0-xi0m --format md
 ```
 
 ### `memory`
