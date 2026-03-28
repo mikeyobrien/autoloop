@@ -39,3 +39,4 @@ Rules:
 - Do not claim completion until every scoped batch is explicitly marked `verified` or `no-op verified`.
 - Do not treat a dirty uncommitted simplify batch as complete. Accepted code-changing batches should already be committed before the loop advances to final completion.
 - Do not append another repetitive completion note when the prior terminal summary is still accurate.
+- EARLY EXIT: If `.miniloop/progress.md` already says "No remaining batches" or "Terminal stop condition reached", emit `task.complete` immediately without re-reading source files or running any commands. Two consecutive task.complete iterations means the loop leaked — exit, do not cycle again.
