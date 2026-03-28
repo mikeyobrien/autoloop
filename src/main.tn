@@ -327,19 +327,25 @@ defmodule Demo do
   end
 
   defp split_inspect_format([artifact | rest]) do
-    split_inspect_format_rest(artifact, rest)
+    count = list_count(rest)
+    split_inspect_format_rest(artifact, rest, count)
   end
 
   defp split_inspect_format([]) do
-    inspect_usage_error("inspect requires an artifact and --format")
+    inspect_usage_error("inspect requires an artifact")
   end
 
-  defp split_inspect_format_rest(artifact, rest) do
-    count = list_count(rest)
+  defp split_inspect_format_rest(artifact, rest, count) do
+    case count == 1 and list_at(rest, 1) == "--format" do
+      true -> inspect_usage_error("inspect requires a value after --format")
+      _ -> split_inspect_format_rest_count(artifact, rest, count)
+    end
+  end
 
+  defp split_inspect_format_rest_count(artifact, rest, count) do
     case count >= 2 do
       true -> split_inspect_format_with_count(artifact, rest, count)
-      _ -> inspect_usage_error("inspect requires --format <md|terminal|text|json|csv>")
+      _ -> %{artifact: artifact, positionals: rest, format: ""}
     end
   end
 
@@ -350,80 +356,115 @@ defmodule Demo do
 
     case flag do
       "--format" -> %{artifact: artifact, positionals: positionals, format: format}
-      _ -> inspect_usage_error("inspect requires --format <md|terminal|text|json|csv>")
+      _ -> split_inspect_format_without_flag(artifact, rest)
     end
   end
 
-  defp parse_inspect_positionals("prompt", format, [selector]) do
-    %{artifact: "prompt", selector: selector, project_dir: resolve_runtime_project_dir(), format: format}
+  defp split_inspect_format_without_flag(artifact, rest) do
+    case LoopUtils.list_contains(rest, "--format") do
+      true -> inspect_usage_error("inspect requires --format <md|terminal|text|json|csv>")
+      _ -> %{artifact: artifact, positionals: rest, format: ""}
+    end
   end
 
-  defp parse_inspect_positionals("prompt", format, [selector, project_dir]) do
-    %{artifact: "prompt", selector: selector, project_dir: project_dir, format: format}
+  defp parse_inspect_positionals("prompt", format, positionals) do
+    parse_inspect_selector_artifact("prompt", format, positionals)
   end
 
-  defp parse_inspect_positionals("output", format, [selector]) do
-    %{artifact: "output", selector: selector, project_dir: resolve_runtime_project_dir(), format: format}
+  defp parse_inspect_positionals("output", format, positionals) do
+    parse_inspect_selector_artifact("output", format, positionals)
   end
 
-  defp parse_inspect_positionals("output", format, [selector, project_dir]) do
-    %{artifact: "output", selector: selector, project_dir: project_dir, format: format}
+  defp parse_inspect_positionals("scratchpad", format, positionals) do
+    parse_inspect_project_artifact("scratchpad", format, positionals)
   end
 
-  defp parse_inspect_positionals("scratchpad", format, []) do
-    %{artifact: "scratchpad", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
+  defp parse_inspect_positionals("memory", format, positionals) do
+    parse_inspect_project_artifact("memory", format, positionals)
   end
 
-  defp parse_inspect_positionals("scratchpad", format, [project_dir]) do
-    %{artifact: "scratchpad", selector: "", project_dir: project_dir, format: format}
+  defp parse_inspect_positionals("journal", format, positionals) do
+    parse_inspect_project_artifact("journal", format, positionals)
   end
 
-  defp parse_inspect_positionals("memory", format, []) do
-    %{artifact: "memory", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
+  defp parse_inspect_positionals("coordination", format, positionals) do
+    parse_inspect_project_artifact("coordination", format, positionals)
   end
 
-  defp parse_inspect_positionals("memory", format, [project_dir]) do
-    %{artifact: "memory", selector: "", project_dir: project_dir, format: format}
+  defp parse_inspect_positionals("metrics", format, positionals) do
+    parse_inspect_metrics_positionals(format, positionals)
   end
 
-  defp parse_inspect_positionals("journal", format, []) do
-    %{artifact: "journal", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
-  end
-
-  defp parse_inspect_positionals("journal", format, [project_dir]) do
-    %{artifact: "journal", selector: "", project_dir: project_dir, format: format}
-  end
-
-  defp parse_inspect_positionals("coordination", format, []) do
-    %{artifact: "coordination", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
-  end
-
-  defp parse_inspect_positionals("coordination", format, [project_dir]) do
-    %{artifact: "coordination", selector: "", project_dir: project_dir, format: format}
-  end
-
-  defp parse_inspect_positionals("metrics", format, []) do
-    %{artifact: "metrics", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
-  end
-
-  defp parse_inspect_positionals("metrics", format, [run_id]) do
-    %{artifact: "metrics", selector: run_id, project_dir: resolve_runtime_project_dir(), format: format}
-  end
-
-  defp parse_inspect_positionals("metrics", format, [run_id, project_dir]) do
-    %{artifact: "metrics", selector: run_id, project_dir: project_dir, format: format}
-  end
-
-  defp parse_inspect_positionals("chain", format, []) do
-    %{artifact: "chain", selector: "", project_dir: resolve_runtime_project_dir(), format: format}
-  end
-
-  defp parse_inspect_positionals("chain", format, [project_dir]) do
-    %{artifact: "chain", selector: "", project_dir: project_dir, format: format}
+  defp parse_inspect_positionals("chain", format, positionals) do
+    parse_inspect_project_artifact("chain", format, positionals)
   end
 
   defp parse_inspect_positionals(artifact, _format, _positionals) do
     inspect_usage_error("invalid inspect usage for `" <> artifact <> "`")
+  end
+
+  defp parse_inspect_selector_artifact(artifact, format, [selector]) do
+    inspect_spec(artifact, selector, resolve_runtime_project_dir(), format)
+  end
+
+  defp parse_inspect_selector_artifact(artifact, format, [selector, project_dir]) do
+    inspect_spec(artifact, selector, project_dir, format)
+  end
+
+  defp parse_inspect_selector_artifact(artifact, _format, _positionals) do
+    inspect_usage_error("invalid inspect usage for `" <> artifact <> "`")
+  end
+
+  defp parse_inspect_project_artifact(artifact, format, []) do
+    inspect_spec(artifact, "", resolve_runtime_project_dir(), format)
+  end
+
+  defp parse_inspect_project_artifact(artifact, format, [project_dir]) do
+    inspect_spec(artifact, "", project_dir, format)
+  end
+
+  defp parse_inspect_project_artifact(artifact, _format, _positionals) do
+    inspect_usage_error("invalid inspect usage for `" <> artifact <> "`")
+  end
+
+  defp parse_inspect_metrics_positionals(format, []) do
+    inspect_spec("metrics", "", resolve_runtime_project_dir(), format)
+  end
+
+  defp parse_inspect_metrics_positionals(format, [run_id]) do
+    inspect_spec("metrics", run_id, resolve_runtime_project_dir(), format)
+  end
+
+  defp parse_inspect_metrics_positionals(format, [run_id, project_dir]) do
+    inspect_spec("metrics", run_id, project_dir, format)
+  end
+
+  defp parse_inspect_metrics_positionals(_format, _positionals) do
+    inspect_usage_error("invalid inspect usage for `metrics`")
+  end
+
+  defp inspect_spec(artifact, selector, project_dir, format) do
+    %{artifact: artifact, selector: selector, project_dir: project_dir, format: inspect_format_or_default(artifact, format)}
+  end
+
+  defp inspect_format_or_default(artifact, "") do
+    inspect_default_format(artifact)
+  end
+
+  defp inspect_format_or_default(_artifact, format) do
+    format
+  end
+
+  defp inspect_default_format("output") do
+    "text"
+  end
+
+  defp inspect_default_format("journal") do
+    "json"
+  end
+
+  defp inspect_default_format(_artifact) do
+    "terminal"
   end
 
   defp inspect_usage_error(message) do
@@ -739,7 +780,7 @@ defmodule Demo do
     IO.puts("Usage:")
     IO.puts("  miniloops run <preset-name|preset-dir> [prompt...] [flags]")
     IO.puts("  miniloops emit <topic> [summary]")
-    IO.puts("  miniloops inspect <artifact> --format <md|terminal|text|json|csv>")
+    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]")
     IO.puts("  miniloops memory <list|add|remove> [args]")
     IO.puts("  miniloops chain <list|run> [args]")
     IO.puts("")
@@ -768,7 +809,12 @@ defmodule Demo do
 
   defp print_inspect_usage() do
     IO.puts("Usage:")
-    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] --format <md|terminal|text|json|csv>")
+    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]")
+    IO.puts("")
+    IO.puts("Defaults when --format is omitted:")
+    IO.puts("  scratchpad, prompt, memory, coordination, chain, metrics -> terminal")
+    IO.puts("  output -> text")
+    IO.puts("  journal -> json")
     IO.puts("")
     IO.puts("Artifacts:")
     IO.puts("  scratchpad, prompt, output, journal, memory, coordination, chain, metrics")
@@ -838,10 +884,3 @@ defmodule Demo do
     []
   end
 end
-    IO.puts("  miniloops memory status [project-dir]")
-    IO.puts("  miniloops memory find <pattern...>")
-    IO.puts("")
-    IO.puts("Memory helpers:")
-    IO.puts("  miniloops memory status [project-dir]")
-    IO.puts("  miniloops memory find <pattern...>")
-    IO.puts("  miniloops memory remove <id> [reason...]")

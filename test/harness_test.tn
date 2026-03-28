@@ -43,11 +43,40 @@ defmodule HarnessTest do
     Assert.assert_not_equal(pretty, raw)
   end
 
-  def test_inspect_help_mentions_terminal_format() do
+  def test_inspect_defaults_markdown_views_to_terminal() do
+    project_dir = prepare_fixture()
+    pretty = inspect_scratchpad_default(project_dir)
+
+    Assert.assert_contains(pretty, "Iteration 1")
+    Assert.refute(String.contains(pretty, "## Iteration 1"), "default inspect scratchpad should use terminal rendering")
+  end
+
+  def test_inspect_defaults_output_and_journal_to_raw_formats() do
+    project_dir = prepare_fixture()
+    output = inspect_output_default(project_dir, 1)
+    journal = inspect_journal_default(project_dir)
+
+    Assert.assert_contains(output, "worker iteration 1")
+    Assert.assert_contains(output, "detail line for iteration 1")
+    Assert.assert_contains(journal, "\"topic\": \"loop.start\"")
+    Assert.assert_contains(journal, "\"topic\": \"iteration.finish\"")
+  end
+
+  def test_inspect_help_mentions_default_formats() do
     project_dir = prepare_fixture()
     help = inspect_help(project_dir)
 
-    Assert.assert_contains(help, "--format <md|terminal|text|json|csv>")
+    Assert.assert_contains(help, "[--format <md|terminal|text|json|csv>]")
+    Assert.assert_contains(help, "scratchpad, prompt, memory, coordination, chain, metrics -> terminal")
+    Assert.assert_contains(help, "output -> text")
+    Assert.assert_contains(help, "journal -> json")
+  end
+
+  def test_inspect_rejects_missing_format_value() do
+    project_dir = prepare_fixture()
+    result = run_repo_command(project_dir, "inspect scratchpad --format")
+
+    Assert.assert_contains(Map.get(result, :output, ""), "inspect requires a value after --format")
   end
 
   def test_parallel_metaprompt_renders_for_normal_parent_prompts() do
@@ -184,6 +213,24 @@ defmodule HarnessTest do
 
   defp inspect_scratchpad_terminal(project_dir) do
     result = run_repo_command(project_dir, "inspect scratchpad --format terminal")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_scratchpad_default(project_dir) do
+    result = run_repo_command(project_dir, "inspect scratchpad")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_output_default(project_dir, iteration) do
+    result = run_repo_command(project_dir, "inspect output " <> to_string(iteration))
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp inspect_journal_default(project_dir) do
+    result = run_repo_command(project_dir, "inspect journal")
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
     Map.get(result, :output, "")
   end
