@@ -1,0 +1,215 @@
+defmodule Markdown do
+  # --- Inline formatting ---
+
+  def bold(text) do
+    "**" <> text <> "**"
+  end
+
+  def italic(text) do
+    "_" <> text <> "_"
+  end
+
+  def code(text) do
+    "`" <> text <> "`"
+  end
+
+  # --- Block elements ---
+
+  def heading(1, text) do
+    "# " <> text
+  end
+
+  def heading(2, text) do
+    "## " <> text
+  end
+
+  def heading(3, text) do
+    "### " <> text
+  end
+
+  def heading(4, text) do
+    "#### " <> text
+  end
+
+  def heading(_level, text) do
+    "##### " <> text
+  end
+
+  def code_block(text, lang) do
+    "```" <> lang <> "\n" <> text <> "\n```"
+  end
+
+  def code_block(text) do
+    "```\n" <> text <> "\n```"
+  end
+
+  def blockquote(text) do
+    prefix_lines(text, "> ")
+  end
+
+  def section(title, level, body) do
+    heading(level, title) <> "\n\n" <> body
+  end
+
+  def section(title, body) do
+    heading(2, title) <> "\n\n" <> body
+  end
+
+  # --- Lists ---
+
+  def bullet_list([]) do
+    ""
+  end
+
+  def bullet_list(items) do
+    bullet_lines(items)
+  end
+
+  defp bullet_lines([]) do
+    ""
+  end
+
+  defp bullet_lines([item]) do
+    "- " <> item
+  end
+
+  defp bullet_lines([item | rest]) do
+    "- " <> item <> "\n" <> bullet_lines(rest)
+  end
+
+  def numbered_list([]) do
+    ""
+  end
+
+  def numbered_list(items) do
+    numbered_lines(items, 1)
+  end
+
+  defp numbered_lines([], _n) do
+    ""
+  end
+
+  defp numbered_lines([item], n) do
+    to_string(n) <> ". " <> item
+  end
+
+  defp numbered_lines([item | rest], n) do
+    to_string(n) <> ". " <> item <> "\n" <> numbered_lines(rest, n + 1)
+  end
+
+  # --- Tables with aligned columns ---
+
+  def table(headers, rows) do
+    widths = column_widths(headers, rows)
+    header_row = table_row(headers, widths)
+    separator = separator_row(widths)
+    body = table_rows(rows, widths)
+    header_row <> "\n" <> separator <> body
+  end
+
+  defp table_row(cells, widths) do
+    "| " <> table_cells(cells, widths) <> "|"
+  end
+
+  defp table_cells([], []) do
+    ""
+  end
+
+  defp table_cells([cell], [width]) do
+    pad_cell(cell, width) <> " "
+  end
+
+  defp table_cells([cell | rest_cells], [width | rest_widths]) do
+    pad_cell(cell, width) <> " | " <> table_cells(rest_cells, rest_widths)
+  end
+
+  defp pad_cell(cell, width) do
+    String.pad_trailing(cell, width, " ")
+  end
+
+  defp separator_row(widths) do
+    "| " <> separator_cells(widths) <> "|"
+  end
+
+  defp separator_cells([]) do
+    ""
+  end
+
+  defp separator_cells([width]) do
+    String.pad_trailing("", width, "-") <> " "
+  end
+
+  defp separator_cells([width | rest]) do
+    String.pad_trailing("", width, "-") <> " | " <> separator_cells(rest)
+  end
+
+  defp table_rows([], _widths) do
+    ""
+  end
+
+  defp table_rows([row | rest], widths) do
+    "\n" <> table_row(row, widths) <> table_rows(rest, widths)
+  end
+
+  # --- Column width calculation ---
+
+  defp column_widths(headers, rows) do
+    initial = cell_widths(headers, [])
+    max_widths(rows, initial)
+  end
+
+  defp cell_widths([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp cell_widths([cell | rest], acc) do
+    cell_widths(rest, [String.length(cell)] ++ acc)
+  end
+
+  defp max_widths([], widths) do
+    widths
+  end
+
+  defp max_widths([row | rest], widths) do
+    max_widths(rest, merge_row_widths(row, widths))
+  end
+
+  defp merge_row_widths([], widths) do
+    widths
+  end
+
+  defp merge_row_widths(_cells, []) do
+    []
+  end
+
+  defp merge_row_widths([cell | rest_cells], [width | rest_widths]) do
+    cell_len = String.length(cell)
+
+    new_width =
+    case cell_len > width do
+      true -> cell_len
+      _ -> width
+    end
+
+    [new_width] ++ merge_row_widths(rest_cells, rest_widths)
+  end
+
+  # --- Helpers ---
+
+  defp prefix_lines(text, prefix) do
+    lines = String.split(text, "\n")
+    prefix_each(lines, prefix)
+  end
+
+  defp prefix_each([], _prefix) do
+    ""
+  end
+
+  defp prefix_each([line], prefix) do
+    prefix <> line
+  end
+
+  defp prefix_each([line | rest], prefix) do
+    prefix <> line <> "\n" <> prefix_each(rest, prefix)
+  end
+end

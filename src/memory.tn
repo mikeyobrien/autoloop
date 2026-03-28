@@ -87,15 +87,16 @@ defmodule LoopMemory do
   end
 
   defp render_preferences(entries) do
-    "Preferences:\n" <> render_preference_lines(entries)
+    "Preferences:\n" <> Markdown.bullet_list(preference_items(entries, [])) <> "\n"
   end
 
-  defp render_preference_lines([]) do
-    ""
+  defp preference_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_preference_lines([entry | rest]) do
-    "- [" <> extract_field(entry, "category") <> "] " <> extract_field(entry, "text") <> "\n" <> render_preference_lines(rest)
+  defp preference_items([entry | rest], acc) do
+    text = "[" <> extract_field(entry, "category") <> "] " <> extract_field(entry, "text")
+    preference_items(rest, [text] ++ acc)
   end
 
   defp render_learnings([]) do
@@ -103,17 +104,18 @@ defmodule LoopMemory do
   end
 
   defp render_learnings(entries) do
-    "Learnings:\n" <> render_learning_lines(entries)
+    "Learnings:\n" <> Markdown.bullet_list(learning_items(entries, [])) <> "\n"
   end
 
-  defp render_learning_lines([]) do
-    ""
+  defp learning_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_learning_lines([entry | rest]) do
+  defp learning_items([entry | rest], acc) do
     source = extract_field(entry, "source")
     prefix = learning_prefix(source)
-    "- " <> prefix <> extract_field(entry, "text") <> "\n" <> render_learning_lines(rest)
+    text = prefix <> extract_field(entry, "text")
+    learning_items(rest, [text] ++ acc)
   end
 
   defp learning_prefix("") do
@@ -129,15 +131,16 @@ defmodule LoopMemory do
   end
 
   defp render_meta(entries) do
-    "Meta:\n" <> render_meta_lines(entries)
+    "Meta:\n" <> Markdown.bullet_list(meta_items(entries, [])) <> "\n"
   end
 
-  defp render_meta_lines([]) do
-    ""
+  defp meta_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_meta_lines([entry | rest]) do
-    "- " <> extract_field(entry, "key") <> ": " <> extract_field(entry, "value") <> "\n" <> render_meta_lines(rest)
+  defp meta_items([entry | rest], acc) do
+    text = extract_field(entry, "key") <> ": " <> extract_field(entry, "value")
+    meta_items(rest, [text] ++ acc)
   end
 
   defp truncate_text(text, budget_chars) do

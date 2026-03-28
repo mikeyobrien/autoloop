@@ -789,41 +789,60 @@ defmodule LoopHarness do
   end
 
   defp write_wave_spec(wave_dir, wave_id, emitted_topic, iter, objectives) do
-    content = "# Parallel Wave " <> wave_id <> "\n\n" <> "Trigger: `" <> emitted_topic <> "`\n" <> "Opening recent event: `" <> recent_event(iter) <> "`\n" <> "Opening roles: " <> LoopUtils.list_text(allowed_roles(iter)) <> "\n" <> "Opening events: " <> LoopUtils.list_text(allowed_events(iter)) <> "\n\n" <> "## Branch Objectives\n" <> render_wave_objectives(objectives)
+    content = Markdown.heading(1, "Parallel Wave " <> wave_id) <> "\n\n" <>
+      "Trigger: " <> Markdown.code(emitted_topic) <> "\n" <>
+      "Opening recent event: " <> Markdown.code(recent_event(iter)) <> "\n" <>
+      "Opening roles: " <> LoopUtils.list_text(allowed_roles(iter)) <> "\n" <>
+      "Opening events: " <> LoopUtils.list_text(allowed_events(iter)) <> "\n\n" <>
+      Markdown.heading(2, "Branch Objectives") <> "\n" <> Markdown.bullet_list(objectives)
     System.write_text(Path.join(wave_dir, "spec.md"), content)
   end
 
   defp write_wave_join(wave_dir, wave_id, emitted_topic, objectives, branch_results, opening_recent_event, opening_roles, opening_events) do
-    content = "# Parallel Join " <> wave_id <> "\n\n" <> "Trigger: `" <> emitted_topic <> "`\n" <> "Opening recent event: `" <> opening_recent_event <> "`\n" <> "Opening roles: " <> LoopUtils.list_text(opening_roles) <> "\n" <> "Opening events: " <> LoopUtils.list_text(opening_events) <> "\n\n" <> "## Objectives\n" <> render_wave_objectives(objectives) <> "\n## Branch Results\n" <> render_wave_branch_results(branch_results)
+    content = Markdown.heading(1, "Parallel Join " <> wave_id) <> "\n\n" <>
+      "Trigger: " <> Markdown.code(emitted_topic) <> "\n" <>
+      "Opening recent event: " <> Markdown.code(opening_recent_event) <> "\n" <>
+      "Opening roles: " <> LoopUtils.list_text(opening_roles) <> "\n" <>
+      "Opening events: " <> LoopUtils.list_text(opening_events) <> "\n\n" <>
+      Markdown.heading(2, "Objectives") <> "\n" <> Markdown.bullet_list(objectives) <> "\n\n" <>
+      Markdown.heading(2, "Branch Results") <> "\n" <> Markdown.bullet_list(wave_branch_result_items(branch_results, []))
     System.write_text(Path.join(wave_dir, "join.md"), content)
   end
 
-  defp render_wave_objectives([]) do
-    ""
+  defp wave_branch_result_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_wave_objectives([objective | rest]) do
-    "- " <> objective <> "\n" <> render_wave_objectives(rest)
-  end
-
-  defp render_wave_branch_results([]) do
-    ""
-  end
-
-  defp render_wave_branch_results([branch | rest]) do
-    "- `" <> Map.get(branch, :branch_id, "") <> "`: " <> Map.get(branch, :stop_reason, "") <> "\n" <> render_wave_branch_results(rest)
+  defp wave_branch_result_items([branch | rest], acc) do
+    text = Markdown.code(Map.get(branch, :branch_id, "")) <> ": " <> Map.get(branch, :stop_reason, "")
+    wave_branch_result_items(rest, [text] ++ acc)
   end
 
   defp render_branch_objective(objective, emitted_topic, routing_event, branch_roles, branch_events) do
-    "# Branch Objective\n\n" <> "Trigger: `" <> emitted_topic <> "`\n" <> "Routing event: `" <> routing_event <> "`\n" <> "Roles: " <> LoopUtils.list_text(branch_roles) <> "\n" <> "Allowed events: " <> LoopUtils.list_text(branch_events) <> "\n\n" <> objective <> "\n"
+    Markdown.heading(1, "Branch Objective") <> "\n\n" <>
+      "Trigger: " <> Markdown.code(emitted_topic) <> "\n" <>
+      "Routing event: " <> Markdown.code(routing_event) <> "\n" <>
+      "Roles: " <> LoopUtils.list_text(branch_roles) <> "\n" <>
+      "Allowed events: " <> LoopUtils.list_text(branch_events) <> "\n\n" <>
+      objective <> "\n"
   end
 
   defp render_branch_prompt(loop, objective, emitted_topic, routing_event, branch_roles, branch_events) do
-    "Parallel branch objective:\n" <> objective <> "\n\n" <> "Parent objective:\n" <> objective(loop) <> "\n\n" <> "Wave trigger: `" <> emitted_topic <> "`\n" <> "Branch routing event: `" <> routing_event <> "`\n" <> "Suggested roles: " <> LoopUtils.list_text(branch_roles) <> "\n" <> "Allowed events: " <> LoopUtils.list_text(branch_events) <> "\n" <> "Work only on this branch objective. Branch state is isolated; do not assume you can control parent routing directly.\n"
+    "Parallel branch objective:\n" <> objective <> "\n\n" <>
+      "Parent objective:\n" <> objective(loop) <> "\n\n" <>
+      "Wave trigger: " <> Markdown.code(emitted_topic) <> "\n" <>
+      "Branch routing event: " <> Markdown.code(routing_event) <> "\n" <>
+      "Suggested roles: " <> LoopUtils.list_text(branch_roles) <> "\n" <>
+      "Allowed events: " <> LoopUtils.list_text(branch_events) <> "\n" <>
+      "Work only on this branch objective. Branch state is isolated; do not assume you can control parent routing directly.\n"
   end
 
   defp render_branch_result(result) do
-    "# Branch Result\n\n" <> "Stop reason: `" <> Map.get(result, :stop_reason, "unknown") <> "`\n" <> "Routing event: `" <> Map.get(result, :routing_event, "") <> "`\n" <> "Allowed events: " <> LoopUtils.list_text(Map.get(result, :allowed_events, [])) <> "\n\n" <> "## Output\n\n" <> Map.get(result, :output, "") <> "\n"
+    Markdown.heading(1, "Branch Result") <> "\n\n" <>
+      "Stop reason: " <> Markdown.code(Map.get(result, :stop_reason, "unknown")) <> "\n" <>
+      "Routing event: " <> Markdown.code(Map.get(result, :routing_event, "")) <> "\n" <>
+      "Allowed events: " <> LoopUtils.list_text(Map.get(result, :allowed_events, [])) <> "\n\n" <>
+      Markdown.heading(2, "Output") <> "\n\n" <> Map.get(result, :output, "") <> "\n"
   end
 
   defp completed_via_event(topics, completion_event, required_events) do
@@ -1581,19 +1600,20 @@ defmodule LoopHarness do
     compacted = take_n(entries, compact_count, [])
     recent = drop_n(entries, compact_count)
 
-    "## Earlier iterations (compacted)\n\n" <> render_compact_scratchpad_entries(compacted) <> "\n" <> render_scratchpad_entries(recent)
+    Markdown.heading(2, "Earlier iterations (compacted)") <> "\n\n" <> Markdown.bullet_list(compact_scratchpad_items(compacted, [])) <> "\n\n" <> render_scratchpad_entries(recent)
   end
 
-  defp render_compact_scratchpad_entries([]) do
-    ""
+  defp compact_scratchpad_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_compact_scratchpad_entries([entry | rest]) do
-    "- Iteration " <> Map.get(entry, :iteration, "") <> " exit_code=" <> Map.get(entry, :exit_code, "") <> " — " <> scratchpad_entry_summary(entry) <> "\n" <> render_compact_scratchpad_entries(rest)
+  defp compact_scratchpad_items([entry | rest], acc) do
+    text = "Iteration " <> Map.get(entry, :iteration, "") <> " exit_code=" <> Map.get(entry, :exit_code, "") <> " — " <> scratchpad_entry_summary(entry)
+    compact_scratchpad_items(rest, [text] ++ acc)
   end
 
   defp scratchpad_entry_text(entry) do
-    "## Iteration " <> Map.get(entry, :iteration, "") <> "\n\n" <> "exit_code=" <> Map.get(entry, :exit_code, "") <> "\n\n" <>
+    Markdown.heading(2, "Iteration " <> Map.get(entry, :iteration, "")) <> "\n\n" <> "exit_code=" <> Map.get(entry, :exit_code, "") <> "\n\n" <>
     Map.get(entry, :output, "") <> "\n"
   end
 
@@ -1738,7 +1758,7 @@ defmodule LoopHarness do
     case issues == [] and slices == [] and commits == [] and archives == [] do
       true -> ""
       _ ->
-        "# Coordination State (from journal)\n\n" <>
+        Markdown.heading(1, "Coordination State (from journal)") <> "\n\n" <>
         render_coordination_issues(issues) <>
         render_coordination_slices(slices) <>
         render_coordination_commits(commits) <>
@@ -1751,17 +1771,17 @@ defmodule LoopHarness do
   end
 
   defp render_coordination_issues(issues) do
-    "## Issues\n" <> render_issue_lines(issues)
+    Markdown.heading(2, "Issues") <> "\n" <> Markdown.bullet_list(issue_items(issues, [])) <> "\n\n"
   end
 
-  defp render_issue_lines([]) do
-    "\n"
+  defp issue_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_issue_lines([issue | rest]) do
+  defp issue_items([issue | rest], acc) do
     disposition = Map.get(issue, :disposition, "open")
-    line = "- [" <> disposition <> "] " <> Map.get(issue, :id, "?") <> ": " <> Map.get(issue, :summary, "") <> render_issue_resolution(Map.get(issue, :resolution, "")) <> render_issue_owner(Map.get(issue, :owner, "")) <> "\n"
-    line <> render_issue_lines(rest)
+    text = "[" <> disposition <> "] " <> Map.get(issue, :id, "?") <> ": " <> Map.get(issue, :summary, "") <> render_issue_resolution(Map.get(issue, :resolution, "")) <> render_issue_owner(Map.get(issue, :owner, ""))
+    issue_items(rest, [text] ++ acc)
   end
 
   defp render_issue_resolution("") do
@@ -1785,17 +1805,17 @@ defmodule LoopHarness do
   end
 
   defp render_coordination_slices(slices) do
-    "## Slices\n" <> render_slice_lines(slices)
+    Markdown.heading(2, "Slices") <> "\n" <> Markdown.bullet_list(slice_items(slices, [])) <> "\n\n"
   end
 
-  defp render_slice_lines([]) do
-    "\n"
+  defp slice_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_slice_lines([slice | rest]) do
+  defp slice_items([slice | rest], acc) do
     status = Map.get(slice, :status, "unknown")
-    line = "- [" <> status <> "] " <> Map.get(slice, :id, "?") <> ": " <> Map.get(slice, :description, "") <> "\n"
-    line <> render_slice_lines(rest)
+    text = "[" <> status <> "] " <> Map.get(slice, :id, "?") <> ": " <> Map.get(slice, :description, "")
+    slice_items(rest, [text] ++ acc)
   end
 
   defp render_coordination_commits([]) do
@@ -1803,16 +1823,16 @@ defmodule LoopHarness do
   end
 
   defp render_coordination_commits(commits) do
-    "## Commits\n" <> render_commit_lines(commits)
+    Markdown.heading(2, "Commits") <> "\n" <> Markdown.bullet_list(commit_items(commits, [])) <> "\n\n"
   end
 
-  defp render_commit_lines([]) do
-    "\n"
+  defp commit_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_commit_lines([commit | rest]) do
-    line = "- " <> Map.get(commit, :slice_id, "?") <> " → " <> Map.get(commit, :commit_hash, "?") <> "\n"
-    line <> render_commit_lines(rest)
+  defp commit_items([commit | rest], acc) do
+    text = Map.get(commit, :slice_id, "?") <> " → " <> Map.get(commit, :commit_hash, "?")
+    commit_items(rest, [text] ++ acc)
   end
 
   defp render_coordination_archives([]) do
@@ -1820,16 +1840,16 @@ defmodule LoopHarness do
   end
 
   defp render_coordination_archives(archives) do
-    "## Archives\n" <> render_archive_lines(archives)
+    Markdown.heading(2, "Archives") <> "\n" <> Markdown.bullet_list(archive_items(archives, [])) <> "\n\n"
   end
 
-  defp render_archive_lines([]) do
-    "\n"
+  defp archive_items([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp render_archive_lines([archive | rest]) do
-    line = "- " <> Map.get(archive, :source_file, "?") <> " → " <> Map.get(archive, :dest_file, "?") <> " (" <> Map.get(archive, :reason, "") <> ")\n"
-    line <> render_archive_lines(rest)
+  defp archive_items([archive | rest], acc) do
+    text = Map.get(archive, :source_file, "?") <> " → " <> Map.get(archive, :dest_file, "?") <> " (" <> Map.get(archive, :reason, "") <> ")"
+    archive_items(rest, [text] ++ acc)
   end
 
   defp latest_run_id(path) do
@@ -2773,16 +2793,26 @@ defmodule LoopHarness do
   end
 
   defp format_metrics_md(rows) do
-    header = "| iteration | role | event | elapsed_s | exit_code | timed_out | outcome |\n| --- | --- | --- | --- | --- | --- | --- |\n"
-    header <> metrics_md_rows(rows) <> "\n" <> metrics_summary(rows)
+    headers = ["iteration", "role", "event", "elapsed_s", "exit_code", "timed_out", "outcome"]
+    table_rows = metrics_to_table_rows(rows, [])
+    Markdown.table(headers, table_rows) <> "\n\n" <> metrics_summary(rows)
   end
 
-  defp metrics_md_rows([]) do
-    ""
+  defp metrics_to_table_rows([], acc) do
+    Enum.reverse(acc)
   end
 
-  defp metrics_md_rows([row | rest]) do
-    "| " <> Map.get(row, :iteration, "") <> " | " <> Map.get(row, :role, "") <> " | " <> Map.get(row, :event, "") <> " | " <> Map.get(row, :elapsed_s, "") <> " | " <> Map.get(row, :exit_code, "") <> " | " <> Map.get(row, :timed_out, "") <> " | " <> Map.get(row, :outcome, "") <> " |\n" <> metrics_md_rows(rest)
+  defp metrics_to_table_rows([row | rest], acc) do
+    cells = [
+      Map.get(row, :iteration, ""),
+      Map.get(row, :role, ""),
+      Map.get(row, :event, ""),
+      Map.get(row, :elapsed_s, ""),
+      Map.get(row, :exit_code, ""),
+      Map.get(row, :timed_out, ""),
+      Map.get(row, :outcome, "")
+    ]
+    metrics_to_table_rows(rest, [cells] ++ acc)
   end
 
   defp metrics_summary(rows) do
