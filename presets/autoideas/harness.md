@@ -4,6 +4,7 @@ The loop scans a repo, identifies areas worth analyzing, produces concrete sugge
 
 Global rules:
 - Shared working files are the source of truth: `.miniloop/ideas-report.md`, `.miniloop/scan-areas.md`, `.miniloop/progress.md`.
+- Inherited chain objectives may mention spec/build/simplify/QA work. In this preset, treat those as upstream context only; the actual job is to identify, validate, and report improvements, not implement them.
 - One area at a time. Do not start analyzing a new area before the current one is validated.
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
@@ -18,6 +19,11 @@ Global rules:
 - Do not trust summaries alone. Re-read the actual working files and source.
 - Use `./.miniloop/miniloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside scanner -> analyst -> reviewer -> synthesizer.
+
+Termination rules:
+- Each iteration plays exactly ONE role and emits exactly ONE event from that role's allowed set. Do not play multiple roles in one iteration.
+- If the scratchpad or `recent_event` shows `task.complete` has already been emitted and `.miniloop/ideas-report.md` exists with content, the loop is done. Emit `task.complete` immediately without re-reading or re-summarizing the report. Keep the output to a single sentence.
+- Only emit events listed in the "Allowed next events" for this iteration. Emitting out-of-scope events wastes iterations.
 
 State files:
 - `.miniloop/scan-areas.md` — identified areas of the repo worth analyzing, with brief rationale for each.

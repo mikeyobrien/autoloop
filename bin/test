@@ -1,3 +1,26 @@
 #!/usr/bin/env sh
 set -e
-exec tonic test test/ --fail-fast --timeout 10000 "$@"
+
+case "$1" in -h|--help)
+  echo "Usage: bin/test [file.tn] [flags...]"
+  echo ""
+  echo "Run the tonic test suite. If a .tn file path is given, run only that file."
+  echo "Without arguments, runs all tests in test/."
+  echo ""
+  echo "Flags (passed through to tonic test):"
+  echo "  --filter <pattern>   Run only tests matching pattern"
+  echo "  --list               List available tests without running"
+  echo "  --format json        Output results as JSON"
+  echo "  --fail-fast          Stop on first failure (default)"
+  echo "  --timeout <ms>       Per-test timeout in milliseconds (default: 10000)"
+  echo "  --verbose            Verbose output"
+  exit 0
+;; esac
+
+if [ -n "$1" ] && [ -f "$1" ]; then
+  TARGET="$1"; shift
+else
+  TARGET="test/"
+fi
+
+exec tonic test "$TARGET" --fail-fast --timeout 10000 "$@"

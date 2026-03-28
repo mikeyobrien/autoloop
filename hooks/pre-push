@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -e
+
+echo "pre-push: running tests..."
+if ! bin/test; then
+  echo "" >&2
+  echo "pre-push: tests failed. Push aborted." >&2
+  echo "Use 'git push --no-verify' to bypass (not recommended)." >&2
+  exit 1
+fi

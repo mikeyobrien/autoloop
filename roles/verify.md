@@ -18,6 +18,7 @@ Review checklist:
 - Is there needless complexity or speculative work?
 - Does the code fit the surrounding repo style?
 - Did the claimed verification really cover the change?
+- Do `.miniloop/context.md` and `.miniloop/plan.md` still match the current slice, or did stale objective text survive a rejection/narrowing step?
 - Did you run your own manual smoke test that exercised the builder's changed code path when a practical manual path existed?
 - If the change touched CLI/runtime behavior, did your smoke hit the operator-facing surface rather than only a lower-level wrapper that can mask failure semantics?
 - Is the verified slice committed, with `git status --short` clean except for intentional unrelated files?

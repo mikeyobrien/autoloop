@@ -375,10 +375,6 @@ defmodule LoopMemory do
     acc
   end
 
-  defp add_entry(acc, _type, id, _line) when id == "" do
-    acc
-  end
-
   defp add_entry(acc, _type, id, _line) do
     case LoopUtils.list_contains(Map.get(acc, :tombstoned, []), id) or LoopUtils.list_contains(Map.get(acc, :seen, []), id) do
       true -> acc

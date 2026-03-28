@@ -37,7 +37,13 @@ On first activation (after `surfaces.identified`):
 
 On later activations (`qa.blocked` or `qa.continue`):
 - Read what blocked the executor or what the reporter recorded.
-- Adjust the plan: skip the surface, try an alternative, or reorder.
+- Reconcile `.miniloop/progress.md` and `.miniloop/qa-report.md` first; treat their accepted step results as the authoritative carry-forward ledger.
+- Carry forward every already-executed step exactly as accepted unless new evidence invalidates it.
+- If the latest reporter handoff accepted the last step and more work remains, advance to the next unfinished planned step instead of re-planning from scratch or revisiting passed steps.
+- Refresh `.miniloop/qa-plan.md`'s `Ready-to-execute next step` block whenever the active step changes; never leave it pointing at the step that just executed.
+- Update `.miniloop/progress.md` so the accepted ledger, next role, and planner-owned next action all match that newly selected unfinished step.
+- Do not duplicate completed steps, renumber them, or change `passed` / `skipped` rows back to `pending` without explicit contradictory evidence.
+- Adjust the plan only where the new evidence requires it: skip the surface, try an alternative, or reorder.
 - Emit `qa.planned` with the next viable step.
 
 Rules:

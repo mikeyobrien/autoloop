@@ -5,6 +5,7 @@ Implement exactly the active slice from the latest `tasks.ready` handoff.
 On every activation:
 - Re-read `.miniloop/context.md`, `.miniloop/plan.md`, and `.miniloop/progress.md`.
 - Re-read the source files named in the current slice.
+- If the latest rejection or handoff changed the active issue/slice, refresh `.miniloop/context.md` and `.miniloop/plan.md` so they describe the current objective before coding; archive resolved detours under `.miniloop/docs/` instead of leaving stale focus text in the active files.
 - Re-check the routing context in your prompt and emit only an allowed workflow event (`review.ready` or `build.blocked`).
 - Update `.miniloop/progress.md` with the slice start, what you verified, the slice commit hash, and any relevant issue dispositions.
 

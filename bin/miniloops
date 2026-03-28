@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+case "${1:-}" in -h|--help)
+  echo "Usage: miniloops <subcommand> [args...]"
+  echo ""
+  echo "Thin launcher for 'tonic run <repo-dir> <args...>'."
+  echo "See docs/cli.md for subcommand reference."
+  exit 0
+;; esac
+
 SCRIPT_PATH="$0"
 case "$SCRIPT_PATH" in
   /*) ;;

@@ -159,6 +159,68 @@ defmodule HarnessTest do
     Assert.assert_contains(metrics, "**Summary:** 2 iterations, 4.3s total elapsed, 0 distinct events")
   end
 
+  def test_named_chain_run_accepts_prompt_and_records_entry_objective() do
+    project_dir = prepare_chain_prompt_fixture()
+    prompt = "Ship the smallest viable change."
+    result = run_repo_command(project_dir, "chain run prompt-chain . " <> shell_quote(prompt))
+    chain_dir = Path.join(project_dir, ".miniloop/chains/chain-1")
+    step1_handoff = System.read_text(Path.join(chain_dir, "step-1/handoff.md"))
+    step2_handoff = System.read_text(Path.join(chain_dir, "step-2/handoff.md"))
+    step1_prompt = System.read_text(Path.join(chain_dir, "step-1/.miniloop/prompt-seen.txt"))
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(step1_prompt, prompt)
+    Assert.assert_contains(step1_handoff, "## Entry Objective")
+    Assert.assert_contains(step1_handoff, prompt)
+    Assert.assert_contains(step2_handoff, prompt)
+    Assert.assert_contains(step2_handoff, "- Step 1 (first): completion_event")
+  end
+
+  def test_chain_advances_after_max_iterations_stop() do
+    project_dir = prepare_chain_prompt_fixture_without_completion_event()
+    result = run_repo_command(project_dir, "chain run prompt-chain .")
+    chain_dir = Path.join(project_dir, ".miniloop/chains/chain-1")
+    step2_prompt = System.read_text(Path.join(chain_dir, "step-2/.miniloop/prompt-seen.txt"))
+    chain_state = run_repo_command(project_dir, "inspect chain --format md")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_equal(step2_prompt, "")
+    Assert.assert_contains(Map.get(chain_state, :output, ""), "Step 1 (first) finished: max_iterations")
+    Assert.assert_contains(Map.get(chain_state, :output, ""), "Step 2 (second) finished: max_iterations")
+    Assert.assert_contains(Map.get(chain_state, :output, ""), "Outcome: all_steps_complete")
+  end
+
+  def test_inline_chain_defaults_to_bundle_root_and_uses_prompt_from_non_project_cwd() do
+    harness_fixture = prepare_chain_prompt_fixture()
+    cwd = "/tmp/miniloops-external-inline-chain-cwd"
+    prompt = "Ship the smallest viable change."
+    chain_csv = Path.join(harness_fixture, "presets/first") <> "," <> Path.join(harness_fixture, "presets/second")
+
+    System.run("rm -rf " <> shell_quote(cwd) <> " && mkdir -p " <> shell_quote(cwd))
+
+    result = run_harness_command(repo_root(), cwd, "run --chain " <> shell_quote(chain_csv) <> " " <> shell_quote(prompt))
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), prompt)
+  end
+
+  def test_inline_chain_rejects_unknown_preset_names() do
+    result = run_repo_command(repo_root(), "run --chain autoidea,autospec \"Ship the smallest viable change.\"")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_contains(output, "error: invalid inline chain")
+    Assert.assert_contains(output, "unknown preset: autoidea")
+    Assert.refute(String.contains(output, "loop start run_id="), "invalid inline chain should not start a loop")
+  end
+
+  def test_run_rejects_unsupported_iterations_flag() do
+    result = run_repo_command(repo_root(), "run -i 200 --chain autoideas,autospec \"Ship the smallest viable change.\"")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_contains(output, "unsupported flag `-i`")
+    Assert.refute(String.contains(output, "loop start run_id="), "unsupported flags should fail before loop startup")
+  end
+
   defp prepare_fixture() do
     project_dir = fixture_dir()
     backend_path = Path.join(project_dir, "backend.sh")
@@ -277,6 +339,10 @@ defmodule HarnessTest do
     run_repo_command_with_env(project_dir, args, "")
   end
 
+  defp run_harness_command(harness_project, cwd, args) do
+    System.run("cd " <> shell_quote(cwd) <> " && " <> clean_miniloops_env() <> " tonic run " <> shell_quote(harness_project) <> " " <> args)
+  end
+
   defp run_repo_command_with_env(project_dir, args, extra_env) do
     extra = case extra_env do
       "" -> ""
@@ -379,8 +445,95 @@ defmodule HarnessTest do
     "\"loop.start\" = [\"planner\"]\n"
   end
 
+  defp chain_prompt_backend_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "mkdir -p \"${MINILOOPS_STATE_DIR:-.}\"\n" <>
+    "printf '%s' \"${1:-}\" > \"${MINILOOPS_STATE_DIR:-.}/prompt-seen.txt\"\n" <>
+    "printf '%s\\n' \"${1:-}\"\n" <>
+    "first_event=$(printf '%s' \"${MINILOOPS_ALLOWED_EVENTS:-}\" | awk -F, '{print $1}')\n" <>
+    "if [ -n \"$first_event\" ] && [ -n \"${MINILOOPS_BIN:-}\" ]; then\n" <>
+    "  \"$MINILOOPS_BIN\" emit \"$first_event\" \"chain prompt ok\"\n" <>
+    "fi\n"
+  end
+
+  defp chain_prompt_backend_script_without_completion_event() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "mkdir -p \"${MINILOOPS_STATE_DIR:-.}\"\n" <>
+    "printf '%s' \"${1:-}\" > \"${MINILOOPS_STATE_DIR:-.}/prompt-seen.txt\"\n" <>
+    "printf 'no completion event emitted\\n'\n"
+  end
+
+  defp chain_host_miniloops_toml() do
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n" <>
+    "core.run_id_format = \"counter\"\n"
+  end
+
+  defp chain_prompt_preset_miniloops_toml(backend_path) do
+    "event_loop.max_iterations = 1\n" <>
+    "event_loop.completion_event = \"task.complete\"\n" <>
+    "backend.kind = \"command\"\n" <>
+    "backend.command = \"" <> backend_path <> "\"\n" <>
+    "backend.timeout_ms = 10000\n" <>
+    "review.enabled = false\n" <>
+    "harness.instructions_file = \"harness.md\"\n" <>
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+  end
+
+  defp chain_prompt_topology_toml() do
+    "name = \"chain-prompt-check\"\n" <>
+    "completion = \"task.complete\"\n\n" <>
+    "[[role]]\n" <>
+    "id = \"worker\"\n" <>
+    "emits = [\"task.complete\"]\n" <>
+    "prompt_file = \"roles/worker.md\"\n\n" <>
+    "[handoff]\n" <>
+    "\"loop.start\" = [\"worker\"]\n"
+  end
+
+  defp prepare_chain_prompt_fixture() do
+    prepare_chain_prompt_fixture_with_backend(chain_prompt_fixture_dir(), chain_prompt_backend_script())
+  end
+
+  defp prepare_chain_prompt_fixture_without_completion_event() do
+    prepare_chain_prompt_fixture_with_backend("/tmp/miniloops-chain-prompt-no-complete-fixture", chain_prompt_backend_script_without_completion_event())
+  end
+
+  defp prepare_chain_prompt_fixture_with_backend(project_dir, backend_script) do
+    backend_path = Path.join(project_dir, "backend.sh")
+    first_dir = Path.join(project_dir, "presets/first")
+    second_dir = Path.join(project_dir, "presets/second")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(Path.join(first_dir, "roles")) <> " " <> shell_quote(Path.join(second_dir, "roles")))
+
+    System.write_text(backend_path, backend_script)
+    System.run("chmod +x " <> shell_quote(backend_path))
+    System.write_text(Path.join(project_dir, "miniloops.toml"), chain_host_miniloops_toml())
+    System.write_text(Path.join(project_dir, "chains.toml"), "[[chain]]\nname = \"prompt-chain\"\nsteps = [\"first\", \"second\"]\n")
+    write_chain_prompt_preset(first_dir, backend_path)
+    write_chain_prompt_preset(second_dir, backend_path)
+
+    project_dir
+  end
+
+  defp write_chain_prompt_preset(preset_dir, backend_path) do
+    System.write_text(Path.join(preset_dir, "miniloops.toml"), chain_prompt_preset_miniloops_toml(backend_path))
+    System.write_text(Path.join(preset_dir, "topology.toml"), chain_prompt_topology_toml())
+    System.write_text(Path.join(preset_dir, "harness.md"), "chain prompt harness\n")
+    System.write_text(Path.join(preset_dir, "roles/worker.md"), "You are the worker. Emit task.complete.\n")
+  end
+
   defp fixture_dir() do
     "/tmp/miniloops-scratchpad-fixture"
+  end
+
+  defp chain_prompt_fixture_dir() do
+    "/tmp/miniloops-chain-prompt-fixture"
   end
 
   defp parallel_prompt_fixture_dir() do

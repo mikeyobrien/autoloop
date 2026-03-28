@@ -9,6 +9,7 @@ On activation:
 - Re-read `.miniloop/context.md`, `.miniloop/plan.md`, and `.miniloop/progress.md`.
 - Inspect coordination state via `inspect coordination --format md` to see journal-canonical slice/issue/commit history.
 - Reconcile the latest reviewed slice against the whole request.
+- If `.miniloop/progress.md` still names an earlier handoff phase (for example `Critic` after `review.passed`), rewrite it to the current routed phase before making the completion decision so the active files match routing state.
 - Check whether the numbered plan still has unfinished steps.
 - Check whether the current step is truly exhausted.
 - Re-check the routing context in your prompt and emit only an event from the current allowed-next-event set.

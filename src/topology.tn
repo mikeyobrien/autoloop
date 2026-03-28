@@ -347,6 +347,7 @@ defmodule LoopTopology do
     end
   end
 
+  # TONIC_MISSING: Regex
   # --- Regex event matching helpers ---
 
   defp collect_matching_roles([], _handoff, _event, acc) do

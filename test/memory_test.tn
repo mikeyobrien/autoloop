@@ -198,6 +198,12 @@ defmodule LoopMemory do
     read_if_exists(resolve_file(project_dir))
   end
 
+  def remove(project_dir, id, reason) do
+    path = resolve_file(project_dir)
+    append_memory_entry(path, memory_line(next_id(path, "ts"), "tombstone", tombstone_fields(id, reason)))
+    IO.puts("removed " <> id)
+  end
+
   defp render_materialized(memory) do
     preferences = Map.get(memory, :preferences, [])
     learnings = Map.get(memory, :learnings, [])
@@ -336,10 +342,6 @@ defmodule LoopMemory do
     acc
   end
 
-  defp add_entry(acc, _type, id, _line) when id == "" do
-    acc
-  end
-
   defp add_entry(acc, _type, id, _line) do
     case list_contains(Map.get(acc, :tombstoned, []), id) or list_contains(Map.get(acc, :seen, []), id) do
       true -> acc
@@ -394,6 +396,38 @@ defmodule LoopMemory do
       "" -> collect_lines(rest, acc)
       _ -> collect_lines(rest, [trimmed] ++ acc)
     end
+  end
+
+  defp append_memory_entry(path, content) do
+    System.run("printf '%s' '" <> String.replace(content, "'", "'\\''") <> "' >> '" <> String.replace(path, "'", "'\\''") <> "'")
+  end
+
+  defp next_id(path, prefix) do
+    prefix <> "-" <> to_string(count_lines(read_lines(path), 0) + 1)
+  end
+
+  defp count_lines([], count) do
+    count
+  end
+
+  defp count_lines([_line | rest], count) do
+    count_lines(rest, count + 1)
+  end
+
+  defp memory_line(id, type, fields_json) do
+    "{" <> json_field("id", id) <> ", " <> json_field("type", type) <> ", " <> fields_json <> "}\n"
+  end
+
+  defp tombstone_fields(id, reason) do
+    json_field("target_id", id) <> ", " <> json_field("reason", reason) <> ", " <> json_field("created", current_time())
+  end
+
+  defp current_time() do
+    "2026-03-28T00:00:00Z"
+  end
+
+  defp json_field(key, value) do
+    "\"" <> key <> "\": \"" <> String.replace(String.replace(value, "\\", "\\u005c"), "\"", "\\u0022") <> "\""
   end
 
   defp extract_field(line, key) do
@@ -515,6 +549,27 @@ defmodule MemoryTest do
     Assert.assert_contains(full, "[meta-3]")
     Assert.assert_contains(clipped, "(memory truncated:")
     Assert.assert_contains(clipped, "chars)")
+  end
+
+  def test_remove_appends_tombstone_and_hides_removed_entry() do
+    project_dir = "/tmp/miniloops-memory-remove-project"
+    memory_dir = project_dir <> "/.miniloop"
+    memory_path = memory_dir <> "/memory.jsonl"
+
+    System.run("rm -rf '" <> project_dir <> "' && mkdir -p '" <> memory_dir <> "'")
+    System.write_text(project_dir <> "/miniloops.toml", "core.memory_file = \".miniloop/memory.jsonl\"\n")
+    System.write_text(memory_path, "{\"id\": \"mem-1\", \"type\": \"learning\", \"text\": \"Old fact\", \"source\": \"manual\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"mem-2\", \"type\": \"preference\", \"category\": \"Workflow\", \"text\": \"Keep prompts small\", \"created\": \"2026-03-27T00:00:00Z\"}\n")
+
+    LoopMemory.remove(project_dir, "mem-1", "stale")
+
+    raw = LoopMemory.raw_project(project_dir)
+    rendered = LoopMemory.render_project(project_dir, 0)
+
+    Assert.assert_contains(raw, "\"type\": \"tombstone\"")
+    Assert.assert_contains(raw, "\"target_id\": \"mem-1\"")
+    Assert.assert_contains(raw, "\"reason\": \"stale\"")
+    Assert.refute(String.contains(rendered, "Old fact"), "removed entry should not stay active")
+    Assert.assert_contains(rendered, "Keep prompts small")
   end
 
   defp project_dir() do

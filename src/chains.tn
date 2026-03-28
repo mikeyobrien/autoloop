@@ -126,7 +126,7 @@ defmodule LoopChains do
 
   def validate_preset_vocabulary(steps, project_dir) do
     known = list_known_presets(project_dir)
-    validate_step_names(steps, known)
+    validate_step_names(steps, known, project_dir)
   end
 
   defp default_chains() do
@@ -307,12 +307,12 @@ defmodule LoopChains do
     step_work_dir = Path.join(chain_dir, "step-" <> to_string(step_num))
     System.ensure_dir(step_work_dir)
 
-    write_handoff_artifact(step_work_dir, step_num, completed)
+    write_handoff_artifact(step_work_dir, step_num, completed, Map.get(run_options, :prompt, nil))
 
     append_chain_event(journal_file, chain_run_id, "chain.step.start", LoopJson.json_field("step", to_string(step_num)) <> ", " <> LoopJson.json_field("preset", step_name) <> ", " <> LoopJson.json_field("preset_dir", preset_dir) <> ", " <> LoopJson.json_field("work_dir", step_work_dir))
 
     step_options = Map.put(run_options, :work_dir, step_work_dir)
-    result = LoopHarness.run(preset_dir, nil, self_command, step_options)
+    result = run_step_loop(preset_dir, step_num, run_options, self_command, step_options)
     stop_reason = Map.get(result, :stop_reason, "unknown")
 
     write_result_artifact(step_work_dir, step_num, step_name, result)
@@ -321,17 +321,44 @@ defmodule LoopChains do
 
     step_record = %{step: step_num, name: step_name, stop_reason: stop_reason}
 
-    case stop_reason do
-      "completion_event" -> run_steps(rest, step_num + 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, completed ++ [step_record])
-      "completion_promise" -> run_steps(rest, step_num + 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, completed ++ [step_record])
+    case chain_step_success_stop_reason(stop_reason) do
+      true -> run_steps(rest, step_num + 1, project_dir, chain_dir, chain_run_id, self_command, run_options, journal_file, completed ++ [step_record])
       _ -> %{completed: completed ++ [step_record], outcome: "step_failed", failed_step: step_num, failed_reason: stop_reason}
     end
   end
 
-  defp write_handoff_artifact(step_work_dir, step_num, completed) do
+  defp chain_step_success_stop_reason("max_iterations") do
+    true
+  end
+
+  defp chain_step_success_stop_reason("completion_event") do
+    true
+  end
+
+  defp chain_step_success_stop_reason("completion_promise") do
+    true
+  end
+
+  defp chain_step_success_stop_reason(_stop_reason) do
+    false
+  end
+
+  defp write_handoff_artifact(step_work_dir, step_num, completed, prompt) do
     path = Path.join(step_work_dir, "handoff.md")
-    content = "# Chain Handoff — Step " <> to_string(step_num) <> "\n\n" <> render_prior_steps(completed)
+    content = "# Chain Handoff — Step " <> to_string(step_num) <> "\n\n" <> render_entry_objective(prompt) <> render_prior_steps(completed)
     System.write_text(path, content)
+  end
+
+  defp render_entry_objective(nil) do
+    ""
+  end
+
+  defp render_entry_objective("") do
+    ""
+  end
+
+  defp render_entry_objective(prompt) do
+    "## Entry Objective\n\n" <> prompt <> "\n\n"
   end
 
   defp render_prior_steps([]) do
@@ -354,6 +381,14 @@ defmodule LoopChains do
     path = Path.join(step_work_dir, "result.md")
     content = "# Chain Result — Step " <> to_string(step_num) <> " (" <> step_name <> ")\n\n" <> "Stop reason: " <> Map.get(result, :stop_reason, "unknown") <> "\n" <> "Iterations: " <> to_string(Map.get(result, :iterations, 0)) <> "\n"
     System.write_text(path, content)
+  end
+
+  defp run_step_loop(preset_dir, 1, run_options, self_command, step_options) do
+    LoopHarness.run(preset_dir, Map.get(run_options, :prompt, nil), self_command, step_options)
+  end
+
+  defp run_step_loop(preset_dir, _step_num, _run_options, self_command, step_options) do
+    LoopHarness.run(preset_dir, nil, self_command, step_options)
   end
 
   defp next_chain_run_id(project_dir, config) do
@@ -589,14 +624,21 @@ defmodule LoopChains do
 
   # --- preset vocabulary validation ---
 
-  defp validate_step_names([], _known) do
+  defp validate_step_names([], _known, _project_dir) do
     :ok
   end
 
-  defp validate_step_names([name | rest], known) do
-    case LoopUtils.list_contains(known, name) do
-      true -> validate_step_names(rest, known)
+  defp validate_step_names([name | rest], known, project_dir) do
+    case valid_step_name(name, known, project_dir) do
+      true -> validate_step_names(rest, known, project_dir)
       _ -> {:rejected, "unknown preset: " <> name}
+    end
+  end
+
+  defp valid_step_name(name, known, project_dir) do
+    case LoopUtils.list_contains(known, name) do
+      true -> true
+      _ -> LoopConfig.project_has_config(resolve_preset_dir(name, project_dir))
     end
   end
 

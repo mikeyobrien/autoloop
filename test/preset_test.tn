@@ -10,11 +10,26 @@ defmodule PresetConfig do
     System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
   end
 
-  def get(config, key, fallback) do
-    case is_list(key) do
-      true -> get_in_path(config, key, fallback)
-      _ -> get_in_path(config, String.split(key, "."), fallback)
+  def get(_config, [], fallback) do
+    fallback
+  end
+
+  def get(config, [key], fallback) do
+    case Map.get(config, key, nil) do
+      nil -> fallback
+      value -> value
     end
+  end
+
+  def get(config, [key | rest], fallback) do
+    case Map.get(config, key, nil) do
+      nil -> fallback
+      inner -> get(inner, rest, fallback)
+    end
+  end
+
+  def get(config, key, fallback) do
+    get(config, String.split(key, "."), fallback)
   end
 
   defp load(path) do
@@ -65,11 +80,7 @@ defmodule PresetConfig do
   defp get_in_path(map, [key | rest], fallback) do
     case Map.get(map, key, nil) do
       nil -> fallback
-      inner ->
-        case is_map(inner) do
-          true -> get_in_path(inner, rest, fallback)
-          _ -> fallback
-        end
+      inner -> get_in_path(inner, rest, fallback)
     end
   end
 
@@ -80,11 +91,7 @@ defmodule PresetConfig do
   defp put_in_path(map, [key | rest], value) do
     inner = case Map.get(map, key, nil) do
       nil -> %{}
-      existing ->
-        case is_map(existing) do
-          true -> existing
-          _ -> %{}
-        end
+      existing -> existing
     end
     Map.put(map, key, put_in_path(inner, rest, value))
   end

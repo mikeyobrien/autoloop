@@ -34,3 +34,7 @@ steps = ["autosec", "autofix", "autotest"]
 [[chain]]
 name = "doc-review"
 steps = ["autodoc", "autoreview"]
+
+[[chain]]
+name = "idea-spec-code-simplify-qa"
+steps = ["autoideas", "autospec", "autocode", "autosimplify", "autoqa"]

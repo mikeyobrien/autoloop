@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+set -e
+
+case "$1" in -h|--help)
+  echo "Usage: bin/test-watch [file.tn] [flags...]"
+  echo ""
+  echo "Re-run tests on file changes using entr."
+  echo "Arguments are passed through to bin/test."
+  exit 0
+;; esac
+
+if ! command -v entr >/dev/null 2>&1; then
+  echo "error: entr is not installed." >&2
+  echo "" >&2
+  echo "Install it with one of:" >&2
+  echo "  brew install entr        # macOS" >&2
+  echo "  apt install entr         # Debian/Ubuntu" >&2
+  echo "  nix-env -iA nixpkgs.entr # Nix" >&2
+  echo "" >&2
+  echo "See https://eradman.com/entrproject/ for more options." >&2
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+find test/ src/ -name '*.tn' | entr -c "$SCRIPT_DIR/test" "$@"

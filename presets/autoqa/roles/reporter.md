@@ -16,14 +16,21 @@ Process:
    - Step number and description
    - Command or inspection action run
    - Result: PASS / FAIL / BLOCKED / SKIPPED
-   - Key evidence (exit code, error summary, test counts, or cited structural evidence)
+   - Key evidence (exit code, error summary, test counts, cited structural evidence, and any plan-defined artifact/verdict fields)
 2. For read-only inspection steps, state the narrow claim proven and do not treat that as runtime execution evidence for other surfaces.
-3. Check the plan for remaining steps.
-4. Update `.miniloop/progress.md` so the handoff note matches the reporter role's actual routing powers:
+3. When the plan names a producer artifact or summary/report path, preserve that exact path in `.miniloop/qa-report.md` and `.miniloop/progress.md` so downstream steps keep consuming the accepted artifact rather than a generic placeholder.
+4. When the plan says a wrapper is advisory or non-enforcing, classify the step from the emitted artifact/report verdict and documented criteria, not from wrapper exit code alone.
+5. Update `.miniloop/progress.md` to preserve the carry-forward ledger:
+   - Mark the current step's surface/result in the status table.
+   - Preserve previously accepted steps exactly as-is unless the new evidence contradicts them.
+   - Identify the next unfinished planned step, if any, without assigning executor work directly.
+   - If `.miniloop/qa-plan.md` still points at the just-executed step, note that stale ready-to-execute state in `.miniloop/progress.md` so the planner refreshes it on `qa.continue`.
+6. Check the plan for remaining steps.
+7. Update `.miniloop/progress.md` so the handoff note matches the reporter role's actual routing powers:
    - If continuing, write the next action for the planner, because the reporter hands off with `qa.continue` and the planner chooses the next executable step.
    - Do not tell the executor to run a new step directly from the reporter turn.
    - Do not mention executor-only emits or commands as the reporter's handoff.
-5. Decide:
+8. Decide:
    - If there are more steps to execute → emit `qa.continue`.
    - If all planned steps are complete and all critical steps passed → emit `task.complete` with an overall result of PASS.
    - If a critical step failed and more inspection is needed → emit `qa.failed` with which step failed and why it matters.

@@ -1,0 +1,42 @@
+#!/usr/bin/env sh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+usage() {
+  echo "Usage: bin/dev <command> [args...]"
+  echo ""
+  echo "Commands:"
+  echo "  test [args]    Run tests (bin/test)"
+  echo "  watch [args]   Watch and re-run tests (bin/test-watch)"
+  echo "  smoke          Run pi-smoke integration check (scripts/pi-smoke.sh)"
+  echo "  judge          Run LLM judge evaluation (scripts/llm-judge.sh)"
+  echo "  run [args]     Start a miniloops run (bin/miniloops)"
+  echo "  hooks          Install git hooks (bin/install-hooks)"
+  echo "  check-missing  Scan for unannotated workarounds (bin/check-missing)"
+}
+
+if [ $# -eq 0 ]; then
+  usage
+  exit 0
+fi
+
+cmd="$1"; shift
+
+case "$cmd" in
+  test)          exec "$SCRIPT_DIR/test" "$@" ;;
+  watch)         exec "$SCRIPT_DIR/test-watch" "$@" ;;
+  smoke)         exec "$REPO_DIR/scripts/pi-smoke.sh" "$@" ;;
+  judge)         exec "$REPO_DIR/scripts/llm-judge.sh" "$@" ;;
+  run)           exec "$SCRIPT_DIR/miniloops" "$@" ;;
+  hooks)         exec "$SCRIPT_DIR/install-hooks" "$@" ;;
+  check-missing) exec "$SCRIPT_DIR/check-missing" "$@" ;;
+  -h|--help)     usage; exit 0 ;;
+  *)
+    echo "error: unknown command '$cmd'" >&2
+    echo "" >&2
+    usage >&2
+    exit 1
+  ;;
+esac

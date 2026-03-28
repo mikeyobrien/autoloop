@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -e
+
+echo "pre-commit: running tonic check..."
+if ! tonic check .; then
+  echo "" >&2
+  echo "pre-commit: tonic check failed. Fix syntax errors before committing." >&2
+  exit 1
+fi

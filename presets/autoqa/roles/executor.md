@@ -18,6 +18,8 @@ Process:
    - Command or inspection action run
    - Exit code when applicable
    - Key output lines or cited evidence (truncate verbose output, keep the signal)
+   - Any exact artifact/report paths the plan named for this step, plus whether they existed after the run
+   - Any plan-defined verdict/status fields from those artifacts when applicable
    - Pass or fail per the plan's criteria
 4. If the step ran, emit `qa.executed` with:
    - step number
@@ -31,6 +33,8 @@ Process:
 Rules:
 - Run exactly what the plan says. Do not improvise alternative commands or broader inspection.
 - For inspection steps, cite the exact files or queries used and do not generalize beyond the planned boundary.
+- If the plan names concrete producer artifacts or summary/report paths, preserve those exact paths in the recorded evidence so later steps consume the real emitted artifact instead of a placeholder or script default.
+- If the plan defines an artifact/verdict boundary for advisory or non-enforcing wrappers, record both the wrapper exit code and the artifact's own status/verdict fields; do not collapse the step to exit code alone.
 - Do not fix issues you find. Just record them.
 - Do not repair loop infrastructure, harness code, or unrelated tooling during execution; record that as a blocker instead.
 - Do not skip steps. If a step fails, still record the failure and hand off to the reporter.

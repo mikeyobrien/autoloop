@@ -81,7 +81,8 @@ miniloops run . --chain autocode,autoqa,autoresearch "Implement the approved cha
 - Each step runs its preset in sequence with isolated state in `.miniloop/chains/<chain-run-id>/step-<n>/`
 - Handoff artifacts (prior step summaries) and result artifacts are written between steps
 - Chain lifecycle is journaled: `chain.start`, `chain.step.start`, `chain.step.finish`, `chain.complete`
-- If a step fails (non-completion stop), the chain stops and reports the failure
+- If a step ends with `completion_event`, `completion_promise`, or `max_iterations`, the chain advances to the next step
+- If a step fails with an actual error stop (`backend_failed`, `backend_timeout`, etc.), the chain stops and reports the failure
 - Preset resolution: step name → `presets/<name>/` directory
 
 Inspect chain state:
@@ -464,6 +465,16 @@ Notes:
 - `-b claude` runs Claude in command mode as `claude -p ...`.
 - other `-b <command>` values run that command directly in command mode.
 - this does not rewrite `miniloops.toml`; it is a one-run override.
+
+## Git hooks
+
+Install pre-commit and pre-push hooks:
+
+```bash
+bin/install-hooks
+```
+
+This symlinks `hooks/pre-commit` (runs `tonic check .`) and `hooks/pre-push` (runs `bin/test`) into `.git/hooks/`. The installer is idempotent. Use `git commit --no-verify` or `git push --no-verify` to bypass when needed.
 
 ## Install `miniloops` as a command
 

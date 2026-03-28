@@ -1,0 +1,60 @@
+#!/usr/bin/env sh
+set -e
+
+case "$1" in -h|--help)
+  echo "Usage: bin/check-missing"
+  echo ""
+  echo "Scan .tn source files for shell-out workaround patterns (grep, perl, sed,"
+  echo "awk used for text processing via System.run) and check that each file has"
+  echo "a nearby # TONIC_MISSING: annotation with a matching TONIC_MISSING.md entry."
+  echo ""
+  echo "Legitimate System.run usage (launching processes, file ops) is not flagged."
+  exit 0
+;; esac
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+MISSING_FILE="$REPO_DIR/TONIC_MISSING.md"
+warnings=0
+
+# Patterns that indicate workarounds for missing stdlib capabilities:
+# - grep/egrep for regex matching or text search
+# - perl/sed/awk for text processing
+# These are distinct from legitimate System.run usage (launching backends,
+# chmod, mkdir, rm, kill, date, etc.)
+workaround_patterns='grep -|perl -|sed -|awk '
+
+# Check src/ .tn files for workaround patterns without TONIC_MISSING annotations
+for file in $(find "$REPO_DIR/src" -name '*.tn' 2>/dev/null); do
+  matches=$(grep -nE "$workaround_patterns" "$file" 2>/dev/null || true)
+  [ -z "$matches" ] && continue
+
+  if ! grep -q "# TONIC_MISSING:" "$file" 2>/dev/null; then
+    relpath="${file#"$REPO_DIR"/}"
+    echo "warning: $relpath has shell-out workaround patterns but no # TONIC_MISSING: annotation"
+    printf '%s\n' "$matches" | sed 's/^/  /'
+    warnings=$((warnings + 1))
+  fi
+done
+
+# Cross-reference annotations against TONIC_MISSING.md entries
+if [ -f "$MISSING_FILE" ]; then
+  for file in $(grep -rl "# TONIC_MISSING:" "$REPO_DIR/src" 2>/dev/null || true); do
+    annotations=$(grep -o "# TONIC_MISSING: [A-Za-z_]*" "$file" 2>/dev/null || true)
+    [ -z "$annotations" ] && continue
+
+    relpath="${file#"$REPO_DIR"/}"
+    for capability in $(printf '%s\n' "$annotations" | sed 's/^# TONIC_MISSING: //'); do
+      if ! grep -qi "### $capability" "$MISSING_FILE" 2>/dev/null; then
+        echo "warning: $relpath annotates TONIC_MISSING: $capability but no ### $capability section in TONIC_MISSING.md"
+        warnings=$((warnings + 1))
+      fi
+    done
+  done
+fi
+
+if [ "$warnings" -eq 0 ]; then
+  echo "ok: all shell-out workarounds are annotated and tracked"
+  exit 0
+else
+  exit 1
+fi

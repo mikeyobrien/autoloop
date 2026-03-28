@@ -1,0 +1,46 @@
+#!/usr/bin/env sh
+set -e
+
+case "$1" in -h|--help)
+  echo "Usage: bin/install-hooks"
+  echo ""
+  echo "Symlink hooks/ into .git/hooks/. Idempotent."
+  exit 0
+;; esac
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+HOOKS_DIR="$REPO_DIR/hooks"
+GIT_HOOKS_DIR="$REPO_DIR/.git/hooks"
+
+if [ ! -d "$HOOKS_DIR" ]; then
+  echo "error: hooks/ directory not found." >&2
+  exit 1
+fi
+
+if [ ! -d "$GIT_HOOKS_DIR" ]; then
+  echo "error: .git/hooks/ directory not found. Is this a git repo?" >&2
+  exit 1
+fi
+
+for hook in "$HOOKS_DIR"/*; do
+  name="$(basename "$hook")"
+  target="$GIT_HOOKS_DIR/$name"
+
+  if [ -L "$target" ]; then
+    existing="$(readlink "$target")"
+    if [ "$existing" = "$hook" ]; then
+      echo "  ok: $name (already linked)"
+      continue
+    fi
+    rm "$target"
+  elif [ -e "$target" ]; then
+    echo "  skip: $name (non-symlink file exists at $target)" >&2
+    continue
+  fi
+
+  ln -s "$hook" "$target"
+  echo "  linked: $name"
+done
+
+echo "Done. Hooks installed."

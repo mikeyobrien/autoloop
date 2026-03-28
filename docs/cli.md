@@ -59,7 +59,7 @@ miniloops run autocode
 miniloops run autocode "Fix the login bug"
 miniloops run --preset autocode "Fix the login bug"
 miniloops run . "Fix the login bug" -b pi
-miniloops run . --chain autocode,autoqa
+miniloops run . --chain autocode,autoqa "Implement the approved change and validate it"
 ```
 
 ### `emit`
@@ -84,10 +84,14 @@ miniloops emit task.complete "All documentation gaps addressed"
 Read projected artifacts from the journal and state directory.
 
 ```bash
-miniloops inspect <artifact> [selector] [project-dir] --format <md|terminal|text|json|csv>
+miniloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]
 ```
 
-The `--format` flag is required.
+If `--format` is omitted, inspect uses artifact-specific defaults:
+
+- `scratchpad`, `prompt`, `memory`, `coordination`, `chain`, `metrics` → `terminal`
+- `output` → `text`
+- `journal` → `json`
 
 **Artifacts:**
 
@@ -116,20 +120,18 @@ When no metrics data exists, `md` outputs `"No metrics data available."`, `csv` 
 **Examples:**
 
 ```bash
+miniloops inspect scratchpad                    # defaults to terminal
 miniloops inspect scratchpad --format md
-miniloops inspect scratchpad --format terminal
+miniloops inspect prompt 5                     # defaults to terminal
 miniloops inspect prompt 5 --format md
-miniloops inspect prompt 5 --format terminal
-miniloops inspect output 3 --format text
-miniloops inspect journal --format json
+miniloops inspect output 3                     # defaults to text
+miniloops inspect journal                      # defaults to json
+miniloops inspect memory                       # defaults to terminal
 miniloops inspect memory --format md
-miniloops inspect memory --format terminal
-miniloops inspect coordination --format md
-miniloops inspect coordination --format terminal
-miniloops inspect chain --format md
-miniloops inspect chain --format terminal
+miniloops inspect coordination                 # defaults to terminal
+miniloops inspect chain                        # defaults to terminal
+miniloops inspect metrics                      # defaults to terminal
 miniloops inspect metrics --format md
-miniloops inspect metrics --format terminal
 miniloops inspect metrics --format csv
 miniloops inspect metrics --format json
 miniloops inspect metrics run-mn9d3uk0-xi0m --format md
@@ -141,10 +143,26 @@ Manage the loop's persistent memory store.
 
 #### `memory list`
 
-Print materialized memory entries.
+Print materialized memory entries with stable IDs.
 
 ```bash
 miniloops memory list [project-dir]
+```
+
+#### `memory status`
+
+Print rendered size, configured budget, and active entry counts.
+
+```bash
+miniloops memory status [project-dir]
+```
+
+#### `memory find`
+
+Search active memory entries by text, category, key/value, source, or ID.
+
+```bash
+miniloops memory find <pattern...>
 ```
 
 #### `memory add learning`
@@ -156,6 +174,8 @@ miniloops memory add learning <text...>
 ```
 
 The entry is tagged with `source: "manual"`.
+
+If the new entry pushes rendered memory over `memory.prompt_budget_chars`, the CLI warns that the prompt memory will be truncated.
 
 #### `memory add preference`
 
@@ -183,6 +203,8 @@ miniloops memory remove <id> [reason...]
 
 If no reason is given, the source is recorded as `"manual"`.
 
+If the target ID is missing or already inactive, the CLI prints a warning instead of appending a no-op tombstone.
+
 ### `chain`
 
 Manage named chains defined in `chains.toml`.
@@ -202,10 +224,10 @@ Output shows each chain name followed by its step sequence (e.g. `code-and-qa: a
 Run a named chain.
 
 ```bash
-miniloops chain run <name> [project-dir]
+miniloops chain run <name> [project-dir] [prompt...]
 ```
 
-The chain must be defined in `chains.toml`. Each step runs as an isolated loop in `.miniloop/chains/<chain-run-id>/step-<n>/`.
+The chain must be defined in `chains.toml`. Each step runs as an isolated loop in `.miniloop/chains/<chain-run-id>/step-<n>/`. When a prompt is provided, it is passed directly to step 1 and also written into each step's `handoff.md` as the chain entry objective. Chains advance on bounded-success stops (`completion_event`, `completion_promise`, or `max_iterations`) and stop only on real failure reasons such as backend errors or timeouts.
 
 ### `pi-adapter`
 
@@ -227,3 +249,76 @@ tonic run "$REPO_DIR" "$@"
 ```
 
 It resolves the repository root from its own location, runs `tonic run` with that directory as the project, and forwards all remaining arguments. It traps `INT`/`TERM` to clean up the child process.
+
+## Testing
+
+### `bin/test`
+
+Run the test suite.
+
+```bash
+bin/test                        # run all tests in test/
+bin/test test/config_test.tn    # run a single test file
+bin/test --filter "parse"       # run tests matching a pattern
+```
+
+When the first argument is an existing `.tn` file, it is used as the test target instead of the default `test/` directory. All other arguments are passed through to `tonic test`.
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--filter <pattern>` | Run only tests matching pattern |
+| `--list` | List available tests without running |
+| `--format json` | Output results as JSON |
+| `--fail-fast` | Stop on first failure (default) |
+| `--timeout <ms>` | Per-test timeout in milliseconds (default: 10000) |
+| `--verbose` | Verbose output |
+
+### `bin/test-watch`
+
+Re-run tests automatically on file changes. Requires [`entr`](https://eradman.com/entrproject/) (soft dependency).
+
+```bash
+bin/test-watch                       # watch and re-run all tests
+bin/test-watch test/config_test.tn   # watch and re-run a single file
+```
+
+If `entr` is not installed, the script prints install instructions and exits. All arguments are forwarded to `bin/test`.
+
+## Developer Scripts
+
+All developer scripts are accessible through the `bin/dev` dispatcher or individually.
+
+```bash
+bin/dev              # list available commands
+bin/dev <command>    # run a command
+```
+
+### `bin/dev` commands
+
+| Command | Script | Purpose | Exit codes |
+|---------|--------|---------|------------|
+| `test [args]` | `bin/test` | Run the test suite | 0 = pass, 1 = failure |
+| `watch [args]` | `bin/test-watch` | Watch mode for tests | 1 = `entr` not installed |
+| `smoke` | `scripts/pi-smoke.sh` | Pi backend integration smoke test | 0 = pass, 1 = failure |
+| `judge` | `scripts/llm-judge.sh` | LLM judge evaluation | 0 = pass, 1 = failure |
+| `run [args]` | `bin/miniloops` | Start a miniloops run | See subcommand docs |
+| `hooks` | `bin/install-hooks` | Install git hooks | 0 = success, 1 = error |
+| `check-missing` | `bin/check-missing` | Lint for unannotated workarounds | 0 = clean, 1 = warnings |
+
+### `scripts/pi-smoke.sh`
+
+End-to-end Pi backend smoke test. Creates a temporary miniloops project, runs one Pi-backed iteration, and asserts that the loop completes correctly with expected journal entries.
+
+### `scripts/llm-judge.sh`
+
+LLM judge evaluation harness. Runs evaluation prompts through the backend and scores the outputs.
+
+### `bin/install-hooks`
+
+Symlinks `hooks/pre-commit` and `hooks/pre-push` into `.git/hooks/`. Idempotent — safe to re-run.
+
+### `bin/check-missing`
+
+Scans `.tn` files for shell-out workaround patterns and cross-references them against `# TONIC_MISSING:` annotations and `TONIC_MISSING.md` entries. Warns on unannotated workarounds.

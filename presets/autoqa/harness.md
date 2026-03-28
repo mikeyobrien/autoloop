@@ -12,6 +12,10 @@ Global rules:
 - Absence of evidence is unresolved, not pass.
 - Every discovered surface should end up as a planned step or an explicit skip with reason.
 - Maintain a status table in `.miniloop/progress.md` for each discovered surface: `pending | passed | failed | blocked | skipped`.
+- Treat that status table plus any accepted results in `.miniloop/qa-report.md` as the cumulative carry-forward ledger. Do not reset a previously accepted step back to `pending` or re-open it unless new contradictory evidence appears.
+- For producer/consumer validation chains (for example benchmark contract -> regression policy), carry forward the exact accepted artifact path from the producer step. Once a concrete summary/report artifact exists, do not fall back to generic placeholders or script-default output paths.
+- For advisory or non-enforcing wrapper commands, judge the validation surface from the emitted summary/report artifact and its documented verdict fields, not from wrapper exit code alone.
+- On `qa.continue`, the planner must refresh `.miniloop/qa-plan.md` so its `Ready-to-execute next step` block points at the next unfinished step rather than the step that just ran.
 - When updating `.miniloop/progress.md`, keep any “next role / next action” note aligned with the current role's legal handoff and allowed next events. Do not skip routing stages by assigning work directly to a later role.
 - In particular, the reporter either continues via `qa.continue`, escalates via `qa.failed`, or finishes via `task.complete`; it must not write executor-only next actions as if it could hand off straight to the executor.
 - Do not convert “couldn’t verify” into “looks fine”.
