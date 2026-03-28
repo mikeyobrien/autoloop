@@ -76,13 +76,32 @@ Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `h
 
 ### Parallel
 
-Structured parallelism stays intentionally small in v1. These keys only enable the `.parallel` event protocol and bound future wave execution behavior; branch plans still come from event payloads rather than config.
+Structured parallelism stays intentionally small in v1. These keys enable the `.parallel` event protocol and bound wave execution; branch plans still come from event payloads rather than config.
+
+Supported trigger forms:
+- `explore.parallel` — exploratory fan-out that resumes the opening routing context after join
+- `<allowed-event>.parallel` — dispatch fan-out for a currently allowed normal event such as `tasks.ready.parallel`
+
+Rules and behavior:
+- only the harness may emit `*.parallel.joined`
+- normal parent turns get the global `Structured parallelism` prompt block when parallelism is enabled
+- branch child prompts do **not** get that global metaprompt
+- only one active wave is allowed at a time
+- wave artifacts are written under `core.state_dir/waves/<wave-id>/...` (default `.miniloop/waves/<wave-id>/...`)
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `parallel.enabled` | bool | `false` | Enable structured parallel trigger validation (`explore.parallel` and `<allowed-event>.parallel`). |
-| `parallel.max_branches` | int | `3` | Maximum number of branch objectives accepted from one `.parallel` trigger payload. |
-| `parallel.branch_timeout_ms` | int | `180000` | Timeout budget per branch wave in milliseconds. |
+| `parallel.enabled` | bool | `false` | Enable structured parallel trigger validation and the parent-only parallel metaprompt (`explore.parallel` and `<allowed-event>.parallel`). |
+| `parallel.max_branches` | int | `3` | Maximum number of branch objectives accepted from one `.parallel` trigger payload. Payloads must be markdown bullet or numbered lists with 1..N distinct items. |
+| `parallel.branch_timeout_ms` | int | `180000` | Timeout budget per branch wave in milliseconds. Timed-out waves record `wave.timeout` in the parent journal. |
+
+Example:
+
+```toml
+parallel.enabled = true
+parallel.max_branches = 3
+parallel.branch_timeout_ms = 180000
+```
 
 ### Memory
 

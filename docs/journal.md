@@ -60,6 +60,7 @@ loop.start
   iteration.finish         ─┘
   [review.start]           ─┐  optional,
   [review.finish]          ─┘  periodic
+  [wave.* events]              optional, during structured parallel fan-out/join
   [event.invalid]              optional, on bad emit
 loop.complete   or   loop.stop
 ```
@@ -116,6 +117,26 @@ Chain events are recorded in the journal when running multi-loop compositions vi
 | `chain.step.finish` | `step`, `preset`, `stop_reason` | A chain step completed. |
 | `chain.complete` | `name`, `steps_completed`, `outcome` | Chain execution finished. |
 | `chain.spawn` | `chain_id`, `parent_id`, `steps`, `justification` | Dynamic sub-chain spawned (also a coordination event). |
+
+### Structured parallel wave events
+
+When structured parallelism is enabled and the parent emits `explore.parallel` or `<allowed-event>.parallel`, the harness appends wave lifecycle events to the **parent** journal.
+
+| Topic | Fields | Description |
+|-------|--------|-------------|
+| `wave.start` | `wave_id`, `trigger_topic`, `branch_count`, `opening_recent_event`, `opening_roles`, `opening_events`, `objectives` | A new wave opened from the parent routing context. |
+| `wave.branch.start` | `wave_id`, `branch_id`, `objective`, `routing_event`, `branch_roles`, `branch_events` | One branch child run started. |
+| `wave.branch.finish` | `wave_id`, `branch_id`, `stop_reason`, `output` | One branch child run finished. |
+| `wave.join.start` | `wave_id`, `trigger_topic`, `branch_count`, `branch_outcomes` | The parent reached the join barrier and is aggregating branch outcomes. |
+| `wave.join.finish` | `wave_id`, `trigger_topic`, `joined_topic`, `routing_basis`, `resume_recent_event`, `resume_roles`, `resume_events` | The harness resolved the barrier and prepared the parent resume context. |
+| `wave.timeout` | `wave_id`, `timed_out_branches` | One or more branches exceeded `parallel.branch_timeout_ms`. |
+| `wave.failed` | `wave_id`, `failed_branches` | One or more branches ended without a success stop reason. |
+| `wave.invalid` | `trigger_topic`, `reason`, `active_wave_id`, `opening_recent_event` | A `.parallel` trigger payload or active-wave rule was invalid. |
+
+Notes:
+- only the harness may emit `*.parallel.joined`; those joined events are recorded as normal agent-style journal entries on the parent run after `wave.join.finish`
+- branch state stays isolated on disk under `core.state_dir/waves/<wave-id>/...` (default `.miniloop/waves/<wave-id>/...`), including `spec.md`, `join.md`, and per-branch result artifacts
+- only one active wave exists at a time in v1
 
 ## Backpressure and event validation
 

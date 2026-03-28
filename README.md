@@ -131,6 +131,7 @@ These are separate layers. Topology stays focused on roles within one loop; chai
 - `hyperagent.md` — live review instructions
 - `.miniloop/journal.jsonl` — append-only runtime journal
 - `.miniloop/memory.jsonl` — append-only loop memory
+- `.miniloop/waves/<wave-id>/...` — structured-parallel wave artifacts (`spec.md`, `join.md`, branch outputs)
 - `.miniloop/pi-stream.<iteration>.jsonl` — raw Pi NDJSON for task turns
 - `.miniloop/pi-review.<iteration>.jsonl` — raw Pi NDJSON for hyperagent reviews
 
@@ -154,6 +155,10 @@ backend.timeout_ms = 300000
 review.enabled = true
 review.timeout_ms = 300000
 # review.every_iterations = 0
+
+parallel.enabled = false
+parallel.max_branches = 3
+parallel.branch_timeout_ms = 180000
 
 memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
@@ -242,12 +247,36 @@ Important:
 - allowed next events are derived from those roles' `emits`
 - the loop completes when the completion event is emitted
 
+### Structured parallelism
+
+When `parallel.enabled = true`, normal parent turns get a small global `Structured parallelism` prompt block. That block advertises two bounded trigger forms:
+- `explore.parallel` — exploratory fan-out that keeps the current routing context
+- `<allowed-event>.parallel` — dispatch fan-out for a currently allowed normal event such as `tasks.ready.parallel`
+
+Rules:
+- only one wave may be active at a time
+- payloads must be a markdown bullet list or numbered list with 1..`parallel.max_branches` branch objectives
+- branches run in isolated state under `.miniloop/waves/<wave-id>/...`
+- only the harness may emit `*.parallel.joined`
+- branch child prompts do **not** get the global parallelism block
+
+Topology can route joined dispatch events explicitly:
+
+```toml
+[handoff]
+"tasks.ready" = ["builder"]
+"tasks.ready.parallel.joined" = ["builder"]
+```
+
+`explore.parallel.joined` resumes the same routing context that opened the wave.
+
 ## Journal-first runtime model
 
 Miniloops treats the JSONL journal as the runtime source of truth.
 
 That means:
 - `loop.start`, `iteration.start`, `backend.start`, agent events, `event.invalid`, `backend.finish`, `review.start`, `review.finish`, `iteration.finish`, and `loop.complete` all land in `.miniloop/journal.jsonl`
+- structured-parallel runs also append `wave.start`, `wave.branch.start`, `wave.branch.finish`, `wave.join.start`, `wave.join.finish`, and `wave.timeout` / `wave.failed` / `wave.invalid` when needed
 - prompt text is stored in the `iteration.start` record
 - parsed backend output is stored in the `iteration.finish` record
 - raw Pi NDJSON is written separately to `.miniloop/pi-stream.*.jsonl` and `.miniloop/pi-review.*.jsonl`

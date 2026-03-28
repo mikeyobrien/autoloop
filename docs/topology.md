@@ -88,6 +88,37 @@ The routing model has three layers:
 
 This is soft routing: the model sees suggestions and constraints but is not forced into a fixed state machine. The backpressure layer prevents protocol violations without requiring hard-coded transitions.
 
+## Structured parallel routing
+
+When `parallel.enabled = true`, topology still owns the normal routing model, but the harness recognizes two bounded fan-out forms:
+
+- `explore.parallel` — globally available exploratory fan-out
+- `<allowed-event>.parallel` — dispatch fan-out for a normal event that is already in the current allowed set
+
+Examples:
+- if `tasks.ready` is allowed, the parent may emit `tasks.ready.parallel`
+- if `review.ready` is not allowed, `review.ready.parallel` is rejected
+- completion events and coordination events do not gain `.parallel` variants in v1
+
+Joined events are harness-owned:
+- the model must not emit `*.parallel.joined`
+- `explore.parallel.joined` resumes the same routing context that opened the wave
+- `<base-event>.parallel.joined` can be routed explicitly in `handoff`
+
+Example explicit join routing:
+
+```toml
+[handoff]
+"tasks.ready" = ["builder"]
+"tasks.ready.parallel.joined" = ["builder"]
+```
+
+Parallelism is still structured, not free-form:
+- only normal parent turns get the global `Structured parallelism` prompt block
+- branch child prompts do **not** get that global metaprompt
+- only one active wave may exist at a time
+- branch state is isolated under `.miniloop/waves/<wave-id>/...`
+
 ## Prompt injection
 
 Each iteration, the topology is rendered into the prompt as advisory context:
