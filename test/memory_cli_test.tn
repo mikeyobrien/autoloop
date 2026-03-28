@@ -1,0 +1,91 @@
+defmodule MemoryCliTest do
+  def test_memory_list_shows_entry_ids() do
+    project_dir = prepare_fixture(80, seeded_memory())
+    result = run_repo_command(project_dir, "memory list")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "[mem-1]")
+    Assert.assert_contains(output, "[mem-2]")
+    Assert.assert_contains(output, "[meta-3]")
+  end
+
+  def test_memory_status_reports_budget_and_counts() do
+    project_dir = prepare_fixture(80, seeded_memory())
+    result = run_repo_command(project_dir, "memory status")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "Memory:")
+    Assert.assert_contains(output, "80 char budget")
+    Assert.assert_contains(output, "1 learnings, 1 preferences, 1 meta active.")
+  end
+
+  def test_memory_find_returns_matching_entries_with_ids() do
+    project_dir = prepare_fixture(80, seeded_memory())
+    result = run_repo_command(project_dir, "memory find 'routing lag'")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "mem-1: learning")
+    Assert.assert_contains(output, "routing lag")
+  end
+
+  def test_memory_remove_warns_on_missing_id() do
+    project_dir = prepare_fixture(80, seeded_memory())
+    result = run_repo_command(project_dir, "memory remove mem-99")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "warning: no active entry with ID mem-99 found")
+  end
+
+  def test_memory_add_warns_when_budget_is_exceeded() do
+    project_dir = prepare_fixture(20, "")
+    result = run_repo_command(project_dir, "memory add learning 'Long learning text to push memory over the configured prompt budget'")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "stored learning")
+    Assert.assert_contains(output, "warning: memory is")
+    Assert.assert_contains(output, "This entry will be truncated from the agent prompt")
+  end
+
+  defp prepare_fixture(memory_budget_chars, memory_jsonl) do
+    dir = "/tmp/miniloops-memory-cli-fixture"
+    state_dir = Path.join(dir, ".miniloop")
+
+    System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(state_dir))
+    System.write_text(Path.join(dir, "miniloops.toml"), fixture_config(memory_budget_chars))
+    System.write_text(Path.join(state_dir, "memory.jsonl"), memory_jsonl)
+
+    dir
+  end
+
+  defp fixture_config(memory_budget_chars) do
+    "memory.prompt_budget_chars = " <> to_string(memory_budget_chars) <> "\n" <>
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+  end
+
+  defp seeded_memory() do
+    "{\"id\": \"mem-1\", \"type\": \"learning\", \"text\": \"routing lag note\", \"source\": \"manual\", \"created\": \"2026-03-27T00:00:00Z\"}\n" <>
+    "{\"id\": \"mem-2\", \"type\": \"preference\", \"category\": \"Workflow\", \"text\": \"Keep prompts small\", \"created\": \"2026-03-27T00:00:00Z\"}\n" <>
+    "{\"id\": \"meta-3\", \"type\": \"meta\", \"key\": \"smoke_iteration\", \"value\": \"2\", \"created\": \"2026-03-27T00:00:00Z\"}\n"
+  end
+
+  defp run_repo_command(project_dir, args) do
+    System.run(
+      "cd " <> shell_quote(project_dir) <>
+      " && env -u COLUMNS -u MINILOOPS_ALLOWED_EVENTS -u MINILOOPS_ALLOWED_ROLES -u MINILOOPS_BIN -u MINILOOPS_COMPLETION_EVENT -u MINILOOPS_COMPLETION_PROMISE -u MINILOOPS_EVENTS_FILE -u MINILOOPS_ITERATION -u MINILOOPS_JOURNAL_FILE -u MINILOOPS_MEMORY_FILE -u MINILOOPS_PROJECT_DIR -u MINILOOPS_PROMPT -u MINILOOPS_RECENT_EVENT -u MINILOOPS_REQUIRED_EVENTS -u MINILOOPS_RUN_ID -u MINILOOPS_STATE_DIR -u MINILOOPS_WIDTH tonic run " <> shell_quote(repo_root()) <> " " <> args
+    )
+  end
+
+  defp repo_root() do
+    "/Users/rook/projects/tonic-loops"
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
+  end
+end

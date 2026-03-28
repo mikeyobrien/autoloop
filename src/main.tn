@@ -73,6 +73,26 @@ defmodule Demo do
     IO.puts(LoopMemory.list_project(project_dir))
   end
 
+  defp dispatch(["memory", "status"], _argv) do
+    IO.puts(LoopMemory.status_project(resolve_runtime_project_dir()))
+  end
+
+  defp dispatch(["memory", "status", project_dir], _argv) do
+    IO.puts(LoopMemory.status_project(project_dir))
+  end
+
+  defp dispatch(["memory", "find"], _argv) do
+    IO.puts("Usage: miniloops memory find <pattern...>")
+  end
+
+  defp dispatch(["memory", "find", "--help"], _argv) do
+    IO.puts("Usage: miniloops memory find <pattern...>")
+  end
+
+  defp dispatch(["memory", "find" | rest], _argv) do
+    IO.puts(LoopMemory.find_project(resolve_runtime_project_dir(), join_tokens(rest)))
+  end
+
   defp dispatch(["memory", "add", "learning", "--help"], _argv) do
     IO.puts("Usage: miniloops memory add learning <text...>")
   end
@@ -818,3 +838,10 @@ defmodule Demo do
     []
   end
 end
+    IO.puts("  miniloops memory status [project-dir]")
+    IO.puts("  miniloops memory find <pattern...>")
+    IO.puts("")
+    IO.puts("Memory helpers:")
+    IO.puts("  miniloops memory status [project-dir]")
+    IO.puts("  miniloops memory find <pattern...>")
+    IO.puts("  miniloops memory remove <id> [reason...]")

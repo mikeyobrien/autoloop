@@ -100,11 +100,11 @@ Materialized memory is rendered as a text block and injected into the iteration 
 ```
 Loop memory:
 Preferences:
-- [Workflow] Always run tests before emitting review.ready
+- [mem-2] [Workflow] Always run tests before emitting review.ready
 Learnings:
-- (manual) Do not document task.progress as a normal emit example
+- [mem-1] (manual) Do not document task.progress as a normal emit example
 Meta:
-- smoke_iteration: 2
+- [meta-1] smoke_iteration: 2
 ```
 
 Empty categories are omitted. If no entries survive materialization, the memory block is omitted entirely.
@@ -113,7 +113,7 @@ Normal iteration prompts and hyperagent review prompts also include a small **Co
 
 ### Budget truncation
 
-The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **8000**). If the text exceeds the budget, it is sliced at the character boundary and `\n...` is appended to signal truncation. A budget of `0` disables truncation. When truncation happens, the separate **Context pressure** block still reports the full rendered size so the agent and hyperagent can tell that prompt memory is under pressure even though the visible memory block has been clipped.
+The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **8000**). If the text exceeds the budget, it is sliced at the character boundary, `\n...` is appended, and a footer reports the active entry counts plus rendered-vs-budget size so prompt pressure is visible inside the clipped memory block itself. A budget of `0` disables truncation. When truncation happens, the separate **Context pressure** block still reports the full rendered size so the agent and hyperagent can tell that prompt memory is under pressure even though the visible memory block has been clipped.
 
 ## CLI commands
 
@@ -126,6 +126,8 @@ miniloops memory add learning "durable lesson text"
 ```
 
 The `source` field is set to `"manual"` for CLI-added entries.
+
+If the new entry pushes rendered memory over `memory.prompt_budget_chars`, the CLI prints a warning with the rendered size and budget so operators can prune memory or raise the budget before the next prompt silently clips it.
 
 ### Add a preference
 
@@ -150,13 +152,31 @@ miniloops memory remove <id> "reason for removal"
 
 Appends a tombstone targeting `<id>`. If no reason is provided, the reason defaults to `"manual"`.
 
+If the target ID is missing or already inactive, the CLI prints a warning instead of appending a no-op tombstone.
+
 ### List memory
 
 ```sh
 miniloops memory list
 ```
 
-Prints the materialized memory (same format as prompt injection, without budget truncation).
+Prints the materialized memory (same format as prompt injection, without budget truncation). Rendered entries include their stable IDs so `memory remove` is directly actionable.
+
+### Memory status
+
+```sh
+miniloops memory status
+```
+
+Prints the rendered size, configured budget, over/under-budget percentage, and active counts for learnings, preferences, and meta entries.
+
+### Find memory entries
+
+```sh
+miniloops memory find "routing lag"
+```
+
+Searches active entries across IDs, categories, text, sources, keys, and values, then prints matching entries with their IDs.
 
 ### Inspect memory
 

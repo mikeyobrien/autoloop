@@ -171,8 +171,9 @@ defmodule LoopMemory do
   end
 
   def render_file(path, budget_chars) do
-    text = render_materialized(materialize(read_lines(path)))
-    truncate_text(text, budget_chars)
+    memory = materialize(read_lines(path))
+    text = render_materialized(memory)
+    truncate_text(text, budget_chars, memory)
   end
 
   def stats_project(project_dir, budget_chars) do
@@ -225,7 +226,7 @@ defmodule LoopMemory do
   end
 
   defp render_preference_lines([entry | rest]) do
-    "- [" <> extract_field(entry, "category") <> "] " <> extract_field(entry, "text") <> "\n" <> render_preference_lines(rest)
+    "- [" <> extract_field(entry, "id") <> "] [" <> extract_field(entry, "category") <> "] " <> extract_field(entry, "text") <> "\n" <> render_preference_lines(rest)
   end
 
   defp render_learnings([]) do
@@ -243,7 +244,7 @@ defmodule LoopMemory do
   defp render_learning_lines([entry | rest]) do
     source = extract_field(entry, "source")
     prefix = learning_prefix(source)
-    "- " <> prefix <> extract_field(entry, "text") <> "\n" <> render_learning_lines(rest)
+    "- [" <> extract_field(entry, "id") <> "] " <> prefix <> extract_field(entry, "text") <> "\n" <> render_learning_lines(rest)
   end
 
   defp learning_prefix("") do
@@ -267,21 +268,26 @@ defmodule LoopMemory do
   end
 
   defp render_meta_lines([entry | rest]) do
-    "- " <> extract_field(entry, "key") <> ": " <> extract_field(entry, "value") <> "\n" <> render_meta_lines(rest)
+    "- [" <> extract_field(entry, "id") <> "] " <> extract_field(entry, "key") <> ": " <> extract_field(entry, "value") <> "\n" <> render_meta_lines(rest)
   end
 
-  defp truncate_text(text, budget_chars) do
-    case budget_chars <= 0 do
-      true -> text
-      _ -> truncate_text_with_budget(text, budget_chars)
-    end
+  defp truncate_text(text, budget_chars, _memory) when budget_chars <= 0 do
+    text
   end
 
-  defp truncate_text_with_budget(text, budget_chars) do
+  defp truncate_text(text, budget_chars, memory) do
     case String.length(text) <= budget_chars do
       true -> text
-      _ -> String.slice(text, 0, budget_chars) <> "\n..."
+      _ -> String.slice(text, 0, budget_chars) <> "\n...\n" <> truncation_footer(memory, String.length(text), budget_chars)
     end
+  end
+
+  defp truncation_footer(memory, rendered_chars, budget_chars) do
+    "(memory truncated: " <>
+    to_string(count_entries(Map.get(memory, :preferences, []), 0)) <> " preferences, " <>
+    to_string(count_entries(Map.get(memory, :learnings, []), 0)) <> " learnings, " <>
+    to_string(count_entries(Map.get(memory, :meta, []), 0)) <> " meta active — " <>
+    to_string(rendered_chars) <> "/" <> to_string(budget_chars) <> " chars)"
   end
 
   defp memory_truncated(_rendered_chars, budget_chars) when budget_chars <= 0 do
@@ -495,6 +501,20 @@ defmodule MemoryTest do
     Assert.assert_equal(Map.get(stats, :budget_chars, 0), 20)
     Assert.assert(Map.get(stats, :rendered_chars, 0) > 20, "rendered_chars should reflect full materialized length")
     Assert.assert_equal(Map.get(stats, :truncated, false), true)
+  end
+
+  def test_render_file_includes_ids_and_truncation_footer() do
+    path = "/tmp/miniloops-memory-render-test.jsonl"
+    System.write_text(path, "{\"id\": \"mem-1\", \"type\": \"learning\", \"text\": \"Long learning text to trigger truncation\", \"source\": \"manual\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"mem-2\", \"type\": \"preference\", \"category\": \"Workflow\", \"text\": \"Keep prompts small\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"meta-3\", \"type\": \"meta\", \"key\": \"smoke_iteration\", \"value\": \"2\", \"created\": \"2026-03-27T00:00:00Z\"}\n")
+
+    full = LoopMemory.render_file(path, 0)
+    clipped = LoopMemory.render_file(path, 40)
+
+    Assert.assert_contains(full, "[mem-1]")
+    Assert.assert_contains(full, "[mem-2]")
+    Assert.assert_contains(full, "[meta-3]")
+    Assert.assert_contains(clipped, "(memory truncated:")
+    Assert.assert_contains(clipped, "chars)")
   end
 
   defp project_dir() do
