@@ -11,12 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read tonic version
-        id: tonic-version
-        run: echo "version=$(cat .tonic-version)" >> "$GITHUB_OUTPUT"
-
       - name: Install tonic
-        run: cargo install tonic-lang --version "${{ steps.tonic-version.outputs.version }}"
+        run: ./scripts/install-tonic.sh
 
       - name: Check syntax
         run: tonic check .
@@ -30,12 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read tonic version
-        id: tonic-version
-        run: echo "version=$(cat .tonic-version)" >> "$GITHUB_OUTPUT"
-
       - name: Install tonic
-        run: cargo install tonic-lang --version "${{ steps.tonic-version.outputs.version }}"
+        run: ./scripts/install-tonic.sh
 
       - name: Run pi-smoke
         run: scripts/pi-smoke.sh

@@ -341,9 +341,17 @@ Packages a compiled binary into a deterministic release archive.
 scripts/package-release.sh dist/miniloops v0.1.0 linux-x64 dist
 ```
 
+### `scripts/install-tonic.sh`
+
+Installs the Tonic compiler used by CI and release workflows. It prefers the pinned git commit in `.tonic-git-ref` and falls back to `.tonic-version` when the bridge is removed.
+
+```bash
+scripts/install-tonic.sh
+```
+
 ### `scripts/release-smoke.sh`
 
-Smoke-tests a compiled `miniloops` binary by verifying the standalone CLI bootstrap/help path. This keeps the release workflow validating shipped artifacts while native runtime gaps for full loop execution remain tracked in `TONIC_MISSING.md`.
+Smoke-tests a compiled `miniloops` binary with the real run-path check used for release validation.
 
 ```bash
 scripts/release-smoke.sh dist/miniloops

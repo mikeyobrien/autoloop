@@ -25,10 +25,13 @@ git push origin v0.1.0
 
 ## What the workflow does
 
+- installs Tonic via `scripts/install-tonic.sh`
+  - currently this prefers the pinned git commit in `.tonic-git-ref`
+  - it falls back to `.tonic-version` when the git-ref bridge is removed
 - re-runs `tonic check .`
 - re-runs `./bin/test`
 - compiles standalone `miniloops` binaries
-- smoke-tests the compiled binary by verifying the standalone CLI bootstrap/help path
+- smoke-tests the compiled binary with a real run-path check via `scripts/compiled-run-check.sh`
 - packages release archives
 - publishes the archives and checksums to GitHub Releases
 
