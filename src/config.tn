@@ -40,7 +40,7 @@ defmodule LoopConfig do
   end
 
   def get_list(config, key) do
-    split_csv(get(config, key, ""))
+    LoopUtils.parse_string_list(get(config, key, ""))
   end
 
   def put(config, [], _value) do
@@ -273,40 +273,7 @@ defmodule LoopConfig do
   end
 
   defp normalize_value(value) do
-    case is_array_literal(value) do
-      true -> LoopUtils.join_csv(parse_array(value))
-      _ -> LoopUtils.strip_quotes(value)
-    end
-  end
-
-  defp is_array_literal(value) do
-    String.starts_with(value, "[") and String.ends_with(value, "]")
-  end
-
-  defp parse_array(value) do
-    inner = String.trim(LoopUtils.slice_outer(value))
-
-    case inner do
-      "" -> []
-      _ -> split_csv_parts(String.split(inner, ","), [])
-    end
-  end
-
-  defp split_csv(text) do
-    split_csv_parts(String.split(text, ","), [])
-  end
-
-  defp split_csv_parts([], acc) do
-    LoopUtils.reverse_list(acc)
-  end
-
-  defp split_csv_parts([part | rest], acc) do
-    trimmed = LoopUtils.strip_quotes(String.trim(part))
-
-    case trimmed do
-      "" -> split_csv_parts(rest, acc)
-      _ -> split_csv_parts(rest, [trimmed] ++ acc)
-    end
+    LoopUtils.join_csv(LoopUtils.parse_string_list_literal_or_scalar(value))
   end
 
 end

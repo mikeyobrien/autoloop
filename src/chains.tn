@@ -17,7 +17,7 @@ defmodule LoopChains do
   end
 
   def parse_inline_chain(csv_steps, project_dir) do
-    steps = split_csv(csv_steps)
+    steps = LoopUtils.parse_string_list(csv_steps)
 
     %{name: "inline", steps: resolve_steps(steps, project_dir)}
   end
@@ -705,54 +705,7 @@ defmodule LoopChains do
   # --- shared parsing helpers ---
 
   defp normalize_list(value) do
-    case is_array_literal(value) do
-      true -> parse_array(value)
-      _ -> [LoopUtils.strip_quotes(value)]
-    end
-  end
-
-  defp is_array_literal(value) do
-    String.starts_with(value, "[") and String.ends_with(value, "]")
-  end
-
-  defp parse_array(value) do
-    inner = String.trim(LoopUtils.slice_outer(value))
-
-    case inner do
-      "" -> []
-      _ -> split_array_parts(String.split(inner, ","), [])
-    end
-  end
-
-  defp split_array_parts([], acc) do
-    LoopUtils.reverse_list(acc)
-  end
-
-  defp split_array_parts([part | rest], acc) do
-    trimmed = LoopUtils.strip_quotes(String.trim(part))
-
-    case trimmed do
-      "" -> split_array_parts(rest, acc)
-      _ -> split_array_parts(rest, [trimmed] ++ acc)
-    end
-  end
-
-
-  defp split_csv(text) do
-    split_csv_parts(String.split(text, ","), [])
-  end
-
-  defp split_csv_parts([], acc) do
-    LoopUtils.reverse_list(acc)
-  end
-
-  defp split_csv_parts([part | rest], acc) do
-    trimmed = LoopUtils.strip_quotes(String.trim(part))
-
-    case trimmed do
-      "" -> split_csv_parts(rest, acc)
-      _ -> split_csv_parts(rest, [trimmed] ++ acc)
-    end
+    LoopUtils.parse_string_list_literal_or_scalar(value)
   end
 
   defp extract_topic(line) do
@@ -798,7 +751,6 @@ defmodule LoopChains do
   defp first_or_empty([item | _rest]) do
     item
   end
-
 
   defp append_text(path, content) do
     System.run("printf '%s' " <> LoopUtils.shell_quote(content) <> " >> " <> LoopUtils.shell_quote(path))

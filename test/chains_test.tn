@@ -1,0 +1,138 @@
+defmodule ChainsTest do
+  def test_real_chain_list_loads_array_literal_steps() do
+    project_dir = prepare_fixture()
+    result = run_repo_command(project_dir, "chain list")
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "quoted: first -> second")
+  end
+
+  def test_real_inline_chain_parses_quoted_csv_steps() do
+    project_dir = prepare_fixture()
+    prompt = "Ship the smallest viable change."
+    chain_csv = "\"first\", \"\", \"second\""
+    result = run_repo_command(project_dir, "run --chain " <> shell_quote(chain_csv) <> " " <> shell_quote(prompt))
+    chain_state = run_repo_command(project_dir, "inspect chain --format md")
+    chain_output = Map.get(chain_state, :output, "")
+    step1_prompt = System.read_text(Path.join(project_dir, ".miniloop/chains/chain-1/step-1/.miniloop/prompt-seen.txt"))
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_equal(Map.get(chain_state, :exit_code, 1), 0)
+    Assert.assert_contains(step1_prompt, prompt)
+    Assert.assert_contains(chain_output, "Step 1 (first) finished: completion_event")
+    Assert.assert_contains(chain_output, "Step 2 (second) finished: completion_event")
+    Assert.refute(String.contains(chain_output, "Step 3 ("), "empty inline step should be dropped")
+  end
+
+  defp prepare_fixture() do
+    project_dir = fixture_dir()
+    backend_path = Path.join(project_dir, "backend.sh")
+    first_dir = Path.join(project_dir, "presets/first")
+    second_dir = Path.join(project_dir, "presets/second")
+
+    System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(Path.join(first_dir, "roles")) <> " " <> shell_quote(Path.join(second_dir, "roles")))
+
+    System.write_text(backend_path, backend_script())
+    System.run("chmod +x " <> shell_quote(backend_path))
+    System.write_text(Path.join(project_dir, "miniloops.toml"), host_miniloops_toml())
+    System.write_text(Path.join(project_dir, "chains.toml"), chains_toml())
+    write_preset(first_dir, backend_path)
+    write_preset(second_dir, backend_path)
+
+    project_dir
+  end
+
+  defp write_preset(preset_dir, backend_path) do
+    System.write_text(Path.join(preset_dir, "miniloops.toml"), preset_miniloops_toml(backend_path))
+    System.write_text(Path.join(preset_dir, "topology.toml"), preset_topology_toml())
+    System.write_text(Path.join(preset_dir, "harness.md"), "chain parser harness\n")
+    System.write_text(Path.join(preset_dir, "roles/worker.md"), "You are the worker. Emit task.complete.\n")
+  end
+
+  defp run_repo_command(project_dir, args) do
+    System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_miniloops_env() <> " tonic run " <> shell_quote(repo_root()) <> " " <> args)
+  end
+
+  defp clean_miniloops_env() do
+    "env" <>
+    " -u COLUMNS" <>
+    " -u MINILOOPS_ALLOWED_EVENTS" <>
+    " -u MINILOOPS_ALLOWED_ROLES" <>
+    " -u MINILOOPS_BIN" <>
+    " -u MINILOOPS_COMPLETION_EVENT" <>
+    " -u MINILOOPS_COMPLETION_PROMISE" <>
+    " -u MINILOOPS_EVENTS_FILE" <>
+    " -u MINILOOPS_ITERATION" <>
+    " -u MINILOOPS_JOURNAL_FILE" <>
+    " -u MINILOOPS_MEMORY_FILE" <>
+    " -u MINILOOPS_PROJECT_DIR" <>
+    " -u MINILOOPS_PROMPT" <>
+    " -u MINILOOPS_RECENT_EVENT" <>
+    " -u MINILOOPS_REQUIRED_EVENTS" <>
+    " -u MINILOOPS_RUN_ID" <>
+    " -u MINILOOPS_STATE_DIR" <>
+    " -u MINILOOPS_WIDTH"
+  end
+
+  defp backend_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "mkdir -p \"${MINILOOPS_STATE_DIR:-.}\"\n" <>
+    "printf '%s' \"${1:-}\" > \"${MINILOOPS_STATE_DIR:-.}/prompt-seen.txt\"\n" <>
+    "printf '%s\\n' \"${1:-}\"\n" <>
+    "first_event=$(printf '%s' \"${MINILOOPS_ALLOWED_EVENTS:-}\" | awk -F, '{print $1}')\n" <>
+    "if [ -n \"$first_event\" ] && [ -n \"${MINILOOPS_BIN:-}\" ]; then\n" <>
+    "  \"$MINILOOPS_BIN\" emit \"$first_event\" \"chain parser ok\"\n" <>
+    "fi\n"
+  end
+
+  defp host_miniloops_toml() do
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n" <>
+    "core.run_id_format = \"counter\"\n"
+  end
+
+  defp preset_miniloops_toml(backend_path) do
+    "event_loop.max_iterations = 1\n" <>
+    "event_loop.completion_event = \"task.complete\"\n" <>
+    "backend.kind = \"command\"\n" <>
+    "backend.command = \"" <> backend_path <> "\"\n" <>
+    "backend.timeout_ms = 10000\n" <>
+    "review.enabled = false\n" <>
+    "harness.instructions_file = \"harness.md\"\n" <>
+    "core.state_dir = \".miniloop\"\n" <>
+    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+  end
+
+  defp preset_topology_toml() do
+    "name = \"chain-parser-check\"\n" <>
+    "completion = \"task.complete\"\n\n" <>
+    "[[role]]\n" <>
+    "id = \"worker\"\n" <>
+    "emits = [\"task.complete\"]\n" <>
+    "prompt_file = \"roles/worker.md\"\n\n" <>
+    "[handoff]\n" <>
+    "\"loop.start\" = [\"worker\"]\n"
+  end
+
+  defp chains_toml() do
+    "[[chain]]\n" <>
+    "name = \"quoted\"\n" <>
+    "steps = [\"first\", \"\", \"second\"]\n"
+  end
+
+  defp fixture_dir() do
+    "/tmp/miniloops-chains-source-fixture"
+  end
+
+  defp repo_root() do
+    "/Users/rook/projects/tonic-loops"
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
+  end
+end

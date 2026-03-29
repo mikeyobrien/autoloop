@@ -1,612 +1,147 @@
-# Tests for LoopTopology: loading, rendering, consistency checks, regex matching.
-defmodule LoopTopology do
-  def load(project_dir) do
-    path = Path.join(project_dir, "topology.toml")
-
-    case System.path_exists(path) do
-      true -> load_existing(path, project_dir)
-      _ -> default_topology()
-    end
-  end
-
-  def completion_event(topology, fallback) do
-    case Map.get(topology, :completion, "") do
-      "" -> fallback
-      value -> value
-    end
-  end
-
-  def suggested_roles(topology, recent_event) do
-    handoff = Map.get(topology, :handoff, %{})
-    roles = collect_matching_roles(Map.get(topology, :handoff_keys, []), handoff, recent_event, [])
-
-    case roles do
-      [] -> role_ids(Map.get(topology, :roles, []), [])
-      _ -> roles
-    end
-  end
-
-  def allowed_events(topology, recent_event) do
-    collect_events_for_roles(Map.get(topology, :roles, []), suggested_roles(topology, recent_event), [])
-  end
-
-  def event_matches_any(topic, patterns) do
-    match_any(topic, patterns)
-  end
-
-  def get_role_ids(topology) do
-    role_ids(Map.get(topology, :roles, []), [])
-  end
-
-  def all_emitted_events(topology) do
-    collect_all_emits(Map.get(topology, :roles, []), [])
-  end
-
-  def handoff_keys(topology) do
-    Map.get(topology, :handoff_keys, [])
-  end
-
-  def handoff_target_ids(topology) do
-    collect_handoff_targets(Map.get(topology, :handoff_keys, []), Map.get(topology, :handoff, %{}), [])
-  end
-
-  def role_count(topology) do
-    count_roles(Map.get(topology, :roles, []), 0)
-  end
-
-  def render(topology, recent_event) do
-    roles = Map.get(topology, :roles, [])
-
-    case roles do
-      [] -> ""
-      _ -> render_nonempty(topology, recent_event, roles)
-    end
-  end
-
-  defp load_existing(path, project_dir) do
-    lines = String.split(System.read_text(path), line_sep())
-    state = parse_lines(lines, initial_state())
-    finalize(state, project_dir)
-  end
-
-  defp default_topology() do
-    %{name: "", completion: "", roles: [], handoff: %{}, handoff_keys: []}
-  end
-
-  defp render_nonempty(topology, recent_event, roles) do
-    suggested = suggested_roles(topology, recent_event)
-    allowed = allowed_events(topology, recent_event)
-    "Topology (advisory):\n" <> "Recent routing event: " <> recent_event <> "\n" <> "Suggested next roles: " <> list_text(suggested) <> "\n" <> "Allowed next events: " <> list_text(allowed) <> "\n\n" <> "Role deck:\n" <> render_roles(roles)
-  end
-
-  defp initial_state() do
-    %{name: "", completion: "", roles: [], handoff: %{}, handoff_keys: [], current_role: empty_role(), section: "root"}
-  end
-
-  defp empty_role() do
-    %{id: "", prompt: "", prompt_file: "", emits: []}
-  end
-
-  defp parse_lines([], state) do
-    state
-  end
-
-  defp parse_lines([line | rest], state) do
-    trimmed = String.trim(line)
-
-    case skip_line(trimmed) do
-      true -> parse_lines(rest, state)
-      _ -> parse_lines(rest, parse_line(trimmed, state))
-    end
-  end
-
-  defp parse_line("[[role]]", state) do
-    start_role(state)
-  end
-
-  defp parse_line("[handoff]", state) do
-    start_handoff(state)
-  end
-
-  defp parse_line(line, state) do
-    assign_parts(String.split(line, "="), state)
-  end
-
-  defp start_role(state) do
-    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), handoff_keys: Map.get(state, :handoff_keys, []), current_role: empty_role(), section: "role"}
-  end
-
-  defp start_handoff(state) do
-    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: push_current_role(state), handoff: Map.get(state, :handoff, %{}), handoff_keys: Map.get(state, :handoff_keys, []), current_role: empty_role(), section: "handoff"}
-  end
-
-  defp push_current_role(state) do
-    push_role_if_named(Map.get(state, :current_role, empty_role()), Map.get(state, :roles, []))
-  end
-
-  defp push_role_if_named(role, roles) do
-    case Map.get(role, :id, "") do
-      "" -> roles
-      _ -> [role] ++ roles
-    end
-  end
-
-  defp assign_parts([key, value], state) do
-    assign_raw_value(strip_quotes(String.trim(key)), String.trim(value), state)
-  end
-
-  defp assign_parts(_, state) do
-    state
-  end
-
-  defp assign_raw_value("name", raw_value, state) do
-    Map.put(state, :name, normalize_scalar(raw_value))
-  end
-
-  defp assign_raw_value("completion", raw_value, state) do
-    Map.put(state, :completion, normalize_scalar(raw_value))
-  end
-
-  defp assign_raw_value(key, raw_value, state) do
-    section = Map.get(state, :section, "root")
-    assign_in_section(section, state, key, raw_value)
-  end
-
-  defp assign_in_section("role", state, key, raw_value) do
-    Map.put(state, :current_role, role_put(Map.get(state, :current_role, empty_role()), key, raw_value))
-  end
-
-  defp assign_in_section("handoff", state, key, raw_value) do
-    handoff = Map.get(state, :handoff, %{})
-    keys = Map.get(state, :handoff_keys, [])
-    updated = Map.put(state, :handoff, Map.put(handoff, key, normalize_list(raw_value)))
-    Map.put(updated, :handoff_keys, append_handoff_key(keys, key))
-  end
-
-  defp assign_in_section(_, state, _key, _raw_value) do
-    state
-  end
-
-  defp append_handoff_key(keys, key) do
-    case list_contains(keys, key) do
-      true -> keys
-      _ -> [key] ++ keys
-    end
-  end
-
-  defp role_put(role, "id", raw_value) do
-    Map.put(role, :id, normalize_scalar(raw_value))
-  end
-
-  defp role_put(role, "prompt", raw_value) do
-    Map.put(role, :prompt, normalize_scalar(raw_value))
-  end
-
-  defp role_put(role, "prompt_file", raw_value) do
-    Map.put(role, :prompt_file, normalize_scalar(raw_value))
-  end
-
-  defp role_put(role, "emits", raw_value) do
-    Map.put(role, :emits, normalize_list(raw_value))
-  end
-
-  defp role_put(role, _key, _raw_value) do
-    role
-  end
-
-  defp finalize(state, project_dir) do
-    roles = Enum.reverse(push_current_role(state))
-
-    %{name: Map.get(state, :name, ""), completion: Map.get(state, :completion, ""), roles: load_role_prompts(roles, project_dir, []), handoff: Map.get(state, :handoff, %{}), handoff_keys: Enum.reverse(Map.get(state, :handoff_keys, []))}
-  end
-
-  defp load_role_prompts([], _project_dir, acc) do
-    Enum.reverse(acc)
-  end
-
-  defp load_role_prompts([role | rest], project_dir, acc) do
-    role_with_prompt = Map.put(role, :prompt, role_prompt(role, project_dir))
-    load_role_prompts(rest, project_dir, [role_with_prompt] ++ acc)
-  end
-
-  defp role_prompt(role, project_dir) do
-    inline = Map.get(role, :prompt, "")
-
-    case inline do
-      "" -> read_prompt_file(project_dir, Map.get(role, :prompt_file, ""))
-      _ -> inline
-    end
-  end
-
-  defp read_prompt_file(_project_dir, "") do
-    ""
-  end
-
-  defp read_prompt_file(project_dir, prompt_file) do
-    full_path = Path.join(project_dir, prompt_file)
-
-    case System.path_exists(full_path) do
-      true -> System.read_text(full_path)
-      _ -> ""
-    end
-  end
-
-  defp collect_events_for_roles([], _role_ids, acc) do
-    Enum.reverse(acc)
-  end
-
-  defp collect_events_for_roles([role | rest], role_ids, acc) do
-    role_id = Map.get(role, :id, "")
-
-    case list_contains(role_ids, role_id) do
-      true -> collect_events_with_role(role, rest, role_ids, acc)
-      _ -> collect_events_for_roles(rest, role_ids, acc)
-    end
-  end
-
-  defp collect_events_with_role(role, rest, role_ids, acc) do
-    next_acc = append_unique(Map.get(role, :emits, []), acc)
-    collect_events_for_roles(rest, role_ids, next_acc)
-  end
-
-  defp append_unique([], acc) do
-    acc
-  end
-
-  defp append_unique([item | rest], acc) do
-    case list_contains(acc, item) do
-      true -> append_unique(rest, acc)
-      _ -> append_unique(rest, [item] ++ acc)
-    end
-  end
-
-  defp role_ids([], acc) do
-    Enum.reverse(acc)
-  end
-
-  defp role_ids([role | rest], acc) do
-    role_ids(rest, [Map.get(role, :id, "")] ++ acc)
-  end
-
-  defp count_roles([], count) do
-    count
-  end
-
-  defp count_roles([_role | rest], count) do
-    count_roles(rest, count + 1)
-  end
-
-  defp render_roles([]) do
-    ""
-  end
-
-  defp render_roles([role | rest]) do
-    "- role `" <> Map.get(role, :id, "") <> "`\n" <> "  emits: " <> list_text(Map.get(role, :emits, [])) <> "\n" <> "  prompt: " <> prompt_summary(Map.get(role, :prompt, "")) <> "\n" <>
-    render_roles(rest)
-  end
-
-  defp prompt_summary(prompt) do
-    first_nonempty_line(String.split(prompt, line_sep()))
-  end
-
-  defp first_nonempty_line([]) do
-    "(none)"
-  end
-
-  defp first_nonempty_line([line | rest]) do
-    trimmed = String.trim(line)
-
-    case trimmed do
-      "" -> first_nonempty_line(rest)
-      _ -> trimmed
-    end
-  end
-
-  defp normalize_scalar(value) do
-    strip_quotes(value)
-  end
-
-  defp normalize_list(value) do
-    case is_array_literal(value) do
-      true -> parse_array(value)
-      _ -> [normalize_scalar(value)]
-    end
-  end
-
-  defp is_array_literal(value) do
-    String.starts_with(value, "[") and String.ends_with(value, "]")
-  end
-
-  defp parse_array(value) do
-    inner = String.trim(slice_outer(value))
-
-    case inner do
-      "" -> []
-      _ -> split_array_parts(String.split(inner, ","), [])
-    end
-  end
-
-  defp split_array_parts([], acc) do
-    Enum.reverse(acc)
-  end
-
-  defp split_array_parts([part | rest], acc) do
-    trimmed = strip_quotes(String.trim(part))
-
-    case trimmed do
-      "" -> split_array_parts(rest, acc)
-      _ -> split_array_parts(rest, [trimmed] ++ acc)
-    end
-  end
-
-  defp strip_quotes(value) do
-    case is_quoted(value) do
-      true -> slice_outer(value)
-      _ -> value
-    end
-  end
-
-  defp is_quoted(value) do
-    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
-  end
-
-  defp slice_outer(text) do
-    String.slice(text, 1, String.length(text) - 2)
-  end
-
-  defp list_text([]) do
-    "(none)"
-  end
-
-  defp list_text([item]) do
-    item
-  end
-
-  defp list_text([item | rest]) do
-    item <> ", " <> list_text(rest)
-  end
-
-  defp list_contains([], _needle) do
-    false
-  end
-
-  defp list_contains([item | rest], needle) do
-    case item == needle do
-      true -> true
-      _ -> list_contains(rest, needle)
-    end
-  end
-
-  defp skip_line("") do
-    true
-  end
-
-  defp skip_line(line) do
-    String.starts_with(line, "#")
-  end
-
-  defp line_sep() do
-    """
-"""
-  end
-
-  defp collect_matching_roles([], _handoff, _event, acc) do
-    dedup_list(acc, [])
-  end
-
-  defp collect_matching_roles([key | rest], handoff, event, acc) do
-    case event_matches_pattern(event, key) do
-      true -> collect_matching_roles(rest, handoff, event, acc ++ Map.get(handoff, key, []))
-      _ -> collect_matching_roles(rest, handoff, event, acc)
-    end
-  end
-
-  defp dedup_list([], acc) do
-    Enum.reverse(acc)
-  end
-
-  defp dedup_list([item | rest], acc) do
-    case list_contains(acc, item) do
-      true -> dedup_list(rest, acc)
-      _ -> dedup_list(rest, [item] ++ acc)
-    end
-  end
-
-  defp match_any(_topic, []) do
-    false
-  end
-
-  defp match_any(topic, [pattern | rest]) do
-    case event_matches_pattern(topic, pattern) do
-      true -> true
-      _ -> match_any(topic, rest)
-    end
-  end
-
-  defp event_matches_pattern(topic, pattern) do
-    case is_regex_pattern(pattern) do
-      true -> regex_match(topic, strip_regex_delimiters(pattern))
-      _ -> topic == pattern
-    end
-  end
-
-  defp is_regex_pattern(value) do
-    String.length(value) >= 3 and String.starts_with(value, "/") and String.ends_with(value, "/")
-  end
-
-  defp strip_regex_delimiters(value) do
-    String.slice(value, 1, String.length(value) - 2)
-  end
-
-  defp regex_match(topic, pattern) do
-    cmd = "printf '%s' " <> shell_quote(topic) <> " | grep -qE " <> shell_quote("^" <> pattern <> "$") <> " && printf true || printf false"
-    result = System.run(cmd)
-
-    case Map.get(result, :output, "false") do
-      "true" -> true
-      _ -> false
-    end
+defmodule TopologyTest do
+  def test_real_topology_loads_and_renders_with_context() do
+    fixture_dir = prepare_fixture(topology_probe_main(repo_root()))
+    result = run_fixture(fixture_dir)
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "completion=task.complete")
+    Assert.assert_contains(output, "render_has_topology=true")
+    Assert.assert_contains(output, "render_has_role_deck=true")
+    Assert.assert_contains(output, "with_context_has_builder=true")
+    Assert.assert_contains(output, "with_context_has_review_ready=true")
+  end
+
+  def test_real_topology_reports_live_routing_sets() do
+    fixture_dir = prepare_fixture(topology_routing_main(repo_root()))
+    result = run_fixture(fixture_dir)
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "role_count=")
+    Assert.assert_contains(output, "suggested_roles=builder")
+    Assert.assert_contains(output, "allowed_events=review.ready,build.blocked")
+    Assert.assert_contains(output, "role_ids_has_builder=true")
+    Assert.assert_contains(output, "handoff_keys_has_tasks_ready=true")
+    Assert.assert_contains(output, "targets_has_builder=true")
+    Assert.assert_contains(output, "emits_has_review_ready=true")
+  end
+
+  def test_real_topology_regex_matching_uses_source_implementation() do
+    fixture_dir = prepare_fixture(topology_regex_main())
+    result = run_fixture(fixture_dir)
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "regex_review_passed=true")
+    Assert.assert_contains(output, "regex_review_rejected=true")
+    Assert.assert_contains(output, "regex_tasks_ready=false")
+    Assert.assert_contains(output, "empty_patterns=false")
+  end
+
+  defp prepare_fixture(main_source) do
+    dir = "/tmp/miniloops-topology-source-fixture"
+    src_dir = Path.join(dir, "src")
+
+    System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(src_dir))
+    System.write_text(Path.join(dir, "tonic.toml"), tonic_manifest())
+    System.write_text(Path.join(src_dir, "main.tn"), main_source)
+    link_source(dir, "topology.tn")
+    link_source(dir, "utils.tn")
+
+    dir
+  end
+
+  defp link_source(dir, file_name) do
+    source = Path.join(repo_root(), "src/" <> file_name)
+    target = Path.join(dir, "src/" <> file_name)
+    System.run("ln -sf " <> shell_quote(source) <> " " <> shell_quote(target))
+  end
+
+  defp run_fixture(dir) do
+    System.run("tonic run " <> shell_quote(dir))
+  end
+
+  defp topology_probe_main(project_dir) do
+    "defmodule Demo do\n" <>
+    "  def run() do\n" <>
+    "    topology = LoopTopology.load(" <> tn_string(project_dir) <> ")\n" <>
+    "    rendered = LoopTopology.render(topology, \"tasks.ready\")\n" <>
+    "    with_context = LoopTopology.render_with_context(topology, \"tasks.ready\", [\"builder\"], [\"review.ready\"])\n" <>
+    "    IO.puts(\"completion=\" <> LoopTopology.completion_event(topology, \"fallback.event\"))\n" <>
+    "    IO.puts(\"render_has_topology=\" <> bool_text(String.contains(rendered, \"Topology\")))\n" <>
+    "    IO.puts(\"render_has_role_deck=\" <> bool_text(String.contains(rendered, \"Role deck\")))\n" <>
+    "    IO.puts(\"with_context_has_builder=\" <> bool_text(String.contains(with_context, \"Suggested next roles: builder\")))\n" <>
+    "    IO.puts(\"with_context_has_review_ready=\" <> bool_text(String.contains(with_context, \"Allowed next events: review.ready\")))\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(true) do\n" <>
+    "    \"true\"\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(_value) do\n" <>
+    "    \"false\"\n" <>
+    "  end\n" <>
+    "end\n"
+  end
+
+  defp topology_routing_main(project_dir) do
+    "defmodule Demo do\n" <>
+    "  def run() do\n" <>
+    "    topology = LoopTopology.load(" <> tn_string(project_dir) <> ")\n" <>
+    "    suggested = LoopTopology.suggested_roles(topology, \"tasks.ready\")\n" <>
+    "    allowed = LoopTopology.allowed_events(topology, \"tasks.ready\")\n" <>
+    "    ids = LoopTopology.get_role_ids(topology)\n" <>
+    "    keys = LoopTopology.handoff_keys(topology)\n" <>
+    "    targets = LoopTopology.handoff_target_ids(topology)\n" <>
+    "    emits = LoopTopology.all_emitted_events(topology)\n" <>
+    "    IO.puts(\"role_count=\" <> to_string(LoopTopology.role_count(topology)))\n" <>
+    "    IO.puts(\"suggested_roles=\" <> LoopUtils.join_csv(suggested))\n" <>
+    "    IO.puts(\"allowed_events=\" <> LoopUtils.join_csv(allowed))\n" <>
+    "    IO.puts(\"role_ids_has_builder=\" <> bool_text(LoopUtils.list_contains(ids, \"builder\")))\n" <>
+    "    IO.puts(\"handoff_keys_has_tasks_ready=\" <> bool_text(LoopUtils.list_contains(keys, \"tasks.ready\")))\n" <>
+    "    IO.puts(\"targets_has_builder=\" <> bool_text(LoopUtils.list_contains(targets, \"builder\")))\n" <>
+    "    IO.puts(\"emits_has_review_ready=\" <> bool_text(LoopUtils.list_contains(emits, \"review.ready\")))\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(true) do\n" <>
+    "    \"true\"\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(_value) do\n" <>
+    "    \"false\"\n" <>
+    "  end\n" <>
+    "end\n"
+  end
+
+  defp topology_regex_main() do
+    "defmodule Demo do\n" <>
+    "  def run() do\n" <>
+    "    patterns = [\"/review\\\\..+/\"]\n" <>
+    "    IO.puts(\"regex_review_passed=\" <> bool_text(LoopTopology.event_matches_any(\"review.passed\", patterns)))\n" <>
+    "    IO.puts(\"regex_review_rejected=\" <> bool_text(LoopTopology.event_matches_any(\"review.rejected\", patterns)))\n" <>
+    "    IO.puts(\"regex_tasks_ready=\" <> bool_text(LoopTopology.event_matches_any(\"tasks.ready\", patterns)))\n" <>
+    "    IO.puts(\"empty_patterns=\" <> bool_text(LoopTopology.event_matches_any(\"tasks.ready\", [])))\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(true) do\n" <>
+    "    \"true\"\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(_value) do\n" <>
+    "    \"false\"\n" <>
+    "  end\n" <>
+    "end\n"
+  end
+
+  defp tonic_manifest() do
+    "[project]\nname = \"topology-source-test\"\nentry = \"src/main.tn\"\n"
+  end
+
+  defp repo_root() do
+    "/Users/rook/projects/tonic-loops"
   end
 
   defp shell_quote(text) do
     "'" <> String.replace(text, "'", "'\\''") <> "'"
   end
 
-  defp collect_all_emits([], acc) do
-    dedup_list(acc, [])
-  end
-
-  defp collect_all_emits([role | rest], acc) do
-    collect_all_emits(rest, acc ++ Map.get(role, :emits, []))
-  end
-
-  defp collect_handoff_targets([], _handoff, acc) do
-    dedup_list(acc, [])
-  end
-
-  defp collect_handoff_targets([key | rest], handoff, acc) do
-    collect_handoff_targets(rest, handoff, acc ++ Map.get(handoff, key, []))
-  end
-end
-
-defmodule TopologyTest do
-  def test_load_returns_topology_map() do
-    topology = LoopTopology.load(project_dir())
-    roles = Map.get(topology, :roles, [])
-    Assert.assert(is_list(roles), "roles should be a list")
-  end
-
-  def test_load_nonexistent_returns_default() do
-    topology = LoopTopology.load("/nonexistent/dir/no/topology")
-    Assert.assert_equal(Map.get(topology, :name, ""), "")
-    Assert.assert_equal(Map.get(topology, :roles, []), [])
-    Assert.assert_equal(Map.get(topology, :handoff, %{}), %{})
-  end
-
-  def test_completion_event_returns_configured() do
-    topology = LoopTopology.load(project_dir())
-    event = LoopTopology.completion_event(topology, "fallback.event")
-    Assert.assert(event != "", "completion event should not be empty")
-  end
-
-  def test_completion_event_uses_fallback() do
-    topology = %{completion: "", roles: [], handoff: %{}}
-    Assert.assert_equal(LoopTopology.completion_event(topology, "my.fallback"), "my.fallback")
-  end
-
-  def test_role_count() do
-    topology = LoopTopology.load(project_dir())
-    count = LoopTopology.role_count(topology)
-    Assert.assert(count > 0, "project topology should have roles")
-  end
-
-  def test_role_count_empty() do
-    topology = %{completion: "", roles: [], handoff: %{}}
-    Assert.assert_equal(LoopTopology.role_count(topology), 0)
-  end
-
-  def test_suggested_roles_returns_list() do
-    topology = LoopTopology.load(project_dir())
-    suggested = LoopTopology.suggested_roles(topology, "tasks.ready")
-    Assert.assert(is_list(suggested), "suggested_roles should return a list")
-  end
-
-  def test_allowed_events_returns_list() do
-    topology = LoopTopology.load(project_dir())
-    events = LoopTopology.allowed_events(topology, "tasks.ready")
-    Assert.assert(is_list(events), "allowed_events should return a list")
-  end
-
-  def test_render_empty_topology() do
-    topology = %{completion: "", roles: [], handoff: %{}}
-    Assert.assert_equal(LoopTopology.render(topology, "any.event"), "")
-  end
-
-  defp project_dir() do
-    "/Users/rook/projects/tonic-loops"
-  end
-
-  def test_render_nonempty_topology() do
-    topology = LoopTopology.load(project_dir())
-    rendered = LoopTopology.render(topology, "tasks.ready")
-    Assert.assert_contains(rendered, "Topology")
-    Assert.assert_contains(rendered, "Role deck")
-  end
-
-  def test_role_ids_returns_all_ids() do
-    topology = LoopTopology.load(project_dir())
-    ids = LoopTopology.get_role_ids(topology)
-    Assert.assert(is_list(ids), "role_ids should return a list")
-    Assert.assert(length(ids) > 0, "should have role ids")
-  end
-
-  def test_all_emitted_events_returns_list() do
-    topology = LoopTopology.load(project_dir())
-    events = LoopTopology.all_emitted_events(topology)
-    Assert.assert(is_list(events), "all_emitted_events should return a list")
-    Assert.assert(length(events) > 0, "should have emitted events")
-  end
-
-  def test_handoff_keys_returns_list() do
-    topology = LoopTopology.load(project_dir())
-    keys = LoopTopology.handoff_keys(topology)
-    Assert.assert(is_list(keys), "handoff_keys should return a list")
-    Assert.assert(length(keys) > 0, "should have handoff keys")
-  end
-
-  def test_handoff_target_ids_returns_list() do
-    topology = LoopTopology.load(project_dir())
-    targets = LoopTopology.handoff_target_ids(topology)
-    Assert.assert(is_list(targets), "handoff_target_ids should return a list")
-    Assert.assert(length(targets) > 0, "should have handoff targets")
-  end
-
-  def test_all_emits_have_handoff_entries() do
-    topology = LoopTopology.load(project_dir())
-    emits = LoopTopology.all_emitted_events(topology)
-    keys = LoopTopology.handoff_keys(topology)
-    assert_all_in(emits, keys, "emit event missing from handoff")
-  end
-
-  def test_all_handoff_targets_are_valid_roles() do
-    topology = LoopTopology.load(project_dir())
-    targets = LoopTopology.handoff_target_ids(topology)
-    role_ids = LoopTopology.get_role_ids(topology)
-    assert_all_in(targets, role_ids, "handoff target not in role deck")
-  end
-
-  def test_event_matches_any_exact() do
-    Assert.assert(LoopTopology.event_matches_any("tasks.ready", ["tasks.ready", "review.ready"]), "exact match should succeed")
-    Assert.refute(LoopTopology.event_matches_any("build.blocked", ["tasks.ready", "review.ready"]), "non-match should fail")
-  end
-
-  def test_event_matches_any_regex() do
-    Assert.assert(LoopTopology.event_matches_any("review.passed", ["/review\\..+/"]), "regex should match review.passed")
-    Assert.assert(LoopTopology.event_matches_any("review.rejected", ["/review\\..+/"]), "regex should match review.rejected")
-    Assert.refute(LoopTopology.event_matches_any("tasks.ready", ["/review\\..+/"]), "regex should not match tasks.ready")
-  end
-
-  def test_event_matches_any_empty_patterns() do
-    Assert.refute(LoopTopology.event_matches_any("tasks.ready", []), "empty patterns should not match")
-  end
-
-  defp assert_all_in([], _haystack, _msg) do
-    true
-  end
-
-  defp assert_all_in([item | rest], haystack, msg) do
-    Assert.assert(list_contains(haystack, item), msg <> ": " <> item)
-    assert_all_in(rest, haystack, msg)
-  end
-
-  defp list_contains([], _needle) do
-    false
-  end
-
-  defp list_contains([item | rest], needle) do
-    case item == needle do
-      true -> true
-      _ -> list_contains(rest, needle)
-    end
+  defp tn_string(text) do
+    escaped = String.replace(String.replace(text, "\\", "\\\\"), "\"", "\\\"")
+    "\"" <> escaped <> "\""
   end
 end

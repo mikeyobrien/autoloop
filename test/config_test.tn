@@ -1,484 +1,131 @@
-# Tests for LoopConfig: defaults, get/get_int/get_list, put, deep merge, load_project, resolve helpers.
-defmodule LoopConfig do
-  def load_project(project_dir) do
-    load(resolve_config_path(project_dir))
-  end
-
-  def load(path) do
-    case System.path_exists(path) do
-      true -> parse_toml(System.read_text(path))
-      _ -> defaults()
-    end
-  end
-
-  def get(_config, [], fallback) do
-    fallback
-  end
-
-  def get(config, [key], fallback) do
-    case Map.get(config, key, nil) do
-      nil -> fallback
-      value -> value
-    end
-  end
-
-  def get(config, [key | rest], fallback) do
-    case Map.get(config, key, nil) do
-      nil -> fallback
-      inner -> get(inner, rest, fallback)
-    end
-  end
-
-  def get(config, key, fallback) do
-    get(config, String.split(key, "."), fallback)
-  end
-
-  def get_int(config, key, fallback) do
-    case get(config, key, nil) do
-      nil -> fallback
-      value -> String.to_integer(value)
-    end
-  end
-
-  def get_list(config, key) do
-    split_csv(get(config, key, ""))
-  end
-
-  def put(config, [], _value) do
-    config
-  end
-
-  def put(config, [key], value) do
-    Map.put(config, key, value)
-  end
-
-  def put(config, [key | rest], value) do
-    inner = case Map.get(config, key, nil) do
-      nil -> %{}
-      existing -> existing
-    end
-    Map.put(config, key, put(inner, rest, value))
-  end
-
-  def put(config, key, value) do
-    put(config, String.split(key, "."), value)
-  end
-
-  def project_has_config(project_dir) do
-    System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
-  end
-
-  def resolve_project_dir(project_dir_or_preset, bundle_root) do
-    case project_has_config(project_dir_or_preset) do
-      true -> project_dir_or_preset
-      _ -> resolve_bundled_preset_dir(project_dir_or_preset, bundle_root)
-    end
-  end
-
-  def resolve_journal_file(project_dir) do
-    config = load_project(project_dir)
-    Path.join(project_dir, journal_path(config))
-  end
-
-  def resolve_events_file(project_dir) do
-    resolve_journal_file(project_dir)
-  end
-
-  def resolve_memory_file(project_dir) do
-    config = load_project(project_dir)
-    Path.join(project_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
-  end
-
-  defp journal_path(config) do
-    get(config, "core.journal_file", get(config, "core.events_file", ".miniloop/journal.jsonl"))
-  end
-
-  defp resolve_bundled_preset_dir(name, bundle_root) do
-    bundle_candidate = Path.join(bundle_root, "presets/" <> name)
-    cwd_candidate = Path.join(".", "presets/" <> name)
-
-    case project_has_config(bundle_candidate) do
-      true -> bundle_candidate
-      _ -> resolve_bundled_preset_dir_cwd(cwd_candidate)
-    end
-  end
-
-  defp resolve_bundled_preset_dir_cwd(candidate) do
-    case project_has_config(candidate) do
-      true -> candidate
-      _ -> ""
-    end
-  end
-
-  defp resolve_config_path(project_dir) do
-    toml_path = Path.join(project_dir, "miniloops.toml")
-    conf_path = Path.join(project_dir, "miniloops.conf")
-
-    case System.path_exists(toml_path) do
-      true -> toml_path
-      _ -> conf_path
-    end
-  end
-
-  defp defaults() do
-    event_loop = %{
-      "max_iterations" => "3",
-      "completion_promise" => "LOOP_COMPLETE",
-      "completion_event" => "task.complete",
-      "required_events" => ""
-    }
-    backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
-    parallel = %{"enabled" => "false", "max_branches" => "3", "branch_timeout_ms" => "180000"}
-    memory = %{"prompt_budget_chars" => "8000"}
-    core = %{
-      "state_dir" => ".miniloop",
-      "journal_file" => ".miniloop/journal.jsonl",
-      "events_file" => ".miniloop/journal.jsonl",
-      "memory_file" => ".miniloop/memory.jsonl"
-    }
-    %{"event_loop" => event_loop, "backend" => backend, "parallel" => parallel, "memory" => memory, "core" => core}
-  end
-
-  defp get_in_path(_map, [], fallback) do
-    fallback
-  end
-
-  defp get_in_path(map, [key], fallback) do
-    case Map.get(map, key, nil) do
-      nil -> fallback
-      value -> value
-    end
-  end
-
-  defp get_in_path(map, [key | rest], fallback) do
-    case Map.get(map, key, nil) do
-      nil -> fallback
-      inner -> get_in_path(inner, rest, fallback)
-    end
-  end
-
-  defp put_in_path(map, [key], value) do
-    Map.put(map, key, value)
-  end
-
-  defp put_in_path(map, [key | rest], value) do
-    inner = case Map.get(map, key, nil) do
-      nil -> %{}
-      existing -> existing
-    end
-    Map.put(map, key, put_in_path(inner, rest, value))
-  end
-
-  defp deep_merge(base, override) do
-    merge_keys(Map.keys(override), base, override)
-  end
-
-  defp merge_keys([], result, _override) do
-    result
-  end
-
-  defp merge_keys([key | rest], result, override) do
-    over_val = Map.get(override, key, nil)
-    merged = merge_key_value(result, key, over_val)
-    merge_keys(rest, Map.put(result, key, merged), override)
-  end
-
-  defp merge_key_value(result, key, over_val) do
-    case Map.get(result, key, nil) do
-      nil -> over_val
-      base_val -> merge_value(key, base_val, over_val)
-    end
-  end
-
-  defp merge_value("event_loop", base, over) do
-    deep_merge(base, over)
-  end
-
-  defp merge_value("backend", base, over) do
-    deep_merge(base, over)
-  end
-
-  defp merge_value("parallel", base, over) do
-    deep_merge(base, over)
-  end
-
-  defp merge_value("memory", base, over) do
-    deep_merge(base, over)
-  end
-
-  defp merge_value("core", base, over) do
-    deep_merge(base, over)
-  end
-
-  defp merge_value(_key, _base, over) do
-    over
-  end
-
-  defp parse_toml(text) do
-    parse_toml_lines(String.split(text, line_sep()), "", defaults())
-  end
-
-  defp parse_toml_lines([], _section, config) do
-    config
-  end
-
-  defp parse_toml_lines([line | rest], section, config) do
-    trimmed = String.trim(line)
-
-    case skip_line(trimmed) do
-      true -> parse_toml_lines(rest, section, config)
-      _ -> parse_toml_dispatch(trimmed, rest, section, config)
-    end
-  end
-
-  defp parse_toml_dispatch(line, rest, section, config) do
-    case is_section_header(line) do
-      true -> parse_toml_lines(rest, extract_section_name(line), config)
-      _ -> parse_toml_assignment(String.split(line, "="), rest, section, config)
-    end
-  end
-
-  defp is_section_header(line) do
-    String.starts_with(line, "[") and String.ends_with(line, "]")
-  end
-
-  defp extract_section_name(line) do
-    String.trim(slice_outer(line))
-  end
-
-  defp parse_toml_assignment([_single], rest, section, config) do
-    parse_toml_lines(rest, section, config)
-  end
-
-  defp parse_toml_assignment([key | value_parts], rest, section, config) do
-    value = rejoin(value_parts, "=")
-    raw_key = String.trim(key)
-    full_key = case section do
-      "" -> raw_key
-      _ -> section <> "." <> raw_key
-    end
-    path = String.split(full_key, ".")
-    parse_toml_lines(rest, section, put_in_path(config, path, normalize_value(String.trim(value))))
-  end
-
-  defp parse_toml_assignment([], rest, section, config) do
-    parse_toml_lines(rest, section, config)
-  end
-
-  defp rejoin([part], _sep) do
-    part
-  end
-
-  defp rejoin([part | rest], sep) do
-    part <> sep <> rejoin(rest, sep)
-  end
-
-  defp normalize_value(value) do
-    case is_array_literal(value) do
-      true -> join_csv(parse_array(value))
-      _ -> strip_quotes(value)
-    end
-  end
-
-  defp is_array_literal(value) do
-    String.starts_with(value, "[") and String.ends_with(value, "]")
-  end
-
-  defp parse_array(value) do
-    inner = String.trim(slice_outer(value))
-
-    case inner do
-      "" -> []
-      _ -> split_csv_parts(String.split(inner, ","), [])
-    end
-  end
-
-  defp slice_outer(text) do
-    String.slice(text, 1, String.length(text) - 2)
-  end
-
-  defp strip_quotes(value) do
-    case is_quoted(value) do
-      true -> slice_outer(value)
-      _ -> value
-    end
-  end
-
-  defp is_quoted(value) do
-    String.starts_with(value, "\"") and String.ends_with(value, "\"") and String.length(value) >= 2
-  end
-
-  defp split_csv(text) do
-    split_csv_parts(String.split(text, ","), [])
-  end
-
-  defp split_csv_parts([], acc) do
-    Enum.reverse(acc)
-  end
-
-  defp split_csv_parts([part | rest], acc) do
-    trimmed = strip_quotes(String.trim(part))
-
-    case trimmed do
-      "" -> split_csv_parts(rest, acc)
-      _ -> split_csv_parts(rest, [trimmed] ++ acc)
-    end
-  end
-
-  defp join_csv([]) do
-    ""
-  end
-
-  defp join_csv([item]) do
-    item
-  end
-
-  defp join_csv([item | rest]) do
-    item <> "," <> join_csv(rest)
-  end
-
-  defp skip_line("") do
-    true
-  end
-
-  defp skip_line(line) do
-    String.starts_with(line, "#")
-  end
-
-  defp line_sep() do
-    """
-"""
-  end
-end
-
 defmodule ConfigTest do
-  def test_defaults_have_expected_keys() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    Assert.assert_equal(LoopConfig.get(config, "event_loop.max_iterations", ""), "3")
-    Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_promise", ""), "LOOP_COMPLETE")
-    Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_event", ""), "task.complete")
-    Assert.assert_equal(LoopConfig.get(config, "backend.command", ""), "pi")
-    Assert.assert_equal(LoopConfig.get(config, "parallel.enabled", ""), "false")
-    Assert.assert_equal(LoopConfig.get(config, "parallel.max_branches", ""), "3")
-    Assert.assert_equal(LoopConfig.get(config, "parallel.branch_timeout_ms", ""), "180000")
-    Assert.assert_equal(LoopConfig.get(config, "memory.prompt_budget_chars", ""), "8000")
-    Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloop")
+  def test_real_config_defaults_and_project_load() do
+    fixture_dir = prepare_fixture(config_probe_main(repo_root()))
+    result = run_fixture(fixture_dir)
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "default_backend=pi")
+    Assert.assert_contains(output, "default_run_id_format=compact")
+    Assert.assert_contains(output, "default_log_level=info")
+    Assert.assert_contains(output, "loaded_backend_kind=pi")
+    Assert.assert_contains(output, "loaded_state_dir=.miniloop")
+    Assert.assert_contains(output, "loaded_memory_file=.miniloop/memory.jsonl")
+    Assert.assert_contains(output, "loaded_journal_in=/tmp/config-work/.miniloop/journal.jsonl")
+    Assert.assert_contains(output, "loaded_memory_in=/tmp/config-work/.miniloop/memory.jsonl")
+    Assert.assert_contains(output, "loaded_state_dir_name=.miniloop")
+    Assert.assert_contains(output, "loaded_state_dir_path=" <> repo_root() <> "/.miniloop")
   end
 
-  def test_defaults_accessible_via_list_path() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    Assert.assert_equal(LoopConfig.get(config, ["event_loop", "max_iterations"], ""), "3")
-    Assert.assert_equal(LoopConfig.get(config, ["backend", "kind"], ""), "pi")
-    Assert.assert_equal(LoopConfig.get(config, ["parallel", "enabled"], ""), "false")
-    Assert.assert_equal(LoopConfig.get(config, ["parallel", "max_branches"], ""), "3")
-    Assert.assert_equal(LoopConfig.get(config, ["parallel", "branch_timeout_ms"], ""), "180000")
-    Assert.assert_equal(LoopConfig.get(config, ["memory", "prompt_budget_chars"], ""), "8000")
-    Assert.assert_equal(LoopConfig.get(config, ["core", "memory_file"], ""), ".miniloop/memory.jsonl")
+  def test_real_config_resolves_bundled_presets() do
+    fixture_dir = prepare_fixture(config_resolve_probe_main(repo_root()))
+    result = run_fixture(fixture_dir)
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "autosimplify=" <> repo_root() <> "/presets/autosimplify")
+    Assert.assert_contains(output, "autocode=" <> repo_root() <> "/presets/autocode")
+    Assert.assert_contains(output, "unknown_is_empty=true")
   end
 
-  def test_get_returns_fallback_for_missing_key() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    Assert.assert_equal(LoopConfig.get(config, "nonexistent.key", "fallback_value"), "fallback_value")
+  def test_real_config_reads_project_required_events() do
+    fixture_dir = prepare_fixture(config_required_events_probe_main(repo_root()))
+    result = run_fixture(fixture_dir)
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "required_events=review.passed")
+    Assert.assert_contains(output, "project_has_config=true")
   end
 
-  def test_get_returns_fallback_for_missing_list_path() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    Assert.assert_equal(LoopConfig.get(config, ["no", "such", "path"], "fallback"), "fallback")
+  defp prepare_fixture(main_source) do
+    dir = "/tmp/miniloops-config-source-fixture"
+    src_dir = Path.join(dir, "src")
+
+    System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(src_dir))
+    System.write_text(Path.join(dir, "tonic.toml"), tonic_manifest())
+    System.write_text(Path.join(src_dir, "main.tn"), main_source)
+    link_source(dir, "config.tn")
+    link_source(dir, "utils.tn")
+
+    dir
   end
 
-  def test_get_int_returns_integer() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    Assert.assert_equal(LoopConfig.get_int(config, "event_loop.max_iterations", 99), 3)
+  defp link_source(dir, file_name) do
+    source = Path.join(repo_root(), "src/" <> file_name)
+    target = Path.join(dir, "src/" <> file_name)
+    System.run("ln -sf " <> shell_quote(source) <> " " <> shell_quote(target))
   end
 
-  def test_get_int_returns_fallback_for_missing() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    Assert.assert_equal(LoopConfig.get_int(config, "nonexistent.key", 42), 42)
+  defp run_fixture(dir) do
+    System.run("tonic run " <> shell_quote(dir))
   end
 
-  def test_get_list_splits_csv() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    result = LoopConfig.get_list(config, "event_loop.required_events")
-    Assert.assert_equal(result, [])
+  defp config_probe_main(project_dir) do
+    "defmodule Demo do\n" <>
+    "  def run() do\n" <>
+    "    default = LoopConfig.load(\"/definitely/missing/config.toml\")\n" <>
+    "    loaded = LoopConfig.load_project(" <> tn_string(project_dir) <> ")\n" <>
+    "    IO.puts(\"default_backend=\" <> LoopConfig.get(default, \"backend.command\", \"\"))\n" <>
+    "    IO.puts(\"default_run_id_format=\" <> LoopConfig.get(default, \"core.run_id_format\", \"\"))\n" <>
+    "    IO.puts(\"default_log_level=\" <> LoopConfig.get(default, \"core.log_level\", \"\"))\n" <>
+    "    IO.puts(\"loaded_backend_kind=\" <> LoopConfig.get(loaded, \"backend.kind\", \"\"))\n" <>
+    "    IO.puts(\"loaded_state_dir=\" <> LoopConfig.get(loaded, \"core.state_dir\", \"\"))\n" <>
+    "    IO.puts(\"loaded_memory_file=\" <> LoopConfig.get(loaded, \"core.memory_file\", \"\"))\n" <>
+    "    IO.puts(\"loaded_journal_in=\" <> LoopConfig.resolve_journal_file_in(" <> tn_string(project_dir) <> ", \"/tmp/config-work\"))\n" <>
+    "    IO.puts(\"loaded_memory_in=\" <> LoopConfig.resolve_memory_file_in(" <> tn_string(project_dir) <> ", \"/tmp/config-work\"))\n" <>
+    "    IO.puts(\"loaded_state_dir_name=\" <> LoopConfig.state_dir_name(" <> tn_string(project_dir) <> "))\n" <>
+    "    IO.puts(\"loaded_state_dir_path=\" <> LoopConfig.state_dir_path(" <> tn_string(project_dir) <> "))\n" <>
+    "  end\n" <>
+    "end\n"
   end
 
-  def test_put_dotted_key() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    updated = LoopConfig.put(config, "event_loop.max_iterations", "50")
-    Assert.assert_equal(LoopConfig.get(updated, "event_loop.max_iterations", ""), "50")
-    Assert.assert_equal(LoopConfig.get(updated, "event_loop.completion_event", ""), "task.complete")
+  defp config_resolve_probe_main(project_dir) do
+    "defmodule Demo do\n" <>
+    "  def run() do\n" <>
+    "    IO.puts(\"autosimplify=\" <> LoopConfig.resolve_project_dir(\"autosimplify\", " <> tn_string(project_dir) <> "))\n" <>
+    "    IO.puts(\"autocode=\" <> LoopConfig.resolve_project_dir(\"autocode\", " <> tn_string(project_dir) <> "))\n" <>
+    "    IO.puts(\"unknown_is_empty=\" <> bool_text(LoopConfig.resolve_project_dir(\"definitely-not-a-preset\", " <> tn_string(project_dir) <> ") == \"\"))\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(true) do\n" <>
+    "    \"true\"\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(_value) do\n" <>
+    "    \"false\"\n" <>
+    "  end\n" <>
+    "end\n"
   end
 
-  def test_put_list_path() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    updated = LoopConfig.put(config, ["backend", "kind"], "command")
-    Assert.assert_equal(LoopConfig.get(updated, "backend.kind", ""), "command")
-    Assert.assert_equal(LoopConfig.get(updated, "backend.command", ""), "pi")
+  defp config_required_events_probe_main(project_dir) do
+    "defmodule Demo do\n" <>
+    "  def run() do\n" <>
+    "    config = LoopConfig.load_project(" <> tn_string(project_dir) <> ")\n" <>
+    "    IO.puts(\"required_events=\" <> LoopUtils.join_csv(LoopConfig.get_list(config, \"event_loop.required_events\")))\n" <>
+    "    IO.puts(\"project_has_config=\" <> bool_text(LoopConfig.project_has_config(" <> tn_string(project_dir) <> ")))\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(true) do\n" <>
+    "    \"true\"\n" <>
+    "  end\n\n" <>
+    "  defp bool_text(_value) do\n" <>
+    "    \"false\"\n" <>
+    "  end\n" <>
+    "end\n"
   end
 
-  def test_put_creates_intermediate_maps() do
-    config = LoopConfig.load("/nonexistent/path/that/wont/exist")
-    updated = LoopConfig.put(config, "new_section.new_key", "new_value")
-    Assert.assert_equal(LoopConfig.get(updated, "new_section.new_key", ""), "new_value")
+  defp tonic_manifest() do
+    "[project]\nname = \"config-source-test\"\nentry = \"src/main.tn\"\n"
   end
 
-  def test_load_project_with_flat_toml() do
-    config = LoopConfig.load_project(project_dir())
-    iters = LoopConfig.get(config, "event_loop.max_iterations", "")
-    Assert.assert_equal(iters, "100")
-    Assert.assert_equal(LoopConfig.get(config, "backend.kind", ""), "pi")
-    Assert.assert_equal(LoopConfig.get(config, "core.state_dir", ""), ".miniloop")
-  end
-
-  def test_load_project_deep_merge_preserves_defaults() do
-    config = LoopConfig.load_project(project_dir())
-    Assert.assert_equal(LoopConfig.get(config, "event_loop.completion_promise", "missing"), "LOOP_COMPLETE")
-    Assert.assert_equal(LoopConfig.get(config, "parallel.enabled", "missing"), "false")
-    Assert.assert_equal(LoopConfig.get(config, "parallel.max_branches", "missing"), "3")
-    Assert.assert_equal(LoopConfig.get(config, "parallel.branch_timeout_ms", "missing"), "180000")
-  end
-
-  def test_load_project_list_path_access() do
-    config = LoopConfig.load_project(project_dir())
-    Assert.assert_equal(LoopConfig.get(config, ["event_loop", "max_iterations"], ""), "100")
-    Assert.assert_equal(LoopConfig.get(config, ["backend", "kind"], ""), "pi")
-  end
-
-  def test_load_project_required_events_list() do
-    config = LoopConfig.load_project(project_dir())
-    result = LoopConfig.get_list(config, "event_loop.required_events")
-    Assert.assert_equal(result, ["review.passed"])
-  end
-
-  def test_project_has_config_true() do
-    Assert.assert(LoopConfig.project_has_config(project_dir()), "project should have config")
-  end
-
-  defp project_dir() do
+  defp repo_root() do
     "/Users/rook/projects/tonic-loops"
   end
 
-  def test_project_has_config_false() do
-    Assert.refute(LoopConfig.project_has_config("/tmp"), "/tmp should not have config")
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
   end
 
-  def test_resolve_project_dir_returns_explicit_config_path() do
-    resolved = LoopConfig.resolve_project_dir(project_dir(), "/tmp")
-    Assert.assert_equal(resolved, project_dir())
-  end
-
-  def test_resolve_project_dir_resolves_bundled_preset_name() do
-    resolved = LoopConfig.resolve_project_dir("autocode", project_dir())
-    Assert.assert_equal(resolved, Path.join(project_dir(), "presets/autocode"))
-  end
-
-  def test_resolve_project_dir_resolves_autosimplify_preset_name() do
-    resolved = LoopConfig.resolve_project_dir("autosimplify", project_dir())
-    Assert.assert_equal(resolved, Path.join(project_dir(), "presets/autosimplify"))
-  end
-
-  def test_resolve_project_dir_returns_empty_for_unknown_preset() do
-    resolved = LoopConfig.resolve_project_dir("definitely-not-a-preset", project_dir())
-    Assert.assert_equal(resolved, "")
+  defp tn_string(text) do
+    escaped = String.replace(String.replace(text, "\\", "\\\\"), "\"", "\\\"")
+    "\"" <> escaped <> "\""
   end
 end
