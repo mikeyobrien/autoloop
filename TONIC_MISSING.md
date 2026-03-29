@@ -26,11 +26,11 @@ Source annotations use the `# TONIC_MISSING: <capability>` comment convention. P
 ### Native compile list/tuple helpers
 
 - **Date:** 2026-03-28
-- **Missing capability:** Native compile output omits `tn_runtime_length` / `tn_runtime_elem` helpers needed by generated Enum code for list/tuple access
-- **Workaround location:** `scripts/build-release.sh`
-- **Workaround:** If `tonic compile` fails with the missing helper error, patch the generated `.tonic/build/main.c` with small helper implementations and compile it with `${CC:-cc}`
+- **Missing capability:** Native compile output omitted `tn_runtime_length` / `tn_runtime_elem` helpers needed by generated Enum code for list/tuple access
+- **Workaround location:** `scripts/build-release.sh` (removed)
+- **Workaround:** Formerly patched generated `.tonic/build/main.c` with local helper shims and recompiled it with `${CC:-cc}` after `tonic compile` failed
 - **Desired stdlib support:** Native compile should emit and declare the required list/tuple runtime helpers without repo-local patching
-- **Status:** Open
+- **Status:** Resolved in tonic commit `2004243`; local consumer workaround removed
 
 ### Native compiled string host parity
 
