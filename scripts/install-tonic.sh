@@ -15,16 +15,12 @@ if [[ -f "$git_ref_file" ]]; then
   fi
 fi
 
-if [[ ! -f "$version_file" ]]; then
-  echo "install-tonic: missing .tonic-version" >&2
-  exit 1
+if [[ -f "$version_file" ]]; then
+  version="$(tr -d '[:space:]' < "$version_file")"
+  if [[ -n "$version" ]]; then
+    echo "install-tonic: .tonic-version=$version is informational only here; no crates.io install path is configured" >&2
+  fi
 fi
 
-version="$(tr -d '[:space:]' < "$version_file")"
-if [[ -z "$version" ]]; then
-  echo "install-tonic: .tonic-version is empty" >&2
-  exit 1
-fi
-
-echo "install-tonic: installing tonic-lang version $version"
-cargo install tonic-lang --version "$version"
+echo "install-tonic: missing .tonic-git-ref; this repo currently requires a git-pinned Tonic install" >&2
+exit 1

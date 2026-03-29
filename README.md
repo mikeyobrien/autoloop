@@ -496,7 +496,7 @@ miniloops --help
 miniloops run autocode
 ```
 
-Release assets are built by `.github/workflows/release.yml`. See `docs/releasing.md` for the tag-based release flow.
+Release assets are built by `.github/workflows/release.yml`. CI/release currently install Tonic from the git commit pinned in `.tonic-git-ref`. See `docs/releasing.md` for the tag-based release flow.
 
 ### From a source checkout
 

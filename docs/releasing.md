@@ -26,8 +26,8 @@ git push origin v0.1.0
 ## What the workflow does
 
 - installs Tonic via `scripts/install-tonic.sh`
-  - currently this prefers the pinned git commit in `.tonic-git-ref`
-  - it falls back to `.tonic-version` when the git-ref bridge is removed
+  - this repo currently pins Tonic by git commit in `.tonic-git-ref`
+  - `.tonic-version` is informational here, not the active install source
 - re-runs `tonic check .`
 - re-runs `./bin/test`
 - compiles standalone `miniloops` binaries

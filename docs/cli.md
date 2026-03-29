@@ -343,7 +343,7 @@ scripts/package-release.sh dist/miniloops v0.1.0 linux-x64 dist
 
 ### `scripts/install-tonic.sh`
 
-Installs the Tonic compiler used by CI and release workflows. It prefers the pinned git commit in `.tonic-git-ref` and falls back to `.tonic-version` when the bridge is removed.
+Installs the Tonic compiler used by CI and release workflows from the git commit pinned in `.tonic-git-ref`. `.tonic-version` is not treated as a crates.io install source here.
 
 ```bash
 scripts/install-tonic.sh
