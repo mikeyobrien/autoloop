@@ -35,8 +35,8 @@ Source annotations use the `# TONIC_MISSING: <capability>` comment convention. P
 ### Native compiled string host parity
 
 - **Date:** 2026-03-28
-- **Missing capability:** Standalone native binaries currently hit missing string host/runtime coverage on real loop paths (for example `str_length` during loop execution)
+- **Missing capability:** Standalone native binaries currently hit missing string host/runtime coverage on real loop paths (currently reproduced as `unknown host function: str_length` during loop execution)
 - **Workaround location:** `scripts/release-smoke.sh`
-- **Workaround:** Release smoke currently validates the standalone binary bootstrap/help path instead of full loop execution, while the native runtime gap remains visible here
+- **Workaround:** Release smoke currently validates the standalone binary bootstrap/help path instead of full loop execution; `scripts/compiled-run-check.sh <compiled-binary>` now captures the real run-path behavior separately and currently reproduces the `str_length` host error
 - **Desired stdlib support:** Native compiled binaries should support the string host/runtime surface needed for normal miniloops CLI execution, including real run-path smoke tests
-- **Status:** Open
+- **Status:** Open; reproduced on 2026-03-29 with `scripts/compiled-run-check.sh /tmp/miniloops-release-bin` (exit 2, `error: host error: unknown host function: str_length`)
