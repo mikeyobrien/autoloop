@@ -3,6 +3,7 @@
 .autoloops/
 .miniloop/
 .miniloops/
+.git-rewrite-backups/
 *.log
 
 # Legacy loop artifacts that previously leaked into working trees
