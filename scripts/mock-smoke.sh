@@ -103,12 +103,12 @@ output_text="$(cd "$tmpdir" && run_autoloops_clean tonic run "$repo_dir" inspect
   exit 1
 }
 
-rg -n '"topic": "backend.start"' "$journal" >/dev/null || { echo "missing backend.start" >&2; exit 1; }
-rg -n '"backend_kind": "command"' "$journal" >/dev/null || { echo "missing backend_kind=command" >&2; exit 1; }
-rg -n '"topic": "task.complete"' "$journal" >/dev/null || { echo "missing task.complete" >&2; exit 1; }
-rg -n '"payload": "hello-done"' "$journal" >/dev/null || { echo "missing task.complete payload" >&2; exit 1; }
-rg -n '"topic": "backend.finish"' "$journal" >/dev/null || { echo "missing backend.finish" >&2; exit 1; }
-rg -n '"topic": "loop.complete"' "$journal" >/dev/null || { echo "missing loop.complete" >&2; exit 1; }
-rg -n '"reason": "completion_event"' "$journal" >/dev/null || { echo "missing completion_event reason" >&2; exit 1; }
+grep -F '"topic": "backend.start"' "$journal" >/dev/null || { echo "missing backend.start" >&2; exit 1; }
+grep -F '"backend_kind": "command"' "$journal" >/dev/null || { echo "missing backend_kind=command" >&2; exit 1; }
+grep -F '"topic": "task.complete"' "$journal" >/dev/null || { echo "missing task.complete" >&2; exit 1; }
+grep -F '"payload": "hello-done"' "$journal" >/dev/null || { echo "missing task.complete payload" >&2; exit 1; }
+grep -F '"topic": "backend.finish"' "$journal" >/dev/null || { echo "missing backend.finish" >&2; exit 1; }
+grep -F '"topic": "loop.complete"' "$journal" >/dev/null || { echo "missing loop.complete" >&2; exit 1; }
+grep -F '"reason": "completion_event"' "$journal" >/dev/null || { echo "missing completion_event reason" >&2; exit 1; }
 
 printf 'mock smoke: ok\n'
