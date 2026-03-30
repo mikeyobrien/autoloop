@@ -157,7 +157,7 @@ core.memory_file = ".autoloop/memory.jsonl"
 
 - `event_loop.required_events` — events that must have been emitted at least once before `task.complete` is accepted. Use this to enforce quality gates (e.g., require a review pass before completion).
 - `event_loop.completion_promise` — fallback string the model can output as plain text to signal completion when the event tool is unavailable.
-- `review.enabled` — enables the hyperagent review loop. See [`docs/hyperagent.md`](hyperagent.md).
+- `review.enabled` — enables the metareview review loop. See [`docs/metareview.md`](metareview.md).
 - `backend.kind` — `"pi"` for the Pi adapter (production), `"command"` for custom/mock backends.
 
 See [`docs/configuration.md`](configuration.md) for the full key reference.

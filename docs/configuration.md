@@ -56,13 +56,13 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 
 Kind auto-detection: if `kind` is empty or unrecognized, the harness checks whether `command` is or ends with `pi`. If so, kind is `"pi"`; otherwise `"command"`.
 
-### Review (hyperagent)
+### Review (metareview)
 
 The review pass is a separate backend invocation that runs periodically for consolidation and hygiene. Most review keys default to the corresponding backend value if not set, but `review.timeout_ms` defaults to `300000` so large task timeouts do not also make reviews hang for a long time.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `review.enabled` | bool | `true` | Enable the hyperagent review pass. Falsy values: `"false"`, `"0"`, `""`. |
+| `review.enabled` | bool | `true` | Enable the metareview review pass. Falsy values: `"false"`, `"0"`, `""`. |
 | `review.every_iterations` | int | `0` | Run a review every N iterations. `0` means "use the number of roles in `topology.toml`" — one full role cycle between reviews. |
 | `review.command` | string | *backend.command* | Backend executable for reviews. |
 | `review.kind` | string | *backend.kind* | Backend type for reviews. |
@@ -70,9 +70,9 @@ The review pass is a separate backend invocation that runs periodically for cons
 | `review.prompt_mode` | string | *backend.prompt_mode* | Prompt delivery mode for reviews. |
 | `review.timeout_ms` | int | `300000` | Timeout for review invocations. Raise it only if you intentionally want long-running reviews. |
 | `review.prompt` | string | `""` | Inline review prompt. If set, takes precedence over `prompt_file`. |
-| `review.prompt_file` | string | `"hyperagent.md"` | Path to the review prompt file, relative to the project directory. |
+| `review.prompt_file` | string | `"metareview.md"` | Path to the review prompt file, relative to the project directory. |
 
-Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `hyperagent.md`).
+Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `metareview.md`).
 
 ### Parallel
 

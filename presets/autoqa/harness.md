@@ -20,7 +20,7 @@ Global rules:
 - In particular, the reporter either continues via `qa.continue`, escalates via `qa.failed`, or finishes via `task.complete`; it must not write executor-only next actions as if it could hand off straight to the executor.
 - Do not convert “couldn’t verify” into “looks fine”.
 - Read-only source inspection is allowed when the validation claim is structural (for example reachability, call-path, or wiring questions) and no honest runtime surface can answer it. Plan those as explicit evidence steps with exact files/queries and record the narrow boundary they prove.
-- Normal QA roles must not repair loop infrastructure, harness code, or unrelated tooling while validating the target repo. If the loop/runtime itself breaks, record the blocker and hand off; only the hyperagent should make bounded loop-file hygiene edits.
+- Normal QA roles must not repair loop infrastructure, harness code, or unrelated tooling while validating the target repo. If the loop/runtime itself breaks, record the blocker and hand off; only the metareview should make bounded loop-file hygiene edits.
 - Use `./.autoloop/autoloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside inspector → planner → executor → reporter.
 

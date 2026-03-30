@@ -74,8 +74,8 @@ loop.complete   or   loop.stop
 | `backend.start` | Before invoking the backend. | `backend_kind`, `command`, `prompt_mode`, `timeout_ms` |
 | `backend.finish` | After backend returns. | `exit_code`, `timed_out` (boolean), `output` |
 | `iteration.finish` | End of each iteration. | `exit_code`, `timed_out` (boolean), `elapsed_s` (integer seconds), `output` |
-| `review.start` | Before a hyperagent review pass. | `kind` (`"hyperagent"`), `backend_kind`, `command`, `prompt_mode`, `prompt`, `timeout_ms` |
-| `review.finish` | After review completes. | `kind` (`"hyperagent"`), `exit_code`, `timed_out` (boolean), `output` |
+| `review.start` | Before a metareview review pass. | `kind` (`"metareview"`), `backend_kind`, `command`, `prompt_mode`, `prompt`, `timeout_ms` |
+| `review.finish` | After review completes. | `kind` (`"metareview"`), `exit_code`, `timed_out` (boolean), `output` |
 | `loop.complete` | Loop finished successfully. | `reason` (`"completion_event"` or `"completion_promise"`) |
 | `loop.stop` | Loop halted without completion. | `reason` (`"max_iterations"`, `"backend_failed"`, or `"backend_timeout"`). The `max_iterations` variant also includes `completed_iterations`, `stopped_before_iteration`, and `max_iterations`. The `backend_failed` and `backend_timeout` variants also include `iteration` and `output_tail`. |
 
@@ -101,7 +101,7 @@ Coordination events are structured bookkeeping events that bypass backpressure v
 | `slice.started` | `id`, `description` | A unit of work began. Status: `"in-progress"`. |
 | `slice.verified` | `id` | A slice passed verification. Status: `"verified"`. |
 | `slice.committed` | `id`, `commit_hash` | A slice was committed. Status: `"committed"`. Links the slice to a git commit. |
-| `context.archived` | `source_file`, `dest_file`, `reason` | The hyperagent archived stale context from a working file to a docs file. |
+| `context.archived` | `source_file`, `dest_file`, `reason` | The metareview archived stale context from a working file to a docs file. |
 | `chain.spawn` | `chain_id`, `parent_id`, `steps`, `justification` | A dynamic sub-chain was spawned from within a running loop. |
 
 Coordination payload fields use `key=value;` encoding inside the `payload` string.
@@ -213,7 +213,7 @@ exit_code=0
 
 Each section is built from the `exit_code` and `output` fields of the corresponding `iteration.finish` journal entry. The scratchpad has two render targets:
 
-- Iteration prompts and hyperagent review prompts get a compact view that keeps the most recent iterations detailed and collapses older ones to short summaries.
+- Iteration prompts and metareview review prompts get a compact view that keeps the most recent iterations detailed and collapses older ones to short summaries.
 - `autoloops inspect scratchpad --format md` keeps the richer view for debugging.
 - Both views are scoped to the current run (filtered by `run` ID).
 

@@ -143,7 +143,7 @@ def stream_log_path():
     state_dir = os.environ.get("MINILOOPS_STATE_DIR", "")
     if not state_dir:
         return None
-    prefix = "pi-review" if os.environ.get("MINILOOPS_REVIEW_MODE", "") == "hyperagent" else "pi-stream"
+    prefix = "pi-review" if os.environ.get("MINILOOPS_REVIEW_MODE", "") == "metareview" else "pi-stream"
     iteration = os.environ.get("MINILOOPS_ITERATION", "")
     name = prefix + (("." + iteration) if iteration else "") + ".jsonl"
     return pathlib.Path(state_dir) / name

@@ -321,7 +321,7 @@ Rejected because integration often needs a real parent role decision after the b
 - Whether branch mode should internally reuse full loop semantics or run as a more restricted child-job harness in v1
 - Whether joined events should always require explicit topology routing for dispatch, or whether a small default should exist when omitted
 - How much branch result structure should be standardized beyond markdown result artifacts
-- Whether hyperagent review should be deferred automatically while a wave is active
+- Whether metareview review should be deferred automatically while a wave is active
 
 ## Implementation Notes
 Likely touched areas:

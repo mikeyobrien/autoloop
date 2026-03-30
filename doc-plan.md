@@ -27,8 +27,8 @@
 **What:** Loop memory — JSONL format, entry types (learning, preference, meta, tombstone), materialization (dedup, tombstone removal), prompt budget, CLI commands (add/remove/list).
 **Priority:** Medium — covered briefly in README, needs standalone reference.
 
-### Gap 5: Hyperagent review loop
-**What:** Meta-level review pass — cadence, review prompt construction, what the hyperagent does (consolidation, hygiene), `hyperagent.md` role, review config keys, review journal events.
+### Gap 5: Metareview review loop
+**What:** Meta-level review pass — cadence, review prompt construction, what the metareview does (consolidation, hygiene), `metareview.md` role, review config keys, review journal events.
 **Priority:** Medium — mentioned in README but no standalone doc.
 
 ### Gap 6: CLI reference
@@ -54,7 +54,7 @@
 3. `docs/journal.md` — Journal and runtime model (Gap 3)
 4. `docs/memory.md` — Memory system (Gap 4)
 5. `docs/cli.md` — CLI reference (Gap 6)
-6. `docs/hyperagent.md` — Hyperagent review loop (Gap 5)
+6. `docs/metareview.md` — Metareview review loop (Gap 5)
 7. `docs/creating-presets.md` — Creating custom presets (Gap 9)
 8. `docs/llm-judge.md` — LLM judge script (Gap 8)
 

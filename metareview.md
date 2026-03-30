@@ -4,7 +4,7 @@ Review the journal, topology, roles, harness instructions, loop memory, and shar
 
 Your job is to improve loop hygiene, not to finish the task directly.
 You may modify runtime-facing loop files on disk when that will make the next iterations better.
-Prefer bounded hygiene edits to `autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, and `.autoloop/docs/*.md`.
+Prefer bounded hygiene edits to `autoloops.toml`, `topology.toml`, `harness.md`, `metareview.md`, `roles/*.md`, `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, and `.autoloop/docs/*.md`.
 Do not edit app/product source code, tests, package manifests, generated `.autoloop/` state, or journal history during review.
 The scratchpad is projected from journal history, so do not try to edit it directly; improve the prompts, active working files, or archived context instead.
 

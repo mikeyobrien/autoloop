@@ -130,12 +130,12 @@ These are separate layers. Topology stays focused on roles within one loop; chai
 - `topology.toml` — shared loop topology
 - `roles/*.md` — role instructions
 - `harness.md` — live harness instructions
-- `hyperagent.md` — live review instructions
+- `metareview.md` — live review instructions
 - `.autoloop/journal.jsonl` — append-only runtime journal
 - `.autoloop/memory.jsonl` — append-only loop memory
 - `.autoloop/waves/<wave-id>/...` — structured-parallel wave artifacts (`spec.md`, `join.md`, branch outputs)
 - `.autoloop/pi-stream.<iteration>.jsonl` — raw Pi NDJSON for task turns
-- `.autoloop/pi-review.<iteration>.jsonl` — raw Pi NDJSON for hyperagent reviews
+- `.autoloop/pi-review.<iteration>.jsonl` — raw Pi NDJSON for metareview reviews
 
 ## Runtime config
 
@@ -290,18 +290,18 @@ Loop memory is separate and append-only:
 - stores learnings, preferences, and meta notes
 - is injected back into future prompts
 
-## Hyperagent review loop
+## Metareview review loop
 
 Autoloops can run a meta-level review pass every `review.every_iterations` task iterations.
 
 By default:
-- hyperagent review is enabled
+- metareview review is enabled
 - review cadence = number of roles in `topology.toml`
 - review uses the same Pi adapter unless overridden
 - the harness re-reads runtime files before every task iteration, so edits take effect on the next turn
-- the hyperagent may make bounded hygiene edits to runtime-facing loop files (`autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, `.autoloop/logs/`, `.autoloop/docs/*.md`) when that improves the next turn
-- the hyperagent may consolidate stale context, resolved detours, and no-longer-relevant notes into `.autoloop/docs/*.md` so active working files stay focused on the current objective
-- the hyperagent must not edit app/product source code, tests, manifests, or `.autoloop/` state during review
+- the metareview may make bounded hygiene edits to runtime-facing loop files (`autoloops.toml`, `topology.toml`, `harness.md`, `metareview.md`, `roles/*.md`, `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, `.autoloop/logs/`, `.autoloop/docs/*.md`) when that improves the next turn
+- the metareview may consolidate stale context, resolved detours, and no-longer-relevant notes into `.autoloop/docs/*.md` so active working files stay focused on the current objective
+- the metareview must not edit app/product source code, tests, manifests, or `.autoloop/` state during review
 - short durable lessons still belong in loop memory; archived markdown context belongs in `docs/`
 
 ## Backpressure on hallucinated events

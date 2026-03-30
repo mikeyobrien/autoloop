@@ -27,9 +27,9 @@
 - **Covers:** Two invocation forms (`autoloops` wrapper vs `tonic run`), 8 environment variables, all 6 subcommands: `run` (with `-b`, `-v`, `--chain` flags and project-dir auto-detection), `emit` (event validation and `event.invalid` behavior), `inspect` (7 artifacts with formats and selectors), `memory` (list/add learning/add preference/add meta/remove), `chain` (list/run), `pi-adapter` (prompt resolution chain, NDJSON parsing, stream log files). `bin/autoloops` launcher behavior.
 - **Verified:** All claims checked against `src/main.tn`, `src/pi_adapter.tn`, `src/harness.tn`, `src/chains.tn`, and `bin/autoloops` — no inaccuracies.
 
-### 6. `docs/hyperagent.md` — Hyperagent Review Loop
+### 6. `docs/metareview.md` — Metareview Review Loop
 - **Status:** Published
-- **Covers:** Scheduling formula (`iteration > 1 AND (iteration - 1) % review_every == 0`), default cadence derivation (role count from topology, fallback to 1), all 9 `review.*` config keys with defaults and fallbacks, prompt resolution chain (`review.prompt` → `review.prompt_file` → empty), built-in system prompt contents, `MINILOOPS_REVIEW_MODE=hyperagent` environment variable, disabled allowed-events during review, `review.start`/`review.finish` journal events with field schemas, pi-adapter stream log routing (`pi-review.<iter>.jsonl`), hot-reload after review.
+- **Covers:** Scheduling formula (`iteration > 1 AND (iteration - 1) % review_every == 0`), default cadence derivation (role count from topology, fallback to 1), all 9 `review.*` config keys with defaults and fallbacks, prompt resolution chain (`review.prompt` → `review.prompt_file` → empty), built-in system prompt contents, `MINILOOPS_REVIEW_MODE=metareview` environment variable, disabled allowed-events during review, `review.start`/`review.finish` journal events with field schemas, pi-adapter stream log routing (`pi-review.<iter>.jsonl`), hot-reload after review.
 - **Verified:** All 11 checklist claims checked against `src/harness.tn`, `src/pi_adapter.tn`, and `src/config.tn` — no inaccuracies.
 
 ### 7. `docs/creating-presets.md` — Creating Custom Presets
@@ -46,4 +46,4 @@
 
 ## Summary
 
-All 8 documentation gaps identified in the audit have been written, verified, and published. The `docs/` directory now covers: topology, configuration, journal/runtime model, memory system, CLI reference, hyperagent review loop, creating custom presets, and the LLM judge script.
+All 8 documentation gaps identified in the audit have been written, verified, and published. The `docs/` directory now covers: topology, configuration, journal/runtime model, memory system, CLI reference, metareview review loop, creating custom presets, and the LLM judge script.

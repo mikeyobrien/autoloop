@@ -23,7 +23,7 @@ When installed from GitHub Releases, `autoloops` is a standalone compiled binary
 | `MINILOOPS_PROMPT_PATH` | Fallback prompt file path when `MINILOOPS_PROMPT` is unset |
 | `MINILOOPS_BIN` | Path to the autoloops binary — used by the Pi adapter for prompt projection |
 | `MINILOOPS_LOG_LEVEL` | Current log level — exported by the harness. One of `debug`, `info`, `warn`, `error`, `none`. |
-| `MINILOOPS_REVIEW_MODE` | Set to `hyperagent` during review turns — changes the Pi stream log prefix |
+| `MINILOOPS_REVIEW_MODE` | Set to `metareview` during review turns — changes the Pi stream log prefix |
 | `MINILOOPS_MEMORY_FILE` | Exported by the harness so agents can locate the memory file |
 
 ## Subcommands

@@ -109,11 +109,11 @@ Meta:
 
 Empty categories are omitted. If no entries survive materialization, the memory block is omitted entirely.
 
-Normal iteration prompts and hyperagent review prompts also include a small **Context pressure** summary derived from the same materialized memory. That summary reports rendered memory size vs budget, active entry counts by category, and whether the prompt memory is currently being truncated.
+Normal iteration prompts and metareview review prompts also include a small **Context pressure** summary derived from the same materialized memory. That summary reports rendered memory size vs budget, active entry counts by category, and whether the prompt memory is currently being truncated.
 
 ### Budget truncation
 
-The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **8000**). If the text exceeds the budget, it is sliced at the character boundary, `\n...` is appended, and a footer reports the active entry counts plus rendered-vs-budget size so prompt pressure is visible inside the clipped memory block itself. A budget of `0` disables truncation. When truncation happens, the separate **Context pressure** block still reports the full rendered size so the agent and hyperagent can tell that prompt memory is under pressure even though the visible memory block has been clipped.
+The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **8000**). If the text exceeds the budget, it is sliced at the character boundary, `\n...` is appended, and a footer reports the active entry counts plus rendered-vs-budget size so prompt pressure is visible inside the clipped memory block itself. A budget of `0` disables truncation. When truncation happens, the separate **Context pressure** block still reports the full rendered size so the agent and metareview can tell that prompt memory is under pressure even though the visible memory block has been clipped.
 
 ## CLI commands
 

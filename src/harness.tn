@@ -224,7 +224,7 @@ defmodule LoopHarness do
   defp iterate(loop, iteration) do
     live_loop = reload_loop(loop)
     install_runtime_tools(live_loop)
-    reviewed_loop = maybe_run_hyperagent_review(live_loop, iteration)
+    reviewed_loop = maybe_run_metareview_review(live_loop, iteration)
 
     case iteration > max_iterations(reviewed_loop) do
       true -> stop_max_iterations(reviewed_loop, iteration)
@@ -232,35 +232,35 @@ defmodule LoopHarness do
     end
   end
 
-  defp maybe_run_hyperagent_review(loop, iteration) do
-    case should_run_hyperagent_review(loop, iteration) do
+  defp maybe_run_metareview_review(loop, iteration) do
+    case should_run_metareview_review(loop, iteration) do
       true -> review_and_reload(loop, iteration)
       _ -> loop
     end
   end
 
   defp review_and_reload(loop, iteration) do
-    run_hyperagent_review(loop, iteration)
+    run_metareview_review(loop, iteration)
     reload_loop(loop)
   end
 
-  defp should_run_hyperagent_review(loop, iteration) do
+  defp should_run_metareview_review(loop, iteration) do
     review_enabled(loop) and iteration > 1 and divisible_by(iteration - 1, review_every(loop))
   end
 
-  defp run_hyperagent_review(loop, iteration) do
+  defp run_metareview_review(loop, iteration) do
     print_review_banner(loop, iteration)
     run_lines = read_run_lines(journal_file(loop), run_id(loop))
     review_prompt = render_review_prompt_text(loop, iteration, run_lines)
 
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.start", LoopJson.json_field("kind", "hyperagent") <> ", " <> LoopJson.json_field("backend_kind", review_kind(loop)) <> ", " <> LoopJson.json_field("command", review_command(loop)) <> ", " <> LoopJson.json_field("prompt_mode", review_prompt_mode(loop)) <> ", " <> LoopJson.json_field("prompt", review_prompt) <> ", " <> LoopJson.json_field("timeout_ms", to_string(review_timeout_ms(loop))))
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.start", LoopJson.json_field("kind", "metareview") <> ", " <> LoopJson.json_field("backend_kind", review_kind(loop)) <> ", " <> LoopJson.json_field("command", review_command(loop)) <> ", " <> LoopJson.json_field("prompt_mode", review_prompt_mode(loop)) <> ", " <> LoopJson.json_field("prompt", review_prompt) <> ", " <> LoopJson.json_field("timeout_ms", to_string(review_timeout_ms(loop))))
 
     result = System.run(build_review_command(loop, iteration, review_prompt), %{stream: true, timeout_ms: review_timeout_ms(loop)})
     output = Map.get(result, :output, "")
     exit_code = Map.get(result, :exit_code, 1)
     timed_out = Map.get(result, :timed_out, false)
 
-    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.finish", LoopJson.json_field("kind", "hyperagent") <> ", " <> LoopJson.json_field("exit_code", to_string(exit_code)) <> ", " <> LoopJson.json_field_raw("timed_out", LoopJson.json_bool(timed_out)) <> ", " <> LoopJson.json_field("output", output))
+    append_event(journal_file(loop), run_id(loop), to_string(iteration), "review.finish", LoopJson.json_field("kind", "metareview") <> ", " <> LoopJson.json_field("exit_code", to_string(exit_code)) <> ", " <> LoopJson.json_field_raw("timed_out", LoopJson.json_bool(timed_out)) <> ", " <> LoopJson.json_field("output", output))
   end
 
   defp divisible_by(value, divisor) do
@@ -1579,7 +1579,7 @@ defmodule LoopHarness do
     inline_prompt = LoopConfig.get(config, "review.prompt", "")
 
     case inline_prompt do
-      "" -> read_optional_project_file(project_dir, LoopConfig.get(config, "review.prompt_file", "hyperagent.md"))
+      "" -> read_optional_project_file(project_dir, LoopConfig.get(config, "review.prompt_file", "metareview.md"))
       _ -> inline_prompt
     end
   end
@@ -1740,7 +1740,7 @@ defmodule LoopHarness do
   defp review_instructions_text(loop) do
     case review_prompt(loop) do
       "" -> ""
-      text -> "Additional hyperagent instructions:\n" <> text <> "\n\n"
+      text -> "Additional metareview instructions:\n" <> text <> "\n\n"
     end
   end
 
@@ -1866,7 +1866,7 @@ defmodule LoopHarness do
   end
 
   defp build_review_command(loop, iteration, review_prompt) do
-    build_process_command(loop, review_spec(loop), review_prompt, runtime_env_lines(loop, to_string(iteration), "loop.start", "review", "__hyperreview_disabled__", "hyperagent"))
+    build_process_command(loop, review_spec(loop), review_prompt, runtime_env_lines(loop, to_string(iteration), "loop.start", "review", "__metareview_disabled__", "metareview"))
   end
 
   defp build_process_command(loop, spec, prompt, runtime_env) do
@@ -1960,7 +1960,7 @@ defmodule LoopHarness do
     last_rejected = last_rejected_topic(run_lines, "")
     latest_iteration = to_string(max_review_prompt_iteration(run_lines))
 
-    "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" <> "Safe edit targets include `autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `" <> state_dir(loop) <> "/context.md`, `" <> state_dir(loop) <> "/plan.md`, `" <> state_dir(loop) <> "/progress.md`, `" <> state_dir(loop) <> "/logs/`, and `" <> state_dir(loop) <> "/docs/*.md`.\n" <> "Keep loop-owned artifacts under `" <> state_dir(loop) <> "/`; do not leave loop-owned working files at the repo root.\n" <> "Use `" <> tool_path(loop) <> " memory add ...` for short durable lessons or operator notes that should persist across turns.\n" <> "Do not edit app/product source code, tests, package manifests, generated state under `" <> state_dir(loop) <> "/`, or journal history during review.\n" <> "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" <> "Do not emit normal loop events during review.\n\n" <>
+    "You are the metareview meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" <> "Safe edit targets include `autoloops.toml`, `topology.toml`, `harness.md`, `metareview.md`, `roles/*.md`, `" <> state_dir(loop) <> "/context.md`, `" <> state_dir(loop) <> "/plan.md`, `" <> state_dir(loop) <> "/progress.md`, `" <> state_dir(loop) <> "/logs/`, and `" <> state_dir(loop) <> "/docs/*.md`.\n" <> "Keep loop-owned artifacts under `" <> state_dir(loop) <> "/`; do not leave loop-owned working files at the repo root.\n" <> "Use `" <> tool_path(loop) <> " memory add ...` for short durable lessons or operator notes that should persist across turns.\n" <> "Do not edit app/product source code, tests, package manifests, generated state under `" <> state_dir(loop) <> "/`, or journal history during review.\n" <> "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" <> "Do not emit normal loop events during review.\n\n" <>
     review_instructions_text(loop) <>
     context_pressure_text(memory_stats, invalid_count, last_rejected) <>
     backpressure_text(backpressure) <>
