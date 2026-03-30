@@ -1,4 +1,16 @@
 .tonic/
+.autoloop/
+.autoloops/
 .miniloop/
 .miniloops/
 *.log
+
+# Legacy loop artifacts that previously leaked into working trees
+progress.md
+ideas-report.md
+scan-areas.md
+presets/*/progress.md
+presets/*/ideas-report.md
+presets/*/scan-areas.md
+presets/*/autoresearch.md
+presets/*/experiments.jsonl
