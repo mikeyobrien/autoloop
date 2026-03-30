@@ -37,6 +37,99 @@ run_autoloops_clean() {
     "$@"
 }
 
+run_clean_with_timeout() {
+  local seconds="$1"
+  shift
+  env \
+    -u MINILOOPS_PROJECT_DIR \
+    -u MINILOOPS_STATE_DIR \
+    -u MINILOOPS_JOURNAL_FILE \
+    -u MINILOOPS_EVENTS_FILE \
+    -u MINILOOPS_MEMORY_FILE \
+    -u MINILOOPS_RUN_ID \
+    -u MINILOOPS_ITERATION \
+    -u MINILOOPS_RECENT_EVENT \
+    -u MINILOOPS_ALLOWED_ROLES \
+    -u MINILOOPS_ALLOWED_EVENTS \
+    -u MINILOOPS_COMPLETION_EVENT \
+    -u MINILOOPS_COMPLETION_PROMISE \
+    -u MINILOOPS_REQUIRED_EVENTS \
+    -u MINILOOPS_PROMPT \
+    -u MINILOOPS_BIN \
+    bash -lc '
+      set -euo pipefail
+      run_with_timeout() {
+        local seconds="$1"
+        shift
+        if command -v timeout >/dev/null 2>&1; then
+          timeout "$seconds" "$@"
+          return
+        fi
+        if command -v gtimeout >/dev/null 2>&1; then
+          gtimeout "$seconds" "$@"
+          return
+        fi
+        python3 - "$seconds" "$@" <<'"'"'PY'"'"'
+import signal
+import subprocess
+import sys
+seconds = int(sys.argv[1])
+cmd = sys.argv[2:]
+proc = subprocess.Popen(cmd)
+try:
+    code = proc.wait(timeout=seconds)
+except subprocess.TimeoutExpired:
+    proc.send_signal(signal.SIGTERM)
+    try:
+        code = proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        code = proc.wait()
+    sys.exit(124)
+sys.exit(code)
+PY
+      }
+      run_with_timeout "$@"
+    ' bash "$seconds" "$@"
+}
+
+run_with_timeout() {
+  local seconds="$1"
+  shift
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$seconds" "$@"
+    return
+  fi
+
+  if command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$seconds" "$@"
+    return
+  fi
+
+  python3 - "$seconds" "$@" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+
+seconds = int(sys.argv[1])
+cmd = sys.argv[2:]
+proc = subprocess.Popen(cmd)
+try:
+    code = proc.wait(timeout=seconds)
+except subprocess.TimeoutExpired:
+    proc.send_signal(signal.SIGTERM)
+    try:
+        code = proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        code = proc.wait()
+    sys.exit(124)
+sys.exit(code)
+PY
+}
+
 cleanup() {
   status=$?
   if [[ $status -eq 0 ]]; then
@@ -104,7 +197,7 @@ chmod +x "$tmpdir/mock-backend.sh"
 status=0
 (
   cd "$tmpdir"
-  run_autoloops_clean timeout 240 "$binary_path" run . 'Smoke test: print exactly hello, then emit task.complete with payload hello-done.'
+  run_clean_with_timeout 240 "$binary_path" run . 'Smoke test: print exactly hello, then emit task.complete with payload hello-done.'
 ) >"$tmpdir/run.out" 2>"$tmpdir/run.err" || status=$?
 
 if [[ $status -ne 0 ]]; then
