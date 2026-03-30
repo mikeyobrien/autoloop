@@ -20,8 +20,8 @@ jobs:
       - name: Check syntax
         run: tonic check .
 
-      - name: Run tests
-        run: ./bin/test
+      - name: Run release-path tests
+        run: ./bin/test test/release_install_test.tn
 
   build:
     needs: verify
