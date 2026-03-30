@@ -186,9 +186,10 @@ main() {
   fi
 
   mkdir -p "$INSTALL_DIR"
-  install -m 755 "$binary_path" "$INSTALL_DIR/autoloops"
+  # Install the entire package directory so presets/, src/, tonic.toml etc. are available
+  cp -r "$extracted_dir/"* "$INSTALL_DIR/"
 
-  echo "installed autoloops to $INSTALL_DIR/autoloops"
+  echo "installed autoloops to $INSTALL_DIR/autoloops (with presets, src/, tonic.toml)"
   if ! command -v autoloops >/dev/null 2>&1; then
     case ":$PATH:" in
       *":$INSTALL_DIR:"*) ;;
