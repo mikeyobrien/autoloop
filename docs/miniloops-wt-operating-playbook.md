@@ -264,15 +264,13 @@ Use the documented `run` form in scripts, docs, and operator workflows. It is th
 - explicit preset directory
 - `.` when the current directory itself is a valid Miniloops project
 
-### Help gotcha
+### Help
 
-This is currently surprising:
+Subcommand help works as expected:
 
 ```bash
 ./bin/miniloops run --help
 ```
-
-It does not show subcommand help. It treats `--help` as the required preset and exits with a preset resolution/usage error.
 
 Use:
 
@@ -379,8 +377,8 @@ wt switch feature-short-name
 - Or use `wt switch ... --no-cd` and `cd` manually
 
 ### `./bin/miniloops run --help` did not show help
-- Known CLI behavior right now
-- Use `./bin/miniloops --help` instead
+- This should now print `run` subcommand usage
+- If it does not, you are likely on an older checkout or binary; rerun from the current repo/build
 
 ### `miniloops run .` failed
 - `.` only works if the current directory contains a valid Miniloops config/project
@@ -402,6 +400,7 @@ wt remove -y --foreground
 The following were verified locally while writing this playbook:
 - `./scripts/pi-smoke.sh` passed
 - `./bin/miniloops --help` works
+- `./bin/miniloops run --help` works
 - documented Miniloops `run` invocation works
 - `wt --help`, `wt switch --help`, `wt merge --help`, `wt remove --help`, and `wt config show` work
 - a temporary git repo successfully exercised:

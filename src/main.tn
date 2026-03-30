@@ -163,6 +163,14 @@ defmodule Demo do
     handle_chain_run(name, project_dir, join_tokens(prompt_tokens), argv)
   end
 
+  defp dispatch(["run", "--help"], _argv) do
+    print_run_usage()
+  end
+
+  defp dispatch(["run", "-h"], _argv) do
+    print_run_usage()
+  end
+
   defp dispatch(args, argv) do
     options = parse_run_args(args, resolve_bundle_root(argv))
 
@@ -918,6 +926,29 @@ defmodule Demo do
     IO.puts("  -b, --backend    Override backend command")
     IO.puts("  -p, --preset     Resolve a bundled preset name or custom preset dir")
     IO.puts("  --chain          Run an inline chain (comma-separated presets)")
+  end
+
+  defp print_run_usage() do
+    IO.puts("Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    IO.puts("")
+    IO.puts("The preset argument is required. It must be a bundled preset name")
+    IO.puts("(e.g. autocode, autoqa) or a path to a directory containing")
+    IO.puts("miniloops.toml. Use `.` to run from the current directory.")
+    IO.puts("")
+    IO.puts("Flags:")
+    IO.puts("  -h, --help       Show this help")
+    IO.puts("  -v, --verbose    Set log level to debug")
+    IO.puts("  -b, --backend    Override backend command")
+    IO.puts("  -p, --preset     Resolve a bundled preset name or custom preset dir")
+    IO.puts("  --chain          Run an inline chain (comma-separated presets)")
+    IO.puts("")
+    IO.puts("Examples:")
+    IO.puts("  miniloops run autocode")
+    IO.puts("  miniloops run autocode \"Fix the login bug\"")
+    IO.puts("  miniloops run presets/autoqa \"QA recent changes\"")
+    IO.puts("  miniloops run . \"Run from current directory\"")
+    IO.puts("")
+    IO.puts("Run 'miniloops list' to see all available presets.")
   end
 
   defp print_chain_usage() do

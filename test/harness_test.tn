@@ -221,6 +221,25 @@ defmodule HarnessTest do
     Assert.refute(String.contains(output, "loop start run_id="), "unsupported flags should fail before loop startup")
   end
 
+  def test_run_help_shows_run_usage_for_long_flag() do
+    help = run_help(repo_root(), "--help")
+
+    Assert.assert_contains(help, "Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    Assert.assert_contains(help, "-h, --help")
+    Assert.assert_contains(help, "Run 'miniloops list' to see all available presets.")
+    Assert.refute(String.contains(help, "preset `--help` not found"), "run --help should not try to resolve --help as a preset")
+    Assert.refute(String.contains(help, "loop start run_id="), "run --help should not start a loop")
+  end
+
+  def test_run_help_shows_run_usage_for_short_flag() do
+    help = run_help(repo_root(), "-h")
+
+    Assert.assert_contains(help, "Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    Assert.assert_contains(help, "-h, --help")
+    Assert.refute(String.contains(help, "preset `-h` not found"), "run -h should not try to resolve -h as a preset")
+    Assert.refute(String.contains(help, "loop start run_id="), "run -h should not start a loop")
+  end
+
   defp prepare_fixture() do
     project_dir = fixture_dir()
     backend_path = Path.join(project_dir, "backend.sh")
@@ -299,6 +318,12 @@ defmodule HarnessTest do
 
   defp inspect_help(project_dir) do
     result = run_repo_command(project_dir, "inspect --help")
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Map.get(result, :output, "")
+  end
+
+  defp run_help(project_dir, flag) do
+    result = run_repo_command(project_dir, "run " <> flag)
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
     Map.get(result, :output, "")
   end
@@ -563,7 +588,7 @@ defmodule HarnessTest do
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp pad_banner(text, char, width) do
