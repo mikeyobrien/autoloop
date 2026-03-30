@@ -19,6 +19,15 @@ defmodule LoopJson do
     "\"" <> key <> "\": " <> raw_value
   end
 
+  def extract_topic(line) do
+    extract_field(line, "topic")
+  end
+
+  def extract_field(line, key) do
+    marker = "\"" <> key <> "\": "
+    decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
+  end
+
   def encode_json_value(text) do
     escaped_backslash = LoopUtils.replace_all(text, "\\", "\\u005c")
     escaped_quote = LoopUtils.replace_all(escaped_backslash, "\"", "\\u0022")
@@ -39,5 +48,40 @@ defmodule LoopJson do
     restored_tab = LoopUtils.replace_all(restored_return, "\\u0009", "\t")
     restored_quote = LoopUtils.replace_all(restored_tab, "\\u0022", "\"")
     LoopUtils.replace_all(restored_quote, "\\u005c", "\\")
+  end
+
+  defp first_after_marker([]) do
+    ""
+  end
+
+  defp first_after_marker([_only]) do
+    ""
+  end
+
+  defp first_after_marker([_prefix | rest]) do
+    first_or_empty(rest)
+  end
+
+  defp first_quoted_value(text) do
+    first_quoted_value_parts(String.split(text, "\""))
+  end
+
+  defp first_quoted_value_parts([]) do
+    ""
+  end
+
+  defp first_quoted_value_parts([part | rest]) do
+    case part do
+      "" -> first_or_empty(rest)
+      _ -> first_quoted_value_parts(rest)
+    end
+  end
+
+  defp first_or_empty([]) do
+    ""
+  end
+
+  defp first_or_empty([item | _rest]) do
+    item
   end
 end

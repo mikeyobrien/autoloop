@@ -1870,13 +1870,25 @@ defmodule LoopHarness do
   end
 
   defp build_process_command(loop, spec, prompt, runtime_env) do
-    env_lines = runtime_env <> "export MINILOOPS_PROMPT=" <> LoopUtils.shell_quote(prompt) <> "\n"
+    env_lines = runtime_env <> prompt_runtime_env_lines(loop, spec, prompt)
     child_command = case process_kind(spec) do
       "pi" -> build_pi_adapter_invocation(loop, spec)
       _ -> build_command_invocation(spec, prompt)
     end
 
     env_lines <> wrap_process_invocation(child_command)
+  end
+
+  defp prompt_runtime_env_lines(loop, spec, prompt) do
+    prompt_path = Path.join(state_dir(loop), "active-prompt.md")
+    prompt_file_lines =
+      "export MINILOOPS_PROMPT_PATH=" <> LoopUtils.shell_quote(prompt_path) <> "\n" <>
+      "printf '%s' " <> LoopUtils.shell_quote(prompt) <> " > " <> LoopUtils.shell_quote(prompt_path) <> "\n"
+
+    case process_kind(spec) do
+      "pi" -> prompt_file_lines
+      _ -> prompt_file_lines <> "export MINILOOPS_PROMPT=" <> LoopUtils.shell_quote(prompt) <> "\n"
+    end
   end
 
   defp build_pi_adapter_invocation(loop, spec) do
@@ -2606,47 +2618,11 @@ defmodule LoopHarness do
   end
 
   defp extract_field(line, key) do
-    marker = "\"" <> key <> "\": "
-    LoopJson.decode_json_value(first_quoted_value(first_after_marker(String.split(line, marker))))
-  end
-
-  defp first_after_marker([]) do
-    ""
-  end
-
-  defp first_after_marker([_only]) do
-    ""
-  end
-
-  defp first_after_marker([_prefix | rest]) do
-    first_or_empty(rest)
+    LoopJson.extract_field(line, key)
   end
 
   defp extract_topic(line) do
-    LoopJson.decode_json_value(first_quoted_value(first_after_marker(String.split(line, "\"topic\": "))))
-  end
-
-  defp first_quoted_value(text) do
-    first_quoted_value_parts(String.split(text, "\""))
-  end
-
-  defp first_quoted_value_parts([]) do
-    ""
-  end
-
-  defp first_quoted_value_parts([part | rest]) do
-    case part do
-      "" -> first_or_empty(rest)
-      _ -> first_quoted_value_parts(rest)
-    end
-  end
-
-  defp first_or_empty([]) do
-    ""
-  end
-
-  defp first_or_empty([item | _rest]) do
-    item
+    LoopJson.extract_topic(line)
   end
 
   defp latest_agent_event([]) do
@@ -3462,7 +3438,12 @@ defmodule LoopHarness do
   end
 
   defp first_csv_value(csv) do
-    String.trim(first_or_empty(String.split(csv, ",")))
+    parts = String.split(csv, ",")
+
+    case parts do
+      [first | _rest] -> String.trim(first)
+      _ -> ""
+    end
   end
 
   defp merge_finish_into_rows([], _line) do

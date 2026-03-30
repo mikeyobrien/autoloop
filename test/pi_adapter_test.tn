@@ -1,6 +1,6 @@
 defmodule PiAdapterTest do
   def test_pi_adapter_hides_detailed_tool_errors_without_verbose() do
-    fixture = prepare_fixture("tool mismatch detail")
+    fixture = prepare_fixture(tool_error_script("tool mismatch detail"))
     result = run_pi_adapter(fixture, "info")
     output = Map.get(result, :output, "")
 
@@ -10,7 +10,7 @@ defmodule PiAdapterTest do
   end
 
   def test_pi_adapter_shows_detailed_tool_errors_in_verbose_mode() do
-    fixture = prepare_fixture("tool mismatch detail")
+    fixture = prepare_fixture(tool_error_script("tool mismatch detail"))
     result = run_pi_adapter(fixture, "debug")
     output = Map.get(result, :output, "")
 
@@ -18,12 +18,34 @@ defmodule PiAdapterTest do
     Assert.assert_contains(output, "tool mismatch detail")
   end
 
-  defp prepare_fixture(detail) do
+  def test_pi_adapter_handles_large_turn_end_text_without_stack_overflow() do
+    fixture = prepare_fixture(large_turn_end_script())
+    result = run_pi_adapter(fixture, "info")
+    output = Map.get(result, :output, "")
+    chunk = String.duplicate("a", 64)
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, chunk)
+    Assert.assert_contains(output, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+  end
+
+  def test_pi_adapter_handles_large_prompt_via_prompt_path_without_stack_overflow() do
+    fixture = prepare_fixture(prompt_echo_script())
+    prompt = String.duplicate("large prompt ", 600)
+    result = run_pi_adapter_with_prompt_path(fixture, "info", prompt)
+    output = Map.get(result, :output, "")
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(output, "PROMPT_BYTES=")
+    Assert.assert_contains(output, to_string(String.length(prompt)))
+  end
+
+  defp prepare_fixture(script_content) do
     dir = "/tmp/miniloops-pi-adapter-fixture"
     script = Path.join(dir, "mock-pi.sh")
 
     System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(dir))
-    System.write_text(script, mock_pi_script(detail))
+    System.write_text(script, script_content)
     System.run("chmod +x " <> shell_quote(script))
 
     %{dir: dir, script: script}
@@ -32,7 +54,7 @@ defmodule PiAdapterTest do
   defp run_pi_adapter(fixture, log_level) do
     System.run(
       "cd " <> shell_quote(Map.get(fixture, :dir, "")) <>
-      " && env -u MINILOOPS_LOG_LEVEL -u MINILOOPS_PROMPT -u MINILOOPS_STATE_DIR" <>
+      " && env -u MINILOOPS_LOG_LEVEL -u MINILOOPS_PROMPT -u MINILOOPS_PROMPT_PATH -u MINILOOPS_STATE_DIR" <>
       " MINILOOPS_LOG_LEVEL=" <> shell_quote(log_level) <>
       " MINILOOPS_PROMPT='pi adapter test prompt'" <>
       " MINILOOPS_STATE_DIR=" <> shell_quote(Map.get(fixture, :dir, "")) <>
@@ -40,10 +62,49 @@ defmodule PiAdapterTest do
     )
   end
 
-  defp mock_pi_script(detail) do
+  defp run_pi_adapter_with_prompt_path(fixture, log_level, prompt) do
+    prompt_path = Path.join(Map.get(fixture, :dir, ""), "prompt.md")
+    System.write_text(prompt_path, prompt)
+
+    System.run(
+      "cd " <> shell_quote(Map.get(fixture, :dir, "")) <>
+      " && env -u MINILOOPS_LOG_LEVEL -u MINILOOPS_PROMPT -u MINILOOPS_PROMPT_PATH -u MINILOOPS_STATE_DIR" <>
+      " MINILOOPS_LOG_LEVEL=" <> shell_quote(log_level) <>
+      " MINILOOPS_PROMPT_PATH=" <> shell_quote(prompt_path) <>
+      " MINILOOPS_STATE_DIR=" <> shell_quote(Map.get(fixture, :dir, "")) <>
+      " tonic run " <> shell_quote(repo_root()) <> " pi-adapter " <> shell_quote(Map.get(fixture, :script, ""))
+    )
+  end
+
+  defp tool_error_script(detail) do
     "#!/bin/sh\n" <>
     "set -eu\n" <>
     "printf '%s\\n' '{\"type\":\"tool_execution_end\",\"toolExecutionResponseEvent\":{\"isError\":true,\"output\":[{\"type\":\"text\",\"text\":\"" <> detail <> "\"}]}}'\n"
+  end
+
+  defp large_turn_end_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "python3 - <<'PY'\n" <>
+    "import json\n" <>
+    "text = 'a' * 12000\n" <>
+    "print(json.dumps({\"type\": \"turn_end\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": text}]}}))\n" <>
+    "print(json.dumps({\"type\": \"agent_end\", \"messages\": [{\"content\": [{\"type\": \"text\", \"text\": text}]}]}))\n" <>
+    "PY\n"
+  end
+
+  defp prompt_echo_script() do
+    "#!/bin/sh\n" <>
+    "set -eu\n" <>
+    "python3 - <<'PY'\n" <>
+    "import json\n" <>
+    "import os\n" <>
+    "path = os.environ.get('MINILOOPS_PROMPT_PATH', '')\n" <>
+    "with open(path, 'r', encoding='utf-8') as fh:\n" <>
+    "    text = fh.read()\n" <>
+    "print(json.dumps({\"type\": \"turn_end\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": 'PROMPT_BYTES=' + str(len(text))}]}}))\n" <>
+    "print(json.dumps({\"type\": \"agent_end\", \"messages\": [{\"content\": [{\"type\": \"text\", \"text\": 'PROMPT_BYTES=' + str(len(text))}]}]}))\n" <>
+    "PY\n"
   end
 
   defp repo_root() do
