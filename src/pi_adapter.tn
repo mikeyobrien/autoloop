@@ -85,7 +85,9 @@ defmodule LoopPiAdapter do
 
   # TONIC_MISSING: Streaming JSON parser
   defp build_pi_bridge_command(command, extra_args, prompt_path) do
-    LoopUtils.shell_words(["python3", "-c", bridge_script(), command] ++ default_pi_args() ++ extra_args ++ [prompt_path])
+    # Build: python3 -c <bridge> <command> run -P <prompt_path> --no-tui <extra_args>
+    # Bridge script uses sys.argv[-1] as the prompt path, so prompt_path MUST be last.
+    LoopUtils.shell_words(["python3", "-c", bridge_script(), command, "run", "-P", prompt_path, "--no-tui"] ++ extra_args)
   end
 
   defp materialize_prompt_path(prompt) do
@@ -101,10 +103,6 @@ defmodule LoopPiAdapter do
       "" -> "/tmp/autoloops-pi-adapter-prompt.md"
       value -> value
     end
-  end
-
-  defp default_pi_args() do
-    ["-p", "--mode", "json", "--no-session"]
   end
 
   defp bridge_script() do

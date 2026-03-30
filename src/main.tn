@@ -833,14 +833,21 @@ defmodule Demo do
   end
 
   defp resolve_bundle_root([command, "run", harness_project | _rest]) do
-    case is_tonic_command(command) do
+    bundle_root = case is_tonic_command(command) do
       true -> absolute_path(harness_project)
-      _ -> "."
+      _ -> absolute_path(harness_project)
+    end
+    case System.env("AUTOLOOPS_BUNDLE_ROOT") do
+      nil -> bundle_root
+      env_root -> env_root
     end
   end
 
   defp resolve_bundle_root(_argv) do
-    "."
+    case System.env("AUTOLOOPS_BUNDLE_ROOT") do
+      nil -> "."
+      env_root -> env_root
+    end
   end
 
   defp self_command([command, "run", harness_project | _rest]) do
