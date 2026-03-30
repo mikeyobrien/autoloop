@@ -478,6 +478,33 @@ This symlinks `hooks/pre-commit` (runs `tonic check .`) and `hooks/pre-push` (ru
 
 ## Install `autoloops`
 
+### Quick install over HTTPS
+
+Install the latest release to `~/.local/bin`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash -s -- --version v0.1.0
+```
+
+Install to a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash -s -- --dir /usr/local/bin
+```
+
+Then:
+
+```bash
+autoloops --help
+autoloops run autocode
+```
+
 ### From GitHub Releases
 
 Download the archive for your platform from GitHub Releases, then install the bundled `autoloops` binary:
@@ -489,14 +516,7 @@ mkdir -p ~/.local/bin
 mv autoloops-v0.1.0-linux-x64/autoloops ~/.local/bin/autoloops
 ```
 
-Then:
-
-```bash
-autoloops --help
-autoloops run autocode
-```
-
-Release assets are built by `.github/workflows/release.yml`. CI/release currently install Tonic from the git commit pinned in `.tonic-git-ref`. See `docs/releasing.md` for the tag-based release flow.
+Release assets are built by `.github/workflows/release.yml`. The installer above downloads the matching archive and verifies checksums when `SHA256SUMS.txt` is available. CI/release currently install Tonic from the git commit pinned in `.tonic-git-ref`. See `docs/releasing.md` for the tag-based release flow.
 
 ### From a source checkout
 

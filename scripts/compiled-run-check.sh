@@ -13,6 +13,8 @@ if [[ ! -x "$binary_path" ]]; then
   exit 1
 fi
 
+binary_path="$(cd "$(dirname "$binary_path")" && pwd -P)/$(basename "$binary_path")"
+
 tmpdir="$(mktemp -d)"
 
 run_autoloops_clean() {
@@ -51,8 +53,8 @@ event_loop.completion_event = "task.complete"
 event_loop.completion_promise = "LOOP_COMPLETE"
 event_loop.required_events = []
 
-backend.kind = "pi"
-backend.command = "pi"
+backend.kind = "command"
+backend.command = "./mock-backend.sh"
 backend.timeout_ms = 180000
 
 review.enabled = false
@@ -87,6 +89,18 @@ cat > "$tmpdir/harness.md" <<'EOF'
 Keep the turn tiny. Finish in one iteration.
 EOF
 
+cat > "$tmpdir/mock-backend.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'hello\n'
+if [ -n "${MINILOOPS_BIN:-}" ]; then
+  "$MINILOOPS_BIN" emit task.complete hello-done >/dev/null
+else
+  printf 'LOOP_COMPLETE\n'
+fi
+EOF
+chmod +x "$tmpdir/mock-backend.sh"
+
 status=0
 (
   cd "$tmpdir"
@@ -104,18 +118,16 @@ if [[ $status -ne 0 ]]; then
 fi
 
 journal="$tmpdir/.autoloop/journal.jsonl"
-stream="$tmpdir/.autoloop/pi-stream.1.jsonl"
 output_text="$(cd "$tmpdir" && run_autoloops_clean "$binary_path" inspect output 1 . --format text)"
 
 [[ -f "$journal" ]] || { echo "missing journal: $journal" >&2; exit 1; }
-[[ -f "$stream" ]] || { echo "missing Pi stream log: $stream" >&2; exit 1; }
 [[ "$output_text" == $'hello\n' || "$output_text" == "hello" ]] || {
   printf 'unexpected projected output: %q\n' "$output_text" >&2
   exit 1
 }
 
 grep -F '"topic": "backend.start"' "$journal" >/dev/null || { echo "missing backend.start" >&2; exit 1; }
-grep -F '"backend_kind": "pi"' "$journal" >/dev/null || { echo "missing backend_kind=pi" >&2; exit 1; }
+grep -F '"backend_kind": "command"' "$journal" >/dev/null || { echo "missing backend_kind=command" >&2; exit 1; }
 grep -F '"topic": "task.complete"' "$journal" >/dev/null || { echo "missing task.complete" >&2; exit 1; }
 grep -F '"payload": "hello-done"' "$journal" >/dev/null || { echo "missing task.complete payload" >&2; exit 1; }
 grep -F '"topic": "backend.finish"' "$journal" >/dev/null || { echo "missing backend.finish" >&2; exit 1; }

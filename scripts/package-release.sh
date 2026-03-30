@@ -19,7 +19,9 @@ fi
 archive_name="autoloops-${tag}-${platform}.tar.gz"
 stage_root="$(mktemp -d)"
 stage_dir="$stage_root/autoloops-${tag}-${platform}"
-archive_path="$out_dir/$archive_name"
+mkdir -p "$out_dir"
+out_dir_abs="$(cd "$out_dir" && pwd -P)"
+archive_path="$out_dir_abs/$archive_name"
 
 cleanup() {
   rm -rf "$stage_root"

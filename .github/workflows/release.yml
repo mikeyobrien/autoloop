@@ -41,22 +41,22 @@ jobs:
         run: ./scripts/install-tonic.sh
 
       - name: Build compiled binary
-        run: ./scripts/build-release.sh "dist/miniloops"
+        run: ./scripts/build-release.sh "dist/autoloops"
 
       - name: Smoke test compiled binary
-        run: ./scripts/release-smoke.sh "dist/miniloops"
+        run: ./scripts/release-smoke.sh "dist/autoloops"
 
       - name: Package release archive
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_PLATFORM: ${{ matrix.platform }}
-        run: ./scripts/package-release.sh "dist/miniloops" "$RELEASE_TAG" "$RELEASE_PLATFORM" dist
+        run: ./scripts/package-release.sh "dist/autoloops" "$RELEASE_TAG" "$RELEASE_PLATFORM" dist
 
       - name: Upload packaged artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-release
-          path: dist/miniloops-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
+          path: dist/autoloops-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz
           if-no-files-found: error
 
   publish:
@@ -77,8 +77,8 @@ jobs:
         run: |
           mkdir -p release-dist
           find dist -type f -name '*.tar.gz' -exec cp {} release-dist/ \;
-          test -f "release-dist/miniloops-${RELEASE_TAG}-linux-x64.tar.gz"
-          test -f "release-dist/miniloops-${RELEASE_TAG}-macos-arm64.tar.gz"
+          test -f "release-dist/autoloops-${RELEASE_TAG}-linux-x64.tar.gz"
+          test -f "release-dist/autoloops-${RELEASE_TAG}-macos-arm64.tar.gz"
 
       - name: Generate checksums
         run: |

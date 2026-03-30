@@ -35,13 +35,34 @@ git push origin v0.1.0
 - packages release archives
 - publishes the archives and checksums to GitHub Releases
 
+## Install with the HTTPS installer
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash
+```
+
+Pin a version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash -s -- --version v0.1.0
+```
+
+Install to a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash -s -- --dir /usr/local/bin
+```
+
+The installer resolves the correct asset for the current platform, downloads `SHA256SUMS.txt` when available, and installs `autoloops` into `~/.local/bin` by default.
+
 ## Install from a release archive
 
 ```bash
 tar -xzf autoloops-v0.1.0-linux-x64.tar.gz
 chmod +x autoloops-v0.1.0-linux-x64/autoloops
+mkdir -p ~/.local/bin
 mv autoloops-v0.1.0-linux-x64/autoloops ~/.local/bin/autoloops
-autoloops --help
 ```
 
 The release binary does not require a source checkout for normal CLI use.
+

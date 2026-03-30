@@ -1,0 +1,106 @@
+defmodule ReleaseInstallTest do
+  def test_release_workflow_uses_autoloops_asset_names() do
+    workflow = System.read_text(Path.join(repo_root(), ".github/workflows/release.yml"))
+
+    Assert.assert_contains(workflow, "dist/autoloops")
+    Assert.assert_contains(workflow, "autoloops-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz")
+    Assert.refute(String.contains(workflow, "miniloops-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz"), "release workflow should no longer publish miniloops-named assets")
+  end
+
+  def test_install_script_installs_binary_from_release_archive() do
+    fixture = prepare_release_fixture()
+    result = System.run(
+      "cd " <> shell_quote(Map.get(fixture, :tmp_dir, "")) <>
+      " && INSTALL_DIR=" <> shell_quote(Map.get(fixture, :install_dir, "")) <>
+      " AUT0LOOPS_VERSION=''" <>
+      " AUTOLOOPS_VERSION=v9.9.9" <>
+      " AUTOLOOPS_PLATFORM=linux-x64" <>
+      " AUTOLOOPS_RELEASES_BASE_URL=" <> shell_quote(Map.get(fixture, :releases_base_url, "")) <>
+      " bash " <> shell_quote(Path.join(repo_root(), "install.sh"))
+    )
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "installed autoloops to")
+    Assert.assert_contains(System.run(shell_quote(Path.join(Map.get(fixture, :install_dir, ""), "autoloops")) <> " --help") |> Map.get(:output, ""), "autoloops fixture")
+  end
+
+  def test_package_release_supports_relative_output_dir() do
+    fixture = prepare_relative_package_fixture()
+    result = System.run(
+      "cd " <> shell_quote(Map.get(fixture, :repo_copy, "")) <>
+      " && mkdir -p dist/release" <>
+      " && scripts/package-release.sh " <> shell_quote(Map.get(fixture, :binary_path, "")) <>
+      " v1.2.3 linux-x64 dist/release"
+    )
+
+    Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(result, :output, ""), "dist/release/autoloops-v1.2.3-linux-x64.tar.gz")
+    Assert.assert(System.path_exists(Path.join(Map.get(fixture, :repo_copy, ""), "dist/release/autoloops-v1.2.3-linux-x64.tar.gz")), "relative output dir should produce archive under repo dist/release")
+  end
+
+  defp prepare_release_fixture() do
+    tmp_dir = "/tmp/autoloops-release-install-test"
+    release_dir = Path.join(tmp_dir, "release")
+    install_dir = Path.join(tmp_dir, "bin")
+    binary_path = Path.join(tmp_dir, "autoloops-fixture.sh")
+    archive_path = Path.join(release_dir, "autoloops-v9.9.9-linux-x64.tar.gz")
+
+    System.run("rm -rf " <> shell_quote(tmp_dir) <> " && mkdir -p " <> shell_quote(release_dir) <> " " <> shell_quote(install_dir))
+    System.write_text(binary_path, fixture_binary())
+    System.run("chmod +x " <> shell_quote(binary_path))
+
+    package = System.run(
+      "cd " <> shell_quote(repo_root()) <>
+      " && scripts/package-release.sh " <> shell_quote(binary_path) <>
+      " v9.9.9 linux-x64 " <> shell_quote(release_dir)
+    )
+    Assert.assert_equal(Map.get(package, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(package, :output, ""), archive_path)
+
+    checksums = System.run(
+      "cd " <> shell_quote(release_dir) <>
+      " && shasum -a 256 autoloops-v9.9.9-linux-x64.tar.gz > SHA256SUMS.txt"
+    )
+    Assert.assert_equal(Map.get(checksums, :exit_code, 1), 0)
+
+    %{
+      tmp_dir: tmp_dir,
+      release_dir: release_dir,
+      install_dir: install_dir,
+      releases_base_url: "file://" <> release_dir
+    }
+  end
+
+  defp prepare_relative_package_fixture() do
+    tmp_dir = "/tmp/autoloops-relative-package-test"
+    repo_copy = Path.join(tmp_dir, "repo")
+    scripts_dir = Path.join(repo_copy, "scripts")
+    binary_path = Path.join(tmp_dir, "autoloops-fixture.sh")
+
+    System.run("rm -rf " <> shell_quote(tmp_dir) <> " && mkdir -p " <> shell_quote(scripts_dir))
+    System.run("cp " <> shell_quote(Path.join(repo_root(), "scripts/package-release.sh")) <> " " <> shell_quote(Path.join(scripts_dir, "package-release.sh")))
+    System.run("chmod +x " <> shell_quote(Path.join(scripts_dir, "package-release.sh")))
+    System.write_text(binary_path, fixture_binary())
+    System.run("chmod +x " <> shell_quote(binary_path))
+
+    %{tmp_dir: tmp_dir, repo_copy: repo_copy, binary_path: binary_path}
+  end
+
+  defp fixture_binary() do
+    "#!/usr/bin/env bash\n" <>
+    "set -euo pipefail\n" <>
+    "if [ \"${1:-}\" = \"--help\" ]; then\n" <>
+    "  echo 'autoloops fixture help'\n" <>
+    "else\n" <>
+    "  echo 'autoloops fixture run'\n" <>
+    "fi\n"
+  end
+
+  defp repo_root() do
+    System.cwd()
+  end
+
+  defp shell_quote(text) do
+    "'" <> String.replace(text, "'", "'\\''") <> "'"
+  end
+end
