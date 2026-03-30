@@ -8,7 +8,7 @@ A preset directory contains four kinds of files:
 
 ```
 my-preset/
-├── miniloops.toml    # Loop configuration (required)
+├── autoloops.toml    # Loop configuration (required)
 ├── topology.toml     # Role deck and handoff graph (required for multi-role loops)
 ├── harness.md        # Shared instructions loaded every iteration (required)
 ├── README.md         # Human-facing description (optional)
@@ -18,7 +18,7 @@ my-preset/
     └── ...
 ```
 
-The directory can live anywhere. Built-in presets live under `presets/<name>/`; custom presets just need a path that `miniloops run` can resolve.
+The directory can live anywhere. Built-in presets live under `presets/<name>/`; custom presets just need a path that `autoloops run` can resolve.
 
 ## Step 1: Define the topology
 
@@ -57,7 +57,7 @@ prompt_file = "roles/verifier.md"
 - Every role needs an `id`, an `emits` list, and either `prompt_file` or `prompt` (inline string).
 - `prompt_file` paths are relative to the preset directory.
 - The `[handoff]` section maps events to the roles that should handle them. An event not listed in the handoff map causes all roles to be suggested (no routing preference).
-- `completion` sets the topology-level completion event. It can also be set in `miniloops.toml` via `event_loop.completion_event` — the topology value takes precedence, with the config value used as a fallback.
+- `completion` sets the topology-level completion event. It can also be set in `autoloops.toml` via `event_loop.completion_event` — the topology value takes precedence, with the config value used as a fallback.
 - `"loop.start"` is the synthetic event emitted at iteration 1. Use it to define which role kicks off the loop.
 
 See [`docs/topology.md`](topology.md) for the full reference.
@@ -114,23 +114,23 @@ Example:
 This is a custom analysis-and-implementation loop.
 
 Global rules:
-- Shared working files are the source of truth: `.miniloop/tasks.md`, `.miniloop/progress.md`.
+- Shared working files are the source of truth: `.autoloop/tasks.md`, `.autoloop/progress.md`.
 - One task at a time. Do not start the next task before the current one is verified.
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read shared working files before acting.
-- Use `./.miniloop/miniloops memory add learning ...` for durable learnings.
+- Use `./.autoloop/autoloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside analyst → implementer → verifier.
 
 State files:
-- `.miniloop/tasks.md` — task list with priorities and status.
-- `.miniloop/progress.md` — current task, verification results, what the next role should do.
+- `.autoloop/tasks.md` — task list with priorities and status.
+- `.autoloop/progress.md` — current task, verification results, what the next role should do.
 ```
 
-The `harness.instructions_file` key in `miniloops.toml` points to this file. It defaults to `harness.md`.
+The `harness.instructions_file` key in `autoloops.toml` points to this file. It defaults to `harness.md`.
 
 ## Step 4: Configure the loop
 
-`miniloops.toml` sets iteration limits, backend, completion conditions, and memory/review settings.
+`autoloops.toml` sets iteration limits, backend, completion conditions, and memory/review settings.
 
 ```toml
 event_loop.max_iterations = 100
@@ -148,9 +148,9 @@ review.timeout_ms = 300000
 memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloop"
-core.journal_file = ".miniloop/journal.jsonl"
-core.memory_file = ".miniloop/memory.jsonl"
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
 ```
 
 **Key settings:**
@@ -166,23 +166,23 @@ See [`docs/configuration.md`](configuration.md) for the full key reference.
 
 ```bash
 # From the repo root, using the launcher
-./bin/miniloops run path/to/my-preset "Your objective here"
+./bin/autoloops run path/to/my-preset "Your objective here"
 
 # Built-in presets can use their bundled name
-./bin/miniloops run autocode "Your objective here"
+./bin/autoloops run autocode "Your objective here"
 
 # With the installed shim
-miniloops run path/to/my-preset "Your objective here"
+autoloops run path/to/my-preset "Your objective here"
 
 # Explicit flag form for built-in names or custom dirs
-miniloops run --preset autocode "Your objective here"
-miniloops run --preset path/to/my-preset "Your objective here"
+autoloops run --preset autocode "Your objective here"
+autoloops run --preset path/to/my-preset "Your objective here"
 
 # Override backend for a one-off run
-miniloops run -b claude --preset autocode "Your objective here"
+autoloops run -b claude --preset autocode "Your objective here"
 ```
 
-`run` loads `miniloops.toml`, `topology.toml`, and `harness.md` from the selected preset directory. Built-in presets resolve by name through `presets/<name>/`; custom presets still use a directory path.
+`run` loads `autoloops.toml`, `topology.toml`, and `harness.md` from the selected preset directory. Built-in presets resolve by name through `presets/<name>/`; custom presets still use a directory path.
 
 ## Registering a preset in chains
 
@@ -198,7 +198,7 @@ steps = ["autocode", "path/to/my-preset", "autotest"]
 Or compose ad hoc on the command line:
 
 ```bash
-miniloops run . --chain autocode,path/to/my-preset,autotest
+autoloops run . --chain autocode,path/to/my-preset,autotest
 ```
 
 ## Design patterns

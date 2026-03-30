@@ -3,9 +3,9 @@ You are the builder.
 Implement exactly the active slice from the latest `tasks.ready` handoff.
 
 On every activation:
-- Re-read `.miniloop/context.md`, `.miniloop/plan.md`, and `.miniloop/progress.md`.
+- Re-read `.autoloop/context.md`, `.autoloop/plan.md`, and `.autoloop/progress.md`.
 - Re-read the source files named in the current slice.
-- Update `.miniloop/progress.md` with what you are doing and how you will verify it.
+- Update `.autoloop/progress.md` with what you are doing and how you will verify it.
 
 Process:
 1. Understand the active slice and its acceptance criteria.
@@ -13,7 +13,7 @@ Process:
 3. Make the smallest code change that satisfies the slice.
 4. Run the strongest focused verification you can for that slice.
 5. Commit the completed slice before handoff. Each completed slice should land as its own commit.
-6. Record concise evidence in `.miniloop/progress.md` and longer output in `.miniloop/logs/` when useful, including the commit hash when available.
+6. Record concise evidence in `.autoloop/progress.md` and longer output in `.autoloop/logs/` when useful, including the commit hash when available.
 7. Emit `review.ready` with:
    - what changed
    - what was verified
@@ -21,7 +21,7 @@ Process:
    - any known risk or uncertainty
 
 If blocked:
-- Record the reason in `.miniloop/progress.md`.
+- Record the reason in `.autoloop/progress.md`.
 - Emit `build.blocked` with a concrete blocker and the safest next planning move.
 
 Rules:

@@ -1,6 +1,6 @@
 # Autocode miniloop
 
-A miniloops-native port of Ralph's code-assist/autocode loop.
+A autoloops-native port of Ralph's code-assist/autocode loop.
 
 Shape:
 - planner
@@ -8,7 +8,7 @@ Shape:
 - critic
 - finalizer
 
-Shared state lives in project files plus the miniloops journal. One active step is tracked in `.miniloop/progress.md`.
+Shared state lives in project files plus the autoloops journal. One active step is tracked in `.autoloop/progress.md`.
 
 ## Fail-closed contract
 
@@ -23,7 +23,7 @@ Success is evidence-based, not prose-based. Only the finalizer may emit `task.co
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/planner.md`
@@ -34,10 +34,10 @@ Success is evidence-based, not prose-based. Only the finalizer may emit `task.co
 ## Shared working files created by the loop
 
 The planner is expected to create and maintain:
-- `.miniloop/context.md`
-- `.miniloop/plan.md`
-- `.miniloop/progress.md`
-- `.miniloop/logs/`
+- `.autoloop/context.md`
+- `.autoloop/plan.md`
+- `.autoloop/progress.md`
+- `.autoloop/logs/`
 
 ## Backend
 
@@ -62,19 +62,19 @@ backend.command = "../../examples/mock-backend.sh"
 From this repo root:
 
 ```bash
-./bin/miniloops run autocode "Add a --verbose flag to the CLI"
+./bin/autoloops run autocode "Add a --verbose flag to the CLI"
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run autocode "Add a --verbose flag to the CLI"
+autoloops run autocode "Add a --verbose flag to the CLI"
 ```
 
 For a one-off Claude dogfood run without editing config:
 
 ```bash
-./bin/miniloops -b claude -p autocode "Add a --verbose flag to the CLI"
+./bin/autoloops -b claude -p autocode "Add a --verbose flag to the CLI"
 ```
 
 ## Intended input styles

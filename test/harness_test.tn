@@ -105,7 +105,7 @@ defmodule HarnessTest do
 
   def test_metrics_json_escapes_backslashes_and_control_chars() do
     project_dir = metrics_json_escape_fixture_dir()
-    journal_dir = Path.join(project_dir, ".miniloops")
+    journal_dir = Path.join(project_dir, ".autoloops")
     journal_path = Path.join(journal_dir, "journal.jsonl")
     output_path = Path.join(project_dir, "out.json")
 
@@ -146,7 +146,7 @@ defmodule HarnessTest do
 
   def test_metrics_md_summary_preserves_decimal_elapsed_precision() do
     project_dir = metrics_summary_fixture_dir()
-    journal_dir = Path.join(project_dir, ".miniloops")
+    journal_dir = Path.join(project_dir, ".autoloops")
     journal_path = Path.join(journal_dir, "journal.jsonl")
 
     System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(journal_dir))
@@ -192,7 +192,7 @@ defmodule HarnessTest do
 
   def test_inline_chain_defaults_to_bundle_root_and_uses_prompt_from_non_project_cwd() do
     harness_fixture = prepare_chain_prompt_fixture()
-    cwd = "/tmp/miniloops-external-inline-chain-cwd"
+    cwd = "/tmp/autoloops-external-inline-chain-cwd"
     prompt = "Ship the smallest viable change."
     chain_csv = Path.join(harness_fixture, "presets/first") <> "," <> Path.join(harness_fixture, "presets/second")
 
@@ -224,9 +224,9 @@ defmodule HarnessTest do
   def test_run_help_shows_run_usage_for_long_flag() do
     help = run_help(repo_root(), "--help")
 
-    Assert.assert_contains(help, "Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    Assert.assert_contains(help, "Usage: autoloops run <preset-name|preset-dir> [prompt...] [flags]")
     Assert.assert_contains(help, "-h, --help")
-    Assert.assert_contains(help, "Run 'miniloops list' to see all available presets.")
+    Assert.assert_contains(help, "Run 'autoloops list' to see all available presets.")
     Assert.refute(String.contains(help, "preset `--help` not found"), "run --help should not try to resolve --help as a preset")
     Assert.refute(String.contains(help, "loop start run_id="), "run --help should not start a loop")
   end
@@ -234,7 +234,7 @@ defmodule HarnessTest do
   def test_run_help_shows_run_usage_for_short_flag() do
     help = run_help(repo_root(), "-h")
 
-    Assert.assert_contains(help, "Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    Assert.assert_contains(help, "Usage: autoloops run <preset-name|preset-dir> [prompt...] [flags]")
     Assert.assert_contains(help, "-h, --help")
     Assert.refute(String.contains(help, "preset `-h` not found"), "run -h should not try to resolve -h as a preset")
     Assert.refute(String.contains(help, "loop start run_id="), "run -h should not start a loop")
@@ -249,7 +249,7 @@ defmodule HarnessTest do
 
     System.write_text(backend_path, backend_script())
     System.run("chmod +x " <> shell_quote(backend_path))
-    System.write_text(Path.join(project_dir, "miniloops.toml"), miniloops_toml(backend_path))
+    System.write_text(Path.join(project_dir, "autoloops.toml"), autoloops_toml(backend_path))
     System.write_text(Path.join(project_dir, "topology.toml"), topology_toml())
     System.write_text(Path.join(project_dir, "harness.md"), "scratchpad verification harness\n")
     System.write_text(Path.join(roles_dir, "worker.md"), "You are the worker. Emit the allowed event.\n")
@@ -269,7 +269,7 @@ defmodule HarnessTest do
 
     System.write_text(backend_path, parallel_prompt_backend_script())
     System.run("chmod +x " <> shell_quote(backend_path))
-    System.write_text(Path.join(project_dir, "miniloops.toml"), parallel_prompt_miniloops_toml(backend_path))
+    System.write_text(Path.join(project_dir, "autoloops.toml"), parallel_prompt_autoloops_toml(backend_path))
     System.write_text(Path.join(project_dir, "topology.toml"), parallel_prompt_topology_toml())
     System.write_text(Path.join(project_dir, "harness.md"), "parallel prompt verification harness\n")
     System.write_text(Path.join(roles_dir, "planner.md"), "You are the planner.\n")
@@ -337,7 +337,7 @@ defmodule HarnessTest do
   defp inspect_metrics_json_with_env(project_dir, journal_path, run_id) do
     result = System.run(
       "cd " <> shell_quote(project_dir) <>
-      " && " <> clean_miniloops_env() <>
+      " && " <> clean_autoloops_env() <>
       " env MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_path) <>
       " MINILOOPS_RUN_ID=" <> shell_quote(run_id) <>
       " tonic run " <> shell_quote(repo_root()) <> " inspect metrics --format json"
@@ -350,7 +350,7 @@ defmodule HarnessTest do
   defp inspect_metrics_md_with_env(project_dir, journal_path, run_id) do
     result = System.run(
       "cd " <> shell_quote(project_dir) <>
-      " && " <> clean_miniloops_env() <>
+      " && " <> clean_autoloops_env() <>
       " env MINILOOPS_JOURNAL_FILE=" <> shell_quote(journal_path) <>
       " MINILOOPS_RUN_ID=" <> shell_quote(run_id) <>
       " tonic run " <> shell_quote(repo_root()) <> " inspect metrics --format md"
@@ -365,7 +365,7 @@ defmodule HarnessTest do
   end
 
   defp run_harness_command(harness_project, cwd, args) do
-    System.run("cd " <> shell_quote(cwd) <> " && " <> clean_miniloops_env() <> " tonic run " <> shell_quote(harness_project) <> " " <> args)
+    System.run("cd " <> shell_quote(cwd) <> " && " <> clean_autoloops_env() <> " tonic run " <> shell_quote(harness_project) <> " " <> args)
   end
 
   defp run_repo_command_with_env(project_dir, args, extra_env) do
@@ -374,10 +374,10 @@ defmodule HarnessTest do
       value -> value <> " "
     end
 
-    System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_miniloops_env() <> " " <> extra <> "tonic run " <> shell_quote(repo_root()) <> " " <> args)
+    System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_autoloops_env() <> " " <> extra <> "tonic run " <> shell_quote(repo_root()) <> " " <> args)
   end
 
-  defp clean_miniloops_env() do
+  defp clean_autoloops_env() do
     "env" <>
     " -u COLUMNS" <>
     " -u MINILOOPS_ALLOWED_EVENTS" <>
@@ -416,7 +416,7 @@ defmodule HarnessTest do
     "printf 'LOOP_COMPLETE\\n'\n"
   end
 
-  defp miniloops_toml(backend_path) do
+  defp autoloops_toml(backend_path) do
     "event_loop.max_iterations = 6\n" <>
     "event_loop.completion_event = \"task.complete\"\n" <>
     "backend.kind = \"command\"\n" <>
@@ -430,7 +430,7 @@ defmodule HarnessTest do
     "core.memory_file = \".miniloop/memory.jsonl\"\n"
   end
 
-  defp parallel_prompt_miniloops_toml(backend_path) do
+  defp parallel_prompt_autoloops_toml(backend_path) do
     "event_loop.max_iterations = 1\n" <>
     "event_loop.completion_event = \"task.complete\"\n" <>
     "backend.kind = \"command\"\n" <>
@@ -490,14 +490,14 @@ defmodule HarnessTest do
     "printf 'no completion event emitted\\n'\n"
   end
 
-  defp chain_host_miniloops_toml() do
+  defp chain_host_autoloops_toml() do
     "core.state_dir = \".miniloop\"\n" <>
     "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
     "core.memory_file = \".miniloop/memory.jsonl\"\n" <>
     "core.run_id_format = \"counter\"\n"
   end
 
-  defp chain_prompt_preset_miniloops_toml(backend_path) do
+  defp chain_prompt_preset_autoloops_toml(backend_path) do
     "event_loop.max_iterations = 1\n" <>
     "event_loop.completion_event = \"task.complete\"\n" <>
     "backend.kind = \"command\"\n" <>
@@ -526,7 +526,7 @@ defmodule HarnessTest do
   end
 
   defp prepare_chain_prompt_fixture_without_completion_event() do
-    prepare_chain_prompt_fixture_with_backend("/tmp/miniloops-chain-prompt-no-complete-fixture", chain_prompt_backend_script_without_completion_event())
+    prepare_chain_prompt_fixture_with_backend("/tmp/autoloops-chain-prompt-no-complete-fixture", chain_prompt_backend_script_without_completion_event())
   end
 
   defp prepare_chain_prompt_fixture_with_backend(project_dir, backend_script) do
@@ -538,7 +538,7 @@ defmodule HarnessTest do
 
     System.write_text(backend_path, backend_script)
     System.run("chmod +x " <> shell_quote(backend_path))
-    System.write_text(Path.join(project_dir, "miniloops.toml"), chain_host_miniloops_toml())
+    System.write_text(Path.join(project_dir, "autoloops.toml"), chain_host_autoloops_toml())
     System.write_text(Path.join(project_dir, "chains.toml"), "[[chain]]\nname = \"prompt-chain\"\nsteps = [\"first\", \"second\"]\n")
     write_chain_prompt_preset(first_dir, backend_path)
     write_chain_prompt_preset(second_dir, backend_path)
@@ -547,30 +547,30 @@ defmodule HarnessTest do
   end
 
   defp write_chain_prompt_preset(preset_dir, backend_path) do
-    System.write_text(Path.join(preset_dir, "miniloops.toml"), chain_prompt_preset_miniloops_toml(backend_path))
+    System.write_text(Path.join(preset_dir, "autoloops.toml"), chain_prompt_preset_autoloops_toml(backend_path))
     System.write_text(Path.join(preset_dir, "topology.toml"), chain_prompt_topology_toml())
     System.write_text(Path.join(preset_dir, "harness.md"), "chain prompt harness\n")
     System.write_text(Path.join(preset_dir, "roles/worker.md"), "You are the worker. Emit task.complete.\n")
   end
 
   defp fixture_dir() do
-    "/tmp/miniloops-scratchpad-fixture"
+    "/tmp/autoloops-scratchpad-fixture"
   end
 
   defp chain_prompt_fixture_dir() do
-    "/tmp/miniloops-chain-prompt-fixture"
+    "/tmp/autoloops-chain-prompt-fixture"
   end
 
   defp parallel_prompt_fixture_dir() do
-    "/tmp/miniloops-parallel-prompt-fixture"
+    "/tmp/autoloops-parallel-prompt-fixture"
   end
 
   defp metrics_summary_fixture_dir() do
-    "/tmp/miniloops-metrics-summary-fixture"
+    "/tmp/autoloops-metrics-summary-fixture"
   end
 
   defp metrics_json_escape_fixture_dir() do
-    "/tmp/miniloops-json-escape-fixture"
+    "/tmp/autoloops-json-escape-fixture"
   end
 
   defp metrics_summary_journal() do

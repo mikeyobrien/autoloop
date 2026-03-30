@@ -1,6 +1,6 @@
 # AutoTest miniloop
 
-A miniloops-native formal test creation and test-suite tightening loop.
+A autoloops-native formal test creation and test-suite tightening loop.
 
 AutoTest surveys a codebase for coverage gaps, writes new tests using the repo's existing framework and conventions, runs them, and assesses quality — iterating until meaningful regression-catching gaps are covered or no worthwhile gaps remain.
 
@@ -32,7 +32,7 @@ AutoTest is about better tests, not prettier coverage numbers.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/surveyor.md`
@@ -42,20 +42,20 @@ AutoTest is about better tests, not prettier coverage numbers.
 
 ## Shared working files created by the loop
 
-- `.miniloop/test-plan.md` — coverage analysis, prioritized gaps, test framework details
-- `.miniloop/test-report.md` — compiled report with tests written, results, coverage deltas
-- `.miniloop/progress.md` — current gap tracking and regression-catch rationale
+- `.autoloop/test-plan.md` — coverage analysis, prioritized gaps, test framework details
+- `.autoloop/test-report.md` — compiled report with tests written, results, coverage deltas
+- `.autoloop/progress.md` — current gap tracking and regression-catch rationale
 
 ## Run
 
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autotest /path/to/target-repo
+./bin/autoloops run presets/autotest /path/to/target-repo
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run /path/to/tonic-loops/presets/autotest /path/to/target-repo
+autoloops run /path/to/tonic-loops/presets/autotest /path/to/target-repo
 ```

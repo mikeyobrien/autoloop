@@ -16,7 +16,7 @@
 **Priority:** High — core concept with no standalone doc.
 
 ### Gap 2: Configuration reference
-**What:** Full `miniloops.toml` key reference — all keys, types, defaults, precedence (toml > conf), sections (event_loop, backend, review, memory, harness, core). Includes backend override `-b` flag.
+**What:** Full `autoloops.toml` key reference — all keys, types, defaults, precedence (toml > conf), sections (event_loop, backend, review, memory, harness, core). Includes backend override `-b` flag.
 **Priority:** High — operators need this to tune loops.
 
 ### Gap 3: Journal and runtime model
@@ -32,7 +32,7 @@
 **Priority:** Medium — mentioned in README but no standalone doc.
 
 ### Gap 6: CLI reference
-**What:** All CLI commands and subcommands — `run`, `emit`, `inspect` (all artifacts), `memory` (add/remove/list), `chain` (run/list), `pi-adapter`. Flags: `-b`/`--backend`, `--chain`, `-v`/`--verbose`. `bin/miniloops` launcher. `tonic run` vs `miniloops` invocation.
+**What:** All CLI commands and subcommands — `run`, `emit`, `inspect` (all artifacts), `memory` (add/remove/list), `chain` (run/list), `pi-adapter`. Flags: `-b`/`--backend`, `--chain`, `-v`/`--verbose`. `bin/autoloops` launcher. `tonic run` vs `autoloops` invocation.
 **Priority:** High — users need a single place to look up commands.
 
 ### Gap 7: Backpressure and event validation
@@ -44,7 +44,7 @@
 **Priority:** Low — small utility, brief doc suffices.
 
 ### Gap 9: Creating a custom preset/workflow
-**What:** How to create a new auto* preset from scratch — directory structure (harness.md, topology.toml, roles/*.md, miniloops.toml), naming convention, registering in chains.toml.
+**What:** How to create a new auto* preset from scratch — directory structure (harness.md, topology.toml, roles/*.md, autoloops.toml), naming convention, registering in chains.toml.
 **Priority:** Medium — useful for users extending the family.
 
 ## Prioritized write order

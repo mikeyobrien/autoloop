@@ -1,10 +1,10 @@
 # Task: CSV Metrics Export
 
 ## Description
-Add `miniloops inspect metrics --format csv` to export iteration timing, role assignments, event counts, and completion status as CSV using the tonic stdlib `CSV` module. Also support `--format json` and `--format md` (default).
+Add `autoloops inspect metrics --format csv` to export iteration timing, role assignments, event counts, and completion status as CSV using the tonic stdlib `CSV` module. Also support `--format json` and `--format md` (default).
 
 ## Background
-Miniloops already records structured data in the journal (JSONL): iteration start/finish times, backend elapsed seconds, emitted events, role assignments, and completion outcomes. However, extracting this data for analysis requires manual JSONL parsing. A metrics inspect command that aggregates journal data into tabular form makes run analysis accessible to spreadsheets, dashboards, and scripts.
+Autoloops already records structured data in the journal (JSONL): iteration start/finish times, backend elapsed seconds, emitted events, role assignments, and completion outcomes. However, extracting this data for analysis requires manual JSONL parsing. A metrics inspect command that aggregates journal data into tabular form makes run analysis accessible to spreadsheets, dashboards, and scripts.
 
 The tonic stdlib now includes a `CSV` module with `CSV.encode(rows)` and `CSV.encode_maps(headers, maps)` for generating RFC 4180-compliant CSV output.
 
@@ -47,10 +47,10 @@ The tonic stdlib now includes a `CSV` module with `CSV.encode(rows)` and `CSV.en
 8. Scope metrics to the most recent run by default. Add `--run <run_id>` flag to inspect a specific run.
 
 ## Acceptance Criteria
-- `miniloops inspect metrics` prints a markdown table of per-iteration metrics.
-- `miniloops inspect metrics --format csv` prints valid RFC 4180 CSV.
-- `miniloops inspect metrics --format json` prints a JSON array.
-- `miniloops inspect metrics --run <id>` scopes to a specific run.
+- `autoloops inspect metrics` prints a markdown table of per-iteration metrics.
+- `autoloops inspect metrics --format csv` prints valid RFC 4180 CSV.
+- `autoloops inspect metrics --format json` prints a JSON array.
+- `autoloops inspect metrics --run <id>` scopes to a specific run.
 - Partial/interrupted runs show available data without crashing.
 - CSV output can be imported into a spreadsheet and parsed correctly.
 

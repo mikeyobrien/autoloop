@@ -1,7 +1,7 @@
 # Task: Build And Publish Release Binaries Through GitHub Actions
 
 ## Description
-Add a tag-driven GitHub Actions release pipeline that validates the tagged commit, compiles standalone `miniloops` binaries, smoke-tests the compiled artifact, packages platform archives plus checksums, and publishes them to GitHub Releases. Keep the first pass narrow, inspectable, and repo-owned.
+Add a tag-driven GitHub Actions release pipeline that validates the tagged commit, compiles standalone `autoloops` binaries, smoke-tests the compiled artifact, packages platform archives plus checksums, and publishes them to GitHub Releases. Keep the first pass narrow, inspectable, and repo-owned.
 
 ## Background
 The repo now has source CI but no binary release path.
@@ -10,7 +10,7 @@ Current state:
 - `.github/workflows/ci.yml` validates source with `tonic check .` and `bin/test`
 - `.tonic-version` pins the Tonic toolchain version for CI
 - `src/main.tn` already uses `tonic compile ... --out ...` for self-compilation fallback
-- `bin/miniloops` is still a source-install launcher, not a shipped compiled artifact
+- `bin/autoloops` is still a source-install launcher, not a shipped compiled artifact
 - `README.md` documents source installation, not release-binary installation
 
 That means there is still no single command path from “tag this commit” to “downloadable release assets exist for end users.”
@@ -20,7 +20,7 @@ That means there is still no single command path from “tag this commit” to �
 - Design: `docs/rfcs/github-actions-binary-release-pipeline.md`
 - Workflow: `.github/workflows/ci.yml`
 - Toolchain pin: `.tonic-version`
-- CLI wrapper: `bin/miniloops`
+- CLI wrapper: `bin/autoloops`
 - Source: `src/main.tn` (self-compilation path around `compiled_self_command`)
 - Docs: `README.md`
 - Docs: `docs/cli.md`
@@ -33,13 +33,13 @@ That means there is still no single command path from “tag this commit” to �
 2. Trigger it on pushed tags matching `v*`.
 3. Optionally support `workflow_dispatch` for manual rebuilds/dry-runs without making dispatch the primary release contract.
 4. Use the git tag as the release version source of truth; do not add version-bump commits or a separate release metadata file in this slice.
-5. Keep the distributed binary name `miniloops`.
+5. Keep the distributed binary name `autoloops`.
 6. Start with a narrow supported platform matrix:
    - `linux-x64`
    - `macos-arm64`
 7. Produce deterministic archive names:
-   - `miniloops-<tag>-linux-x64.tar.gz`
-   - `miniloops-<tag>-macos-arm64.tar.gz`
+   - `autoloops-<tag>-linux-x64.tar.gz`
+   - `autoloops-<tag>-macos-arm64.tar.gz`
    - `SHA256SUMS.txt`
 
 ### Slice 2 — Add repo-owned build, packaging, and smoke helpers
@@ -48,13 +48,13 @@ That means there is still no single command path from “tag this commit” to �
    - invokes `tonic compile . --out <path>`
    - marks the result executable
 9. Add a small packaging helper script (for example `scripts/package-release.sh`) that:
-   - stages the compiled binary under the canonical name `miniloops`
+   - stages the compiled binary under the canonical name `autoloops`
    - creates the release archive with the canonical asset filename
    - keeps packaging logic out of large inline YAML blocks
 10. Add a compiled-binary smoke script (for example `scripts/release-smoke.sh`) that validates the shipped artifact without depending on Pi/network access.
 11. The smoke path must use a tiny temp fixture with a `command` backend and verify at minimum:
    - the compiled binary runs
-   - `miniloops --help` works
+   - `autoloops --help` works
    - a tiny loop run completes
    - expected runtime artifacts/output can be inspected
 12. Do not make the release workflow depend on Pi-backed smoke or external credentials.
@@ -85,7 +85,7 @@ That means there is still no single command path from “tag this commit” to �
 20. Keep the existing source-install path documented, but make the binary-release path clear for end users who do not want a source checkout.
 21. Update `docs/cli.md` so it is clear the public CLI may come from either:
    - the compiled release binary
-   - the source wrapper `bin/miniloops`
+   - the source wrapper `bin/autoloops`
 22. If needed for clarity, add a short `docs/releasing.md` operator guide covering:
    - create annotated tag
    - push tag
@@ -103,7 +103,7 @@ That means there is still no single command path from “tag this commit” to �
 - Existing source CI in `.github/workflows/ci.yml`
 - Tonic toolchain pin in `.tonic-version`
 - Self-compilation precedent in `src/main.tn`
-- Public CLI wrapper in `bin/miniloops`
+- Public CLI wrapper in `bin/autoloops`
 - Current install docs in `README.md` and `docs/cli.md`
 - GitHub-hosted runners and repo release permissions
 
@@ -135,8 +135,8 @@ Release assets without install docs are half-finished. Land README/CLI/release o
 3. The workflow builds standalone binaries for `linux-x64` and `macos-arm64`.
 4. Each built artifact is smoke-tested using the compiled binary itself and a local command-backend fixture.
 5. The workflow publishes these assets to the GitHub Release for the tag:
-   - `miniloops-<tag>-linux-x64.tar.gz`
-   - `miniloops-<tag>-macos-arm64.tar.gz`
+   - `autoloops-<tag>-linux-x64.tar.gz`
+   - `autoloops-<tag>-macos-arm64.tar.gz`
    - `SHA256SUMS.txt`
 6. Checksums in `SHA256SUMS.txt` match the uploaded archives.
 7. The workflow fails if a platform build, smoke test, packaging step, or release upload fails.

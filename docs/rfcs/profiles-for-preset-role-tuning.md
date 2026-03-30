@@ -35,7 +35,7 @@ Profiles do not:
 - replace presets
 - inherit from presets
 - patch `topology.toml`
-- patch `miniloops.toml` beyond declaring repo default profile names
+- patch `autoloops.toml` beyond declaring repo default profile names
 - add or remove roles
 - change `emits`
 - change handoff routing
@@ -47,7 +47,7 @@ Profiles do not:
 ### Core model
 A profile is a directory of optional markdown fragments keyed by preset and role.
 
-If the active preset is `autocode` and the active role is `critic`, miniloops appends any matching active profile fragments to the shipped `autocode` critic prompt.
+If the active preset is `autocode` and the active role is `critic`, autoloops appends any matching active profile fragments to the shipped `autocode` critic prompt.
 
 Profiles are intentionally **prompt-only** and **append-only**.
 
@@ -58,7 +58,7 @@ Support two profile scopes in v1.
 Checked into the repo:
 
 ```text
-.miniloop/profiles/<profile>/<preset>/<role>.md
+.autoloop/profiles/<profile>/<preset>/<role>.md
 ```
 
 Use for team-shared tuning tied to this codebase.
@@ -67,7 +67,7 @@ Use for team-shared tuning tied to this codebase.
 Stored outside the repo:
 
 ```text
-~/.config/miniloops/profiles/<profile>/<preset>/<role>.md
+~/.config/autoloops/profiles/<profile>/<preset>/<role>.md
 ```
 
 Use for personal reusable modes like strict-review or test-heavy behavior.
@@ -76,8 +76,8 @@ Use for personal reusable modes like strict-review or test-heavy behavior.
 Profiles are selected explicitly by scope and name:
 
 ```bash
-miniloops run autocode "..." --profile repo:phoenix
-miniloops run autocode "..." --profile user:strict-review
+autoloops run autocode "..." --profile repo:phoenix
+autoloops run autocode "..." --profile user:strict-review
 ```
 
 Only these forms are supported in v1:
@@ -87,7 +87,7 @@ Only these forms are supported in v1:
 Bare names are intentionally not supported in v1 because they create avoidable repo/user collision ambiguity.
 
 ### Repo default profiles
-Repos may declare default active profiles in `miniloops.toml`:
+Repos may declare default active profiles in `autoloops.toml`:
 
 ```toml
 profiles.default = ["repo:phoenix"]
@@ -96,7 +96,7 @@ profiles.default = ["repo:phoenix"]
 Users may suppress defaults:
 
 ```bash
-miniloops run autocode "..." --no-default-profiles
+autoloops run autocode "..." --no-default-profiles
 ```
 
 ### Activation order
@@ -116,8 +116,8 @@ For a given role, the effective prompt is built as:
 Example for `autocode/critic`:
 
 1. `presets/autocode/roles/critic.md`
-2. `.miniloop/profiles/phoenix/autocode/critic.md`
-3. `~/.config/miniloops/profiles/strict-review/autocode/critic.md`
+2. `.autoloop/profiles/phoenix/autocode/critic.md`
+3. `~/.config/autoloops/profiles/strict-review/autocode/critic.md`
 
 The semantics are deliberately simple: **ordered text append**. No structural merge logic.
 
@@ -150,7 +150,7 @@ Extend prompt inspection to show:
 Example shape:
 
 ```bash
-miniloops inspect prompt autocode --role critic --profile user:strict-review
+autoloops inspect prompt autocode --role critic --profile user:strict-review
 ```
 
 ## AGENTS.md Interaction
@@ -166,7 +166,7 @@ A good split is:
 
 ### Repo profile example
 ```text
-.miniloop/profiles/phoenix/autocode/planner.md
+.autoloop/profiles/phoenix/autocode/planner.md
 ```
 
 ```md
@@ -178,7 +178,7 @@ Repo-specific planner guidance:
 
 ### User profile example
 ```text
-~/.config/miniloops/profiles/strict-review/autocode/critic.md
+~/.config/autoloops/profiles/strict-review/autocode/critic.md
 ```
 
 ```md
@@ -190,7 +190,7 @@ Strict review mode:
 
 ### Example run
 ```bash
-miniloops run autocode "Add OAuth login" \
+autoloops run autocode "Add OAuth login" \
   --profile user:strict-review
 ```
 

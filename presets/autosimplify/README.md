@@ -1,6 +1,6 @@
 # AutoSimplify miniloop
 
-A miniloops-native post-implementation cleanup loop inspired by Claude Code's `/simplify` workflow.
+A autoloops-native post-implementation cleanup loop inspired by Claude Code's `/simplify` workflow.
 
 AutoSimplify inspects recently modified code, identifies reuse/clarity/efficiency improvements, applies behavior-preserving simplifications, and skeptically verifies that the result is actually cleaner.
 
@@ -29,7 +29,7 @@ AutoSimplify is not a refactor free-for-all.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/scoper.md`
@@ -39,9 +39,9 @@ AutoSimplify is not a refactor free-for-all.
 
 ## Shared working files created by the loop
 
-- `.miniloop/simplify-context.md` — scope, batching, affected files, and guardrails
-- `.miniloop/simplify-plan.md` — current batch findings and concrete cleanup plan
-- `.miniloop/progress.md` — batch status, changes made, verification results, and next action
+- `.autoloop/simplify-context.md` — scope, batching, affected files, and guardrails
+- `.autoloop/simplify-plan.md` — current batch findings and concrete cleanup plan
+- `.autoloop/progress.md` — batch status, changes made, verification results, and next action
 
 ## Backend
 
@@ -64,19 +64,19 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autosimplify "Simplify the current diff"
+./bin/autoloops run presets/autosimplify "Simplify the current diff"
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run /path/to/tonic-loops/presets/autosimplify "Simplify the current diff"
+autoloops run /path/to/tonic-loops/presets/autosimplify "Simplify the current diff"
 ```
 
 For a one-off Claude dogfood run without editing config:
 
 ```bash
-./bin/miniloops -b claude presets/autosimplify "Simplify the current diff"
+./bin/autoloops -b claude presets/autosimplify "Simplify the current diff"
 ```
 
 ## Intended input styles

@@ -9,7 +9,7 @@
 
 ### 2. `docs/configuration.md` — Configuration Reference
 - **Status:** Published
-- **Covers:** Full `miniloops.toml` key reference — 6 sections (event_loop, backend, review, memory, harness, core), 26 keys total. Precedence chain, hot-reload behavior, prompt resolution order, review fallback-to-backend defaults, kind auto-detection, truthy parsing, mock backend mode, preset required-events table.
+- **Covers:** Full `autoloops.toml` key reference — 6 sections (event_loop, backend, review, memory, harness, core), 26 keys total. Precedence chain, hot-reload behavior, prompt resolution order, review fallback-to-backend defaults, kind auto-detection, truthy parsing, mock backend mode, preset required-events table.
 - **Verified:** 17 claims checked against `src/config.tn`, `src/harness.tn`, `src/pi_adapter.tn`, and all 10 example presets — no inaccuracies.
 
 ### 3. `docs/journal.md` — Journal and Runtime Model
@@ -24,8 +24,8 @@
 
 ### 5. `docs/cli.md` — CLI Reference
 - **Status:** Published
-- **Covers:** Two invocation forms (`miniloops` wrapper vs `tonic run`), 8 environment variables, all 6 subcommands: `run` (with `-b`, `-v`, `--chain` flags and project-dir auto-detection), `emit` (event validation and `event.invalid` behavior), `inspect` (7 artifacts with formats and selectors), `memory` (list/add learning/add preference/add meta/remove), `chain` (list/run), `pi-adapter` (prompt resolution chain, NDJSON parsing, stream log files). `bin/miniloops` launcher behavior.
-- **Verified:** All claims checked against `src/main.tn`, `src/pi_adapter.tn`, `src/harness.tn`, `src/chains.tn`, and `bin/miniloops` — no inaccuracies.
+- **Covers:** Two invocation forms (`autoloops` wrapper vs `tonic run`), 8 environment variables, all 6 subcommands: `run` (with `-b`, `-v`, `--chain` flags and project-dir auto-detection), `emit` (event validation and `event.invalid` behavior), `inspect` (7 artifacts with formats and selectors), `memory` (list/add learning/add preference/add meta/remove), `chain` (list/run), `pi-adapter` (prompt resolution chain, NDJSON parsing, stream log files). `bin/autoloops` launcher behavior.
+- **Verified:** All claims checked against `src/main.tn`, `src/pi_adapter.tn`, `src/harness.tn`, `src/chains.tn`, and `bin/autoloops` — no inaccuracies.
 
 ### 6. `docs/hyperagent.md` — Hyperagent Review Loop
 - **Status:** Published

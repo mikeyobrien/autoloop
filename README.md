@@ -1,6 +1,6 @@
-# miniloops
+# autoloops
 
-A miniloops harness implemented as a Tonic app.
+A autoloops harness implemented as a Tonic app.
 
 The default preset is an autocode-style loop:
 - planner
@@ -8,13 +8,13 @@ The default preset is an autocode-style loop:
 - critic
 - finalizer
 
-Pi is the first-class backend. Miniloops now runs Pi itself with `pi -p --mode json --no-session`, parses Pi's NDJSON stream internally, and stores the raw stream under `.miniloop/` for debugging.
+Pi is the first-class backend. Autoloops now runs Pi itself with `pi -p --mode json --no-session`, parses Pi's NDJSON stream internally, and stores the raw stream under `.autoloop/` for debugging.
 
 `examples/mock-backend.sh` remains only as a local mock backend for deterministic harness debugging.
 
 ## Workflow family
 
-Miniloops ships a family of 12 `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
+Autoloops ships a family of 12 `auto*` preset workflows. Each is a self-contained agentic loop with a distinct purpose and topology.
 
 | Preset | What it does | Shape |
 |--------|-------------|-------|
@@ -64,21 +64,21 @@ steps = ["autocode", "autoqa", "autoresearch", "autocode"]
 Run a named chain:
 
 ```bash
-miniloops chain run code-and-qa .
-miniloops chain run code-simplify-qa .
-miniloops chain run code-simplify-qa . "Implement the approved spec, then simplify and QA it"
-miniloops chain list .
+autoloops chain run code-and-qa .
+autoloops chain run code-simplify-qa .
+autoloops chain run code-simplify-qa . "Implement the approved spec, then simplify and QA it"
+autoloops chain list .
 ```
 
 Run an ad hoc chain:
 
 ```bash
-miniloops run . --chain autocode,autoqa,autoresearch "Implement the approved change and validate it"
+autoloops run . --chain autocode,autoqa,autoresearch "Implement the approved change and validate it"
 ```
 
 ### How chains work
 
-- Each step runs its preset in sequence with isolated state in `.miniloop/chains/<chain-run-id>/step-<n>/`
+- Each step runs its preset in sequence with isolated state in `.autoloop/chains/<chain-run-id>/step-<n>/`
 - Handoff artifacts (prior step summaries) and result artifacts are written between steps
 - Chain lifecycle is journaled: `chain.start`, `chain.step.start`, `chain.step.finish`, `chain.complete`
 - If a step ends with `completion_event`, `completion_promise`, or `max_iterations`, the chain advances to the next step
@@ -88,7 +88,7 @@ miniloops run . --chain autocode,autoqa,autoresearch "Implement the approved cha
 Inspect chain state:
 
 ```bash
-miniloops inspect chain --format md
+autoloops inspect chain --format md
 ```
 
 ### Dynamic chain generation
@@ -97,7 +97,7 @@ Chains can be generated dynamically at runtime by a meta-level orchestrator. Dyn
 - **Budget constraints**: max depth, steps, runtime, children, consecutive failures
 - **Quality gates**: refuse spawning after repeated failures
 - **Lineage tracking**: every dynamic chain records its parent
-- **Durable specs**: chain definitions stored as JSON in `.miniloop/chains/specs/`
+- **Durable specs**: chain definitions stored as JSON in `.autoloop/chains/specs/`
 - **Preset vocabulary**: constrained to known preset names
 
 Configure budgets in `chains.toml`:
@@ -125,21 +125,21 @@ These are separate layers. Topology stays focused on roles within one loop; chai
 
 ## Runtime files
 
-- `miniloops.toml` — preferred runtime config
-- `miniloops.conf` — legacy fallback
+- `autoloops.toml` — preferred runtime config
+- `autoloops.conf` — legacy fallback
 - `topology.toml` — shared loop topology
 - `roles/*.md` — role instructions
 - `harness.md` — live harness instructions
 - `hyperagent.md` — live review instructions
-- `.miniloop/journal.jsonl` — append-only runtime journal
-- `.miniloop/memory.jsonl` — append-only loop memory
-- `.miniloop/waves/<wave-id>/...` — structured-parallel wave artifacts (`spec.md`, `join.md`, branch outputs)
-- `.miniloop/pi-stream.<iteration>.jsonl` — raw Pi NDJSON for task turns
-- `.miniloop/pi-review.<iteration>.jsonl` — raw Pi NDJSON for hyperagent reviews
+- `.autoloop/journal.jsonl` — append-only runtime journal
+- `.autoloop/memory.jsonl` — append-only loop memory
+- `.autoloop/waves/<wave-id>/...` — structured-parallel wave artifacts (`spec.md`, `join.md`, branch outputs)
+- `.autoloop/pi-stream.<iteration>.jsonl` — raw Pi NDJSON for task turns
+- `.autoloop/pi-review.<iteration>.jsonl` — raw Pi NDJSON for hyperagent reviews
 
 ## Runtime config
 
-Edit `miniloops.toml`:
+Edit `autoloops.toml`:
 
 ```toml
 event_loop.max_iterations = 100
@@ -165,9 +165,9 @@ parallel.branch_timeout_ms = 180000
 memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloop"
-core.journal_file = ".miniloop/journal.jsonl"
-core.memory_file = ".miniloop/memory.jsonl"
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
 ```
 
 Notes:
@@ -177,7 +177,7 @@ Notes:
 - Review uses the same Pi adapter settings by default.
 - `review.every_iterations = 0` means “use the number of roles in `topology.toml`”.
 - `event_loop.completion_event` is the real completion signal; `completion_promise` is a text fallback.
-- `miniloops.conf` is still accepted for older projects.
+- `autoloops.conf` is still accepted for older projects.
 
 ### Mock backend mode
 
@@ -198,11 +198,11 @@ Run the end-to-end Pi smoke check:
 ./scripts/pi-smoke.sh
 ```
 
-It creates a temp miniloops project, runs a one-iteration Pi-backed loop, and fails unless all of these hold:
+It creates a temp autoloops project, runs a one-iteration Pi-backed loop, and fails unless all of these hold:
 - the loop completes via `task.complete`
 - the journal records `backend.start`, `backend.finish`, and `loop.complete`
 - the projected iteration output is exactly `hello`
-- the raw Pi NDJSON log is written to `.miniloop/pi-stream.1.jsonl`
+- the raw Pi NDJSON log is written to `.autoloop/pi-stream.1.jsonl`
 
 ## Topology
 
@@ -258,7 +258,7 @@ When `parallel.enabled = true`, normal parent turns get a small global `Structur
 Rules:
 - only one wave may be active at a time
 - payloads must be a markdown bullet list or numbered list with 1..`parallel.max_branches` branch objectives
-- branches run as concurrent child jobs in isolated state under `.miniloop/waves/<wave-id>/...`
+- branches run as concurrent child jobs in isolated state under `.autoloop/waves/<wave-id>/...`
 - only the harness may emit `*.parallel.joined`
 - branch child prompts do **not** get the global parallelism block
 - `wave.branch.finish`, `wave.join.start`, `wave.join.finish`, branch `result.md`, and `join.md` surface elapsed timing so overlap stays inspectable
@@ -275,46 +275,46 @@ Topology can route joined dispatch events explicitly:
 
 ## Journal-first runtime model
 
-Miniloops treats the JSONL journal as the runtime source of truth.
+Autoloops treats the JSONL journal as the runtime source of truth.
 
 That means:
-- `loop.start`, `iteration.start`, `backend.start`, agent events, `event.invalid`, `backend.finish`, `review.start`, `review.finish`, `iteration.finish`, and `loop.complete` all land in `.miniloop/journal.jsonl`
+- `loop.start`, `iteration.start`, `backend.start`, agent events, `event.invalid`, `backend.finish`, `review.start`, `review.finish`, `iteration.finish`, and `loop.complete` all land in `.autoloop/journal.jsonl`
 - structured-parallel runs also append `wave.start`, `wave.branch.start`, `wave.branch.finish`, `wave.join.start`, `wave.join.finish`, and `wave.timeout` / `wave.failed` / `wave.invalid` when needed
 - prompt text is stored in the `iteration.start` record
 - parsed backend output is stored in the `iteration.finish` record
-- raw Pi NDJSON is written separately to `.miniloop/pi-stream.*.jsonl` and `.miniloop/pi-review.*.jsonl`
+- raw Pi NDJSON is written separately to `.autoloop/pi-stream.*.jsonl` and `.autoloop/pi-review.*.jsonl`
 - scratchpad is projected from completed iterations; prompts use a compact view while `inspect scratchpad` keeps the richer view
 
 Loop memory is separate and append-only:
-- `.miniloop/memory.jsonl`
+- `.autoloop/memory.jsonl`
 - stores learnings, preferences, and meta notes
 - is injected back into future prompts
 
 ## Hyperagent review loop
 
-Miniloops can run a meta-level review pass every `review.every_iterations` task iterations.
+Autoloops can run a meta-level review pass every `review.every_iterations` task iterations.
 
 By default:
 - hyperagent review is enabled
 - review cadence = number of roles in `topology.toml`
 - review uses the same Pi adapter unless overridden
 - the harness re-reads runtime files before every task iteration, so edits take effect on the next turn
-- the hyperagent may make bounded hygiene edits to runtime-facing loop files (`miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, `.miniloop/logs/`, `.miniloop/docs/*.md`) when that improves the next turn
-- the hyperagent may consolidate stale context, resolved detours, and no-longer-relevant notes into `.miniloop/docs/*.md` so active working files stay focused on the current objective
-- the hyperagent must not edit app/product source code, tests, manifests, or `.miniloop/` state during review
+- the hyperagent may make bounded hygiene edits to runtime-facing loop files (`autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, `.autoloop/logs/`, `.autoloop/docs/*.md`) when that improves the next turn
+- the hyperagent may consolidate stale context, resolved detours, and no-longer-relevant notes into `.autoloop/docs/*.md` so active working files stay focused on the current objective
+- the hyperagent must not edit app/product source code, tests, manifests, or `.autoloop/` state during review
 - short durable lessons still belong in loop memory; archived markdown context belongs in `docs/`
 
 ## Backpressure on hallucinated events
 
-Miniloops uses soft routing + protocol backpressure:
+Autoloops uses soft routing + protocol backpressure:
 - topology suggests next roles from the latest routing event
 - allowed next events are derived from those roles
-- if the model emits an event outside that set, `miniloops emit ...` fails immediately
+- if the model emits an event outside that set, `autoloops emit ...` fails immediately
 - the loop records `event.invalid` and prompts again with the recent routing event, suggested roles, and allowed events
 
 ## Event tool
 
-During a loop run, miniloops creates a helper command inside `.miniloop/` and tells the agent to use it.
+During a loop run, autoloops creates a helper command inside `.autoloop/` and tells the agent to use it.
 
 Important shape:
 
@@ -334,7 +334,7 @@ The topic must be in the current allowed next-event set or the emit will be reje
 Manual usage:
 
 ```bash
-miniloops emit task.complete "manual completion"
+autoloops emit task.complete "manual completion"
 ```
 
 From the repo root without installing the shim:
@@ -346,12 +346,12 @@ tonic run . emit task.complete "manual completion"
 Loop memory commands:
 
 ```bash
-miniloops memory list
-miniloops memory status
-miniloops memory find "verify role"
-miniloops memory add learning "The verify role should summarize test failures"
-miniloops memory add preference Workflow "Keep role prompts short and explicit"
-miniloops memory remove mem-3 "stale"
+autoloops memory list
+autoloops memory status
+autoloops memory find "verify role"
+autoloops memory add learning "The verify role should summarize test failures"
+autoloops memory add preference Workflow "Keep role prompts short and explicit"
+autoloops memory remove mem-3 "stale"
 ```
 
 ## Projections
@@ -359,9 +359,9 @@ miniloops memory remove mem-3 "stale"
 Inspect the latest scratchpad:
 
 ```bash
-miniloops inspect scratchpad                   # defaults to terminal
-miniloops inspect scratchpad --format md
-miniloops inspect scratchpad --format terminal
+autoloops inspect scratchpad                   # defaults to terminal
+autoloops inspect scratchpad --format md
+autoloops inspect scratchpad --format terminal
 ```
 
 Markdown-capable inspect views now default to `terminal`. Use `--format md` when you want the raw markdown projection.
@@ -371,63 +371,63 @@ This inspect view stays richer than the prompt-injected scratchpad so operators 
 Inspect memory:
 
 ```bash
-miniloops inspect memory                       # defaults to terminal
-miniloops inspect memory --format md
-miniloops inspect memory --format json
+autoloops inspect memory                       # defaults to terminal
+autoloops inspect memory --format md
+autoloops inspect memory --format json
 ```
 
 Inspect a specific iteration prompt:
 
 ```bash
-miniloops inspect prompt 1                     # defaults to terminal
-miniloops inspect prompt 1 --format md
+autoloops inspect prompt 1                     # defaults to terminal
+autoloops inspect prompt 1 --format md
 ```
 
 Inspect a specific iteration output:
 
 ```bash
-miniloops inspect output 1                     # defaults to text
-miniloops inspect output 1 --format text
+autoloops inspect output 1                     # defaults to text
+autoloops inspect output 1 --format text
 ```
 
 Inspect the raw journal:
 
 ```bash
-miniloops inspect journal                      # defaults to json
-miniloops inspect journal --format json
+autoloops inspect journal                      # defaults to json
+autoloops inspect journal --format json
 ```
 
 Inspect coordination state (issues, slices, commits from journal):
 
 ```bash
-miniloops inspect coordination                 # defaults to terminal
-miniloops inspect coordination --format md
+autoloops inspect coordination                 # defaults to terminal
+autoloops inspect coordination --format md
 ```
 
 Inspect chain state:
 
 ```bash
-miniloops inspect chain                        # defaults to terminal
-miniloops inspect chain --format md
+autoloops inspect chain                        # defaults to terminal
+autoloops inspect chain --format md
 ```
 
 Inspect metrics (per-iteration timing, roles, events, outcomes):
 
 ```bash
-miniloops inspect metrics                      # terminal-rendered markdown table
-miniloops inspect metrics --format md          # markdown table with summary line
-miniloops inspect metrics --format csv         # RFC 4180 CSV
-miniloops inspect metrics --format json        # JSON array of objects
-miniloops inspect metrics run-1 --format md    # filter to a specific run
+autoloops inspect metrics                      # terminal-rendered markdown table
+autoloops inspect metrics --format md          # markdown table with summary line
+autoloops inspect metrics --format csv         # RFC 4180 CSV
+autoloops inspect metrics --format json        # JSON array of objects
+autoloops inspect metrics run-1 --format md    # filter to a specific run
 ```
 
 Against another project directory:
 
 ```bash
-miniloops inspect scratchpad /path/to/project
-miniloops inspect memory /path/to/project
-miniloops inspect prompt 2 /path/to/project
-miniloops inspect output 2 /path/to/project
+autoloops inspect scratchpad /path/to/project
+autoloops inspect memory /path/to/project
+autoloops inspect prompt 2 /path/to/project
+autoloops inspect output 2 /path/to/project
 ```
 
 ## Run
@@ -448,8 +448,8 @@ tonic run . "Write a tiny checklist"
 Run against another project directory:
 
 ```bash
-tonic run . /path/to/your/miniloops-project
-tonic run . /path/to/your/miniloops-project "Write a tiny checklist"
+tonic run . /path/to/your/autoloops-project
+tonic run . /path/to/your/autoloops-project "Write a tiny checklist"
 ```
 
 ### One-shot backend override
@@ -457,14 +457,14 @@ tonic run . /path/to/your/miniloops-project "Write a tiny checklist"
 For temporary command-mode experiments, you can override the configured backend at launch time:
 
 ```bash
-./bin/miniloops -b claude -p autocode "Add a --verbose flag to the CLI"
+./bin/autoloops -b claude -p autocode "Add a --verbose flag to the CLI"
 ```
 
 Notes:
 - `-b pi` keeps the built-in Pi adapter path.
 - `-b claude` runs Claude in command mode as `claude -p ...`.
 - other `-b <command>` values run that command directly in command mode.
-- this does not rewrite `miniloops.toml`; it is a one-run override.
+- this does not rewrite `autoloops.toml`; it is a one-run override.
 
 ## Git hooks
 
@@ -476,24 +476,24 @@ bin/install-hooks
 
 This symlinks `hooks/pre-commit` (runs `tonic check .`) and `hooks/pre-push` (runs `bin/test`) into `.git/hooks/`. The installer is idempotent. Use `git commit --no-verify` or `git push --no-verify` to bypass when needed.
 
-## Install `miniloops`
+## Install `autoloops`
 
 ### From GitHub Releases
 
-Download the archive for your platform from GitHub Releases, then install the bundled `miniloops` binary:
+Download the archive for your platform from GitHub Releases, then install the bundled `autoloops` binary:
 
 ```bash
-tar -xzf miniloops-v0.1.0-linux-x64.tar.gz
-chmod +x miniloops-v0.1.0-linux-x64/miniloops
+tar -xzf autoloops-v0.1.0-linux-x64.tar.gz
+chmod +x autoloops-v0.1.0-linux-x64/autoloops
 mkdir -p ~/.local/bin
-mv miniloops-v0.1.0-linux-x64/miniloops ~/.local/bin/miniloops
+mv autoloops-v0.1.0-linux-x64/autoloops ~/.local/bin/autoloops
 ```
 
 Then:
 
 ```bash
-miniloops --help
-miniloops run autocode
+autoloops --help
+autoloops run autocode
 ```
 
 Release assets are built by `.github/workflows/release.yml`. CI/release currently install Tonic from the git commit pinned in `.tonic-git-ref`. See `docs/releasing.md` for the tag-based release flow.
@@ -503,18 +503,18 @@ Release assets are built by `.github/workflows/release.yml`. CI/release currentl
 Use the launcher script:
 
 ```bash
-chmod +x bin/miniloops
+chmod +x bin/autoloops
 mkdir -p ~/.local/bin
-ln -sf "$(pwd)/bin/miniloops" ~/.local/bin/miniloops
+ln -sf "$(pwd)/bin/autoloops" ~/.local/bin/autoloops
 ```
 
 Then:
 
 ```bash
-miniloops run autocode
-miniloops run autocode "Add OAuth login"
-miniloops run /path/to/project
-miniloops inspect scratchpad /path/to/project --format md
+autoloops run autocode
+autoloops run autocode "Add OAuth login"
+autoloops run /path/to/project
+autoloops inspect scratchpad /path/to/project --format md
 ```
 
 The source launcher is a thin wrapper around:

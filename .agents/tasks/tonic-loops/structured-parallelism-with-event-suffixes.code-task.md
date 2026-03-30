@@ -8,13 +8,13 @@ Add a minimal structured parallelism model inside loops using event-name convent
 The implementation must preserve a hard anti-chaos boundary: one canonical parent loop, at most one active wave, mandatory join, no nested fan-out in v1, and no branch being allowed to continue as an independent live loop after the barrier.
 
 ## Background
-Miniloops currently has a narrow, inspectable single-lane loop model:
+Autoloops currently has a narrow, inspectable single-lane loop model:
 - one routing context at a time
 - one backend turn per iteration
 - one canonical parent loop
 - one append-only journal as runtime truth
 
-That simplicity is good and should be preserved. The goal is not to turn miniloops into a general workflow engine or scheduler. The goal is to introduce one small structured-concurrency primitive that supports useful bounded parallelism without letting loop state explode into uncontrolled peer loops.
+That simplicity is good and should be preserved. The goal is not to turn autoloops into a general workflow engine or scheduler. The goal is to introduce one small structured-concurrency primitive that supports useful bounded parallelism without letting loop state explode into uncontrolled peer loops.
 
 The design direction is already settled:
 - no `workflow.toml` in v1
@@ -56,7 +56,7 @@ The crucial product boundary is:
 **Note:** Keep the implementation visibly bounded. Do not create free-form peer loops, nested waves, or a second orchestration DSL.
 
 ## Technical Requirements
-1. Add three new minimal runtime config keys in `miniloops.toml`:
+1. Add three new minimal runtime config keys in `autoloops.toml`:
    - `parallel.enabled`
    - `parallel.max_branches`
    - `parallel.branch_timeout_ms`
@@ -90,7 +90,7 @@ The crucial product boundary is:
    - branches cannot advance parent routing directly
    - branches cannot open nested waves
    - branches cannot outlive the wave barrier as live peer loops
-13. Create isolated branch state under the parent state dir using a visible wave layout such as `.miniloop/waves/<wave-id>/branches/<branch-id>/...`.
+13. Create isolated branch state under the parent state dir using a visible wave layout such as `.autoloop/waves/<wave-id>/branches/<branch-id>/...`.
 14. Ensure each branch produces durable branch-local output/artifacts sufficient for later inspection.
 15. Add parent journal events for wave lifecycle, including at minimum:
    - `wave.start`
@@ -189,7 +189,7 @@ The crucial product boundary is:
 
 10. **Branch State Is Isolated And Visible**
    - Given a completed wave
-   - When a reader inspects `.miniloop/waves/...`
+   - When a reader inspects `.autoloop/waves/...`
    - Then they can see branch-local durable state and result artifacts for each child branch
 
 11. **Wave Lifecycle Is Journaled**
@@ -214,5 +214,5 @@ The crucial product boundary is:
 
 ## Metadata
 - **Complexity**: High
-- **Labels**: miniloops, parallelism, structured-concurrency, event-protocol, topology, journal, inspectability, prompting
+- **Labels**: autoloops, parallelism, structured-concurrency, event-protocol, topology, journal, inspectability, prompting
 - **Required Skills**: orchestration design, event schema design, runtime boundary design, Tonic app development, documentation, test design

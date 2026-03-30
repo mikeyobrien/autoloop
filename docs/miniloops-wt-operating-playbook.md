@@ -1,17 +1,17 @@
-# Miniloops + wt Operating Playbook
+# Autoloops + wt Operating Playbook
 
-This playbook is the practical operator guide for running Miniloops inside Git worktrees managed by `wt` (Worktrunk).
+This playbook is the practical operator guide for running Autoloops inside Git worktrees managed by `wt` (Worktrunk).
 
 It is written for the real local setup verified on this machine:
 - `wt` 0.33.0 at `/opt/homebrew/bin/wt`
-- `miniloops` via `./bin/miniloops` inside `/Users/rook/projects/tonic-loops`
+- `autoloops` via `./bin/autoloops` inside `/Users/rook/projects/tonic-loops`
 - Pi-backed smoke test verified with `./scripts/pi-smoke.sh`
 
 ## Mental model
 
 Use `wt` to create and move between isolated task branches.
 
-Use Miniloops inside the selected worktree to run the right `auto*` preset for the task:
+Use Autoloops inside the selected worktree to run the right `auto*` preset for the task:
 - `autocode` for implementation
 - `autoqa` for validation
 - `autoreview` for review
@@ -25,7 +25,7 @@ Use Miniloops inside the selected worktree to run the right `auto*` preset for t
 Recommended rhythm:
 1. Create or switch to a task worktree with `wt`
 2. Enter that worktree explicitly if shell integration is not active
-3. Run the appropriate Miniloops preset in that worktree
+3. Run the appropriate Autoloops preset in that worktree
 4. Inspect outputs/artifacts
 5. Merge with `wt merge`
 6. Only run `wt remove` if you merged with `--no-remove` or are cleaning up without merging
@@ -64,12 +64,12 @@ Remove the current worktree:
 wt remove
 ```
 
-### Miniloops
+### Autoloops
 
 Documented wrapper form:
 
 ```bash
-./bin/miniloops run <preset|.> [prompt...]
+./bin/autoloops run <preset|.> [prompt...]
 ```
 
 Direct Tonic equivalent:
@@ -81,28 +81,28 @@ tonic run /Users/rook/projects/tonic-loops run <preset|.> [prompt...]
 Example invocations:
 
 ```bash
-./bin/miniloops run autocode "Implement the requested feature"
-./bin/miniloops run autoqa "Validate the current changes"
-./bin/miniloops run autoreview "Review the current diff"
-./bin/miniloops run . "Operate on this local miniloops project"
+./bin/autoloops run autocode "Implement the requested feature"
+./bin/autoloops run autoqa "Validate the current changes"
+./bin/autoloops run autoreview "Review the current diff"
+./bin/autoloops run . "Operate on this local autoloops project"
 ```
 
 Inspect outputs:
 
 ```bash
-./bin/miniloops inspect scratchpad --format md
-./bin/miniloops inspect memory --format md
-./bin/miniloops inspect coordination --format md
-./bin/miniloops inspect metrics --format md
-./bin/miniloops inspect output 1 --format text
+./bin/autoloops inspect scratchpad --format md
+./bin/autoloops inspect memory --format md
+./bin/autoloops inspect coordination --format md
+./bin/autoloops inspect metrics --format md
+./bin/autoloops inspect output 1 --format text
 ```
 
 Run a chain:
 
 ```bash
-./bin/miniloops run . --chain autocode,autoqa
-./bin/miniloops chain list .
-./bin/miniloops inspect chain --format md
+./bin/autoloops run . --chain autocode,autoqa
+./bin/autoloops chain list .
+./bin/autoloops inspect chain --format md
 ```
 
 ## Recommended operating flows
@@ -118,20 +118,20 @@ wt switch --create feature-login-fix
 If shell integration is active, `wt switch` can move you there automatically. Otherwise `cd` into the created worktree path and then run:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops run autocode "Fix the login flow and leave the repo passing"
+/Users/rook/projects/tonic-loops/bin/autoloops run autocode "Fix the login flow and leave the repo passing"
 ```
 
 Inspect the run:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops inspect metrics --format md
-/Users/rook/projects/tonic-loops/bin/miniloops inspect scratchpad --format md
+/Users/rook/projects/tonic-loops/bin/autoloops inspect metrics --format md
+/Users/rook/projects/tonic-loops/bin/autoloops inspect scratchpad --format md
 ```
 
 Validate with a second loop if needed:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops run autoqa "Validate the current changes and report any failures"
+/Users/rook/projects/tonic-loops/bin/autoloops run autoqa "Validate the current changes and report any failures"
 ```
 
 Merge when ready:
@@ -152,14 +152,14 @@ wt switch feature-review-target
 If shell integration is not active, `cd` into the selected worktree path before running review:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops run autoreview "Review the current diff for correctness, risk, and missing tests"
+/Users/rook/projects/tonic-loops/bin/autoloops run autoreview "Review the current diff for correctness, risk, and missing tests"
 ```
 
 Inspect:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops inspect scratchpad --format md
-/Users/rook/projects/tonic-loops/bin/miniloops inspect coordination --format md
+/Users/rook/projects/tonic-loops/bin/autoloops inspect scratchpad --format md
+/Users/rook/projects/tonic-loops/bin/autoloops inspect coordination --format md
 ```
 
 ## 3) Spec-first flow
@@ -173,28 +173,28 @@ wt switch --create feature-new-flow
 If shell integration is not active, `cd` into the created worktree path first. Then draft the plan/spec:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops run autospec "Turn this rough idea into an RFC and implementation task"
+/Users/rook/projects/tonic-loops/bin/autoloops run autospec "Turn this rough idea into an RFC and implementation task"
 ```
 
 Then implement:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops run autocode "Implement the approved spec from this worktree"
+/Users/rook/projects/tonic-loops/bin/autoloops run autocode "Implement the approved spec from this worktree"
 ```
 
 ## 4) Chain flow for implementation + QA
 
-If the current directory is itself a valid Miniloops project:
+If the current directory is itself a valid Autoloops project:
 
 ```bash
-./bin/miniloops run . --chain autocode,autoqa
+./bin/autoloops run . --chain autocode,autoqa
 ```
 
 Otherwise run the presets sequentially from the tonic-loops repo binary:
 
 ```bash
-/Users/rook/projects/tonic-loops/bin/miniloops run autocode "Implement the requested change"
-/Users/rook/projects/tonic-loops/bin/miniloops run autoqa "Validate the requested change"
+/Users/rook/projects/tonic-loops/bin/autoloops run autocode "Implement the requested change"
+/Users/rook/projects/tonic-loops/bin/autoloops run autoqa "Validate the requested change"
 ```
 
 ## Non-interactive / agent-safe mode
@@ -245,14 +245,14 @@ Without active shell integration:
 - but it cannot actually `cd` the parent shell
 - in that case use `--no-cd` and change directories yourself
 
-## Miniloops operator notes
+## Autoloops operator notes
 
 ### Canonical invocation
 
 Prefer the explicit documented form:
 
 ```bash
-./bin/miniloops run autocode "Your task"
+./bin/autoloops run autocode "Your task"
 ```
 
 Use the documented `run` form in scripts, docs, and operator workflows. It is the clearest and least ambiguous invocation shape.
@@ -262,20 +262,20 @@ Use the documented `run` form in scripts, docs, and operator workflows. It is th
 `run` requires a preset-name or preset-directory style argument:
 - bundled preset name such as `autocode`, `autoqa`, `autoreview`
 - explicit preset directory
-- `.` when the current directory itself is a valid Miniloops project
+- `.` when the current directory itself is a valid Autoloops project
 
 ### Help
 
 Subcommand help works as expected:
 
 ```bash
-./bin/miniloops run --help
+./bin/autoloops run --help
 ```
 
 Use:
 
 ```bash
-./bin/miniloops --help
+./bin/autoloops --help
 ```
 
 for top-level help.
@@ -355,8 +355,8 @@ For most code tasks:
 ```bash
 wt switch --create feature-short-name
 # cd into the worktree if shell integration is not active
-/Users/rook/projects/tonic-loops/bin/miniloops run autocode "Implement the requested change"
-/Users/rook/projects/tonic-loops/bin/miniloops run autoqa "Validate the current changes"
+/Users/rook/projects/tonic-loops/bin/autoloops run autocode "Implement the requested change"
+/Users/rook/projects/tonic-loops/bin/autoloops run autoqa "Validate the current changes"
 wt merge --no-remove
 wt remove
 ```
@@ -366,7 +366,7 @@ For review tasks:
 ```bash
 wt switch feature-short-name
 # cd into the worktree if shell integration is not active
-/Users/rook/projects/tonic-loops/bin/miniloops run autoreview "Review the current diff"
+/Users/rook/projects/tonic-loops/bin/autoloops run autoreview "Review the current diff"
 ```
 
 ## Troubleshooting
@@ -376,12 +376,12 @@ wt switch feature-short-name
 - Fix: run `wt config shell install`, restart shell, verify with `type wt`
 - Or use `wt switch ... --no-cd` and `cd` manually
 
-### `./bin/miniloops run --help` did not show help
+### `./bin/autoloops run --help` did not show help
 - This should now print `run` subcommand usage
 - If it does not, you are likely on an older checkout or binary; rerun from the current repo/build
 
-### `miniloops run .` failed
-- `.` only works if the current directory contains a valid Miniloops config/project
+### `autoloops run .` failed
+- `.` only works if the current directory contains a valid Autoloops config/project
 - Use a named preset (`autocode`, `autoqa`, etc.) or point at an explicit preset directory instead
 
 ### I want a predictable agent-safe flow
@@ -390,7 +390,7 @@ Use:
 ```bash
 wt switch --create feature-name --no-cd -y
 # cd into the created worktree path
-/Users/rook/projects/tonic-loops/bin/miniloops run autocode "Your task"
+/Users/rook/projects/tonic-loops/bin/autoloops run autocode "Your task"
 wt merge --no-remove -y
 wt remove -y --foreground
 ```
@@ -399,9 +399,9 @@ wt remove -y --foreground
 
 The following were verified locally while writing this playbook:
 - `./scripts/pi-smoke.sh` passed
-- `./bin/miniloops --help` works
-- `./bin/miniloops run --help` works
-- documented Miniloops `run` invocation works
+- `./bin/autoloops --help` works
+- `./bin/autoloops run --help` works
+- documented Autoloops `run` invocation works
 - `wt --help`, `wt switch --help`, `wt merge --help`, `wt remove --help`, and `wt config show` work
 - a temporary git repo successfully exercised:
   - `wt switch --create ... --no-cd -y`

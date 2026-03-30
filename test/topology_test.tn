@@ -40,7 +40,7 @@ defmodule TopologyTest do
   end
 
   defp prepare_fixture(main_source) do
-    dir = "/tmp/miniloops-topology-source-fixture"
+    dir = "/tmp/autoloops-topology-source-fixture"
     src_dir = Path.join(dir, "src")
 
     System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(src_dir))
@@ -133,7 +133,7 @@ defmodule TopologyTest do
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp shell_quote(text) do

@@ -1,10 +1,10 @@
 # Task: Store-Backed Iteration Context
 
 ## Description
-Use the tonic stdlib `Store` module for in-memory iteration state (current role, recent event, iteration number, run ID) to reduce redundant file re-reads and environment variable round-trips during a single miniloops run.
+Use the tonic stdlib `Store` module for in-memory iteration state (current role, recent event, iteration number, run ID) to reduce redundant file re-reads and environment variable round-trips during a single autoloops run.
 
 ## Background
-During each iteration, miniloops re-reads config, topology, journal, and memory files to reconstruct state. While `reload_loop()` is intentional for hot-reload support, some state is immutable within a run (run_id, self_command, project_dir) and other state only changes at well-defined points (iteration number increments, recent_event updates on emit). Currently this state is threaded through function arguments or reconstructed from environment variables.
+During each iteration, autoloops re-reads config, topology, journal, and memory files to reconstruct state. While `reload_loop()` is intentional for hot-reload support, some state is immutable within a run (run_id, self_command, project_dir) and other state only changes at well-defined points (iteration number increments, recent_event updates on emit). Currently this state is threaded through function arguments or reconstructed from environment variables.
 
 The tonic stdlib now includes a `Store` module providing an in-memory key-value store. Using Store for run-scoped state eliminates redundant parsing while keeping hot-reloadable state (config, topology) on the file-read path.
 
@@ -32,7 +32,7 @@ The tonic stdlib now includes a `Store` module providing an in-memory key-value 
 2. Populate immutable run state into the store at initialization:
    - `"run_id"` — the generated run ID
    - `"project_dir"` — project directory path
-   - `"self_command"` — the miniloops binary path
+   - `"self_command"` — the autoloops binary path
    - `"max_iterations"` — from config
    - `"completion_event"` — from config/topology
    - `"completion_promise"` — from config

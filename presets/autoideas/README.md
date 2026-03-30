@@ -1,6 +1,6 @@
 # Autoideas miniloop
 
-A miniloops-native loop that surveys a repository and generates a skeptically filtered improvement report.
+A autoloops-native loop that surveys a repository and generates a skeptically filtered improvement report.
 
 Shape:
 - scanner
@@ -8,7 +8,7 @@ Shape:
 - reviewer
 - synthesizer
 
-The scanner identifies areas worth analyzing. The analyst deep-dives each area and produces concrete suggestions. The reviewer tries to kill weak ideas. The synthesizer compiles only the survivors into `.miniloop/ideas-report.md`.
+The scanner identifies areas worth analyzing. The analyst deep-dives each area and produces concrete suggestions. The reviewer tries to kill weak ideas. The synthesizer compiles only the survivors into `.autoloop/ideas-report.md`.
 
 ## Fail-closed contract
 
@@ -16,12 +16,12 @@ Autoideas should prefer false negatives over false positives.
 
 - A healthy run may reject many areas.
 - A healthy run may end with only a few strong ideas.
-- `.miniloop/ideas-report.md` should contain reviewer-validated suggestions, not every plausible thought.
-- Inspect `.miniloop/progress.md` if you want to see what was trimmed or rejected.
+- `.autoloop/ideas-report.md` should contain reviewer-validated suggestions, not every plausible thought.
+- Inspect `.autoloop/progress.md` if you want to see what was trimmed or rejected.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/scanner.md`
@@ -31,9 +31,9 @@ Autoideas should prefer false negatives over false positives.
 
 ## Shared working files created by the loop
 
-- `.miniloop/scan-areas.md` — prioritized list of repo areas to analyze
-- `.miniloop/progress.md` — current area, status, completed areas, PASS/DROP reviewer notes
-- `.miniloop/ideas-report.md` — the final output report
+- `.autoloop/scan-areas.md` — prioritized list of repo areas to analyze
+- `.autoloop/progress.md` — current area, status, completed areas, PASS/DROP reviewer notes
+- `.autoloop/ideas-report.md` — the final output report
 
 ## Backend
 
@@ -56,24 +56,24 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autoideas /path/to/target-repo
+./bin/autoloops run presets/autoideas /path/to/target-repo
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run /path/to/tonic-loops/presets/autoideas /path/to/target-repo
+autoloops run /path/to/tonic-loops/presets/autoideas /path/to/target-repo
 ```
 
 For a one-off Claude dogfood run without editing config:
 
 ```bash
-./bin/miniloops -b claude presets/autoideas /path/to/target-repo
+./bin/autoloops -b claude presets/autoideas /path/to/target-repo
 ```
 
 ## What it produces
 
-An `.miniloop/ideas-report.md` containing:
+An `.autoloop/ideas-report.md` containing:
 - Concrete suggestions organized by area
 - Only ideas that survived skeptical review
 - Enough context to understand why each surviving idea is worth doing

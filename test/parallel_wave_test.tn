@@ -83,7 +83,7 @@ defmodule ParallelWaveTest do
 
   def test_parallel_wave_rejects_second_active_wave() do
     project_dir = prepare_fixture(500)
-    active_marker = Path.join(project_dir, ".miniloop/waves/active")
+    active_marker = Path.join(project_dir, ".autoloop/waves/active")
 
     System.run("mkdir -p " <> shell_quote(Path.dirname(active_marker)))
     System.write_text(active_marker, "wave-existing")
@@ -139,7 +139,7 @@ defmodule ParallelWaveTest do
     backend_path = Path.join(project_dir, "backend.sh")
 
     System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(roles_dir))
-    System.write_text(Path.join(project_dir, "miniloops.toml"), miniloops_toml(branch_timeout_ms, backend_path))
+    System.write_text(Path.join(project_dir, "autoloops.toml"), autoloops_toml(branch_timeout_ms, backend_path))
     System.write_text(Path.join(project_dir, "topology.toml"), topology_toml())
     System.write_text(Path.join(project_dir, "harness.md"), "parallel wave test harness\n")
     System.write_text(Path.join(roles_dir, "planner.md"), "You are the planner.\n")
@@ -153,14 +153,14 @@ defmodule ParallelWaveTest do
   defp run_fixture(project_dir, prompt) do
     System.run(
       "cd " <> shell_quote(project_dir) <>
-      " && " <> clean_miniloops_env() <>
+      " && " <> clean_autoloops_env() <>
       " tonic run " <> shell_quote(repo_root()) <> " " <> shell_quote(project_dir) <> " " <> shell_quote(prompt)
     )
   end
 
   defp latest_wave_dir(project_dir) do
     result = System.run(
-      "find " <> shell_quote(Path.join(project_dir, ".miniloop/waves")) <>
+      "find " <> shell_quote(Path.join(project_dir, ".autoloop/waves")) <>
       " -maxdepth 1 -mindepth 1 -type d -name 'wave-*' 2>/dev/null | head -n 1"
     )
 
@@ -168,10 +168,10 @@ defmodule ParallelWaveTest do
   end
 
   defp inspect_prompt(project_dir, iteration) do
-    tool = Path.join(project_dir, ".miniloop/miniloops")
+    tool = Path.join(project_dir, ".autoloop/autoloops")
     result = System.run(
       "cd " <> shell_quote(project_dir) <>
-      " && " <> clean_miniloops_env() <> " " <> shell_quote(tool) <> " inspect prompt " <> to_string(iteration) <> " --format md"
+      " && " <> clean_autoloops_env() <> " " <> shell_quote(tool) <> " inspect prompt " <> to_string(iteration) <> " --format md"
     )
 
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
@@ -179,7 +179,7 @@ defmodule ParallelWaveTest do
   end
 
   defp read_journal(project_dir) do
-    path = Path.join(project_dir, ".miniloop/journal.jsonl")
+    path = Path.join(project_dir, ".autoloop/journal.jsonl")
 
     case System.path_exists(path) do
       true -> System.read_text(path)
@@ -187,7 +187,7 @@ defmodule ParallelWaveTest do
     end
   end
 
-  defp miniloops_toml(branch_timeout_ms, backend_path) do
+  defp autoloops_toml(branch_timeout_ms, backend_path) do
     "event_loop.max_iterations = 3\n" <>
     "event_loop.completion_event = \"task.complete\"\n" <>
     "backend.kind = \"command\"\n" <>
@@ -198,9 +198,9 @@ defmodule ParallelWaveTest do
     "parallel.max_branches = 3\n" <>
     "parallel.branch_timeout_ms = " <> to_string(branch_timeout_ms) <> "\n" <>
     "memory.prompt_budget_chars = 8000\n" <>
-    "core.state_dir = \".miniloop\"\n" <>
-    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
-    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+    "core.state_dir = \".autoloop\"\n" <>
+    "core.journal_file = \".autoloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".autoloop/memory.jsonl\"\n"
   end
 
   defp topology_toml() do
@@ -273,7 +273,7 @@ defmodule ParallelWaveTest do
     "printf 'unexpected backend prompt\\n'\n"
   end
 
-  defp clean_miniloops_env() do
+  defp clean_autoloops_env() do
     "env" <>
     " -u COLUMNS" <>
     " -u MINILOOPS_ALLOWED_EVENTS" <>
@@ -300,11 +300,11 @@ defmodule ParallelWaveTest do
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp fixture_dir() do
-    "/tmp/miniloops-parallel-wave-fixture"
+    "/tmp/autoloops-parallel-wave-fixture"
   end
 
   defp shell_quote(text) do

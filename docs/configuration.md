@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All runtime configuration lives in `miniloops.toml` at the root of a loop's project directory. Keys use flat dot-notation (`section.key = value`). The legacy `miniloops.conf` format is also accepted — the harness checks for `miniloops.toml` first and falls back to `miniloops.conf`.
+All runtime configuration lives in `autoloops.toml` at the root of a loop's project directory. Keys use flat dot-notation (`section.key = value`). The legacy `autoloops.conf` format is also accepted — the harness checks for `autoloops.toml` first and falls back to `autoloops.conf`.
 
 Configuration is **hot-reloaded** every iteration. You can change any value mid-run and it takes effect on the next iteration without restarting.
 
@@ -25,7 +25,7 @@ Lines without `=` are skipped with a warning. Blank lines and comment lines are 
 
 ## Precedence
 
-`miniloops.toml` > `miniloops.conf` > built-in defaults.
+`autoloops.toml` > `autoloops.conf` > built-in defaults.
 
 The CLI `-b`/`--backend` flag overrides backend settings at runtime (kind, command, args, prompt_mode) without changing the file.
 
@@ -87,7 +87,7 @@ Rules and behavior:
 - normal parent turns get the global `Structured parallelism` prompt block when parallelism is enabled
 - branch child prompts do **not** get that global metaprompt
 - one wave may be active at a time, but branches inside that wave launch as concurrent child jobs before the parent joins
-- wave artifacts are written under `core.state_dir/waves/<wave-id>/...` (default `.miniloop/waves/<wave-id>/...`), including per-branch logs/results plus `join.md` timing summaries
+- wave artifacts are written under `core.state_dir/waves/<wave-id>/...` (default `.autoloop/waves/<wave-id>/...`), including per-branch logs/results plus `join.md` timing summaries
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -119,9 +119,9 @@ parallel.branch_timeout_ms = 180000
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `core.state_dir` | string | `".miniloop"` | Directory for runtime state (journal, memory, tools). |
-| `core.journal_file` | string | `".miniloop/journal.jsonl"` | Path to the journal file. |
-| `core.memory_file` | string | `".miniloop/memory.jsonl"` | Path to the memory file. |
+| `core.state_dir` | string | `".autoloop"` | Directory for runtime state (journal, memory, tools). |
+| `core.journal_file` | string | `".autoloop/journal.jsonl"` | Path to the journal file. |
+| `core.memory_file` | string | `".autoloop/memory.jsonl"` | Path to the memory file. |
 | `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. Still accepted; prefer `journal_file`. |
 | `core.log_level` | string | `"info"` | Log verbosity. Valid levels: `debug`, `info`, `warn`, `error`, `none`. Overridden by `-v`/`--verbose` (sets `debug`). Exported as `MINILOOPS_LOG_LEVEL`. |
 | `core.run_id_format` | string | `"compact"` | Run ID format: `"compact"` for timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
@@ -150,9 +150,9 @@ parallel.branch_timeout_ms = 180000
 memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloop"
-core.journal_file = ".miniloop/journal.jsonl"
-core.memory_file = ".miniloop/memory.jsonl"
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
 # core.log_level = "info"
 ```
 
@@ -186,4 +186,4 @@ All `auto*` presets share the same structure. The only value that typically vari
 | autotest | `tests.passed` |
 | autoideas | `analysis.validated` |
 
-See `presets/<preset>/miniloops.toml` for complete files.
+See `presets/<preset>/autoloops.toml` for complete files.

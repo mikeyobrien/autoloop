@@ -1,7 +1,7 @@
 # Ideas Report UX Improvements
 
 ## Summary
-Turn the approved UX-improvement ideas batch into one delta-shaped workstream that updates current miniloops operator UX without replaying already-landed work. The output is one umbrella RFC plus one executable task that later implementation loops can carry through code, simplification, and QA in clear slices.
+Turn the approved UX-improvement ideas batch into one delta-shaped workstream that updates current autoloops operator UX without replaying already-landed work. The output is one umbrella RFC plus one executable task that later implementation loops can carry through code, simplification, and QA in clear slices.
 
 Code task: `.agents/tasks/tonic-loops/ideas-report-ux-improvements.code-task.md`
 
@@ -116,7 +116,7 @@ Validation surfaces:
 Build on already-landed preset canonicalization rather than re-litigating it.
 
 Planned behaviors:
-- add `miniloops list` for built-in preset discovery
+- add `autoloops list` for built-in preset discovery
 - improve unknown-preset errors to enumerate valid preset names
 - add `inspect preset <name>` so operators can inspect preset metadata without manually traversing files
 

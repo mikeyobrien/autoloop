@@ -15,7 +15,7 @@ defmodule ChainsTest do
     result = run_repo_command(project_dir, "run --chain " <> shell_quote(chain_csv) <> " " <> shell_quote(prompt))
     chain_state = run_repo_command(project_dir, "inspect chain --format md")
     chain_output = Map.get(chain_state, :output, "")
-    step1_prompt = System.read_text(Path.join(project_dir, ".miniloop/chains/chain-1/step-1/.miniloop/prompt-seen.txt"))
+    step1_prompt = System.read_text(Path.join(project_dir, ".autoloop/chains/chain-1/step-1/.autoloop/prompt-seen.txt"))
 
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
     Assert.assert_equal(Map.get(chain_state, :exit_code, 1), 0)
@@ -35,7 +35,7 @@ defmodule ChainsTest do
 
     System.write_text(backend_path, backend_script())
     System.run("chmod +x " <> shell_quote(backend_path))
-    System.write_text(Path.join(project_dir, "miniloops.toml"), host_miniloops_toml())
+    System.write_text(Path.join(project_dir, "autoloops.toml"), host_autoloops_toml())
     System.write_text(Path.join(project_dir, "chains.toml"), chains_toml())
     write_preset(first_dir, backend_path)
     write_preset(second_dir, backend_path)
@@ -44,17 +44,17 @@ defmodule ChainsTest do
   end
 
   defp write_preset(preset_dir, backend_path) do
-    System.write_text(Path.join(preset_dir, "miniloops.toml"), preset_miniloops_toml(backend_path))
+    System.write_text(Path.join(preset_dir, "autoloops.toml"), preset_autoloops_toml(backend_path))
     System.write_text(Path.join(preset_dir, "topology.toml"), preset_topology_toml())
     System.write_text(Path.join(preset_dir, "harness.md"), "chain parser harness\n")
     System.write_text(Path.join(preset_dir, "roles/worker.md"), "You are the worker. Emit task.complete.\n")
   end
 
   defp run_repo_command(project_dir, args) do
-    System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_miniloops_env() <> " tonic run " <> shell_quote(repo_root()) <> " " <> args)
+    System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_autoloops_env() <> " tonic run " <> shell_quote(repo_root()) <> " " <> args)
   end
 
-  defp clean_miniloops_env() do
+  defp clean_autoloops_env() do
     "env" <>
     " -u COLUMNS" <>
     " -u MINILOOPS_ALLOWED_EVENTS" <>
@@ -87,14 +87,14 @@ defmodule ChainsTest do
     "fi\n"
   end
 
-  defp host_miniloops_toml() do
-    "core.state_dir = \".miniloop\"\n" <>
-    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
-    "core.memory_file = \".miniloop/memory.jsonl\"\n" <>
+  defp host_autoloops_toml() do
+    "core.state_dir = \".autoloop\"\n" <>
+    "core.journal_file = \".autoloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".autoloop/memory.jsonl\"\n" <>
     "core.run_id_format = \"counter\"\n"
   end
 
-  defp preset_miniloops_toml(backend_path) do
+  defp preset_autoloops_toml(backend_path) do
     "event_loop.max_iterations = 1\n" <>
     "event_loop.completion_event = \"task.complete\"\n" <>
     "backend.kind = \"command\"\n" <>
@@ -102,9 +102,9 @@ defmodule ChainsTest do
     "backend.timeout_ms = 10000\n" <>
     "review.enabled = false\n" <>
     "harness.instructions_file = \"harness.md\"\n" <>
-    "core.state_dir = \".miniloop\"\n" <>
-    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
-    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+    "core.state_dir = \".autoloop\"\n" <>
+    "core.journal_file = \".autoloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".autoloop/memory.jsonl\"\n"
   end
 
   defp preset_topology_toml() do
@@ -125,11 +125,11 @@ defmodule ChainsTest do
   end
 
   defp fixture_dir() do
-    "/tmp/miniloops-chains-source-fixture"
+    "/tmp/autoloops-chains-source-fixture"
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp shell_quote(text) do

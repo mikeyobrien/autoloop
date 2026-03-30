@@ -4,7 +4,7 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmpdir="$(mktemp -d)"
 
-run_miniloops_clean() {
+run_autoloops_clean() {
   env \
     -u MINILOOPS_PROJECT_DIR \
     -u MINILOOPS_STATE_DIR \
@@ -34,7 +34,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cat > "$tmpdir/miniloops.toml" <<'EOF'
+cat > "$tmpdir/autoloops.toml" <<'EOF'
 event_loop.max_iterations = 2
 event_loop.completion_event = "task.complete"
 event_loop.completion_promise = "LOOP_COMPLETE"
@@ -46,9 +46,9 @@ backend.timeout_ms = 180000
 
 review.enabled = false
 
-core.state_dir = ".miniloop"
-core.journal_file = ".miniloop/journal.jsonl"
-core.memory_file = ".miniloop/memory.jsonl"
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
 EOF
 
 cat > "$tmpdir/topology.toml" <<'EOF'
@@ -79,12 +79,12 @@ EOF
 run_output="$tmpdir/run.out"
 (
   cd "$tmpdir"
-  run_miniloops_clean timeout 240 tonic run "$repo_dir" . 'Smoke test: print exactly hello, then emit task.complete with payload hello-done.'
+  run_autoloops_clean timeout 240 tonic run "$repo_dir" . 'Smoke test: print exactly hello, then emit task.complete with payload hello-done.'
 ) | tee "$run_output"
 
-journal="$tmpdir/.miniloop/journal.jsonl"
-stream="$tmpdir/.miniloop/pi-stream.1.jsonl"
-output_text="$(cd "$tmpdir" && run_miniloops_clean tonic run "$repo_dir" inspect output 1 . --format text)"
+journal="$tmpdir/.autoloop/journal.jsonl"
+stream="$tmpdir/.autoloop/pi-stream.1.jsonl"
+output_text="$(cd "$tmpdir" && run_autoloops_clean tonic run "$repo_dir" inspect output 1 . --format text)"
 
 [[ -f "$journal" ]] || { echo "missing journal: $journal" >&2; exit 1; }
 [[ -f "$stream" ]] || { echo "missing Pi stream log: $stream" >&2; exit 1; }

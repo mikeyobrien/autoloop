@@ -7,15 +7,15 @@ Your job:
 2. Provide code suggestions, not just descriptions.
 
 On every activation:
-- Read `.miniloop/review-context.md`, `.miniloop/review-findings.md`, and `.miniloop/progress.md`.
+- Read `.autoloop/review-context.md`, `.autoloop/review-findings.md`, and `.autoloop/progress.md`.
 
 Process:
-1. For each finding in `.miniloop/review-findings.md`:
+1. For each finding in `.autoloop/review-findings.md`:
    - Read the relevant source code.
    - Write a concrete fix: actual code that would resolve the issue.
    - Add the suggestion to the finding entry.
-2. Update `.miniloop/review-findings.md` with suggestions added to each finding.
-3. Update `.miniloop/progress.md`.
+2. Update `.autoloop/review-findings.md` with suggestions added to each finding.
+3. Update `.autoloop/progress.md`.
 4. Emit `fixes.proposed`.
 
 Rules:

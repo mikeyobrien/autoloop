@@ -1,6 +1,6 @@
 # Journal Reference
 
-The journal is the canonical runtime source of truth for a miniloops loop. Every significant event — system lifecycle, agent actions, coordination, review, and chain execution — is appended as a single JSON line to `.miniloop/journal.jsonl`. Nothing is mutated or deleted; the file is append-only.
+The journal is the canonical runtime source of truth for a autoloops loop. Every significant event — system lifecycle, agent actions, coordination, review, and chain execution — is appended as a single JSON line to `.autoloop/journal.jsonl`. Nothing is mutated or deleted; the file is append-only.
 
 Higher-level views (scratchpad, coordination state, chain progress) are **projections** — derived by reading the journal and filtering/aggregating events.
 
@@ -25,7 +25,7 @@ Emitted by the harness at lifecycle boundaries.
 
 ### Agent events
 
-Emitted by the model via `miniloops emit`.
+Emitted by the model via `autoloops emit`.
 
 ```json
 {"run": "run-mn9d3uk0-xi0m", "iteration": "3", "topic": "review.ready", "payload": "initial implementation complete", "source": "agent"}
@@ -84,8 +84,8 @@ loop.complete   or   loop.stop
 Agents emit events from the role's `emits` list (defined in `topology.toml`). These are the routing events that drive the handoff map:
 
 ```bash
-./.miniloop/miniloops emit review.ready "code is ready for review"
-./.miniloop/miniloops emit task.complete "all work done"
+./.autoloop/autoloops emit review.ready "code is ready for review"
+./.autoloop/autoloops emit task.complete "all work done"
 ```
 
 Any event the agent emits is recorded with `source: "agent"` in the journal.
@@ -122,7 +122,7 @@ When `parallel.enabled = true`, the harness records wave events for parallel bra
 
 ### Chain events
 
-Chain events are recorded in the journal when running multi-loop compositions via `miniloops chain run`. They use the system event shape.
+Chain events are recorded in the journal when running multi-loop compositions via `autoloops chain run`. They use the system event shape.
 
 | Topic | Fields | Description |
 |-------|--------|-------------|
@@ -150,18 +150,18 @@ When structured parallelism is enabled and the parent emits `explore.parallel` o
 Notes:
 - only the harness may emit `*.parallel.joined`; those joined events are recorded as normal agent-style journal entries on the parent run after `wave.join.finish`
 - the parent launches branch children concurrently, but still waits at the join barrier until every launched branch is terminal
-- branch state stays isolated on disk under `core.state_dir/waves/<wave-id>/...` (default `.miniloop/waves/<wave-id>/...`), including `spec.md`, `join.md`, per-branch logs, and per-branch result artifacts
+- branch state stays isolated on disk under `core.state_dir/waves/<wave-id>/...` (default `.autoloop/waves/<wave-id>/...`), including `spec.md`, `join.md`, per-branch logs, and per-branch result artifacts
 - only one active wave exists at a time in v1
 
 ## Backpressure and event validation
 
-Miniloops uses **soft routing with protocol backpressure**. The model receives advisory routing suggestions but is not locked into a state machine. However, the event-emit boundary enforces constraints.
+Autoloops uses **soft routing with protocol backpressure**. The model receives advisory routing suggestions but is not locked into a state machine. However, the event-emit boundary enforces constraints.
 
 ### How validation works
 
 1. The topology's handoff map determines **suggested roles** from the most recent routing event.
 2. The **allowed events** are the union of all `emits` arrays from the suggested roles.
-3. When the agent emits an event (via `miniloops emit` or detected in backend output), it is checked against the allowed set.
+3. When the agent emits an event (via `autoloops emit` or detected in backend output), it is checked against the allowed set.
 4. **Coordination events bypass validation** — they are always accepted.
 5. **If the allowed-events list is empty** (no topology or unmapped event), all events are accepted.
 
@@ -178,14 +178,14 @@ The harness also checks for invalid events after each iteration completes (in ca
 
 Invalid events are caught at two points:
 
-- **At emit time** — the `miniloops emit` command validates against `MINILOOPS_ALLOWED_EVENTS` environment variable and rejects immediately.
+- **At emit time** — the `autoloops emit` command validates against `MINILOOPS_ALLOWED_EVENTS` environment variable and rejects immediately.
 - **After iteration** — the harness scans the iteration's journal entries for the latest agent event and validates it against the topology. This catches events emitted through non-standard paths.
 
 ## Completion detection
 
 The loop checks for completion after each valid iteration, in order:
 
-1. **Completion event** — if the completion event (from `topology.toml` or `miniloops.toml`) appears in the run's journal topics **and** all `required_events` have also been seen, the loop completes with `reason: "completion_event"`.
+1. **Completion event** — if the completion event (from `topology.toml` or `autoloops.toml`) appears in the run's journal topics **and** all `required_events` have also been seen, the loop completes with `reason: "completion_event"`.
 2. **Completion promise** — if the backend output contains the `completion_promise` string literally, the loop completes with `reason: "completion_promise"`.
 3. Otherwise, the next iteration begins.
 
@@ -214,7 +214,7 @@ exit_code=0
 Each section is built from the `exit_code` and `output` fields of the corresponding `iteration.finish` journal entry. The scratchpad has two render targets:
 
 - Iteration prompts and hyperagent review prompts get a compact view that keeps the most recent iterations detailed and collapses older ones to short summaries.
-- `miniloops inspect scratchpad --format md` keeps the richer view for debugging.
+- `autoloops inspect scratchpad --format md` keeps the richer view for debugging.
 - Both views are scoped to the current run (filtered by `run` ID).
 
 ## Run scoping
@@ -228,15 +228,15 @@ The latest run is found by scanning backward for the most recent `loop.start` en
 The journal and its projections can be inspected via CLI:
 
 ```bash
-miniloops inspect journal --format json       # raw JSONL
-miniloops inspect scratchpad --format md       # iteration summaries
-miniloops inspect coordination --format md     # issues, slices, commits, archives
-miniloops inspect metrics --format md          # per-iteration metrics table with summary
-miniloops inspect metrics --format csv         # metrics as RFC 4180 CSV
-miniloops inspect metrics --format json        # metrics as JSON array
-miniloops inspect prompt 3 --format md         # iteration 3 prompt
-miniloops inspect output 3 --format text       # iteration 3 output
-miniloops inspect chain --format md            # chain execution state
+autoloops inspect journal --format json       # raw JSONL
+autoloops inspect scratchpad --format md       # iteration summaries
+autoloops inspect coordination --format md     # issues, slices, commits, archives
+autoloops inspect metrics --format md          # per-iteration metrics table with summary
+autoloops inspect metrics --format csv         # metrics as RFC 4180 CSV
+autoloops inspect metrics --format json        # metrics as JSON array
+autoloops inspect prompt 3 --format md         # iteration 3 prompt
+autoloops inspect output 3 --format text       # iteration 3 output
+autoloops inspect chain --format md            # chain execution state
 ```
 
 ## JSON encoding

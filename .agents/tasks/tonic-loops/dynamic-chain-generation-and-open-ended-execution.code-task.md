@@ -6,7 +6,7 @@ Design and implement the next stage of first-class loop chaining so an LLM can d
 The goal is not literal infinite uncontrolled recursion. The goal is a system that can keep improving until interrupted by running a long-lived sequence of bounded, inspectable, resumable chain episodes with explicit budgets, lineage, and quality gates.
 
 ## Background
-Miniloops already has or is planned to have:
+Autoloops already has or is planned to have:
 - preset-based loop execution (`autocode`, `autoideas`, `autoresearch`, `autoqa`, etc.)
 - a journal-first runtime model
 - git-durable state in markdown/jsonl/toml
@@ -143,5 +143,5 @@ The design should remain faithful to repo tenets:
 
 ## Metadata
 - **Complexity**: High
-- **Labels**: miniloops, dynamic-chains, meta-orchestration, open-ended-execution, journal, lineage, budgets, self-improvement
+- **Labels**: autoloops, dynamic-chains, meta-orchestration, open-ended-execution, journal, lineage, budgets, self-improvement
 - **Required Skills**: orchestration design, event schema design, Tonic app development, runtime budget design, information architecture, autonomous systems safety and control

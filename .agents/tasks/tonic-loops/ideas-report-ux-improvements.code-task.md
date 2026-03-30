@@ -217,5 +217,5 @@ At minimum, validate with:
 
 ## Metadata
 - **Complexity**: Large
-- **Labels**: miniloops, ux, cli, memory, presets, inspect, topology, durations, backpressure, planning-delta
+- **Labels**: autoloops, ux, cli, memory, presets, inspect, topology, durations, backpressure, planning-delta
 - **Required Skills**: CLI design, Tonic app development, operator UX, inspect surface design, config parsing, documentation maintenance, targeted testing

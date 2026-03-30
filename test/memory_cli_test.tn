@@ -52,11 +52,11 @@ defmodule MemoryCliTest do
   end
 
   defp prepare_fixture(memory_budget_chars, memory_jsonl) do
-    dir = "/tmp/miniloops-memory-cli-fixture"
-    state_dir = Path.join(dir, ".miniloop")
+    dir = "/tmp/autoloops-memory-cli-fixture"
+    state_dir = Path.join(dir, ".autoloop")
 
     System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(state_dir))
-    System.write_text(Path.join(dir, "miniloops.toml"), fixture_config(memory_budget_chars))
+    System.write_text(Path.join(dir, "autoloops.toml"), fixture_config(memory_budget_chars))
     System.write_text(Path.join(state_dir, "memory.jsonl"), memory_jsonl)
 
     dir
@@ -64,8 +64,8 @@ defmodule MemoryCliTest do
 
   defp fixture_config(memory_budget_chars) do
     "memory.prompt_budget_chars = " <> to_string(memory_budget_chars) <> "\n" <>
-    "core.state_dir = \".miniloop\"\n" <>
-    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+    "core.state_dir = \".autoloop\"\n" <>
+    "core.memory_file = \".autoloop/memory.jsonl\"\n"
   end
 
   defp seeded_memory() do
@@ -82,7 +82,7 @@ defmodule MemoryCliTest do
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp shell_quote(text) do

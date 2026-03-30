@@ -1,4 +1,4 @@
-# Bare-minimal miniloops config
+# Bare-minimal autoloops config
 
 event_loop.max_iterations = 100
 event_loop.completion_event = "task.complete"
@@ -24,8 +24,8 @@ memory.prompt_budget_chars = 8000
 
 harness.instructions_file = "harness.md"
 
-core.state_dir = ".miniloop"
-core.journal_file = ".miniloop/journal.jsonl"
-core.memory_file = ".miniloop/memory.jsonl"
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
 # legacy alias still accepted:
-# core.events_file = ".miniloop/journal.jsonl"
+# core.events_file = ".autoloop/journal.jsonl"

@@ -9,16 +9,16 @@ The next active issue is **bug 3**: metrics JSON escaping is incomplete for `\\`
 
 ## Source of truth
 - `qa-report.md` — upstream multi-bug QA report and remaining queue
-- `.miniloop/bug-report.md` — current bug write-up for the active bug only
-- `.miniloop/fix-log.md` — applied fix history and verification evidence
-- `.miniloop/progress.md` — current slice, issue dispositions, exact commands, and next action
+- `.autoloop/bug-report.md` — current bug write-up for the active bug only
+- `.autoloop/fix-log.md` — applied fix history and verification evidence
+- `.autoloop/progress.md` — current slice, issue dispositions, exact commands, and next action
 
 ## Constraints
 - One bug at a time.
 - Keep fixes minimal and local to the active bug.
-- Preserve canonical file paths exactly as they exist on disk: use `qa-report.md`, not `qa_report.md` or `.miniloop/qa-report.md`.
-- If a shared `.miniloop/*` working file is missing, recreate it before continuing.
-- Keep `.miniloop/progress.md` concise and maintain explicit dispositions for all relevant issues.
+- Preserve canonical file paths exactly as they exist on disk: use `qa-report.md`, not `qa_report.md` or `.autoloop/qa-report.md`.
+- If a shared `.autoloop/*` working file is missing, recreate it before continuing.
+- Keep `.autoloop/progress.md` concise and maintain explicit dispositions for all relevant issues.
 - Use the strongest available verification before closure.
 
 ## Acceptance criteria for the current bug

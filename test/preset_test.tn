@@ -7,7 +7,7 @@ defmodule PresetConfig do
   end
 
   def has_config(project_dir) do
-    System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
+    System.path_exists(Path.join(project_dir, "autoloops.toml")) or System.path_exists(Path.join(project_dir, "autoloops.conf"))
   end
 
   def get(_config, [], fallback) do
@@ -40,8 +40,8 @@ defmodule PresetConfig do
   end
 
   defp resolve_config_path(project_dir) do
-    toml_path = Path.join(project_dir, "miniloops.toml")
-    conf_path = Path.join(project_dir, "miniloops.conf")
+    toml_path = Path.join(project_dir, "autoloops.toml")
+    conf_path = Path.join(project_dir, "autoloops.conf")
 
     case System.path_exists(toml_path) do
       true -> toml_path
@@ -58,10 +58,10 @@ defmodule PresetConfig do
     }
     backend = %{"kind" => "pi", "command" => "pi", "timeout_ms" => "300000"}
     core = %{
-      "state_dir" => ".miniloop",
-      "journal_file" => ".miniloop/journal.jsonl",
-      "events_file" => ".miniloop/journal.jsonl",
-      "memory_file" => ".miniloop/memory.jsonl"
+      "state_dir" => ".autoloop",
+      "journal_file" => ".autoloop/journal.jsonl",
+      "events_file" => ".autoloop/journal.jsonl",
+      "memory_file" => ".autoloop/memory.jsonl"
     }
     %{"event_loop" => event_loop, "backend" => backend, "core" => core}
   end
@@ -637,7 +637,7 @@ defmodule PresetTest do
   end
 
   defp presets_dir() do
-    "/Users/rook/projects/tonic-loops/presets"
+    Path.join(System.cwd(), "presets")
   end
 
   def test_preset_autocode() do

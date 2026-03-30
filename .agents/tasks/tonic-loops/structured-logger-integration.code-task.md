@@ -4,7 +4,7 @@
 Replace the ad-hoc `verbose_log` pattern in `src/harness.tn` with tonic's stdlib `Logger` module. Add a `log_level` config key so users can control verbosity. Surface the active log level in inspect output and the iteration prompt footer.
 
 ## Background
-Miniloops currently uses a `verbose_log(loop, message)` helper (line 1784) that checks a boolean `verbose` flag and writes to **stdout** via `IO.puts("[verbose] " <> message)` (line 1786). This is binary (on/off) and lacks severity levels. The tonic stdlib now ships a `Logger` module with `debug/info/warn/error` functions and a global level filter (`set_level/get_level`). Adopting it gives miniloops leveled logging with no custom plumbing.
+Autoloops currently uses a `verbose_log(loop, message)` helper (line 1784) that checks a boolean `verbose` flag and writes to **stdout** via `IO.puts("[verbose] " <> message)` (line 1786). This is binary (on/off) and lacks severity levels. The tonic stdlib now ships a `Logger` module with `debug/info/warn/error` functions and a global level filter (`set_level/get_level`). Adopting it gives autoloops leveled logging with no custom plumbing.
 
 **Important behavioral change:** The current `verbose_log` writes to **stdout** (`IO.puts`), while the tonic `Logger` module writes to **stderr**. This is an intentional improvement — log output mixed into stdout can interfere with pipe-based workflows and inspect output parsing. However, any tooling or scripts that capture verbose output from stdout will need updating.
 
@@ -42,8 +42,8 @@ The migration should be conservative: every existing `verbose_log` call maps to 
 ## Acceptance Criteria
 - Running with `--verbose` produces debug-level output on **stderr** (same messages as before, routed through Logger — note: this is an intentional change from the previous stdout-based `verbose_log`).
 - Running without `--verbose` produces only info+ messages on stderr.
-- Setting `core.log_level = "warn"` in `miniloops.toml` suppresses info and debug output.
-- `miniloops inspect prompt <N>` shows the active log level.
+- Setting `core.log_level = "warn"` in `autoloops.toml` suppresses info and debug output.
+- `autoloops inspect prompt <N>` shows the active log level.
 - No `verbose_log` references remain in the codebase.
 - The `verbose` field is removed from the loop state map; `--verbose` is translated to `log_level: :debug` at CLI parse time.
 

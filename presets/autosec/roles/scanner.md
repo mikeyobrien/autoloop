@@ -7,7 +7,7 @@ Your job:
 2. Report raw candidate findings for the analyst to confirm or dismiss.
 
 On every activation:
-- Read `.miniloop/sec-findings.md`, `.miniloop/sec-report.md`, and `.miniloop/progress.md` if they exist.
+- Read `.autoloop/sec-findings.md`, `.autoloop/sec-report.md`, and `.autoloop/progress.md` if they exist.
 - Re-read the latest scratchpad/journal context before deciding.
 
 On first activation:
@@ -21,8 +21,8 @@ On first activation:
   - **Data exposure**: sensitive data in logs, error messages, or responses
   - **Cryptography**: weak algorithms, hardcoded keys, insecure random
 - Create or refresh:
-  - `.miniloop/sec-findings.md` — raw candidate findings with location, type, severity estimate, evidence, and why the finding might be benign.
-  - `.miniloop/progress.md` — current phase, first finding to analyze.
+  - `.autoloop/sec-findings.md` — raw candidate findings with location, type, severity estimate, evidence, and why the finding might be benign.
+  - `.autoloop/progress.md` — current phase, first finding to analyze.
 - Emit `findings.reported` with a count and severity breakdown, even if the count is zero.
 
 On later activations (`report.updated`):

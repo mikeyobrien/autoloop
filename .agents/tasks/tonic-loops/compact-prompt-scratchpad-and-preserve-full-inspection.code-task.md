@@ -4,7 +4,7 @@
 Reduce scratchpad bloat in long-running loops by compacting older iteration entries before they are injected into normal iteration prompts and hyperagent review prompts, while preserving a richer full-history scratchpad for operator inspection and debugging. The goal is to cut prompt pressure at the right layer instead of relying on planners or hyperagents to manually prune around a projected artifact.
 
 ## Background
-Today the scratchpad is projected directly from `iteration.finish` journal events. Every completed iteration contributes a section with the full `output` field, and that same renderer is reused for both prompt injection and `miniloops inspect scratchpad --format md`.
+Today the scratchpad is projected directly from `iteration.finish` journal events. Every completed iteration contributes a section with the full `output` field, and that same renderer is reused for both prompt injection and `autoloops inspect scratchpad --format md`.
 
 That design keeps the implementation simple, but it causes prompt growth to scale linearly with runtime history. Once a run gets long, the planner and hyperagent are forced to react to scratchpad bloat even though they do not actually own the scratchpad. The recent review note before iteration 25 is a good example: the system correctly identified scratchpad growth as the active risk, but the suggested fix targeted planner behavior rather than the projection layer that creates the problem.
 
@@ -21,7 +21,7 @@ The clean fix is to compact the scratchpad at render time for prompt consumers w
 
 **Additional References (if relevant to this task):**
 - `hyperagent.md`
-- `.miniloop/progress.md`
+- `.autoloop/progress.md`
 - `.agents/tasks/tonic-loops/isolate-standalone-loop-state-and-working-context.code-task.md` (for runtime inspectability posture)
 
 **Note:** You MUST preserve journal-first runtime truth. The scratchpad is a projection, not owned mutable state. Fix the projection layer rather than introducing manual cleanup rituals.
@@ -29,13 +29,13 @@ The clean fix is to compact the scratchpad at render time for prompt consumers w
 ## Technical Requirements
 1. Split scratchpad rendering into at least two explicit views:
    - a compact prompt-facing view used for normal iteration prompts and hyperagent review prompts
-   - a fuller inspection view used by `miniloops inspect scratchpad --format md`
+   - a fuller inspection view used by `autoloops inspect scratchpad --format md`
 2. Keep the compact prompt-facing scratchpad small and predictable for long runs. At minimum:
    - preserve the most recent few iterations in a fuller form
    - collapse older iterations to short one-line summaries
    - cap summary length so very noisy iterations do not dominate prompt space
 3. Derive compact summaries from existing `iteration.finish` data without mutating journal history.
-4. Preserve operator inspectability. `miniloops inspect scratchpad --format md` must still expose enough detail to debug a run without forcing operators to read raw journal JSON.
+4. Preserve operator inspectability. `autoloops inspect scratchpad --format md` must still expose enough detail to debug a run without forcing operators to read raw journal JSON.
 5. Keep the mechanism simple. Do not add a heavy summarization subsystem, extra runtime store, or LLM-based scratchpad compression.
 6. Prefer hardcoded or minimal defaults over new config surface unless a setting is clearly necessary.
 7. Update both normal iteration prompt construction and hyperagent review prompt construction to use the compact prompt-facing scratchpad.
@@ -82,11 +82,11 @@ The clean fix is to compact the scratchpad at render time for prompt consumers w
 
 4. **Inspect Scratchpad Preserves Debugging Detail**
    - Given the same long-running loop
-   - When an operator runs `miniloops inspect scratchpad --format md`
+   - When an operator runs `autoloops inspect scratchpad --format md`
    - Then the output remains richer than the prompt-facing compact view and is still suitable for debugging
 
 5. **Journal History Remains Canonical**
-   - Given completed iterations already recorded in `.miniloop/journal.jsonl`
+   - Given completed iterations already recorded in `.autoloop/journal.jsonl`
    - When scratchpad compaction is introduced
    - Then no journal events are rewritten, deleted, or truncated
 
@@ -107,5 +107,5 @@ The clean fix is to compact the scratchpad at render time for prompt consumers w
 
 ## Metadata
 - **Complexity**: Medium
-- **Labels**: miniloops, scratchpad, prompts, hyperagent, journal, inspectability, context-pressure, ergonomics
+- **Labels**: autoloops, scratchpad, prompts, hyperagent, journal, inspectability, context-pressure, ergonomics
 - **Required Skills**: Tonic app development, prompt/runtime boundary design, journal projection design, CLI inspection UX, documentation maintenance

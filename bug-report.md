@@ -10,17 +10,17 @@ Metrics summary truncates decimal elapsed times instead of preserving float prec
 Command used:
 ```sh
 tmpdir=$(mktemp -d)
-mkdir -p "$tmpdir/.miniloops"
-cat > "$tmpdir/.miniloops/journal.jsonl" <<'EOF'
+mkdir -p "$tmpdir/.autoloops"
+cat > "$tmpdir/.autoloops/journal.jsonl" <<'EOF'
 {"run": "run-1", "topic": "loop.start", "fields": {}}
 {"run": "run-1", "iteration": "1", "topic": "iteration.start", "fields": {"suggested_roles": "worker"}}
 {"run": "run-1", "iteration": "1", "topic": "iteration.finish", "fields": {"exit_code": "0", "timed_out": false, "elapsed_s": "1.9", "output": ""}}
 {"run": "run-1", "iteration": "2", "topic": "iteration.start", "fields": {"suggested_roles": "worker"}}
 {"run": "run-1", "iteration": "2", "topic": "iteration.finish", "fields": {"exit_code": "0", "timed_out": false, "elapsed_s": "2.4", "output": ""}}
 EOF
-env MINILOOPS_JOURNAL_FILE="$tmpdir/.miniloops/journal.jsonl" \
+env MINILOOPS_JOURNAL_FILE="$tmpdir/.autoloops/journal.jsonl" \
     MINILOOPS_RUN_ID=run-1 \
-    /Users/rook/projects/tonic-loops/bin/miniloops inspect metrics --format md
+    /Users/rook/projects/tonic-loops/bin/autoloops inspect metrics --format md
 ```
 
 Observed output:

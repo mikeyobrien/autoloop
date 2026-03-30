@@ -1,8 +1,8 @@
 # Archived active context — 2026-03-27
 
 ## Why this was archived
-The active loop narrowed from a repo-wide backlog of 16 implementation tasks to a QA bugfix queue driven by `.miniloop/qa-report.md`.
-Keeping the old backlog in `.miniloop/context.md` and `.miniloop/plan.md` was now hurting the loop:
+The active loop narrowed from a repo-wide backlog of 16 implementation tasks to a QA bugfix queue driven by `.autoloop/qa-report.md`.
+Keeping the old backlog in `.autoloop/context.md` and `.autoloop/plan.md` was now hurting the loop:
 - it no longer matched the live bugfix objective
 - it kept stale slice instructions in every prompt
 - it made the planner compete with old Tier 1-4 roadmap text instead of the next QA bug
@@ -35,5 +35,5 @@ Implement the pending `.agents/tasks/tonic-loops/*.code-task.md` work in depende
 ## What replaced it
 The active working files were refocused on the QA bug queue:
 - bug 1 (typed metrics JSON fields) is closed
-- next active work is bug 2 from `.miniloop/qa-report.md`: decimal truncation in `parse_float_or_zero()`
-- remaining findings are tracked in `.miniloop/progress.md` under `Relevant Issues`
+- next active work is bug 2 from `.autoloop/qa-report.md`: decimal truncation in `parse_float_or_zero()`
+- remaining findings are tracked in `.autoloop/progress.md` under `Relevant Issues`

@@ -15,7 +15,7 @@
   - Output: `check: ok`
 - `bin/test`
   - Output: `test result: ok. 60 passed; 0 failed; 60 total`
-- `./bin/miniloops inspect metrics --format json | head -n 5`
+- `./bin/autoloops inspect metrics --format json | head -n 5`
   - Output: `[{"iteration": 1, "role": "diagnoser", "event": "cause.found", "elapsed_s": 82, "exit_code": 0, "timed_out": false, "outcome": "emitted"}, {"iteration": 2, "role": "fixer", "event": "fix.applied", "elapsed_s": 266, "exit_code": 0, "timed_out": false, "outcome": "emitted"}, {"iteration": 3, "role": "verifier", "event": "none", "elapsed_s": null, "exit_code": null, "timed_out": false, "outcome": "continue"}]`
 - Re-ran verification in verifier turn:
   - `tonic check .` → `check: ok`
@@ -23,7 +23,7 @@
 
 ### Closure
 - Bug 1 closed.
-- Next queued issue from `.miniloop/qa-report.md`: bug 2, float truncation in `parse_float_or_zero()`.
+- Next queued issue from `.autoloop/qa-report.md`: bug 2, float truncation in `parse_float_or_zero()`.
 
 ## Bug 2 — metrics summary decimal precision
 

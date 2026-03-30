@@ -1,6 +1,6 @@
 # AutoSpec miniloop
 
-A miniloops-native specification loop for turning a rough idea into a durable RFC + implementation task pair.
+A autoloops-native specification loop for turning a rough idea into a durable RFC + implementation task pair.
 
 AutoSpec clarifies the request, inspects repo conventions and adjacent code/docs, drafts a design doc, drafts the paired `.code-task.md`, and adversarially checks that the pair is aligned and actionable.
 
@@ -22,15 +22,15 @@ AutoSpec is not done when the docs merely sound plausible.
 
 ## How it works
 
-1. **Clarifier** writes `.miniloop/spec-brief.md` with goals, non-goals, constraints, assumptions, slug, and output paths.
-2. **Researcher** writes `.miniloop/spec-research.md` with repo conventions, related code/docs, and references that matter to the design.
+1. **Clarifier** writes `.autoloop/spec-brief.md` with goals, non-goals, constraints, assumptions, slug, and output paths.
+2. **Researcher** writes `.autoloop/spec-research.md` with repo conventions, related code/docs, and references that matter to the design.
 3. **Designer** drafts the RFC-style design doc.
 4. **Planner** drafts the paired `.code-task.md`.
 5. **Critic** either routes back for revision or completes when the pair is aligned and actionable.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/clarifier.md`
@@ -41,16 +41,16 @@ AutoSpec is not done when the docs merely sound plausible.
 
 ## Shared working files created by the loop
 
-- `.miniloop/spec-brief.md` — clarified objective, title/slug, constraints, assumptions, output paths
-- `.miniloop/spec-research.md` — repo conventions, related docs/code, references, open gaps
-- `.miniloop/progress.md` — current phase, active artifact paths, critic checklist, revision log
+- `.autoloop/spec-brief.md` — clarified objective, title/slug, constraints, assumptions, output paths
+- `.autoloop/spec-research.md` — repo conventions, related docs/code, references, open gaps
+- `.autoloop/progress.md` — current phase, active artifact paths, critic checklist, revision log
 
 ## Default artifact outputs
 
 - `docs/rfcs/<slug>.md`
 - `.agents/tasks/<project-name>/<slug>.code-task.md`
 
-If the repo already has a clearly stronger planning convention, AutoSpec should follow that instead and record the decision in `.miniloop/spec-brief.md`.
+If the repo already has a clearly stronger planning convention, AutoSpec should follow that instead and record the decision in `.autoloop/spec-brief.md`.
 
 ## Backend
 
@@ -73,13 +73,13 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-./bin/miniloops run autospec "Add preset-level profiles for role tuning"
+./bin/autoloops run autospec "Add preset-level profiles for role tuning"
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run autospec "Add preset-level profiles for role tuning"
+autoloops run autospec "Add preset-level profiles for role tuning"
 ```
 
 ## Intended input styles

@@ -34,7 +34,7 @@ defmodule Demo do
   end
 
   defp dispatch(["list", "--help"], _argv) do
-    IO.puts("Usage: miniloops list")
+    IO.puts("Usage: autoloops list")
     IO.puts("")
     IO.puts("Lists all bundled presets.")
   end
@@ -96,11 +96,11 @@ defmodule Demo do
   end
 
   defp dispatch(["memory", "find"], _argv) do
-    IO.puts("Usage: miniloops memory find <pattern...>")
+    IO.puts("Usage: autoloops memory find <pattern...>")
   end
 
   defp dispatch(["memory", "find", "--help"], _argv) do
-    IO.puts("Usage: miniloops memory find <pattern...>")
+    IO.puts("Usage: autoloops memory find <pattern...>")
   end
 
   defp dispatch(["memory", "find" | rest], _argv) do
@@ -108,7 +108,7 @@ defmodule Demo do
   end
 
   defp dispatch(["memory", "add", "learning", "--help"], _argv) do
-    IO.puts("Usage: miniloops memory add learning <text...>")
+    IO.puts("Usage: autoloops memory add learning <text...>")
   end
 
   defp dispatch(["memory", "add", "learning" | rest], _argv) do
@@ -116,7 +116,7 @@ defmodule Demo do
   end
 
   defp dispatch(["memory", "add", "preference", "--help"], _argv) do
-    IO.puts("Usage: miniloops memory add preference <category> <text...>")
+    IO.puts("Usage: autoloops memory add preference <category> <text...>")
   end
 
   defp dispatch(["memory", "add", "preference", category | rest], _argv) do
@@ -124,7 +124,7 @@ defmodule Demo do
   end
 
   defp dispatch(["memory", "add", "meta", "--help"], _argv) do
-    IO.puts("Usage: miniloops memory add meta <key> <value...>")
+    IO.puts("Usage: autoloops memory add meta <key> <value...>")
   end
 
   defp dispatch(["memory", "add", "meta", key | rest], _argv) do
@@ -132,7 +132,7 @@ defmodule Demo do
   end
 
   defp dispatch(["memory", "remove", "--help"], _argv) do
-    IO.puts("Usage: miniloops memory remove <id> [reason...]")
+    IO.puts("Usage: autoloops memory remove <id> [reason...]")
   end
 
   defp dispatch(["memory", "remove", id], _argv) do
@@ -530,7 +530,7 @@ defmodule Demo do
 
   defp inspect_usage_error(message) do
     IO.puts(message)
-    IO.puts("Run 'miniloops inspect --help' for valid targets and usage.")
+    IO.puts("Run 'autoloops inspect --help' for valid targets and usage.")
     %{artifact: "", positionals: [], format: ""}
   end
 
@@ -792,15 +792,15 @@ defmodule Demo do
   defp missing_preset_error() do
     IO.puts("error: missing required preset argument")
     IO.puts("")
-    IO.puts("Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    IO.puts("Usage: autoloops run <preset-name|preset-dir> [prompt...] [flags]")
     IO.puts("")
     IO.puts("Examples:")
-    IO.puts("  miniloops run autocode")
-    IO.puts("  miniloops run autocode \"Fix the login bug\"")
-    IO.puts("  miniloops run presets/autoqa \"QA recent changes\"")
-    IO.puts("  miniloops run . \"Run from current directory\"")
+    IO.puts("  autoloops run autocode")
+    IO.puts("  autoloops run autocode \"Fix the login bug\"")
+    IO.puts("  autoloops run presets/autoqa \"QA recent changes\"")
+    IO.puts("  autoloops run . \"Run from current directory\"")
     IO.puts("")
-    IO.puts("Run 'miniloops list' to see all available presets.")
+    IO.puts("Run 'autoloops list' to see all available presets.")
     Map.put(default_run_options(), :usage_error, true)
   end
 
@@ -808,13 +808,13 @@ defmodule Demo do
     IO.puts("error: preset `" <> name <> "` not found")
     IO.puts("")
     IO.puts("The argument `" <> name <> "` is not a valid preset name or directory.")
-    IO.puts("A preset must be a directory containing miniloops.toml (or miniloops.conf),")
+    IO.puts("A preset must be a directory containing autoloops.toml (or autoloops.conf),")
     IO.puts("or a bundled preset name.")
     IO.puts("")
     IO.puts("Available presets: " <> LoopUtils.join_csv(LoopChains.list_known_presets()))
-    IO.puts("Run 'miniloops list' to see all available presets.")
+    IO.puts("Run 'autoloops list' to see all available presets.")
     IO.puts("")
-    IO.puts("Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    IO.puts("Usage: autoloops run <preset-name|preset-dir> [prompt...] [flags]")
     Map.put(default_run_options(), :usage_error, true)
   end
 
@@ -855,7 +855,7 @@ defmodule Demo do
   end
 
   defp self_command([]) do
-    "'miniloops'"
+    "'autoloops'"
   end
 
   defp absolute_path(path) do
@@ -906,19 +906,19 @@ defmodule Demo do
   end
 
   defp print_usage() do
-    IO.puts("miniloops — autonomous LLM loop harness")
+    IO.puts("autoloops — autonomous LLM loop harness")
     IO.puts("")
     IO.puts("Usage:")
-    IO.puts("  miniloops run <preset-name|preset-dir> [prompt...] [flags]")
-    IO.puts("  miniloops emit <topic> [summary]")
-    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]")
-    IO.puts("  miniloops memory <list|add|remove> [args]")
-    IO.puts("  miniloops list")
-    IO.puts("  miniloops chain <list|run> [args]")
+    IO.puts("  autoloops run <preset-name|preset-dir> [prompt...] [flags]")
+    IO.puts("  autoloops emit <topic> [summary]")
+    IO.puts("  autoloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]")
+    IO.puts("  autoloops memory <list|add|remove> [args]")
+    IO.puts("  autoloops list")
+    IO.puts("  autoloops chain <list|run> [args]")
     IO.puts("")
     IO.puts("The preset argument is required for `run`. It must be a bundled preset")
     IO.puts("name (e.g. autocode, autoqa) or a path to a directory containing")
-    IO.puts("miniloops.toml. Use `.` to run from the current directory.")
+    IO.puts("autoloops.toml. Use `.` to run from the current directory.")
     IO.puts("")
     IO.puts("Flags:")
     IO.puts("  -h, --help       Show this help")
@@ -929,11 +929,11 @@ defmodule Demo do
   end
 
   defp print_run_usage() do
-    IO.puts("Usage: miniloops run <preset-name|preset-dir> [prompt...] [flags]")
+    IO.puts("Usage: autoloops run <preset-name|preset-dir> [prompt...] [flags]")
     IO.puts("")
     IO.puts("The preset argument is required. It must be a bundled preset name")
     IO.puts("(e.g. autocode, autoqa) or a path to a directory containing")
-    IO.puts("miniloops.toml. Use `.` to run from the current directory.")
+    IO.puts("autoloops.toml. Use `.` to run from the current directory.")
     IO.puts("")
     IO.puts("Flags:")
     IO.puts("  -h, --help       Show this help")
@@ -943,28 +943,28 @@ defmodule Demo do
     IO.puts("  --chain          Run an inline chain (comma-separated presets)")
     IO.puts("")
     IO.puts("Examples:")
-    IO.puts("  miniloops run autocode")
-    IO.puts("  miniloops run autocode \"Fix the login bug\"")
-    IO.puts("  miniloops run presets/autoqa \"QA recent changes\"")
-    IO.puts("  miniloops run . \"Run from current directory\"")
+    IO.puts("  autoloops run autocode")
+    IO.puts("  autoloops run autocode \"Fix the login bug\"")
+    IO.puts("  autoloops run presets/autoqa \"QA recent changes\"")
+    IO.puts("  autoloops run . \"Run from current directory\"")
     IO.puts("")
-    IO.puts("Run 'miniloops list' to see all available presets.")
+    IO.puts("Run 'autoloops list' to see all available presets.")
   end
 
   defp print_chain_usage() do
     IO.puts("Usage:")
-    IO.puts("  miniloops chain list [project-dir]")
-    IO.puts("  miniloops chain run <name> [project-dir] [prompt...]")
+    IO.puts("  autoloops chain list [project-dir]")
+    IO.puts("  autoloops chain run <name> [project-dir] [prompt...]")
   end
 
   defp print_emit_usage() do
     IO.puts("Usage:")
-    IO.puts("  miniloops emit <topic> [summary]")
+    IO.puts("  autoloops emit <topic> [summary]")
   end
 
   defp print_inspect_usage() do
     IO.puts("Usage:")
-    IO.puts("  miniloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]")
+    IO.puts("  autoloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]")
     IO.puts("")
     IO.puts("Defaults when --format is omitted:")
     IO.puts("  scratchpad, prompt, memory, coordination, chain, metrics -> terminal")
@@ -977,25 +977,25 @@ defmodule Demo do
 
   defp print_memory_usage() do
     IO.puts("Usage:")
-    IO.puts("  miniloops memory list [project-dir]")
-    IO.puts("  miniloops memory status [project-dir]")
-    IO.puts("  miniloops memory find <pattern...>")
-    IO.puts("  miniloops memory add learning <text...>")
-    IO.puts("  miniloops memory add preference <category> <text...>")
-    IO.puts("  miniloops memory add meta <key> <value...>")
-    IO.puts("  miniloops memory remove <id> [reason...]")
+    IO.puts("  autoloops memory list [project-dir]")
+    IO.puts("  autoloops memory status [project-dir]")
+    IO.puts("  autoloops memory find <pattern...>")
+    IO.puts("  autoloops memory add learning <text...>")
+    IO.puts("  autoloops memory add preference <category> <text...>")
+    IO.puts("  autoloops memory add meta <key> <value...>")
+    IO.puts("  autoloops memory remove <id> [reason...]")
   end
 
   defp print_memory_add_usage() do
     IO.puts("Usage:")
-    IO.puts("  miniloops memory add learning <text...>")
-    IO.puts("  miniloops memory add preference <category> <text...>")
-    IO.puts("  miniloops memory add meta <key> <value...>")
+    IO.puts("  autoloops memory add learning <text...>")
+    IO.puts("  autoloops memory add preference <category> <text...>")
+    IO.puts("  autoloops memory add meta <key> <value...>")
     IO.puts("")
     IO.puts("Memory helpers:")
-    IO.puts("  miniloops memory status [project-dir]")
-    IO.puts("  miniloops memory find <pattern...>")
-    IO.puts("  miniloops memory remove <id> [reason...]")
+    IO.puts("  autoloops memory status [project-dir]")
+    IO.puts("  autoloops memory find <pattern...>")
+    IO.puts("  autoloops memory remove <id> [reason...]")
   end
 
   defp join_tokens([]) do

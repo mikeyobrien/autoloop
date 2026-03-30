@@ -1,6 +1,6 @@
 # AutoSec miniloop
 
-A miniloops-native security audit and hardening loop.
+A autoloops-native security audit and hardening loop.
 
 AutoSec scans a target repo for security vulnerabilities across injection, auth, secrets, dependencies, and configuration. Candidate findings are confirmed or dismissed by an analyst, fixed by a hardener when appropriate, and tracked in a prioritized security report.
 
@@ -28,7 +28,7 @@ AutoSec should prefer open risks over fake certainty.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/scanner.md`
@@ -38,20 +38,20 @@ AutoSec should prefer open risks over fake certainty.
 
 ## Shared working files created by the loop
 
-- `.miniloop/sec-findings.md` — raw candidate findings with location, type, severity, evidence
-- `.miniloop/sec-report.md` — compiled security report with fixes and open risks
-- `.miniloop/progress.md` — current finding tracking
+- `.autoloop/sec-findings.md` — raw candidate findings with location, type, severity, evidence
+- `.autoloop/sec-report.md` — compiled security report with fixes and open risks
+- `.autoloop/progress.md` — current finding tracking
 
 ## Run
 
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autosec /path/to/target-repo
+./bin/autoloops run presets/autosec /path/to/target-repo
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run /path/to/tonic-loops/presets/autosec /path/to/target-repo
+autoloops run /path/to/tonic-loops/presets/autosec /path/to/target-repo
 ```

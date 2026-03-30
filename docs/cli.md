@@ -1,16 +1,16 @@
 # CLI Reference
 
-Miniloops exposes all functionality through a single binary with subcommands. The public CLI can come from either a compiled release binary or the source wrapper script.
+Autoloops exposes all functionality through a single binary with subcommands. The public CLI can come from either a compiled release binary or the source wrapper script.
 
 ```bash
 # Via a compiled release binary or an installed source wrapper
-miniloops <subcommand> [args...]
+autoloops <subcommand> [args...]
 
 # Via the source checkout through the Tonic runtime
 tonic run <project-dir> <subcommand> [args...]
 ```
 
-When installed from GitHub Releases, `miniloops` is a standalone compiled binary. In a source checkout, `bin/miniloops` is a thin shell wrapper that calls `tonic run` with the repo root as the project directory and forwards all arguments.
+When installed from GitHub Releases, `autoloops` is a standalone compiled binary. In a source checkout, `bin/autoloops` is a thin shell wrapper that calls `tonic run` with the repo root as the project directory and forwards all arguments.
 
 ## Environment
 
@@ -21,7 +21,7 @@ When installed from GitHub Releases, `miniloops` is a standalone compiled binary
 | `MINILOOPS_ITERATION` | Current iteration number — set by the harness during runs |
 | `MINILOOPS_PROMPT` | Override the prompt sent to the backend |
 | `MINILOOPS_PROMPT_PATH` | Fallback prompt file path when `MINILOOPS_PROMPT` is unset |
-| `MINILOOPS_BIN` | Path to the miniloops binary — used by the Pi adapter for prompt projection |
+| `MINILOOPS_BIN` | Path to the autoloops binary — used by the Pi adapter for prompt projection |
 | `MINILOOPS_LOG_LEVEL` | Current log level — exported by the harness. One of `debug`, `info`, `warn`, `error`, `none`. |
 | `MINILOOPS_REVIEW_MODE` | Set to `hyperagent` during review turns — changes the Pi stream log prefix |
 | `MINILOOPS_MEMORY_FILE` | Exported by the harness so agents can locate the memory file |
@@ -33,12 +33,12 @@ When installed from GitHub Releases, `miniloops` is a standalone compiled binary
 Start a loop.
 
 ```bash
-miniloops run <preset-name|preset-dir> [prompt...] [flags]
+autoloops run <preset-name|preset-dir> [prompt...] [flags]
 ```
 
 The preset argument is required. It must be one of:
 - A bundled preset name (e.g. `autocode`, `autoqa`) — resolved to `examples/<name>/` under the installed project.
-- An explicit path to a directory containing `miniloops.toml` (or `miniloops.conf`).
+- An explicit path to a directory containing `autoloops.toml` (or `autoloops.conf`).
 - `.` to run from the current directory.
 
 If the preset argument is missing, the CLI exits with a usage error. If the argument does not resolve to a valid preset directory or bundled preset name, the CLI exits with a resolution error. Unknown arguments are never silently reinterpreted as prompt text.
@@ -55,11 +55,11 @@ If the preset argument is missing, the CLI exits with a usage error. If the argu
 **Examples:**
 
 ```bash
-miniloops run autocode
-miniloops run autocode "Fix the login bug"
-miniloops run --preset autocode "Fix the login bug"
-miniloops run . "Fix the login bug" -b pi
-miniloops run . --chain autocode,autoqa "Implement the approved change and validate it"
+autoloops run autocode
+autoloops run autocode "Fix the login bug"
+autoloops run --preset autocode "Fix the login bug"
+autoloops run . "Fix the login bug" -b pi
+autoloops run . --chain autocode,autoqa "Implement the approved change and validate it"
 ```
 
 ### `emit`
@@ -67,7 +67,7 @@ miniloops run . --chain autocode,autoqa "Implement the approved change and valid
 Publish a coordination event to the journal.
 
 ```bash
-miniloops emit <topic> [payload...]
+autoloops emit <topic> [payload...]
 ```
 
 The event is validated against the current iteration's allowed-event set. If the topic is not allowed and is not a built-in coordination topic, the emit is rejected and an `event.invalid` entry is written to the journal. Allowed events are derived from the topology's handoff map for the current role.
@@ -75,8 +75,8 @@ The event is validated against the current iteration's allowed-event set. If the
 **Examples:**
 
 ```bash
-miniloops emit doc.written "Wrote docs/cli.md covering all subcommands"
-miniloops emit task.complete "All documentation gaps addressed"
+autoloops emit doc.written "Wrote docs/cli.md covering all subcommands"
+autoloops emit task.complete "All documentation gaps addressed"
 ```
 
 ### `inspect`
@@ -84,7 +84,7 @@ miniloops emit task.complete "All documentation gaps addressed"
 Read projected artifacts from the journal and state directory.
 
 ```bash
-miniloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]
+autoloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]
 ```
 
 If `--format` is omitted, inspect uses artifact-specific defaults:
@@ -120,21 +120,21 @@ When no metrics data exists, `md` outputs `"No metrics data available."`, `csv` 
 **Examples:**
 
 ```bash
-miniloops inspect scratchpad                    # defaults to terminal
-miniloops inspect scratchpad --format md
-miniloops inspect prompt 5                     # defaults to terminal
-miniloops inspect prompt 5 --format md
-miniloops inspect output 3                     # defaults to text
-miniloops inspect journal                      # defaults to json
-miniloops inspect memory                       # defaults to terminal
-miniloops inspect memory --format md
-miniloops inspect coordination                 # defaults to terminal
-miniloops inspect chain                        # defaults to terminal
-miniloops inspect metrics                      # defaults to terminal
-miniloops inspect metrics --format md
-miniloops inspect metrics --format csv
-miniloops inspect metrics --format json
-miniloops inspect metrics run-mn9d3uk0-xi0m --format md
+autoloops inspect scratchpad                    # defaults to terminal
+autoloops inspect scratchpad --format md
+autoloops inspect prompt 5                     # defaults to terminal
+autoloops inspect prompt 5 --format md
+autoloops inspect output 3                     # defaults to text
+autoloops inspect journal                      # defaults to json
+autoloops inspect memory                       # defaults to terminal
+autoloops inspect memory --format md
+autoloops inspect coordination                 # defaults to terminal
+autoloops inspect chain                        # defaults to terminal
+autoloops inspect metrics                      # defaults to terminal
+autoloops inspect metrics --format md
+autoloops inspect metrics --format csv
+autoloops inspect metrics --format json
+autoloops inspect metrics run-mn9d3uk0-xi0m --format md
 ```
 
 ### `memory`
@@ -146,7 +146,7 @@ Manage the loop's persistent memory store.
 Print materialized memory entries with stable IDs.
 
 ```bash
-miniloops memory list [project-dir]
+autoloops memory list [project-dir]
 ```
 
 #### `memory status`
@@ -154,7 +154,7 @@ miniloops memory list [project-dir]
 Print rendered size, configured budget, and active entry counts.
 
 ```bash
-miniloops memory status [project-dir]
+autoloops memory status [project-dir]
 ```
 
 #### `memory find`
@@ -162,7 +162,7 @@ miniloops memory status [project-dir]
 Search active memory entries by text, category, key/value, source, or ID.
 
 ```bash
-miniloops memory find <pattern...>
+autoloops memory find <pattern...>
 ```
 
 #### `memory add learning`
@@ -170,7 +170,7 @@ miniloops memory find <pattern...>
 Add a learning entry.
 
 ```bash
-miniloops memory add learning <text...>
+autoloops memory add learning <text...>
 ```
 
 The entry is tagged with `source: "manual"`.
@@ -182,7 +182,7 @@ If the new entry pushes rendered memory over `memory.prompt_budget_chars`, the C
 Add a categorized preference entry.
 
 ```bash
-miniloops memory add preference <category> <text...>
+autoloops memory add preference <category> <text...>
 ```
 
 #### `memory add meta`
@@ -190,7 +190,7 @@ miniloops memory add preference <category> <text...>
 Add a metadata entry.
 
 ```bash
-miniloops memory add meta <key> <value...>
+autoloops memory add meta <key> <value...>
 ```
 
 #### `memory remove`
@@ -198,7 +198,7 @@ miniloops memory add meta <key> <value...>
 Tombstone an entry by ID.
 
 ```bash
-miniloops memory remove <id> [reason...]
+autoloops memory remove <id> [reason...]
 ```
 
 If no reason is given, the source is recorded as `"manual"`.
@@ -214,7 +214,7 @@ Manage named chains defined in `chains.toml`.
 List all defined chains and their steps.
 
 ```bash
-miniloops chain list [project-dir]
+autoloops chain list [project-dir]
 ```
 
 Output shows each chain name followed by its step sequence (e.g. `code-and-qa: autocode -> autoqa`).
@@ -224,24 +224,24 @@ Output shows each chain name followed by its step sequence (e.g. `code-and-qa: a
 Run a named chain.
 
 ```bash
-miniloops chain run <name> [project-dir] [prompt...]
+autoloops chain run <name> [project-dir] [prompt...]
 ```
 
-The chain must be defined in `chains.toml`. Each step runs as an isolated loop in `.miniloop/chains/<chain-run-id>/step-<n>/`. When a prompt is provided, it is passed directly to step 1 and also written into each step's `handoff.md` as the chain entry objective. Chains advance on bounded-success stops (`completion_event`, `completion_promise`, or `max_iterations`) and stop only on real failure reasons such as backend errors or timeouts.
+The chain must be defined in `chains.toml`. Each step runs as an isolated loop in `.autoloop/chains/<chain-run-id>/step-<n>/`. When a prompt is provided, it is passed directly to step 1 and also written into each step's `handoff.md` as the chain entry objective. Chains advance on bounded-success stops (`completion_event`, `completion_promise`, or `max_iterations`) and stop only on real failure reasons such as backend errors or timeouts.
 
 ### `pi-adapter`
 
 Run the Pi backend adapter directly. This is normally called by the harness, not by users.
 
 ```bash
-miniloops pi-adapter [pi-command] [extra-args...]
+autoloops pi-adapter [pi-command] [extra-args...]
 ```
 
-The adapter resolves the prompt from `MINILOOPS_PROMPT`, then falls back to projecting it via `miniloops inspect prompt`, then falls back to reading `MINILOOPS_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.miniloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
+The adapter resolves the prompt from `MINILOOPS_PROMPT`, then falls back to projecting it via `autoloops inspect prompt`, then falls back to reading `MINILOOPS_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.autoloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
 
-## `bin/miniloops` launcher
+## `bin/autoloops` launcher
 
-The `bin/miniloops` shell script is a convenience wrapper:
+The `bin/autoloops` shell script is a convenience wrapper:
 
 ```bash
 #!/bin/sh
@@ -303,7 +303,7 @@ bin/dev <command>    # run a command
 | `watch [args]` | `bin/test-watch` | Watch mode for tests | 1 = `entr` not installed |
 | `smoke` | `scripts/pi-smoke.sh` | Pi backend integration smoke test | 0 = pass, 1 = failure |
 | `judge` | `scripts/llm-judge.sh` | LLM judge evaluation | 0 = pass, 1 = failure |
-| `run [args]` | `bin/miniloops` | Start a miniloops run | See subcommand docs |
+| `run [args]` | `bin/autoloops` | Start a autoloops run | See subcommand docs |
 | `hooks` | `bin/install-hooks` | Install git hooks | 0 = success, 1 = error |
 | `check-missing` | `bin/check-missing` | Lint for unannotated workarounds | 0 = clean, 1 = warnings |
 
@@ -311,7 +311,7 @@ Additional release scripts live under `scripts/` and are used by `.github/workfl
 
 ### `scripts/pi-smoke.sh`
 
-End-to-end Pi backend smoke test. Creates a temporary miniloops project, runs one Pi-backed iteration, and asserts that the loop completes correctly with expected journal entries.
+End-to-end Pi backend smoke test. Creates a temporary autoloops project, runs one Pi-backed iteration, and asserts that the loop completes correctly with expected journal entries.
 
 ### `scripts/llm-judge.sh`
 
@@ -327,10 +327,10 @@ Scans `.tn` files for shell-out workaround patterns and cross-references them ag
 
 ### `scripts/build-release.sh`
 
-Compiles a standalone `miniloops` binary with `tonic compile` to the output path you pass in.
+Compiles a standalone `autoloops` binary with `tonic compile` to the output path you pass in.
 
 ```bash
-scripts/build-release.sh dist/miniloops
+scripts/build-release.sh dist/autoloops
 ```
 
 ### `scripts/package-release.sh`
@@ -338,7 +338,7 @@ scripts/build-release.sh dist/miniloops
 Packages a compiled binary into a deterministic release archive.
 
 ```bash
-scripts/package-release.sh dist/miniloops v0.1.0 linux-x64 dist
+scripts/package-release.sh dist/autoloops v0.1.0 linux-x64 dist
 ```
 
 ### `scripts/install-tonic.sh`
@@ -351,8 +351,8 @@ scripts/install-tonic.sh
 
 ### `scripts/release-smoke.sh`
 
-Smoke-tests a compiled `miniloops` binary with the real run-path check used for release validation.
+Smoke-tests a compiled `autoloops` binary with the real run-path check used for release validation.
 
 ```bash
-scripts/release-smoke.sh dist/miniloops
+scripts/release-smoke.sh dist/autoloops
 ```

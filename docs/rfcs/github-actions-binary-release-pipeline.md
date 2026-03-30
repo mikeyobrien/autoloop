@@ -1,7 +1,7 @@
 # GitHub Actions Binary Release Pipeline
 
 ## Summary
-Add a tag-driven GitHub Actions release pipeline that validates the tagged commit, compiles a standalone `miniloops` binary on supported runner platforms, smoke-tests the compiled artifact without requiring `tonic` at runtime, packages release archives plus checksums, and publishes them to GitHub Releases.
+Add a tag-driven GitHub Actions release pipeline that validates the tagged commit, compiles a standalone `autoloops` binary on supported runner platforms, smoke-tests the compiled artifact without requiring `tonic` at runtime, packages release archives plus checksums, and publishes them to GitHub Releases.
 
 Code task: `.agents/tasks/tonic-loops/github-actions-binary-release-pipeline.code-task.md`
 
@@ -16,13 +16,13 @@ That leaves three gaps:
 The repo already contains the pieces needed for a releaseable binary:
 - `.tonic-version` pins the toolchain
 - `src/main.tn` already uses `tonic compile ... --out ...` for self-compilation paths
-- `bin/miniloops` defines the public CLI name and current source-install UX
+- `bin/autoloops` defines the public CLI name and current source-install UX
 - `.github/workflows/ci.yml` already proves GitHub Actions is part of the toolchain story
 
 What is missing is one explicit release contract and one workflow that turns tags into release assets.
 
 ## Goals
-- Build standalone `miniloops` binaries in GitHub Actions from tagged commits.
+- Build standalone `autoloops` binaries in GitHub Actions from tagged commits.
 - Publish binary archives and checksums to GitHub Releases.
 - Validate the compiled binary itself, not just the source tree.
 - Keep the release process tag-first and inspectable.
@@ -32,7 +32,7 @@ What is missing is one explicit release contract and one workflow that turns tag
 - Publishing to package managers (`npm`, Homebrew, apt, etc.) in this workstream.
 - Adding Windows support in the first pass.
 - Building a generalized release orchestration framework.
-- Replacing the existing source-based `bin/miniloops` development workflow.
+- Replacing the existing source-based `bin/autoloops` development workflow.
 - Making Pi-backed smoke tests a hard blocker for release publication when they depend on external credentials/runtime setup.
 
 ## Proposed Design
@@ -54,16 +54,16 @@ Possible later expansion:
 - `macos-x64`
 - `linux-arm64`
 
-Keep the binary name `miniloops` even if the GitHub repo is named differently. The CLI/docs already speak in terms of `miniloops`; renaming the distributed binary would create unnecessary churn.
+Keep the binary name `autoloops` even if the GitHub repo is named differently. The CLI/docs already speak in terms of `autoloops`; renaming the distributed binary would create unnecessary churn.
 
 ### 2. Release artifact layout
 Each release should publish:
-- `miniloops-<tag>-linux-x64.tar.gz`
-- `miniloops-<tag>-macos-arm64.tar.gz`
+- `autoloops-<tag>-linux-x64.tar.gz`
+- `autoloops-<tag>-macos-arm64.tar.gz`
 - `SHA256SUMS.txt`
 
 Each archive should contain:
-- the compiled `miniloops` binary
+- the compiled `autoloops` binary
 - a small README/install note or copied top-level docs excerpt if useful
 - license file if/when the repo adds one
 
@@ -84,7 +84,7 @@ Proposed scripts:
 - `scripts/release-smoke.sh`
   - runs the compiled binary against a tiny temp fixture using a `command` backend
   - verifies at minimum:
-    - `miniloops --help` works
+    - `autoloops --help` works
     - a one-iteration loop can complete
     - projected output/journal artifacts are produced
 
@@ -135,7 +135,7 @@ Minimum doc changes:
   - add an install-from-release section
   - keep the existing source-install path, but make the release binary the shortest path for end users
 - `docs/cli.md`
-  - note that the public CLI can come either from the compiled release binary or from `bin/miniloops`
+  - note that the public CLI can come either from the compiled release binary or from `bin/autoloops`
 - optional `docs/releasing.md`
   - one short operator runbook: create tag, push tag, inspect workflow, verify release assets
 
@@ -166,5 +166,5 @@ Rejected for now. It couples artifact publication to external runtime assumption
 
 ## Implementation Notes
 - Code task: `.agents/tasks/tonic-loops/github-actions-binary-release-pipeline.code-task.md`
-- Ground the implementation in `.github/workflows/ci.yml`, `.tonic-version`, `README.md`, `docs/cli.md`, `bin/miniloops`, and the self-compilation path in `src/main.tn`.
+- Ground the implementation in `.github/workflows/ci.yml`, `.tonic-version`, `README.md`, `docs/cli.md`, `bin/autoloops`, and the self-compilation path in `src/main.tn`.
 - Prefer a small number of repo-owned scripts over large inline YAML shell blocks.

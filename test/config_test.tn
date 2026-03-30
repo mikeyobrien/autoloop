@@ -9,12 +9,12 @@ defmodule ConfigTest do
     Assert.assert_contains(output, "default_run_id_format=compact")
     Assert.assert_contains(output, "default_log_level=info")
     Assert.assert_contains(output, "loaded_backend_kind=pi")
-    Assert.assert_contains(output, "loaded_state_dir=.miniloop")
-    Assert.assert_contains(output, "loaded_memory_file=.miniloop/memory.jsonl")
-    Assert.assert_contains(output, "loaded_journal_in=/tmp/config-work/.miniloop/journal.jsonl")
-    Assert.assert_contains(output, "loaded_memory_in=/tmp/config-work/.miniloop/memory.jsonl")
-    Assert.assert_contains(output, "loaded_state_dir_name=.miniloop")
-    Assert.assert_contains(output, "loaded_state_dir_path=" <> repo_root() <> "/.miniloop")
+    Assert.assert_contains(output, "loaded_state_dir=.autoloop")
+    Assert.assert_contains(output, "loaded_memory_file=.autoloop/memory.jsonl")
+    Assert.assert_contains(output, "loaded_journal_in=/tmp/config-work/.autoloop/journal.jsonl")
+    Assert.assert_contains(output, "loaded_memory_in=/tmp/config-work/.autoloop/memory.jsonl")
+    Assert.assert_contains(output, "loaded_state_dir_name=.autoloop")
+    Assert.assert_contains(output, "loaded_state_dir_path=" <> repo_root() <> "/.autoloop")
   end
 
   def test_real_config_resolves_bundled_presets() do
@@ -39,7 +39,7 @@ defmodule ConfigTest do
   end
 
   defp prepare_fixture(main_source) do
-    dir = "/tmp/miniloops-config-source-fixture"
+    dir = "/tmp/autoloops-config-source-fixture"
     src_dir = Path.join(dir, "src")
 
     System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(src_dir))
@@ -117,7 +117,7 @@ defmodule ConfigTest do
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp shell_quote(text) do

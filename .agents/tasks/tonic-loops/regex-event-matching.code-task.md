@@ -4,7 +4,7 @@
 Add optional regex pattern-based event matching to topology routing. Allow `emits` entries and `handoff` keys in `topology.toml` to use regex patterns (delimited by `/`) alongside exact string matches. This enables flexible event routing without enumerating every possible event name.
 
 ## Background
-Miniloops topology currently uses exact string matching for event validation and handoff routing. A role's `emits` list must contain the literal event topic, and `[handoff]` keys must be exact event names. This works for small topologies but becomes verbose when events follow naming conventions (e.g., `review.passed`, `review.rejected`, `review.deferred`).
+Autoloops topology currently uses exact string matching for event validation and handoff routing. A role's `emits` list must contain the literal event topic, and `[handoff]` keys must be exact event names. This works for small topologies but becomes verbose when events follow naming conventions (e.g., `review.passed`, `review.rejected`, `review.deferred`).
 
 The tonic stdlib now includes a `Regex` module with `Regex.match?(string, pattern)` and related functions. Adding optional regex patterns to topology routing lets preset authors write compact event matching rules while keeping exact strings as the default.
 
@@ -39,7 +39,7 @@ The tonic stdlib now includes a `Regex` module with `Regex.match?(string, patter
 - A handoff key `"/build\\..+/" = ["builder"]` routes `build.started`, `build.blocked` to builder.
 - Exact string entries continue to work unchanged.
 - Invalid regex patterns produce a warning and are skipped, not a crash.
-- `miniloops inspect coordination` renders regex patterns with `/` delimiters.
+- `autoloops inspect coordination` renders regex patterns with `/` delimiters.
 
 ## Dependencies
 - Tonic runtime with Regex module available in stdlib

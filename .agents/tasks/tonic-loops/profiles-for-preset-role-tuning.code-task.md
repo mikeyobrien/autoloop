@@ -4,7 +4,7 @@
 Add a first-class profile system that lets users tune shipped preset roles with extra markdown instructions without forking presets. Profiles should be append-only, role-scoped prompt fragments that can be activated from repo scope or user scope, with support for repo-defined default profiles. The implementation must keep the preset contract stable: profiles may refine how a role behaves in a given repo or runtime mode, but they must not mutate topology, emit contracts, routing, or role identity.
 
 ## Background
-Miniloops already leans on plain markdown prompts, role decks, and explicit files rather than hidden workflow machinery. That makes prompt-layer customization the natural place to let users adapt presets to their repos and working styles.
+Autoloops already leans on plain markdown prompts, role decks, and explicit files rather than hidden workflow machinery. That makes prompt-layer customization the natural place to let users adapt presets to their repos and working styles.
 
 The desired model is:
 - a **preset** remains the canonical workflow bundle with stable topology and role/event contracts
@@ -52,16 +52,16 @@ Key design decisions already settled:
 
 ## Technical Requirements
 1. Introduce a first-class profile concept for preset role tuning with two supported scopes in v1: repo and user.
-2. Support repo-scoped profiles at `.miniloop/profiles/<profile>/<preset>/<role>.md`.
-3. Support user-scoped profiles at `~/.config/miniloops/profiles/<profile>/<preset>/<role>.md`.
+2. Support repo-scoped profiles at `.autoloop/profiles/<profile>/<preset>/<role>.md`.
+3. Support user-scoped profiles at `~/.config/autoloops/profiles/<profile>/<preset>/<role>.md`.
 4. Support explicit profile activation in the CLI using only `repo:<name>` and `user:<name>` forms in v1.
-5. Support repo default profiles via config, using a key such as `profiles.default = ["repo:phoenix"]` in `miniloops.toml`.
+5. Support repo default profiles via config, using a key such as `profiles.default = ["repo:phoenix"]` in `autoloops.toml`.
 6. Support `--no-default-profiles` so users can suppress repo defaults for a run.
 7. Define profile application order as:
    1. repo default profiles, in config order
    2. explicit CLI profiles, in CLI order
 8. Keep profile behavior append-only: matching fragments are appended to the shipped role prompt in activation order.
-9. Do not allow profiles to modify `topology.toml`, `miniloops.toml` behavior beyond default profile declaration, role lists, `emits`, handoff routing, or completion semantics.
+9. Do not allow profiles to modify `topology.toml`, `autoloops.toml` behavior beyond default profile declaration, role lists, `emits`, handoff routing, or completion semantics.
 10. Keep matching exact in v1: exact profile, exact preset, exact role, with no wildcard support.
 11. Warn and ignore profile fragments whose filenames do not match a real role in the target preset.
 12. Warn when an activated profile contributes no fragments for the target preset.
@@ -96,12 +96,12 @@ Key design decisions already settled:
 ## Acceptance Criteria
 
 1. **Repo And User Profile Scopes Work**
-   - Given a repo profile at `.miniloop/profiles/phoenix/autocode/planner.md` and a user profile at `~/.config/miniloops/profiles/strict-review/autocode/critic.md`
+   - Given a repo profile at `.autoloop/profiles/phoenix/autocode/planner.md` and a user profile at `~/.config/autoloops/profiles/strict-review/autocode/critic.md`
    - When each is activated for an `autocode` run
    - Then the matching fragment is appended to the corresponding shipped role prompt
 
 2. **Repo Default Profiles Apply First**
-   - Given `profiles.default = ["repo:phoenix", "repo:strict-ci"]` in `miniloops.toml`
+   - Given `profiles.default = ["repo:phoenix", "repo:strict-ci"]` in `autoloops.toml`
    - When a run starts without `--no-default-profiles`
    - Then those defaults are active before any explicit CLI profiles and preserve config order
 
@@ -121,7 +121,7 @@ Key design decisions already settled:
    - Then profiles only contribute markdown prompt fragments and do not mutate topology, emits, handoff, config structure, or role identity
 
 6. **Exact Matching Is Enforced**
-   - Given a fragment at `.miniloop/profiles/phoenix/autocode/planner.md`
+   - Given a fragment at `.autoloop/profiles/phoenix/autocode/planner.md`
    - When a different preset or role is active
    - Then that fragment is not applied unless both preset and role match exactly
 
@@ -137,11 +137,11 @@ Key design decisions already settled:
 
 9. **Missing Explicit Profiles Fail Fast**
    - Given a user runs with `--profile user:strict-review`
-   - When `~/.config/miniloops/profiles/strict-review` does not exist
+   - When `~/.config/autoloops/profiles/strict-review` does not exist
    - Then the command fails with a clear error explaining which profile was not found and where it was expected
 
 10. **Inspect Shows Effective Prompt Composition**
-    - Given a user runs `miniloops inspect prompt autocode --role critic --profile repo:phoenix --profile user:strict-review`
+    - Given a user runs `autoloops inspect prompt autocode --role critic --profile repo:phoenix --profile user:strict-review`
     - When inspect output is rendered
     - Then it shows default profiles, explicit profiles, activation order, prompt source files, warnings, and the final rendered prompt
 
@@ -162,5 +162,5 @@ Key design decisions already settled:
 
 ## Metadata
 - **Complexity**: Medium
-- **Labels**: miniloops, profiles, presets, prompts, cli, inspectability, configuration, role-tuning
+- **Labels**: autoloops, profiles, presets, prompts, cli, inspectability, configuration, role-tuning
 - **Required Skills**: CLI design, prompt-system design, configuration design, Tonic app development, documentation, test design

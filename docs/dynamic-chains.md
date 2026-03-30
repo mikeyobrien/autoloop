@@ -39,7 +39,7 @@ This prevents unjustified runaway chain creation.
 
 ## Dynamic chain specs
 
-Dynamic chain specs are durable JSON files stored in `.miniloop/chains/specs/`:
+Dynamic chain specs are durable JSON files stored in `.autoloop/chains/specs/`:
 
 ```json
 {"chain_id": "dyn-1", "parent_id": "chain-2", "steps": "autocode,autoqa", "justification": "Code changes need validation"}
@@ -73,10 +73,10 @@ Agents can emit `chain.spawn` coordination events to request dynamic chain creat
 ## Inspection
 
 ```bash
-miniloops inspect chain --format md    # see all chain runs including dynamic
+autoloops inspect chain --format md    # see all chain runs including dynamic
 ```
 
-Chain spec files are readable at `.miniloop/chains/specs/*.json`.
+Chain spec files are readable at `.autoloop/chains/specs/*.json`.
 
 ## Design principles
 

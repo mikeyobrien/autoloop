@@ -1,6 +1,6 @@
 # AutoReview miniloop
 
-A miniloops-native code review loop for PR diffs and change sets.
+A autoloops-native code review loop for PR diffs and change sets.
 
 AutoReview reads changes, checks for issues across correctness, security, style, performance, and maintainability, proposes concrete fixes, and compiles structured review feedback with a clear verdict.
 
@@ -28,7 +28,7 @@ AutoReview is skeptical by default.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/reader.md`
@@ -38,20 +38,20 @@ AutoReview is skeptical by default.
 
 ## Shared working files created by the loop
 
-- `.miniloop/review-context.md` — diff summary, affected files, architectural context, risk map
-- `.miniloop/review-findings.md` — structured findings with suggestions and verdict
-- `.miniloop/progress.md` — review pass tracking
+- `.autoloop/review-context.md` — diff summary, affected files, architectural context, risk map
+- `.autoloop/review-findings.md` — structured findings with suggestions and verdict
+- `.autoloop/progress.md` — review pass tracking
 
 ## Run
 
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autoreview /path/to/target-repo
+./bin/autoloops run presets/autoreview /path/to/target-repo
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run /path/to/tonic-loops/presets/autoreview /path/to/target-repo
+autoloops run /path/to/tonic-loops/presets/autoreview /path/to/target-repo
 ```

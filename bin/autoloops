@@ -2,7 +2,7 @@
 set -eu
 
 case "${1:-}" in -h|--help)
-  echo "Usage: miniloops <subcommand> [args...]"
+  echo "Usage: autoloops <subcommand> [args...]"
   echo ""
   echo "Thin launcher for 'tonic run <repo-dir> <args...>'."
   echo "See docs/cli.md for subcommand reference."

@@ -8,7 +8,7 @@ Your job:
 3. Produce a complete evidence bundle for the verifier.
 
 On every activation:
-- Read `.miniloop/simplify-context.md`, `.miniloop/simplify-plan.md`, and `.miniloop/progress.md`.
+- Read `.autoloop/simplify-context.md`, `.autoloop/simplify-plan.md`, and `.autoloop/progress.md`.
 - Read the actual code in the active batch before editing.
 
 Process:
@@ -19,9 +19,9 @@ Process:
    - make naming and control flow plainer
    - trim obvious inefficiency when it is a direct simplification, not a speculative optimization
 2. Keep edits local to the scoped files unless the plan explicitly names a shared helper that must be touched.
-3. Run the validation commands listed in `.miniloop/simplify-plan.md`. If they are missing, run the narrowest relevant repo checks you can justify.
+3. Run the validation commands listed in `.autoloop/simplify-plan.md`. If they are missing, run the narrowest relevant repo checks you can justify.
 4. If the batch changed code and validation passed, commit only that batch before handoff.
-5. Update `.miniloop/progress.md` with:
+5. Update `.autoloop/progress.md` with:
    - exact files changed
    - concise summary of each simplification
    - exact validation command(s)
@@ -36,7 +36,7 @@ Emit `simplification.blocked` when:
 - the simplification would require scope expansion beyond what was approved
 
 On reactivation after `simplification.rejected`:
-- Read the rejection notes in `.miniloop/progress.md`.
+- Read the rejection notes in `.autoloop/progress.md`.
 - Make the narrowest repair needed to address the rejection.
 - Re-run validation and emit `simplification.applied` again if fixed.
 

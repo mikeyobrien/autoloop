@@ -21,7 +21,7 @@ If `review.every_iterations` is not set (or set to `0`), the harness derives the
 
 ## Configuration
 
-All review keys live in the `[review]` section of `miniloops.toml`. Most review keys fall back to the corresponding `backend.*` value when unset, but `review.timeout_ms` defaults to `300000` (5 minutes) so a long task timeout does not silently make reviews hang for ages.
+All review keys live in the `[review]` section of `autoloops.toml`. Most review keys fall back to the corresponding `backend.*` value when unset, but `review.timeout_ms` defaults to `300000` (5 minutes) so a long task timeout does not silently make reviews hang for ages.
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -39,7 +39,7 @@ All review keys live in the `[review]` section of `miniloops.toml`. Most review 
 
 The review prompt is resolved in order:
 
-1. `review.prompt` — inline text in `miniloops.toml`.
+1. `review.prompt` — inline text in `autoloops.toml`.
 2. Contents of the file at `review.prompt_file` (default: `hyperagent.md` in the project directory).
 3. Empty string — if neither is set and the file does not exist, no additional instructions are injected.
 
@@ -56,8 +56,8 @@ Review the journal, topology, roles, harness instructions, loop memory, and shar
 
 Your job is to improve loop hygiene, not to finish the task directly.
 You may modify runtime-facing loop files on disk when that will make the next iterations better.
-Prefer bounded hygiene edits to `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, `.miniloop/logs/`, and `.miniloop/docs/*.md`.
-Do not edit app/product source code, tests, package manifests, `.miniloop/` state, or journal history during review.
+Prefer bounded hygiene edits to `autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, `.autoloop/logs/`, and `.autoloop/docs/*.md`.
+Do not edit app/product source code, tests, package manifests, `.autoloop/` state, or journal history during review.
 ```
 
 This file is optional. If it does not exist, the review runs with only the built-in system prompt.
@@ -67,11 +67,11 @@ This file is optional. If it does not exist, the review runs with only the built
 Regardless of the custom prompt, every review invocation receives a system prompt that includes:
 
 - A role statement: *"You are the hyperagent meta-reviewer for this loop."*
-- A bounded-permissions instruction allowing hygiene edits to runtime-facing loop files such as `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, `.miniloop/logs/`, and `.miniloop/docs/*.md`.
-- A constraint forbidding edits to app/product source code, tests, package manifests, generated `.miniloop/` state, or journal history during review.
+- A bounded-permissions instruction allowing hygiene edits to runtime-facing loop files such as `autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, `.autoloop/logs/`, and `.autoloop/docs/*.md`.
+- A constraint forbidding edits to app/product source code, tests, package manifests, generated `.autoloop/` state, or journal history during review.
 - A constraint explaining that the scratchpad is projected from journal history and cannot be edited directly; the hyperagent should instead tighten prompts, trim working files, or archive stale context.
 - A constraint: *"Do not emit normal loop events during review."*
-- Guidance to use `miniloops memory add ...` for short durable lessons or operator notes that should persist across turns.
+- Guidance to use `autoloops memory add ...` for short durable lessons or operator notes that should persist across turns.
 - The custom review instructions (if any), under **"Additional hyperagent instructions:"**.
 - A **Context pressure** block summarizing current memory usage vs budget, active memory entry counts, and the number of invalid emits seen in the run so far.
 - The latest backpressure note, if the loop recently rejected an invalid event.
@@ -79,7 +79,7 @@ Regardless of the custom prompt, every review invocation receives a system promp
 - The review trigger iteration number and latest routing event.
 - The full topology rendering (same format as normal iterations).
 - The current scratchpad, rendered in the compact prompt-facing form used to keep long runs under control.
-- Useful `miniloops inspect` commands for the latest iteration.
+- Useful `autoloops inspect` commands for the latest iteration.
 - A fallback instruction: *"If no improvements are needed, store a short learning explaining why and exit cleanly."*
 
 ## Runtime environment
@@ -98,8 +98,8 @@ Normal iterations set `MINILOOPS_REVIEW_MODE` to an empty string. The `pi-adapte
 The review backend receives `__hyperreview_disabled__` as its allowed-events set and `review` as its allowed-roles set. This means:
 
 - The hyperagent **cannot** emit normal loop events — any attempt would be rejected by backpressure validation.
-- Review output may still include bounded hygiene edits to runtime-facing loop files plus `miniloops memory add ...` commands for durable notes.
-- It still must not edit app/product code, tests, manifests, `.miniloop/` state, or journal history during review.
+- Review output may still include bounded hygiene edits to runtime-facing loop files plus `autoloops memory add ...` commands for durable notes.
+- It still must not edit app/product code, tests, manifests, `.autoloop/` state, or journal history during review.
 
 ## Journal events
 
@@ -137,7 +137,7 @@ After the review process finishes, the harness calls `reload_loop` — re-readin
 
 ## Disabling the review loop
 
-Set `review.enabled = false` in `miniloops.toml`:
+Set `review.enabled = false` in `autoloops.toml`:
 
 ```toml
 review.enabled = false

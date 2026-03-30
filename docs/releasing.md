@@ -19,8 +19,8 @@ git push origin v0.1.0
 
 4. Watch `.github/workflows/release.yml`.
 5. Verify the GitHub Release contains:
-   - `miniloops-v0.1.0-linux-x64.tar.gz`
-   - `miniloops-v0.1.0-macos-arm64.tar.gz`
+   - `autoloops-v0.1.0-linux-x64.tar.gz`
+   - `autoloops-v0.1.0-macos-arm64.tar.gz`
    - `SHA256SUMS.txt`
 
 ## What the workflow does
@@ -30,7 +30,7 @@ git push origin v0.1.0
   - `.tonic-version` is informational here, not the active install source
 - re-runs `tonic check .`
 - re-runs `./bin/test`
-- compiles standalone `miniloops` binaries
+- compiles standalone `autoloops` binaries
 - smoke-tests the compiled binary with a real run-path check via `scripts/compiled-run-check.sh`
 - packages release archives
 - publishes the archives and checksums to GitHub Releases
@@ -38,10 +38,10 @@ git push origin v0.1.0
 ## Install from a release archive
 
 ```bash
-tar -xzf miniloops-v0.1.0-linux-x64.tar.gz
-chmod +x miniloops-v0.1.0-linux-x64/miniloops
-mv miniloops-v0.1.0-linux-x64/miniloops ~/.local/bin/miniloops
-miniloops --help
+tar -xzf autoloops-v0.1.0-linux-x64.tar.gz
+chmod +x autoloops-v0.1.0-linux-x64/autoloops
+mv autoloops-v0.1.0-linux-x64/autoloops ~/.local/bin/autoloops
+autoloops --help
 ```
 
 The release binary does not require a source checkout for normal CLI use.

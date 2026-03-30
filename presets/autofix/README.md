@@ -1,6 +1,6 @@
 # AutoFix miniloop
 
-A miniloops-native bug diagnosis and repair loop.
+A autoloops-native bug diagnosis and repair loop.
 
 AutoFix takes a bug report or failing test, reproduces the issue, traces the root cause, implements a minimal fix, and verifies the fix — all without refactoring or improving code beyond what is needed.
 
@@ -33,7 +33,7 @@ AutoFix should reject weak fixes.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/diagnoser.md`
@@ -43,20 +43,20 @@ AutoFix should reject weak fixes.
 
 ## Shared working files created by the loop
 
-- `.miniloop/bug-report.md` — symptom, reproduction steps, root cause analysis
-- `.miniloop/fix-log.md` — log of fixes applied with verification results
-- `.miniloop/progress.md` — current bug tracking
+- `.autoloop/bug-report.md` — symptom, reproduction steps, root cause analysis
+- `.autoloop/fix-log.md` — log of fixes applied with verification results
+- `.autoloop/progress.md` — current bug tracking
 
 ## Run
 
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autofix "TypeError in parse_config when TOML has nested arrays"
+./bin/autoloops run presets/autofix "TypeError in parse_config when TOML has nested arrays"
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run /path/to/tonic-loops/presets/autofix /path/to/target-repo
+autoloops run /path/to/tonic-loops/presets/autofix /path/to/target-repo
 ```

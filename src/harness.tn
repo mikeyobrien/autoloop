@@ -165,7 +165,7 @@ defmodule LoopHarness do
     config_log_level = LoopConfig.get(config, "core.log_level", "info")
     log_level = resolve_log_level(cli_log_level, config_log_level)
 
-    %{paths: %{project_dir: resolved_project_dir, work_dir: resolved_work_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "miniloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override, backend_override: backend_override, log_level: log_level}}
+    %{paths: %{project_dir: resolved_project_dir, work_dir: resolved_work_dir, state_dir: state_dir, journal_file: journal_file, memory_file: memory_file, tool_path: Path.join(state_dir, "autoloops"), pi_adapter_path: Path.join(state_dir, "pi-adapter")}, runtime: %{run_id: run_id, self_command: self_command, prompt_override: prompt_override, backend_override: backend_override, log_level: log_level}}
     |> reload_loop()
   end
 
@@ -1659,7 +1659,7 @@ defmodule LoopHarness do
   end
 
   defp render_iteration_prompt_text(loop, iteration, recent_event, allowed_roles, allowed_events, backpressure, invalid_count, last_rejected, scratchpad_text, memory_text, memory_stats) do
-    "You are inside a bare-minimal miniloops harness.\n\n" <>
+    "You are inside a bare-minimal autoloops harness.\n\n" <>
     harness_instructions_text(loop) <>
     context_pressure_text(memory_stats, invalid_count, last_rejected) <>
     backpressure_text(backpressure) <> "Objective:\n" <> objective(loop) <> "\n\n" <>
@@ -1905,21 +1905,21 @@ defmodule LoopHarness do
   end
 
   defp wrap_process_invocation(command) do
-    "miniloops_child_pid=''\n" <>
-    "miniloops_cleanup() {\n" <>
-    "  if [ -n \"$miniloops_child_pid\" ]; then\n" <>
-    "    kill \"$miniloops_child_pid\" 2>/dev/null || true\n" <>
-    "    wait \"$miniloops_child_pid\" 2>/dev/null || true\n" <>
+    "autoloops_child_pid=''\n" <>
+    "autoloops_cleanup() {\n" <>
+    "  if [ -n \"$autoloops_child_pid\" ]; then\n" <>
+    "    kill \"$autoloops_child_pid\" 2>/dev/null || true\n" <>
+    "    wait \"$autoloops_child_pid\" 2>/dev/null || true\n" <>
     "  fi\n" <>
     "}\n" <>
-    "trap 'miniloops_cleanup; exit 130' INT TERM\n" <>
+    "trap 'autoloops_cleanup; exit 130' INT TERM\n" <>
     "(\n" <> command <> "\n" <>
     ") &\n" <>
-    "miniloops_child_pid=$!\n" <>
-    "wait \"$miniloops_child_pid\"\n" <>
-    "miniloops_status=$?\n" <>
+    "autoloops_child_pid=$!\n" <>
+    "wait \"$autoloops_child_pid\"\n" <>
+    "autoloops_status=$?\n" <>
     "trap - INT TERM\n" <>
-    "exit \"$miniloops_status\"\n"
+    "exit \"$autoloops_status\"\n"
   end
 
   defp runtime_env_lines(loop, iteration, recent_event, allowed_roles, allowed_events, review_mode) do
@@ -1960,7 +1960,7 @@ defmodule LoopHarness do
     last_rejected = last_rejected_topic(run_lines, "")
     latest_iteration = to_string(max_review_prompt_iteration(run_lines))
 
-    "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" <> "Safe edit targets include `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `" <> state_dir(loop) <> "/context.md`, `" <> state_dir(loop) <> "/plan.md`, `" <> state_dir(loop) <> "/progress.md`, `" <> state_dir(loop) <> "/logs/`, and `" <> state_dir(loop) <> "/docs/*.md`.\n" <> "Keep loop-owned artifacts under `" <> state_dir(loop) <> "/`; do not leave loop-owned working files at the repo root.\n" <> "Use `" <> tool_path(loop) <> " memory add ...` for short durable lessons or operator notes that should persist across turns.\n" <> "Do not edit app/product source code, tests, package manifests, generated state under `" <> state_dir(loop) <> "/`, or journal history during review.\n" <> "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" <> "Do not emit normal loop events during review.\n\n" <>
+    "You are the hyperagent meta-reviewer for this loop.\n\n" <> "Your job is to improve the loop itself, not to finish the task directly.\n" <> "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" <> "Safe edit targets include `autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, `roles/*.md`, `" <> state_dir(loop) <> "/context.md`, `" <> state_dir(loop) <> "/plan.md`, `" <> state_dir(loop) <> "/progress.md`, `" <> state_dir(loop) <> "/logs/`, and `" <> state_dir(loop) <> "/docs/*.md`.\n" <> "Keep loop-owned artifacts under `" <> state_dir(loop) <> "/`; do not leave loop-owned working files at the repo root.\n" <> "Use `" <> tool_path(loop) <> " memory add ...` for short durable lessons or operator notes that should persist across turns.\n" <> "Do not edit app/product source code, tests, package manifests, generated state under `" <> state_dir(loop) <> "/`, or journal history during review.\n" <> "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" <> "Do not emit normal loop events during review.\n\n" <>
     review_instructions_text(loop) <>
     context_pressure_text(memory_stats, invalid_count, last_rejected) <>
     backpressure_text(backpressure) <>
@@ -2850,7 +2850,7 @@ defmodule LoopHarness do
     stop_reason = Map.get(summary, :stop_reason, "unknown")
     hint = stop_reason_hint(stop_reason)
 
-    print_lines(["miniloops summary", "===================","run_id: #{run_id(loop)}","iterations: #{Map.get(summary, :iterations, 0)}","stop_reason: #{stop_reason}","journal: #{journal_file(loop)}","memory: #{memory_file(loop)}","review_every: #{review_every(loop)}","inspect scratchpad: #{tool_path(loop)} inspect scratchpad --format md"] ++ hint)
+    print_lines(["autoloops summary", "===================","run_id: #{run_id(loop)}","iterations: #{Map.get(summary, :iterations, 0)}","stop_reason: #{stop_reason}","journal: #{journal_file(loop)}","memory: #{memory_file(loop)}","review_every: #{review_every(loop)}","inspect scratchpad: #{tool_path(loop)} inspect scratchpad --format md"] ++ hint)
   end
 
   defp stop_reason_hint("backend_failed") do
@@ -3218,23 +3218,23 @@ defmodule LoopHarness do
   end
 
   defp state_dir(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :state_dir, ".miniloop")
+    Map.get(Map.get(loop, :paths, %{}), :state_dir, ".autoloop")
   end
 
   defp journal_file(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :journal_file, ".miniloop/journal.jsonl")
+    Map.get(Map.get(loop, :paths, %{}), :journal_file, ".autoloop/journal.jsonl")
   end
 
   defp memory_file(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :memory_file, ".miniloop/memory.jsonl")
+    Map.get(Map.get(loop, :paths, %{}), :memory_file, ".autoloop/memory.jsonl")
   end
 
   defp tool_path(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :tool_path, ".miniloop/miniloops")
+    Map.get(Map.get(loop, :paths, %{}), :tool_path, ".autoloop/autoloops")
   end
 
   defp pi_adapter_path(loop) do
-    Map.get(Map.get(loop, :paths, %{}), :pi_adapter_path, ".miniloop/pi-adapter")
+    Map.get(Map.get(loop, :paths, %{}), :pi_adapter_path, ".autoloop/pi-adapter")
   end
 
   defp run_id(loop) do
@@ -3242,7 +3242,7 @@ defmodule LoopHarness do
   end
 
   defp self_command(loop) do
-    Map.get(Map.get(loop, :runtime, %{}), :self_command, "'miniloops'")
+    Map.get(Map.get(loop, :runtime, %{}), :self_command, "'autoloops'")
   end
 
   defp prompt_override(loop) do
@@ -3270,7 +3270,7 @@ defmodule LoopHarness do
 
   defp log(loop, level, message) do
     case log_level_rank(level) >= log_level_rank(log_level_atom(log_level(loop))) do
-      true -> System.log(level, message, %{source: "miniloops"})
+      true -> System.log(level, message, %{source: "autoloops"})
       _ -> :ok
     end
   end

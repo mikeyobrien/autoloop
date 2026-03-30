@@ -1,6 +1,6 @@
 # AutoQA miniloop
 
-A miniloops-native zero-dependency, domain-adaptive validation orchestrator.
+A autoloops-native zero-dependency, domain-adaptive validation orchestrator.
 
 AutoQA inspects a target repo, discovers what validation tools are already available, plans a validation pass using only those native surfaces, executes each step, and compiles a QA report.
 
@@ -24,7 +24,7 @@ AutoQA is adversarial toward claims of health.
 1. **Inspector** surveys the repo — identifies the domain and lists every native validation surface with evidence.
 2. **Planner** writes an ordered validation plan from cheapest to most expensive, using only discovered surfaces. Every surface becomes a step or an explicit skip.
 3. **Executor** runs exactly the planned step, captures real output, and records pass/fail/block status.
-4. **Reporter** compiles results into `.miniloop/qa-report.md` and decides whether to continue, fail, or complete.
+4. **Reporter** compiles results into `.autoloop/qa-report.md` and decides whether to continue, fail, or complete.
 
 ## Zero-dependency guarantee
 
@@ -32,7 +32,7 @@ AutoQA never installs frameworks, test runners, linters, or any tools. It uses o
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/inspector.md`
@@ -42,9 +42,9 @@ AutoQA never installs frameworks, test runners, linters, or any tools. It uses o
 
 ## Shared working files created by the loop
 
-- `.miniloop/qa-plan.md` — validation plan with discovered surfaces and ordered steps
-- `.miniloop/qa-report.md` — compiled validation report with pass/fail evidence
-- `.miniloop/progress.md` — current step tracking plus per-surface status
+- `.autoloop/qa-plan.md` — validation plan with discovered surfaces and ordered steps
+- `.autoloop/qa-report.md` — compiled validation report with pass/fail evidence
+- `.autoloop/progress.md` — current step tracking plus per-surface status
 
 ## Backend
 
@@ -67,13 +67,13 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autoqa /path/to/target-repo
+./bin/autoloops run presets/autoqa /path/to/target-repo
 ```
 
 Or with the installed shim:
 
 ```bash
-miniloops run /path/to/tonic-loops/presets/autoqa /path/to/target-repo
+autoloops run /path/to/tonic-loops/presets/autoqa /path/to/target-repo
 ```
 
 ## AutoQA vs AutoTest

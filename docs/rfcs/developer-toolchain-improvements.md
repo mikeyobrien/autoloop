@@ -88,14 +88,14 @@ Pure-shell script that prints a help listing when called with no args and dispat
 - `bin/dev watch [args]` → `bin/test-watch`
 - `bin/dev smoke` → `scripts/pi-smoke.sh`
 - `bin/dev judge` → `scripts/llm-judge.sh`
-- `bin/dev run [args]` → `bin/miniloops`
+- `bin/dev run [args]` → `bin/autoloops`
 - `bin/dev hooks` → `bin/install-hooks`
 
 **S11: "Developer scripts" section in `docs/cli.md`**
 Document each script with purpose, usage, and exit codes. Pure documentation addition.
 
 **S12: `--help` flag handling**
-Add a 3-line guard to `bin/test` and `bin/miniloops`:
+Add a 3-line guard to `bin/test` and `bin/autoloops`:
 ```bash
 case "$1" in -h|--help) echo "Usage: ..."; exit 0;; esac
 ```
@@ -132,7 +132,7 @@ Per-slice validation:
 - **Slice 1:** `bin/test test/config_test.tn` runs a single file successfully; `bin/test` without args still runs the full suite; `bin/test-watch` errors gracefully when `entr` is missing
 - **Slice 2:** `bin/install-hooks` creates symlinks; committing broken syntax is blocked; pushing failing tests is blocked; re-running `bin/install-hooks` is idempotent
 - **Slice 3:** CI workflow passes on a clean branch; pi-smoke job runs on main push only; `.tonic-version` is read by CI
-- **Slice 4:** `bin/dev` lists all commands; `bin/dev test` delegates correctly; `bin/test --help` and `bin/miniloops --help` print usage
+- **Slice 4:** `bin/dev` lists all commands; `bin/dev test` delegates correctly; `bin/test --help` and `bin/autoloops --help` print usage
 - **Slice 5:** `TONIC_MISSING.md` has the Regex entry; `bin/check-missing` warns on unannotated workarounds; `grep -r "TONIC_MISSING:" src/` finds the annotation
 
 Repo-level gate: `tonic check .` passes after all slices land.

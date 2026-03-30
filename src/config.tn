@@ -64,7 +64,8 @@ defmodule LoopConfig do
   end
 
   def project_has_config(project_dir) do
-    System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
+    System.path_exists(Path.join(project_dir, "autoloops.toml")) or
+      System.path_exists(Path.join(project_dir, "autoloops.conf"))
   end
 
   def resolve_project_dir(project_dir_or_preset, bundle_root) do
@@ -90,17 +91,17 @@ defmodule LoopConfig do
 
   def resolve_memory_file(project_dir) do
     config = load_project(project_dir)
-    Path.join(project_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
+    Path.join(project_dir, get(config, "core.memory_file", ".autoloop/memory.jsonl"))
   end
 
   def resolve_memory_file_in(project_dir, work_dir) do
     config = load_project(project_dir)
-    Path.join(work_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
+    Path.join(work_dir, get(config, "core.memory_file", ".autoloop/memory.jsonl"))
   end
 
   def state_dir_name(project_dir) do
     config = load_project(project_dir)
-    get(config, "core.state_dir", ".miniloop")
+    get(config, "core.state_dir", ".autoloop")
   end
 
   def state_dir_path(project_dir) do
@@ -108,7 +109,7 @@ defmodule LoopConfig do
   end
 
   defp journal_path(config) do
-    get(config, "core.journal_file", get(config, "core.events_file", ".miniloop/journal.jsonl"))
+    get(config, "core.journal_file", get(config, "core.events_file", ".autoloop/journal.jsonl"))
   end
 
   defp resolve_bundled_preset_dir(name, bundle_root) do
@@ -128,9 +129,10 @@ defmodule LoopConfig do
     end
   end
 
+
   defp resolve_config_path(project_dir) do
-    toml_path = Path.join(project_dir, "miniloops.toml")
-    conf_path = Path.join(project_dir, "miniloops.conf")
+    toml_path = Path.join(project_dir, "autoloops.toml")
+    conf_path = Path.join(project_dir, "autoloops.conf")
 
     case System.path_exists(toml_path) do
       true -> toml_path
@@ -151,10 +153,10 @@ defmodule LoopConfig do
     parallel = %{"enabled" => "false", "max_branches" => "3", "branch_timeout_ms" => "180000"}
     memory = %{"prompt_budget_chars" => "8000"}
     core = %{
-      "state_dir" => ".miniloop",
-      "journal_file" => ".miniloop/journal.jsonl",
-      "events_file" => ".miniloop/journal.jsonl",
-      "memory_file" => ".miniloop/memory.jsonl",
+      "state_dir" => ".autoloop",
+      "journal_file" => ".autoloop/journal.jsonl",
+      "events_file" => ".autoloop/journal.jsonl",
+      "memory_file" => ".autoloop/memory.jsonl",
       "run_id_format" => "compact",
       "log_level" => "info"
     }

@@ -33,9 +33,9 @@ Coordination events (`issue.*`, `slice.*`, `context.archived`) make issue/slice/
 Use `inspect coordination --format md` to project current state from journal events.
 
 ### 7. Markdown for curated intent
-Keep `.miniloop/context.md`, `.miniloop/plan.md`, `.miniloop/progress.md`, and `docs/*.md` as human-shaped artifacts.
+Keep `.autoloop/context.md`, `.autoloop/plan.md`, `.autoloop/progress.md`, and `docs/*.md` as human-shaped artifacts.
 These files should stay concise, editable, and useful to both humans and agents.
-`.miniloop/progress.md` is a lightweight human-facing summary; the journal is canonical for machine-owned coordination state.
+`.autoloop/progress.md` is a lightweight human-facing summary; the journal is canonical for machine-owned coordination state.
 
 ### 8. Archive, don’t accumulate
 When context stops helping the active objective, consolidate and archive it into `docs/` instead of letting active working files grow indefinitely.

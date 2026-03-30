@@ -4,7 +4,7 @@
 Add `.tn` test files for preset validation — config parsing, topology loading, prompt assembly, and role/event contract checking. Leverage tonic's enhanced test command with `--filter`, `--fail-fast`, and `--timeout` for CI integration.
 
 ## Background
-Miniloops presets (e.g., `examples/autocode/`) are workflow bundles with topology, config, role prompts, and harness instructions. Currently there are no automated tests verifying that presets load correctly, that their topologies are internally consistent (all emitted events have handoff entries, all handoff targets exist as roles), or that prompt assembly produces expected output.
+Autoloops presets (e.g., `examples/autocode/`) are workflow bundles with topology, config, role prompts, and harness instructions. Currently there are no automated tests verifying that presets load correctly, that their topologies are internally consistent (all emitted events have handoff entries, all handoff targets exist as roles), or that prompt assembly produces expected output.
 
 The tonic test command now supports `--filter <pattern>` for substring filtering, `--fail-fast` for early termination, `--seed <n>` for randomized ordering, and `--timeout <ms>` for per-test limits. These features make it practical to build a test suite that runs in CI.
 
@@ -21,14 +21,14 @@ The tonic test command now supports `--filter <pattern>` for substring filtering
 
 **Additional References:**
 - `examples/autocode/topology.toml` — example preset topology
-- `examples/autocode/miniloops.toml` — example preset config
+- `examples/autocode/autoloops.toml` — example preset config
 - `examples/autocode/roles/*.md` — example role prompts
 - `examples/autocode/harness.md` — example harness instructions
 
 ## Technical Requirements
 1. Create a `test/` directory at the project root for test files.
 2. Add `test/config_test.tn` with tests for:
-   - Loading a valid `miniloops.toml` produces expected config map.
+   - Loading a valid `autoloops.toml` produces expected config map.
    - Default values are present for all required keys.
    - `get`, `get_int`, `get_list` return correct types.
    - Missing config file returns defaults gracefully.

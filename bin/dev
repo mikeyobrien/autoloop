@@ -12,7 +12,7 @@ usage() {
   echo "  watch [args]   Watch and re-run tests (bin/test-watch)"
   echo "  smoke          Run pi-smoke integration check (scripts/pi-smoke.sh)"
   echo "  judge          Run LLM judge evaluation (scripts/llm-judge.sh)"
-  echo "  run [args]     Start a miniloops run (bin/miniloops)"
+  echo "  run [args]     Start an autoloops run (bin/autoloops)"
   echo "  hooks          Install git hooks (bin/install-hooks)"
   echo "  check-missing  Scan for unannotated workarounds (bin/check-missing)"
 }
@@ -29,7 +29,7 @@ case "$cmd" in
   watch)         exec "$SCRIPT_DIR/test-watch" "$@" ;;
   smoke)         exec "$REPO_DIR/scripts/pi-smoke.sh" "$@" ;;
   judge)         exec "$REPO_DIR/scripts/llm-judge.sh" "$@" ;;
-  run)           exec "$SCRIPT_DIR/miniloops" "$@" ;;
+  run)           exec "$SCRIPT_DIR/autoloops" "$@" ;;
   hooks)         exec "$SCRIPT_DIR/install-hooks" "$@" ;;
   check-missing) exec "$SCRIPT_DIR/check-missing" "$@" ;;
   -h|--help)     usage; exit 0 ;;

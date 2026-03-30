@@ -9,7 +9,7 @@ defmodule LoopMemory do
 
   defp resolve_project_file(project_dir) do
     config = LoopConfig.load_project(project_dir)
-    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloop/memory.jsonl"))
+    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".autoloop/memory.jsonl"))
   end
 
   def render_project(project_dir, budget_chars) do

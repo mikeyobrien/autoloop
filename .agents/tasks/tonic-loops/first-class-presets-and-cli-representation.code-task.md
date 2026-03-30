@@ -4,11 +4,11 @@
 Rename the current `examples/auto*` workflow directories into first-class `presets/auto*` bundles and represent them explicitly in the CLI as presets rather than example paths. The implementation must make preset names the canonical interface, keep the filesystem layout simple and inspectable, and remove all fallback and deprecation behavior during the transition.
 
 ## Background
-Miniloops already talks about these workflow bundles as presets in docs and chain composition, but the implementation still leaks `examples/<name>` as the backing path. That makes the product model muddy: users see “preset” in docs but the runtime still treats the canonical location like a demo/example directory.
+Autoloops already talks about these workflow bundles as presets in docs and chain composition, but the implementation still leaks `examples/<name>` as the backing path. That makes the product model muddy: users see “preset” in docs but the runtime still treats the canonical location like a demo/example directory.
 
 The intended model is:
 - a **preset** is a named workflow bundle such as `autocode` or `autoresearch`
-- a **config** is runtime configuration such as `miniloops.toml`
+- a **config** is runtime configuration such as `autoloops.toml`
 - a **chain** is composition of presets such as `autocode -> autoqa`
 
 This repo is alpha software. Breaking changes are expected. The change should therefore be clean and direct:
@@ -41,11 +41,11 @@ The CLI should make presets feel first-class rather than incidental path convent
 ## Technical Requirements
 1. Rename the built-in workflow bundles from `examples/auto*` to `presets/auto*`.
 2. Treat `presets/<name>` as the only built-in canonical location for named presets.
-3. Represent preset selection explicitly in the CLI, for example with `miniloops run --preset <name> ...` and related preset-oriented commands if needed.
+3. Represent preset selection explicitly in the CLI, for example with `autoloops run --preset <name> ...` and related preset-oriented commands if needed.
 4. Preserve support for explicit filesystem paths when a user intentionally passes a path, but do not treat legacy `examples/<name>` resolution as a supported compatibility path.
 5. Update chain resolution so named steps resolve through the canonical preset model rather than hardcoded `examples/<name>` assumptions.
 6. Prefer preset discovery from the canonical preset directory over duplicated hardcoded vocabulary lists where practical.
-7. Keep preset bundles as plain inspectable directories containing existing runtime files such as `miniloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, and `roles/`.
+7. Keep preset bundles as plain inspectable directories containing existing runtime files such as `autoloops.toml`, `topology.toml`, `harness.md`, `hyperagent.md`, and `roles/`.
 8. Update docs, examples, and help text so the product language consistently says presets and points to `presets/` rather than `examples/`.
 9. Remove or rewrite code, docs, and comments that describe the old `examples/<name>` convention as canonical.
 10. Do not add deprecation warnings, migration branches, fallback resolvers, alias maps, or dual-path support.
@@ -117,5 +117,5 @@ The CLI should make presets feel first-class rather than incidental path convent
 
 ## Metadata
 - **Complexity**: Medium
-- **Labels**: miniloops, presets, cli, chains, naming, information-architecture, alpha-breaking-change
+- **Labels**: autoloops, presets, cli, chains, naming, information-architecture, alpha-breaking-change
 - **Required Skills**: CLI design, information architecture, Tonic app development, documentation refactoring, resolver design

@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-27
 **Scope**: Last 5 commits on `main` (c9416eb, 4854014, be040df, 2e4e918, 3d47cb8)
-**Domain**: Tonic-lang project (miniloops harness)
+**Domain**: Tonic-lang project (autoloops harness)
 **Result**: **8/9 surfaces passed, 1 failed**
 
 ## Changes Under Test

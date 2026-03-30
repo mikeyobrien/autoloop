@@ -1,6 +1,6 @@
 # Topology Reference
 
-Topology defines the role structure and routing within a miniloops loop. It is declared in `topology.toml` and controls which roles exist, what events they can emit, and how events route to the next role.
+Topology defines the role structure and routing within a autoloops loop. It is declared in `topology.toml` and controls which roles exist, what events they can emit, and how events route to the next role.
 
 Topology is **advisory** — it is not a hard workflow engine. The model receives routing suggestions and allowed events as context, and backpressure enforces the protocol at the event-emit boundary.
 
@@ -48,7 +48,7 @@ prompt_file = "roles/finalizer.md"
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
 | `name` | string | No | Human-readable name for the topology. |
-| `completion` | string | No | The event that signals loop completion. Falls back to `event_loop.completion_event` in `miniloops.toml`, then to the `completion_promise` text fallback. |
+| `completion` | string | No | The event that signals loop completion. Falls back to `event_loop.completion_event` in `autoloops.toml`, then to the `completion_promise` text fallback. |
 
 ## `[[role]]` — role definitions
 
@@ -84,7 +84,7 @@ The routing model has three layers:
 
 1. **Suggested roles** — looked up from the handoff map using the most recent event. If the event has no entry, all roles are suggested.
 2. **Allowed events** — the union of `emits` arrays from all suggested roles. This is what the model may emit next.
-3. **Backpressure** — if the model emits an event not in the allowed set, `miniloops emit` fails immediately and the event is logged as `event.invalid` in the journal. The model is re-prompted with routing context.
+3. **Backpressure** — if the model emits an event not in the allowed set, `autoloops emit` fails immediately and the event is logged as `event.invalid` in the journal. The model is re-prompted with routing context.
 
 This is soft routing: the model sees suggestions and constraints but is not forced into a fixed state machine. The backpressure layer prevents protocol violations without requiring hard-coded transitions.
 
@@ -118,7 +118,7 @@ Parallelism is still structured, not free-form:
 - branch child prompts do **not** get that global metaprompt
 - only one active wave may exist at a time
 - the parent launches all branches in that wave before joining them
-- branch state is isolated under `.miniloop/waves/<wave-id>/...`
+- branch state is isolated under `.autoloop/waves/<wave-id>/...`
 
 ## Prompt injection
 
@@ -144,17 +144,17 @@ The prompt summary for each role shows the first non-empty line of its prompt te
 
 ## Default topology
 
-If no `topology.toml` exists, the loop runs with an empty topology: no roles, no handoff map, no completion event from topology. The loop still functions — it relies on `miniloops.toml` for the completion event and the model operates without role routing.
+If no `topology.toml` exists, the loop runs with an empty topology: no roles, no handoff map, no completion event from topology. The loop still functions — it relies on `autoloops.toml` for the completion event and the model operates without role routing.
 
 ## Completion
 
 The loop completes when the completion event is emitted. The completion event is resolved in this order:
 
 1. `completion` field in `topology.toml`
-2. `event_loop.completion_event` in `miniloops.toml`
+2. `event_loop.completion_event` in `autoloops.toml`
 3. The `completion_promise` text fallback (a string the model can output directly)
 
-Additionally, `miniloops.toml` can declare `event_loop.required_events` — events that must appear in the journal before the completion event is accepted.
+Additionally, `autoloops.toml` can declare `event_loop.required_events` — events that must appear in the journal before the completion event is accepted.
 
 ## Design patterns
 

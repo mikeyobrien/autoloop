@@ -85,7 +85,7 @@ Example:
 ### Minimal config surface
 Keep the runtime config intentionally small.
 
-`miniloops.toml`:
+`autoloops.toml`:
 
 ```toml
 parallel.enabled = true
@@ -213,7 +213,7 @@ Keep branch state under the existing state root.
 Example:
 
 ```text
-.miniloop/
+.autoloop/
   journal.jsonl
   memory.jsonl
   waves/
@@ -258,7 +258,7 @@ Normal topology continues to declare ordinary events. Parallelism becomes an eve
 Example prompt-driven usage:
 
 ```bash
-./.miniloop/miniloops emit explore.parallel "
+./.autoloop/autoloops emit explore.parallel "
 - Compare two different decompositions of the task and recommend one.
 - Identify the highest-risk unknown that should be validated before coding.
 - Find the smallest slice that would prove the design.
@@ -268,7 +268,7 @@ Example prompt-driven usage:
 Dispatch example:
 
 ```bash
-./.miniloop/miniloops emit tasks.ready.parallel "
+./.autoloop/autoloops emit tasks.ready.parallel "
 - Parse `.parallel` events and validate payload shape.
 - Inject the global parallelism metaprompt when enabled.
 - Add wave journal events and inspect rendering.

@@ -1,10 +1,10 @@
 # Task: Add First-Class Loop Chaining With chains.toml And CLI Composition
 
 ## Description
-Add first-class loop chaining to miniloops as a separate orchestration layer above individual preset topology. The design should support both reusable named chains in `chains.toml` and ad hoc chain definitions from the CLI, so users can compose presets like `autocode -> autoqa -> autoresearch -> autocode` without coupling those compositions into per-preset role routing.
+Add first-class loop chaining to autoloops as a separate orchestration layer above individual preset topology. The design should support both reusable named chains in `chains.toml` and ad hoc chain definitions from the CLI, so users can compose presets like `autocode -> autoqa -> autoresearch -> autocode` without coupling those compositions into per-preset role routing.
 
 ## Background
-Miniloops already has a strong model for intra-loop orchestration:
+Autoloops already has a strong model for intra-loop orchestration:
 - `topology.toml` defines roles and handoff behavior inside one preset
 - the journal records runtime state for a single loop
 - prompts, working files, and examples define preset-specific behavior
@@ -87,11 +87,11 @@ The composition layer should remain simple and inspectable, with git-durable han
 1. **chains.toml Supports Named Reusable Chains**
    - Given a repo with a `chains.toml`
    - When it defines a named chain such as `autocode -> autoqa -> autoresearch -> autocode`
-   - Then miniloops can execute that named chain without editing per-preset topology
+   - Then autoloops can execute that named chain without editing per-preset topology
 
 2. **CLI Supports Ad Hoc Chains**
    - Given a user who does not want to edit repo files
-   - When they run miniloops with an inline chain definition
+   - When they run autoloops with an inline chain definition
    - Then the chain executes using the supplied preset sequence
 
 3. **Topology And Chaining Stay Separate**
@@ -101,7 +101,7 @@ The composition layer should remain simple and inspectable, with git-durable han
 
 4. **Preset Sequences Are Explicitly Composable**
    - Given a chain like `autocode,autoqa,autoresearch,autocode`
-   - When miniloops executes it
+   - When autoloops executes it
    - Then each step runs in sequence with clear handoff/result boundaries between loops
 
 5. **Handoff And Result Artifacts Are Durable**
@@ -136,5 +136,5 @@ The composition layer should remain simple and inspectable, with git-durable han
 
 ## Metadata
 - **Complexity**: High
-- **Labels**: miniloops, chaining, orchestration, presets, chains, cli, jsonl, markdown
+- **Labels**: autoloops, chaining, orchestration, presets, chains, cli, jsonl, markdown
 - **Required Skills**: CLI design, orchestration design, event schema design, Tonic app development, information architecture, preset system design

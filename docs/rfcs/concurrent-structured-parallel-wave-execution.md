@@ -6,11 +6,11 @@ Make structured parallel waves truly concurrent. The current `.parallel` protoco
 Code task: `.agents/tasks/tonic-loops/concurrent-structured-parallel-wave-execution.code-task.md`
 
 ## Problem
-Miniloops already ships a structured-parallel feature surface:
+Autoloops already ships a structured-parallel feature surface:
 - `explore.parallel`
 - `<base-event>.parallel`
 - harness-owned `*.parallel.joined`
-- branch artifacts under `.miniloop/waves/<wave-id>/...`
+- branch artifacts under `.autoloop/waves/<wave-id>/...`
 - wave lifecycle events in the parent journal
 
 That contract is documented in `README.md`, `docs/topology.md`, `docs/configuration.md`, `docs/journal.md`, and the earlier RFC `docs/rfcs/structured-parallelism-with-event-suffixes.md`.
@@ -45,7 +45,7 @@ This is a follow-on correction to the already-approved structured-parallel desig
 - `explore.parallel`
 - `<base-event>.parallel`
 - harness-owned `*.parallel.joined`
-- `.miniloop/waves/<wave-id>/...` artifact layout
+- `.autoloop/waves/<wave-id>/...` artifact layout
 
 The main behavior change is internal: a wave launches all branch jobs before waiting on the barrier.
 

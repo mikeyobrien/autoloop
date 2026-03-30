@@ -1,6 +1,6 @@
 # Autoresearch miniloop
 
-A miniloops-native autonomous experiment loop inspired by Ralph's autoresearch preset.
+A autoloops-native autonomous experiment loop inspired by Ralph's autoresearch preset.
 
 Shape:
 - strategist — decides what experiment to try next
@@ -8,7 +8,7 @@ Shape:
 - benchmarker — runs measurements and captures metrics
 - evaluator — skeptically judges keep/discard, optionally using LLM-as-judge
 
-State lives in `.miniloop/autoresearch.md`, `.miniloop/experiments.jsonl`, and `.miniloop/progress.md`.
+State lives in `.autoloop/autoresearch.md`, `.autoloop/experiments.jsonl`, and `.autoloop/progress.md`.
 
 ## Fail-closed contract
 
@@ -21,7 +21,7 @@ Autoresearch is a skeptical experiment loop, not an auto-approval loop.
 
 ## Files
 
-- `miniloops.toml` — loop + backend config
+- `autoloops.toml` — loop + backend config
 - `topology.toml` — role deck + handoff graph
 - `harness.md` — shared harness rules loaded every iteration
 - `roles/strategist.md`
@@ -44,7 +44,7 @@ Returns `{"pass": true|false, "reason": "..."}` and exits 0 (pass) or 1 (fail).
 From the repo root:
 
 ```bash
-./bin/miniloops run presets/autoresearch "Optimize test suite runtime by 30%"
+./bin/autoloops run presets/autoresearch "Optimize test suite runtime by 30%"
 ```
 
 ## Example use cases

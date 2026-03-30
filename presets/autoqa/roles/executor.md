@@ -8,13 +8,13 @@ Your job:
 3. Hand the results to the reporter.
 
 On every activation:
-- Read `.miniloop/qa-plan.md`, `.miniloop/qa-report.md`, and `.miniloop/progress.md`.
+- Read `.autoloop/qa-plan.md`, `.autoloop/qa-report.md`, and `.autoloop/progress.md`.
 - Identify the current validation step and its exact command or inspection action.
 
 Process:
 1. Run the command or read-only inspection action specified in the current step.
 2. Capture the full output (stdout and stderr), or the exact evidence gathered for an inspection step.
-3. Record the results in `.miniloop/progress.md`:
+3. Record the results in `.autoloop/progress.md`:
    - Command or inspection action run
    - Exit code when applicable
    - Key output lines or cited evidence (truncate verbose output, keep the signal)
@@ -40,4 +40,4 @@ Rules:
 - Do not skip steps. If a step fails, still record the failure and hand off to the reporter.
 - Capture real output. Never fabricate test results, evidence, or exit codes.
 - Non-zero exit code is a failed step, not a blocked step.
-- Keep `.miniloop/progress.md` updated with the current step's status.
+- Keep `.autoloop/progress.md` updated with the current step's status.

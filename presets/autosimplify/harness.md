@@ -1,7 +1,7 @@
-This is a miniloops-native autosimplify loop inspired by Claude Code's `/simplify` workflow.
+This is a autoloops-native autosimplify loop inspired by Claude Code's `/simplify` workflow.
 
 Global rules:
-- Shared working files are the source of truth: `.miniloop/simplify-context.md`, `.miniloop/simplify-plan.md`, and `.miniloop/progress.md`.
+- Shared working files are the source of truth: `.autoloop/simplify-context.md`, `.autoloop/simplify-plan.md`, and `.autoloop/progress.md`.
 - Scope defaults to the current diff. If there is no diff, fall back to recently modified files. If the user explicitly names files or directories, respect that scope.
 - Keep only one simplification batch active at a time.
 - Use the event tool instead of prose-only handoffs.
@@ -9,17 +9,17 @@ Global rules:
 - Preserve behavior exactly. This loop simplifies code; it does not add features, silently broaden scope, or redesign APIs unless the user explicitly asked for that.
 - Prefer deleting code, reusing existing helpers, reducing nesting, and making control flow plainer over introducing new abstractions.
 - Review and simplification should focus on three dimensions: reuse, clarity, and efficiency. Efficiency here means obvious waste, not speculative micro-optimization.
-- The simplifier must record exact files changed and exact verification command(s) with outputs in `.miniloop/progress.md` before claiming success.
+- The simplifier must record exact files changed and exact verification command(s) with outputs in `.autoloop/progress.md` before claiming success.
 - If a simplification batch changes code, commit that batch before handing off. Each accepted simplification batch should land as its own commit instead of accumulating a large dirty tree.
 - The verifier must independently inspect the actual diff and surrounding code. Another role's summary is not proof.
 - Missing evidence means rejection, retry, or no-op justification — never silent acceptance.
 - `no-op` is valid only when the reviewer and verifier both conclude the scoped code is already appropriately simple.
-- Use `./.miniloop/miniloops memory add learning ...` for durable learnings.
+- Use `./.autoloop/autoloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside scoper → reviewer → simplifier → verifier.
 - Only the scoper may emit `task.complete`.
-- Once `.miniloop/progress.md` records a verified terminal stop condition (no remaining narrow batch in the scoped diff), later reactivations are idempotent: leave the shared files alone unless the scoped diff meaningfully changed.
+- Once `.autoloop/progress.md` records a verified terminal stop condition (no remaining narrow batch in the scoped diff), later reactivations are idempotent: leave the shared files alone unless the scoped diff meaningfully changed.
 
 State files:
-- `.miniloop/simplify-context.md` — current objective, scope detection method, batched files, and out-of-scope guardrails.
-- `.miniloop/simplify-plan.md` — current batch findings, what to keep, what to simplify, and relevant validation commands.
-- `.miniloop/progress.md` — active batch, edits made, verification evidence, rejected attempts, and next action.
+- `.autoloop/simplify-context.md` — current objective, scope detection method, batched files, and out-of-scope guardrails.
+- `.autoloop/simplify-plan.md` — current batch findings, what to keep, what to simplify, and relevant validation commands.
+- `.autoloop/progress.md` — active batch, edits made, verification evidence, rejected attempts, and next action.

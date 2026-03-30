@@ -1,7 +1,7 @@
 # Task: Build Auto Workflow Family With Native AutoQA
 
 ## Description
-Create a coherent `auto*` workflow family for miniloops by reusing and extending the existing example presets. Add a new `autoqa` preset for native, zero-dependency, domain-adaptive agentic manual validation, and define how the rest of the family fits together without overbuilding the runtime.
+Create a coherent `auto*` workflow family for autoloops by reusing and extending the existing example presets. Add a new `autoqa` preset for native, zero-dependency, domain-adaptive agentic manual validation, and define how the rest of the family fits together without overbuilding the runtime.
 
 ## Background
 The repo already has three `auto*` examples with clear behavioral centers:
@@ -11,7 +11,7 @@ The repo already has three `auto*` examples with clear behavioral centers:
 
 The next step is to turn those into a coherent family and add the missing workflows that users would expect. The most important new addition is `autoqa`, which must not depend on `expect-cli` or any other external testing framework. Instead, the agent should inspect the target repo, infer the domain, choose the idiomatic validation surface, write a validation plan, and execute it using the repo's native/manual testing workflows.
 
-Use Facebook Research HyperAgents as design inspiration for task/meta layering and context hygiene, but keep the implementation miniloops-native and lightweight.
+Use Facebook Research HyperAgents as design inspiration for task/meta layering and context hygiene, but keep the implementation autoloops-native and lightweight.
 
 ## Reference Documentation
 **Required:**
@@ -46,14 +46,14 @@ Use Facebook Research HyperAgents as design inspiration for task/meta layering a
 
 ## Dependencies
 - Existing example preset structure under `examples/`
-- Existing miniloops config, topology, harness, and role prompt conventions
+- Existing autoloops config, topology, harness, and role prompt conventions
 - Existing docs and README structure
 - HyperAgents repo materials for research and naming/architecture inspiration
 - Tonic validation via `tonic check .`
 
 ## Implementation Approach
 1. Audit the existing `auto*` examples and write down their true behavioral roles.
-2. Research HyperAgents and extract only the ideas that fit miniloops cleanly, especially task/meta layering and context hygiene.
+2. Research HyperAgents and extract only the ideas that fit autoloops cleanly, especially task/meta layering and context hygiene.
 3. Create a taxonomy doc under `docs/` describing the top-10 `auto*` family and how current presets map into it.
 4. Implement `examples/autoqa/` as the first new concrete preset.
 5. Add or scaffold the remaining family members where doing so is low-cost and coherent, prioritizing reuse over novelty.
@@ -75,7 +75,7 @@ Use Facebook Research HyperAgents as design inspiration for task/meta layering a
 3. **Native AutoQA Preset Exists**
    - Given the `examples/` directory
    - When the implementation is complete
-   - Then `examples/autoqa/` exists with a coherent miniloops example structure (`README.md`, `miniloops.toml`, `topology.toml`, `harness.md`, and role prompts)
+   - Then `examples/autoqa/` exists with a coherent autoloops example structure (`README.md`, `autoloops.toml`, `topology.toml`, `harness.md`, and role prompts)
 
 4. **AutoQA Is Zero-Dependency By Default**
    - Given the `autoqa` preset docs and harness instructions
@@ -109,5 +109,5 @@ Use Facebook Research HyperAgents as design inspiration for task/meta layering a
 
 ## Metadata
 - **Complexity**: High
-- **Labels**: miniloops, presets, naming, docs, autoqa, workflow-family, examples
-- **Required Skills**: prompt design, documentation design, information architecture, Tonic app conventions, miniloops preset design, repo pattern reuse
+- **Labels**: autoloops, presets, naming, docs, autoqa, workflow-family, examples
+- **Required Skills**: prompt design, documentation design, information architecture, Tonic app conventions, autoloops preset design, repo pattern reuse

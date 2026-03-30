@@ -1,6 +1,6 @@
 # Memory Reference
 
-Loop memory is a persistent, append-only store that carries learnings, preferences, and metadata across iterations and runs. It lives in `.miniloop/memory.jsonl` and is injected into each iteration prompt within a configurable character budget.
+Loop memory is a persistent, append-only store that carries learnings, preferences, and metadata across iterations and runs. It lives in `.autoloop/memory.jsonl` and is injected into each iteration prompt within a configurable character budget.
 
 Memory is **durable** — entries survive across runs. It is also **soft-deletable** — entries are never physically removed; instead, a tombstone entry marks the target as inactive.
 
@@ -117,12 +117,12 @@ The rendered text is truncated to `memory.prompt_budget_chars` characters (defau
 
 ## CLI commands
 
-All memory mutations happen through the `miniloops` CLI (or the loop's event tool, which delegates to the same binary).
+All memory mutations happen through the `autoloops` CLI (or the loop's event tool, which delegates to the same binary).
 
 ### Add a learning
 
 ```sh
-miniloops memory add learning "durable lesson text"
+autoloops memory add learning "durable lesson text"
 ```
 
 The `source` field is set to `"manual"` for CLI-added entries.
@@ -132,7 +132,7 @@ If the new entry pushes rendered memory over `memory.prompt_budget_chars`, the C
 ### Add a preference
 
 ```sh
-miniloops memory add preference <category> "preference text"
+autoloops memory add preference <category> "preference text"
 ```
 
 The first argument after `preference` is the category label.
@@ -140,14 +140,14 @@ The first argument after `preference` is the category label.
 ### Add a meta entry
 
 ```sh
-miniloops memory add meta <key> "value text"
+autoloops memory add meta <key> "value text"
 ```
 
 ### Remove an entry
 
 ```sh
-miniloops memory remove <id>
-miniloops memory remove <id> "reason for removal"
+autoloops memory remove <id>
+autoloops memory remove <id> "reason for removal"
 ```
 
 Appends a tombstone targeting `<id>`. If no reason is provided, the reason defaults to `"manual"`.
@@ -157,7 +157,7 @@ If the target ID is missing or already inactive, the CLI prints a warning instea
 ### List memory
 
 ```sh
-miniloops memory list
+autoloops memory list
 ```
 
 Prints the materialized memory (same format as prompt injection, without budget truncation). Rendered entries include their stable IDs so `memory remove` is directly actionable.
@@ -165,7 +165,7 @@ Prints the materialized memory (same format as prompt injection, without budget 
 ### Memory status
 
 ```sh
-miniloops memory status
+autoloops memory status
 ```
 
 Prints the rendered size, configured budget, over/under-budget percentage, and active counts for learnings, preferences, and meta entries.
@@ -173,7 +173,7 @@ Prints the rendered size, configured budget, over/under-budget percentage, and a
 ### Find memory entries
 
 ```sh
-miniloops memory find "routing lag"
+autoloops memory find "routing lag"
 ```
 
 Searches active entries across IDs, categories, text, sources, keys, and values, then prints matching entries with their IDs.
@@ -181,8 +181,8 @@ Searches active entries across IDs, categories, text, sources, keys, and values,
 ### Inspect memory
 
 ```sh
-miniloops inspect memory --format md     # rendered text
-miniloops inspect memory --format json   # raw JSONL content
+autoloops inspect memory --format md     # rendered text
+autoloops inspect memory --format json   # raw JSONL content
 ```
 
 ## Configuration
@@ -190,7 +190,7 @@ miniloops inspect memory --format json   # raw JSONL content
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `memory.prompt_budget_chars` | int | `8000` | Character budget for prompt injection. `0` disables truncation. |
-| `core.memory_file` | string | `".miniloop/memory.jsonl"` | Path to the memory file, relative to the project directory. |
+| `core.memory_file` | string | `".autoloop/memory.jsonl"` | Path to the memory file, relative to the project directory. |
 
 ## Environment
 

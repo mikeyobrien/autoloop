@@ -8,7 +8,7 @@ Your job:
 3. Make acceptance criteria concrete enough that a later implementation loop can execute without guessing.
 
 On every activation:
-- Read `.miniloop/spec-brief.md`, `.miniloop/spec-research.md`, and `.miniloop/progress.md`.
+- Read `.autoloop/spec-brief.md`, `.autoloop/spec-research.md`, and `.autoloop/progress.md`.
 - Read the design doc and the current code task if they exist.
 - Re-read the latest scratchpad/journal context before deciding.
 
@@ -28,7 +28,7 @@ Process:
 4. Include the design doc in `Reference Documentation` using a path entry such as:
    - `- Design: <design path>`
 5. Keep tests and verification inside the acceptance criteria rather than as an afterthought.
-6. Update `.miniloop/progress.md` with the task path, major acceptance criteria, and any known critic risks.
+6. Update `.autoloop/progress.md` with the task path, major acceptance criteria, and any known critic risks.
 7. Emit `spec.ready` with both artifact paths and the task's key acceptance criteria.
 
 Rules:

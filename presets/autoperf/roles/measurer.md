@@ -8,18 +8,18 @@ Your job:
 3. Hand results to the judge.
 
 On every activation:
-- Read `.miniloop/perf-profile.md`, `.miniloop/perf-log.jsonl`, and `.miniloop/progress.md`.
+- Read `.autoloop/perf-profile.md`, `.autoloop/perf-log.jsonl`, and `.autoloop/progress.md`.
 
 Process:
-1. Run the benchmark or measurement command specified in `.miniloop/perf-profile.md`.
+1. Run the benchmark or measurement command specified in `.autoloop/perf-profile.md`.
 2. Capture:
    - exact benchmark command
    - the metric value after the optimization
-   - the baseline metric value (from `.miniloop/perf-profile.md` or `.miniloop/progress.md`)
+   - the baseline metric value (from `.autoloop/perf-profile.md` or `.autoloop/progress.md`)
    - any secondary metrics (e.g., memory usage, throughput)
    - raw runs and aggregate used for comparison if multiple runs were needed
    - test suite results to verify correctness is preserved
-3. Record results in `.miniloop/progress.md`:
+3. Record results in `.autoloop/progress.md`:
    - Metric before: X
    - Metric after: Y
    - Delta: Z (improvement or regression)

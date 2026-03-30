@@ -65,29 +65,29 @@ defmodule ParallelEmitTest do
 
   defp prepare_fixture(parallel_enabled) do
     project_dir = fixture_dir()
-    journal_dir = Path.join(project_dir, ".miniloop")
+    journal_dir = Path.join(project_dir, ".autoloop")
     journal_path = Path.join(journal_dir, "journal.jsonl")
     roles_dir = Path.join(project_dir, "roles")
     backend_path = Path.join(project_dir, "backend.sh")
 
     System.run("rm -rf " <> shell_quote(project_dir) <> " && mkdir -p " <> shell_quote(roles_dir))
-    System.write_text(Path.join(project_dir, "miniloops.toml"), miniloops_toml(parallel_enabled, backend_path))
+    System.write_text(Path.join(project_dir, "autoloops.toml"), autoloops_toml(parallel_enabled, backend_path))
     System.write_text(Path.join(project_dir, "topology.toml"), topology_toml())
     System.write_text(Path.join(project_dir, "harness.md"), "parallel emit test harness\n")
     System.write_text(Path.join(roles_dir, "worker.md"), "You are the worker.\n")
     System.write_text(backend_path, backend_script())
     System.run("chmod +x " <> shell_quote(backend_path))
 
-    setup = System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_miniloops_env() <> " tonic run " <> shell_quote(repo_root()) <> " " <> shell_quote(project_dir) <> " \"setup prompt\"")
+    setup = System.run("cd " <> shell_quote(project_dir) <> " && " <> clean_autoloops_env() <> " tonic run " <> shell_quote(repo_root()) <> " " <> shell_quote(project_dir) <> " \"setup prompt\"")
     Assert.assert_equal(Map.get(setup, :exit_code, 1), 0)
 
-    %{project_dir: project_dir, journal_path: journal_path, tool_path: Path.join(journal_dir, "miniloops")}
+    %{project_dir: project_dir, journal_path: journal_path, tool_path: Path.join(journal_dir, "autoloops")}
   end
 
   defp emit_with_env(fixture, topic, payload, allowed_events, recent_event) do
     System.run(
       "cd " <> shell_quote(Map.get(fixture, :project_dir, "")) <>
-      " && " <> clean_miniloops_env() <>
+      " && " <> clean_autoloops_env() <>
       " env MINILOOPS_ITERATION=1" <>
       " MINILOOPS_RECENT_EVENT=" <> shell_quote(recent_event) <>
       " MINILOOPS_ALLOWED_ROLES='planner,builder'" <>
@@ -99,7 +99,7 @@ defmodule ParallelEmitTest do
   defp emit_without_allowed_events(fixture, topic, payload, recent_event) do
     System.run(
       "cd " <> shell_quote(Map.get(fixture, :project_dir, "")) <>
-      " && " <> clean_miniloops_env() <>
+      " && " <> clean_autoloops_env() <>
       " env MINILOOPS_ITERATION=1" <>
       " MINILOOPS_RECENT_EVENT=" <> shell_quote(recent_event) <>
       " MINILOOPS_ALLOWED_ROLES='planner,builder'" <>
@@ -116,7 +116,7 @@ defmodule ParallelEmitTest do
     end
   end
 
-  defp miniloops_toml(parallel_enabled, backend_path) do
+  defp autoloops_toml(parallel_enabled, backend_path) do
     enabled_value = case parallel_enabled do
       true -> "true"
       _ -> "false"
@@ -132,12 +132,12 @@ defmodule ParallelEmitTest do
     "parallel.max_branches = 3\n" <>
     "parallel.branch_timeout_ms = 180000\n" <>
     "memory.prompt_budget_chars = 8000\n" <>
-    "core.state_dir = \".miniloop\"\n" <>
-    "core.journal_file = \".miniloop/journal.jsonl\"\n" <>
-    "core.memory_file = \".miniloop/memory.jsonl\"\n"
+    "core.state_dir = \".autoloop\"\n" <>
+    "core.journal_file = \".autoloop/journal.jsonl\"\n" <>
+    "core.memory_file = \".autoloop/memory.jsonl\"\n"
   end
 
-  defp clean_miniloops_env() do
+  defp clean_autoloops_env() do
     "env" <>
     " -u MINILOOPS_ALLOWED_EVENTS" <>
     " -u MINILOOPS_ALLOWED_ROLES" <>
@@ -154,7 +154,7 @@ defmodule ParallelEmitTest do
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp topology_toml() do
@@ -176,7 +176,7 @@ defmodule ParallelEmitTest do
   end
 
   defp fixture_dir() do
-    "/tmp/miniloops-parallel-emit-fixture"
+    "/tmp/autoloops-parallel-emit-fixture"
   end
 
   defp shell_quote(text) do

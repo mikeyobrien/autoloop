@@ -1,7 +1,7 @@
 # QA Plan — Recent Changes (last 5 commits)
 
 ## Domain
-Tonic-lang project (`miniloops`): a shell+Tonic harness for autonomous LLM loops.
+Tonic-lang project (`autoloops`): a shell+Tonic harness for autonomous LLM loops.
 
 ## Recent Changes
 1. **c9416eb** — Move `examples/auto*` → `presets/auto*` as first-class presets; update resolvers, docs, tests
@@ -17,7 +17,7 @@ Tonic-lang project (`miniloops`): a shell+Tonic harness for autonomous LLM loops
 | 1 | `tonic check .` — compiler/type check | `tonic check .` | **passed** (inspector pre-check) |
 | 2 | Test suite — 57 tests covering topology, config, presets, memory | `bin/test` | pending |
 | 3 | Stale `examples/auto*` refs in source code | grep scan | **passed** — only in .agents/tasks + planning docs, not source |
-| 4 | Preset directory completeness — 12 presets × {miniloops.toml, topology.toml, harness.md} | ls check | **passed** — 36 files confirmed |
+| 4 | Preset directory completeness — 12 presets × {autoloops.toml, topology.toml, harness.md} | ls check | **passed** — 36 files confirmed |
 | 5 | CSV metrics export — public API callable, format correctness | runtime smoke or test review | pending |
 | 6 | Regex event matching — pattern syntax, anchoring, edge cases | test review + optional smoke | pending |
 | 7 | Structured logger — level parsing, backward compat (--verbose → debug) | code review + test check | pending |

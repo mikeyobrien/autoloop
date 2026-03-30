@@ -16,9 +16,9 @@ if [[ ! -f "$binary_path" ]]; then
   exit 1
 fi
 
-archive_name="miniloops-${tag}-${platform}.tar.gz"
+archive_name="autoloops-${tag}-${platform}.tar.gz"
 stage_root="$(mktemp -d)"
-stage_dir="$stage_root/miniloops-${tag}-${platform}"
+stage_dir="$stage_root/autoloops-${tag}-${platform}"
 archive_path="$out_dir/$archive_name"
 
 cleanup() {
@@ -27,17 +27,18 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$stage_dir" "$out_dir"
-cp "$binary_path" "$stage_dir/miniloops"
-chmod +x "$stage_dir/miniloops"
+cp "$binary_path" "$stage_dir/autoloops"
+chmod +x "$stage_dir/autoloops"
 cat > "$stage_dir/README.txt" <<EOF
-miniloops ${tag} (${platform})
+autoloops ${tag} (${platform})
 
 Install:
-  chmod +x miniloops
-  mv miniloops ~/.local/bin/miniloops
+  chmod +x autoloops
+  mv autoloops ~/.local/bin/autoloops
 
 Then run:
-  miniloops --help
+  autoloops --help
+
 EOF
 
 (

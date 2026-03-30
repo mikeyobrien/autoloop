@@ -6,7 +6,7 @@ Implement 15 developer toolchain improvements across test runner ergonomics, git
 ## Background
 The developer toolchain has grown organically but lacks key connective tissue:
 - `bin/test` is a 3-line wrapper that can't run a single file, has no `--help`, and its flags are undocumented
-- `bin/miniloops` is a 34-line launcher with no `--help`
+- `bin/autoloops` is a 34-line launcher with no `--help`
 - `scripts/llm-judge.sh` and `scripts/pi-smoke.sh` are undocumented in `docs/cli.md`
 - No git hooks are active (only `.sample` files in `.git/hooks/`)
 - No CI/CD exists (no `.github/workflows/`)
@@ -20,7 +20,7 @@ No existing task artifacts overlap with this work. Adjacent tasks that should be
 - Design: `docs/rfcs/developer-toolchain-improvements.md`
 - Design: `README.md`
 - Source: `bin/test`
-- Source: `bin/miniloops`
+- Source: `bin/autoloops`
 - Source: `scripts/llm-judge.sh`
 - Source: `scripts/pi-smoke.sh`
 - Source: `src/topology.tn` (lines 2–5, 350–401 for Regex workaround)
@@ -28,7 +28,7 @@ No existing task artifacts overlap with this work. Adjacent tasks that should be
 - Tracking: `TONIC_MISSING.md`
 
 **Additional references per slice:**
-- Ideas report: `.miniloop/chains/chain-mnarh86w-v9cl/step-1/.miniloop/ideas-report.md`
+- Ideas report: `.autoloop/chains/chain-mnarh86w-v9cl/step-1/.autoloop/ideas-report.md`
 
 ## Technical Requirements
 
@@ -50,7 +50,7 @@ No existing task artifacts overlap with this work. Adjacent tasks that should be
 ### Slice 4 — Script discoverability (S10–S12)
 10. **S10:** Add `bin/dev` dispatcher listing commands with no args and delegating subcommands (`test`, `watch`, `smoke`, `judge`, `run`, `hooks`).
 11. **S11:** Add "Developer scripts" section to `docs/cli.md` documenting all scripts with purpose, usage, and exit codes.
-12. **S12:** Add `--help`/`-h` guard to `bin/test` and `bin/miniloops` printing one-line usage and exiting.
+12. **S12:** Add `--help`/`-h` guard to `bin/test` and `bin/autoloops` printing one-line usage and exiting.
 
 ### Slice 5 — TONIC_MISSING.md feedback loop (S13–S15)
 13. **S13:** Add the Regex stdlib gap as the first entry in `TONIC_MISSING.md`. Missing capability: `Regex` module. Workaround: `grep -qE` shell-out in `src/topology.tn`. Desired: native `Regex.match?/2`.
@@ -64,9 +64,9 @@ No existing task artifacts overlap with this work. Adjacent tasks that should be
 
 ## Dependencies
 - `bin/test` (current 3-line wrapper)
-- `bin/miniloops` (current 34-line launcher)
+- `bin/autoloops` (current 34-line launcher)
 - `scripts/llm-judge.sh`, `scripts/pi-smoke.sh`
-- `docs/cli.md` (current state documents miniloops but not test/scripts)
+- `docs/cli.md` (current state documents autoloops but not test/scripts)
 - `TONIC_MISSING.md` (template, zero entries)
 - `src/topology.tn` (Regex workaround at lines 350–401)
 - No external dependencies except `entr` (soft, S2 only) and GitHub Actions (S7–S8)
@@ -131,7 +131,7 @@ Each slice has its own validation gate (see Acceptance Criteria). After all slic
     - `docs/cli.md` has a Developer Scripts section covering all scripts
 
 12. **S12 help flags work**
-    - `bin/test --help` and `bin/miniloops --help` print usage and exit
+    - `bin/test --help` and `bin/autoloops --help` print usage and exit
 
 13. **S13 Regex gap is tracked**
     - `TONIC_MISSING.md` has a complete Regex entry with all template fields

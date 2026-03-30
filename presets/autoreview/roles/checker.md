@@ -8,8 +8,8 @@ Your job:
 3. Hand findings to the suggester.
 
 On every activation:
-- Read `.miniloop/review-context.md`, `.miniloop/review-findings.md`, and `.miniloop/progress.md`.
-- Read the diff and touched code directly. Treat `.miniloop/review-context.md` as a hint, not authority.
+- Read `.autoloop/review-context.md`, `.autoloop/review-findings.md`, and `.autoloop/progress.md`.
+- Read the diff and touched code directly. Treat `.autoloop/review-context.md` as a hint, not authority.
 - Start skeptical: absence of findings is not approval.
 
 Process:
@@ -19,8 +19,8 @@ Process:
    - **Style**: naming, formatting, idiomatic patterns for the language
    - **Performance**: unnecessary allocations, N+1 queries, missing indexes, hot-path issues
    - **Maintainability**: unclear intent, missing error handling, tight coupling
-2. Record a coverage note in `.miniloop/progress.md` for every changed file: reviewed dimensions, not-applicable dimensions, and any blocked areas.
-3. For each finding, record in `.miniloop/review-findings.md`:
+2. Record a coverage note in `.autoloop/progress.md` for every changed file: reviewed dimensions, not-applicable dimensions, and any blocked areas.
+3. For each finding, record in `.autoloop/review-findings.md`:
    - File and line
    - Dimension (correctness/security/style/performance/maintainability)
    - Severity (blocking/warning/nit)

@@ -47,4 +47,4 @@ Error messages (empty content, `pi` failure, unparseable response) are printed t
 
 ## Dependencies
 
-The script requires the `pi` CLI to be available on `$PATH`. See the [`pi-adapter` subcommand](cli.md#pi-adapter) for details on how miniloops wraps `pi`.
+The script requires the `pi` CLI to be available on `$PATH`. See the [`pi-adapter` subcommand](cli.md#pi-adapter) for details on how autoloops wraps `pi`.

@@ -4,7 +4,7 @@
 Generate shorter, more readable run IDs using base-36 encoding via the tonic stdlib `Integer` module instead of the current monotonic counter scheme (`"run-N"`, `"chain-N"`). Optionally support hex-encoded short IDs via the `Hex` module.
 
 ## Background
-Miniloops currently generates run IDs as monotonic counters: `next_run_id/1` in `src/harness.tn` (line 1114) counts `loop.start` events and produces `"run-1"`, `"run-2"`, etc. Similarly, `next_chain_run_id/1` in `src/chains.tn` (line 354) counts `chain.start` events and produces `"chain-1"`, `"chain-2"`, etc. These IDs are short but have drawbacks: they collide if the journal is reset or truncated, they carry no timestamp information, and they can't be correlated across machines or journal files.
+Autoloops currently generates run IDs as monotonic counters: `next_run_id/1` in `src/harness.tn` (line 1114) counts `loop.start` events and produces `"run-1"`, `"run-2"`, etc. Similarly, `next_chain_run_id/1` in `src/chains.tn` (line 354) counts `chain.start` events and produces `"chain-1"`, `"chain-2"`, etc. These IDs are short but have drawbacks: they collide if the journal is reset or truncated, they carry no timestamp information, and they can't be correlated across machines or journal files.
 
 The tonic stdlib now includes `Integer.to_string(n, base)` (two-arg overload) for base-2..36 conversion and `Hex.encode` for hex encoding. A timestamp-based ID encoded in base-36 would be ~8-10 characters, globally unique within a machine, and carry embedded temporal ordering.
 

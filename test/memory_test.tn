@@ -30,7 +30,7 @@ defmodule LoopConfig do
   end
 
   def project_has_config(project_dir) do
-    System.path_exists(Path.join(project_dir, "miniloops.toml")) or System.path_exists(Path.join(project_dir, "miniloops.conf"))
+    System.path_exists(Path.join(project_dir, "autoloops.toml")) or System.path_exists(Path.join(project_dir, "autoloops.conf"))
   end
 
   def resolve_journal_file(project_dir) do
@@ -40,16 +40,16 @@ defmodule LoopConfig do
 
   def resolve_memory_file(project_dir) do
     config = load_project(project_dir)
-    Path.join(project_dir, get(config, "core.memory_file", ".miniloop/memory.jsonl"))
+    Path.join(project_dir, get(config, "core.memory_file", ".autoloop/memory.jsonl"))
   end
 
   defp journal_path(config) do
-    get(config, "core.journal_file", get(config, "core.events_file", ".miniloop/journal.jsonl"))
+    get(config, "core.journal_file", get(config, "core.events_file", ".autoloop/journal.jsonl"))
   end
 
   defp resolve_config_path(project_dir) do
-    toml_path = Path.join(project_dir, "miniloops.toml")
-    conf_path = Path.join(project_dir, "miniloops.conf")
+    toml_path = Path.join(project_dir, "autoloops.toml")
+    conf_path = Path.join(project_dir, "autoloops.conf")
 
     case System.path_exists(toml_path) do
       true -> toml_path
@@ -58,7 +58,7 @@ defmodule LoopConfig do
   end
 
   defp defaults() do
-    Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(%{}, "event_loop.max_iterations", "3"), "event_loop.completion_promise", "LOOP_COMPLETE"), "event_loop.completion_event", "task.complete"), "event_loop.required_events", ""), "backend.kind", "pi"), "backend.command", "pi"), "backend.timeout_ms", "300000"), "core.state_dir", ".miniloop"), "core.journal_file", ".miniloop/journal.jsonl"), "core.events_file", ".miniloop/journal.jsonl"), "core.memory_file", ".miniloop/memory.jsonl")
+    Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(Map.put(%{}, "event_loop.max_iterations", "3"), "event_loop.completion_promise", "LOOP_COMPLETE"), "event_loop.completion_event", "task.complete"), "event_loop.required_events", ""), "backend.kind", "pi"), "backend.command", "pi"), "backend.timeout_ms", "300000"), "core.state_dir", ".autoloop"), "core.journal_file", ".autoloop/journal.jsonl"), "core.events_file", ".autoloop/journal.jsonl"), "core.memory_file", ".autoloop/memory.jsonl")
   end
 
   defp parse_lines([], config) do
@@ -163,7 +163,7 @@ end
 defmodule LoopMemory do
   def resolve_file(project_dir) do
     config = LoopConfig.load_project(project_dir)
-    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".miniloop/memory.jsonl"))
+    Path.join(project_dir, LoopConfig.get(config, "core.memory_file", ".autoloop/memory.jsonl"))
   end
 
   def render_project(project_dir, budget_chars) do
@@ -524,7 +524,7 @@ defmodule MemoryTest do
   end
 
   def test_stats_file_reports_budget_pressure() do
-    path = "/tmp/miniloops-memory-stats-test.jsonl"
+    path = "/tmp/autoloops-memory-stats-test.jsonl"
     System.write_text(path, "{\"id\": \"mem-1\", \"type\": \"learning\", \"text\": \"Long learning text to trigger truncation\", \"source\": \"manual\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"mem-2\", \"type\": \"preference\", \"category\": \"Workflow\", \"text\": \"Keep prompts small\", \"created\": \"2026-03-27T00:00:00Z\"}\n")
 
     stats = LoopMemory.stats_file(path, 20)
@@ -538,7 +538,7 @@ defmodule MemoryTest do
   end
 
   def test_render_file_includes_ids_and_truncation_footer() do
-    path = "/tmp/miniloops-memory-render-test.jsonl"
+    path = "/tmp/autoloops-memory-render-test.jsonl"
     System.write_text(path, "{\"id\": \"mem-1\", \"type\": \"learning\", \"text\": \"Long learning text to trigger truncation\", \"source\": \"manual\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"mem-2\", \"type\": \"preference\", \"category\": \"Workflow\", \"text\": \"Keep prompts small\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"meta-3\", \"type\": \"meta\", \"key\": \"smoke_iteration\", \"value\": \"2\", \"created\": \"2026-03-27T00:00:00Z\"}\n")
 
     full = LoopMemory.render_file(path, 0)
@@ -552,12 +552,12 @@ defmodule MemoryTest do
   end
 
   def test_remove_appends_tombstone_and_hides_removed_entry() do
-    project_dir = "/tmp/miniloops-memory-remove-project"
-    memory_dir = project_dir <> "/.miniloop"
+    project_dir = "/tmp/autoloops-memory-remove-project"
+    memory_dir = project_dir <> "/.autoloop"
     memory_path = memory_dir <> "/memory.jsonl"
 
     System.run("rm -rf '" <> project_dir <> "' && mkdir -p '" <> memory_dir <> "'")
-    System.write_text(project_dir <> "/miniloops.toml", "core.memory_file = \".miniloop/memory.jsonl\"\n")
+    System.write_text(project_dir <> "/autoloops.toml", "core.memory_file = \".autoloop/memory.jsonl\"\n")
     System.write_text(memory_path, "{\"id\": \"mem-1\", \"type\": \"learning\", \"text\": \"Old fact\", \"source\": \"manual\", \"created\": \"2026-03-27T00:00:00Z\"}\n{\"id\": \"mem-2\", \"type\": \"preference\", \"category\": \"Workflow\", \"text\": \"Keep prompts small\", \"created\": \"2026-03-27T00:00:00Z\"}\n")
 
     LoopMemory.remove(project_dir, "mem-1", "stale")
@@ -573,11 +573,11 @@ defmodule MemoryTest do
   end
 
   defp project_dir() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   def test_resolve_file_uses_config() do
     path = LoopMemory.resolve_file("/nonexistent/project")
-    Assert.assert_contains(path, ".miniloop/memory.jsonl")
+    Assert.assert_contains(path, ".autoloop/memory.jsonl")
   end
 end

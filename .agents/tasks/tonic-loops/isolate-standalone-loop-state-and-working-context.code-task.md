@@ -1,18 +1,18 @@
 # Task: Isolate Standalone Loop State And Working Context
 
 ## Description
-Eliminate cross-run and cross-preset contamination for standalone miniloops runs. Today, standalone runs launched from the same repository root reuse shared runtime state (`.miniloop/journal.jsonl`, `.miniloop/memory.jsonl`, `pi-stream.*`, `pi-review.*`) and shared working files such as `.miniloop/progress.md`. That causes unrelated autocode, autoqa, autodoc, and hyperagent context to leak into later runs. The goal is to give each standalone loop an isolated working context comparable to chain step isolation, while preserving journal-first runtime truth and keeping inspection/debugging ergonomic.
+Eliminate cross-run and cross-preset contamination for standalone autoloops runs. Today, standalone runs launched from the same repository root reuse shared runtime state (`.autoloop/journal.jsonl`, `.autoloop/memory.jsonl`, `pi-stream.*`, `pi-review.*`) and shared working files such as `.autoloop/progress.md`. That causes unrelated autocode, autoqa, autodoc, and hyperagent context to leak into later runs. The goal is to give each standalone loop an isolated working context comparable to chain step isolation, while preserving journal-first runtime truth and keeping inspection/debugging ergonomic.
 
 ## Background
 Recent tracing showed that the bad autoqa inspector execution was not caused by run-id filtering bugs in scratchpad reconstruction. The harness correctly scopes scratchpad rendering with `read_run_lines(journal_file, run_id)`. The contamination came from state that is still shared at the cwd/project level:
 
 - standalone runs default `work_dir` to `"."`
-- runtime files default to repo-root `.miniloop/*`
-- loop memory is injected from the shared `.miniloop/memory.jsonl`
-- preset working files such as `.miniloop/progress.md` are reused across unrelated presets in the same repo root
+- runtime files default to repo-root `.autoloop/*`
+- loop memory is injected from the shared `.autoloop/memory.jsonl`
+- preset working files such as `.autoloop/progress.md` are reused across unrelated presets in the same repo root
 - debug stream logs are named only by iteration (`pi-stream.1.jsonl`, `pi-review.1.jsonl`), so later runs overwrite earlier forensic evidence
 
-Chains already avoid much of this by assigning each step its own work directory under `.miniloop/chains/<chain-run-id>/step-<n>/`. Standalone runs should get similar isolation rather than sharing the repo root by default.
+Chains already avoid much of this by assigning each step its own work directory under `.autoloop/chains/<chain-run-id>/step-<n>/`. Standalone runs should get similar isolation rather than sharing the repo root by default.
 
 The fix should stay simple and inspectable. Do not add a heavy state manager or opaque database. Prefer explicit directories and git-friendly files.
 
@@ -24,7 +24,7 @@ The fix should stay simple and inspectable. Do not add a heavy state manager or 
 - Design: `src/pi_adapter.tn`
 - Design: `src/chains.tn`
 - Design: `README.md`
-- Design: `miniloops.toml`
+- Design: `autoloops.toml`
 - Design: `examples/autoqa/harness.md`
 - Design: `examples/autoqa/roles/inspector.md`
 - Design: `examples/autocode/harness.md`
@@ -34,15 +34,15 @@ The fix should stay simple and inspectable. Do not add a heavy state manager or 
 - `docs/configuration.md`
 - `docs/journal.md`
 - `src/memory.tn`
-- `.miniloop/progress.md`
-- `.miniloop/qa-plan.md`
+- `.autoloop/progress.md`
+- `.autoloop/qa-plan.md`
 
 **Note:** You MUST trace how `project_dir`, `work_dir`, journal paths, memory paths, child-process environment variables, and prompt-loaded working files interact before making changes. Preserve chain-step isolation and the journal-first model.
 
 ## Technical Requirements
 1. Define and implement an isolation strategy for standalone runs so they do not default to sharing repo-root runtime state with unrelated presets.
-2. Ensure standalone runs no longer inject unrelated memory from a shared cwd-level `.miniloop/memory.jsonl` unless that sharing is explicitly requested.
-3. Ensure preset working context is isolated enough that an autoqa run does not accidentally consume autocode working files like `.miniloop/progress.md`, `.miniloop/context.md`, or `.miniloop/plan.md` from the repo root when they belong to a different preset/objective.
+2. Ensure standalone runs no longer inject unrelated memory from a shared cwd-level `.autoloop/memory.jsonl` unless that sharing is explicitly requested.
+3. Ensure preset working context is isolated enough that an autoqa run does not accidentally consume autocode working files like `.autoloop/progress.md`, `.autoloop/context.md`, or `.autoloop/plan.md` from the repo root when they belong to a different preset/objective.
 4. Preserve explicit chain-step isolation in `src/chains.tn`; do not regress existing per-step work directories.
 5. Keep child-process environment wiring correct. Backends and the emit tool must receive paths for the active isolated run/work context, not stale repo-root defaults.
 6. Update runtime file naming so raw Pi debug logs are not overwritten across runs. At minimum, include enough identity (for example `run_id`) to make stream logs for distinct runs coexist.
@@ -70,8 +70,8 @@ The fix should stay simple and inspectable. Do not add a heavy state manager or 
    - preset working files
    - raw Pi debug logs
 2. Choose the smallest explicit isolation scheme that works for standalone runs. Examples that may be acceptable:
-   - a per-run work directory under `.miniloop/runs/<run-id>/`
-   - a per-preset work directory under `.miniloop/<preset>/` plus per-run stream logs
+   - a per-run work directory under `.autoloop/runs/<run-id>/`
+   - a per-preset work directory under `.autoloop/<preset>/` plus per-run stream logs
    - another equally inspectable directory layout
 3. Thread the chosen work context through backend/review child-process environment variables so emits, memory, and scratchpad reconstruction all target the correct run.
 4. Update prompt-facing working-file loading so presets read the active isolated working context rather than unrelated repo-root files.
@@ -88,7 +88,7 @@ The fix should stay simple and inspectable. Do not add a heavy state manager or 
    - Then its prompt does not inject those unrelated learnings unless the operator explicitly opted into shared memory
 
 2. **Standalone Working Files Are Isolated**
-   - Given repo-root `.miniloop/progress.md`, `.miniloop/plan.md`, or `.miniloop/context.md` contain active autocode state
+   - Given repo-root `.autoloop/progress.md`, `.autoloop/plan.md`, or `.autoloop/context.md` contain active autocode state
    - When a standalone autoqa run starts
    - Then the inspector does not consume those unrelated files as its own active working context
 
@@ -109,7 +109,7 @@ The fix should stay simple and inspectable. Do not add a heavy state manager or 
 
 6. **Emit Tool Targets The Active Isolated Context**
    - Given a backend emits an event during an isolated standalone run
-   - When `miniloops emit ...` is invoked through the runtime wrapper
+   - When `autoloops emit ...` is invoked through the runtime wrapper
    - Then the event lands in the active run’s journal, not an unrelated repo-root journal
 
 7. **Contamination Repro Is Fixed**
@@ -124,5 +124,5 @@ The fix should stay simple and inspectable. Do not add a heavy state manager or 
 
 ## Metadata
 - **Complexity**: High
-- **Labels**: miniloops, isolation, runtime-state, autoqa, autocode, memory, journal, preset-context, debugging
+- **Labels**: autoloops, isolation, runtime-state, autoqa, autocode, memory, journal, preset-context, debugging
 - **Required Skills**: Tonic app development, runtime path design, CLI/runtime environment wiring, debugging distributed state, prompt/runtime boundary design

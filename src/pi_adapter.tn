@@ -98,7 +98,7 @@ defmodule LoopPiAdapter do
     configured_path = env_value("MINILOOPS_PROMPT_PATH")
 
     case configured_path do
-      "" -> "/tmp/miniloops-pi-adapter-prompt.md"
+      "" -> "/tmp/autoloops-pi-adapter-prompt.md"
       value -> value
     end
   end

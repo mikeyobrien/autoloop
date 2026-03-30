@@ -4,12 +4,12 @@
 Make structured parallel waves truly concurrent. The current `.parallel` feature surface already exists, but the runtime still executes branches serially by running one branch to completion before starting the next. Update the harness so a wave launches all branch jobs before joining, while preserving the current public event/config surface, branch isolation model, and harness-owned joined-event semantics.
 
 ## Background
-Miniloops already documents structured parallelism as a real fan-out/fan-in primitive:
+Autoloops already documents structured parallelism as a real fan-out/fan-in primitive:
 - `explore.parallel`
 - `<base-event>.parallel`
 - harness-owned `*.parallel.joined`
 - one active wave at a time
-- isolated branch state under `.miniloop/waves/<wave-id>/...`
+- isolated branch state under `.autoloop/waves/<wave-id>/...`
 
 That contract is described in `README.md`, `docs/topology.md`, `docs/configuration.md`, `docs/journal.md`, and the prior RFC `docs/rfcs/structured-parallelism-with-event-suffixes.md`.
 
@@ -34,7 +34,7 @@ So wave duration grows with the sum of branch durations rather than the slowest 
 - Design: `test/parallel_wave_test.tn`
 
 **Additional References (if relevant to this task):**
-- `.miniloop/chains/chain-mnahjswo-9nvh/step-1/.miniloop/ideas-report.md`
+- `.autoloop/chains/chain-mnahjswo-9nvh/step-1/.autoloop/ideas-report.md`
 - `src/config.tn`
 - `src/main.tn`
 - `src/chains.tn`
@@ -59,7 +59,7 @@ So wave duration grows with the sum of branch durations rather than the slowest 
    - branches cannot open nested waves
    - only the harness emits joined events
 4. Launch all branch jobs before waiting on join.
-5. Keep branch execution isolated under `.miniloop/waves/<wave-id>/branches/<branch-id>/...`.
+5. Keep branch execution isolated under `.autoloop/waves/<wave-id>/branches/<branch-id>/...`.
 6. Keep branch mode behavior intact: review disabled, nested parallel disabled, branch-local state only.
 7. Treat branches as child jobs rather than a new long-lived peer-loop concept.
 8. Enforce per-branch timeout from each branch’s launch time, not from the time prior siblings finished.
@@ -161,5 +161,5 @@ So wave duration grows with the sum of branch durations rather than the slowest 
 
 ## Metadata
 - **Complexity**: High
-- **Labels**: miniloops, parallelism, concurrency, structured-concurrency, harness, journal, inspectability, performance
+- **Labels**: autoloops, parallelism, concurrency, structured-concurrency, harness, journal, inspectability, performance
 - **Required Skills**: runtime design, subprocess orchestration, Tonic app development, test design, documentation

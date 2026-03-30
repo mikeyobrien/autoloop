@@ -41,7 +41,7 @@ defmodule PiAdapterTest do
   end
 
   defp prepare_fixture(script_content) do
-    dir = "/tmp/miniloops-pi-adapter-fixture"
+    dir = "/tmp/autoloops-pi-adapter-fixture"
     script = Path.join(dir, "mock-pi.sh")
 
     System.run("rm -rf " <> shell_quote(dir) <> " && mkdir -p " <> shell_quote(dir))
@@ -108,7 +108,7 @@ defmodule PiAdapterTest do
   end
 
   defp repo_root() do
-    "/Users/rook/projects/tonic-loops"
+    System.cwd()
   end
 
   defp shell_quote(text) do
