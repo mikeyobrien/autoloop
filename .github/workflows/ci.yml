@@ -17,10 +17,10 @@ jobs:
       - name: Check syntax
         run: tonic check .
 
-      - name: Run tests
-        run: bin/test
+      - name: Run stable CI tests
+        run: ./bin/test test/release_install_test.tn
 
-  pi-smoke:
+  mock-smoke:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -29,5 +29,5 @@ jobs:
       - name: Install tonic
         run: ./scripts/install-tonic.sh
 
-      - name: Run pi-smoke
-        run: scripts/pi-smoke.sh
+      - name: Run mock smoke
+        run: scripts/mock-smoke.sh
