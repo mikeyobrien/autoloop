@@ -21,13 +21,31 @@ defmodule ReleaseInstallTest do
 
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
     Assert.assert_contains(Map.get(result, :output, ""), "installed autoloops to")
-    Assert.assert_contains(System.run(shell_quote(Path.join(Map.get(fixture, :install_dir, ""), "autoloops")) <> " --help") |> Map.get(:output, ""), "autoloops fixture")
+
+    # The installed autoloops is a wrapper that calls `tonic run <bundle> ...`.
+    # Put a mock tonic on PATH so the wrapper can be exercised end-to-end.
+    mock_tonic_dir = Path.join(Map.get(fixture, :tmp_dir, ""), "mock-bin")
+    System.run("mkdir -p " <> shell_quote(mock_tonic_dir))
+    System.write_text(Path.join(mock_tonic_dir, "tonic"), mock_tonic_script())
+    System.run("chmod +x " <> shell_quote(Path.join(mock_tonic_dir, "tonic")))
+
+    help_result = System.run(
+      "PATH=" <> shell_quote(mock_tonic_dir) <> ":$PATH " <>
+      shell_quote(Path.join(Map.get(fixture, :install_dir, ""), "autoloops")) <> " --help"
+    )
+    Assert.assert_equal(Map.get(help_result, :exit_code, 1), 0)
+    Assert.assert_contains(Map.get(help_result, :output, ""), "autoloops mock-tonic")
 
     install_dir = Map.get(fixture, :install_dir, "")
     Assert.assert(System.path_exists(Path.join(install_dir, "presets")), "presets/ should be installed")
     Assert.assert(System.path_exists(Path.join(install_dir, "roles")), "roles/ should be installed")
     Assert.assert(System.path_exists(Path.join(install_dir, "src")), "src/ should be installed")
     Assert.assert(System.path_exists(Path.join(install_dir, "tonic.toml")), "tonic.toml should be installed")
+
+    # Verify the wrapper sets AUTOLOOPS_BUNDLE_ROOT to its own directory
+    wrapper_content = System.read_text(Path.join(install_dir, "autoloops"))
+    Assert.assert_contains(wrapper_content, "AUTOLOOPS_BUNDLE_ROOT")
+    Assert.assert_contains(wrapper_content, "exec tonic run")
   end
 
   def test_package_release_supports_relative_output_dir() do
@@ -90,6 +108,13 @@ defmodule ReleaseInstallTest do
     System.run("chmod +x " <> shell_quote(binary_path))
 
     %{tmp_dir: tmp_dir, repo_copy: repo_copy, binary_path: binary_path}
+  end
+
+  defp mock_tonic_script() do
+    "#!/usr/bin/env bash\n" <>
+    "# Mock tonic for testing the autoloops wrapper script.\n" <>
+    "# Echoes args so the test can verify the wrapper invoked tonic correctly.\n" <>
+    "echo \"autoloops mock-tonic invoked: $*\"\n"
   end
 
   defp fixture_binary() do
