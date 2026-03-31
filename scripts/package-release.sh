@@ -31,7 +31,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$stage_dir" "out_dir"
+mkdir -p "$stage_dir" "$out_dir"
 
 # Write a shell-wrapper launcher that auto-sets AUTOLOOPS_BUNDLE_ROOT
 # and invokes tonic directly so its arg routing works correctly.

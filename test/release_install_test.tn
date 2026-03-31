@@ -22,6 +22,12 @@ defmodule ReleaseInstallTest do
     Assert.assert_equal(Map.get(result, :exit_code, 1), 0)
     Assert.assert_contains(Map.get(result, :output, ""), "installed autoloops to")
     Assert.assert_contains(System.run(shell_quote(Path.join(Map.get(fixture, :install_dir, ""), "autoloops")) <> " --help") |> Map.get(:output, ""), "autoloops fixture")
+
+    install_dir = Map.get(fixture, :install_dir, "")
+    Assert.assert(System.path_exists(Path.join(install_dir, "presets")), "presets/ should be installed")
+    Assert.assert(System.path_exists(Path.join(install_dir, "roles")), "roles/ should be installed")
+    Assert.assert(System.path_exists(Path.join(install_dir, "src")), "src/ should be installed")
+    Assert.assert(System.path_exists(Path.join(install_dir, "tonic.toml")), "tonic.toml should be installed")
   end
 
   def test_package_release_supports_relative_output_dir() do
