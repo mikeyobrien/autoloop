@@ -104,6 +104,15 @@ defmodule ReleaseInstallTest do
     System.run("rm -rf " <> shell_quote(tmp_dir) <> " && mkdir -p " <> shell_quote(scripts_dir))
     System.run("cp " <> shell_quote(Path.join(repo_root(), "scripts/package-release.sh")) <> " " <> shell_quote(Path.join(scripts_dir, "package-release.sh")))
     System.run("chmod +x " <> shell_quote(Path.join(scripts_dir, "package-release.sh")))
+
+    # package-release.sh now bundles presets/, roles/, src/, tonic.toml, .tonic-version
+    # from repo_dir, so the fixture repo copy needs them too.
+    System.run("cp -r " <> shell_quote(Path.join(repo_root(), "presets")) <> " " <> shell_quote(Path.join(repo_copy, "presets")))
+    System.run("cp -r " <> shell_quote(Path.join(repo_root(), "roles")) <> " " <> shell_quote(Path.join(repo_copy, "roles")))
+    System.run("cp -r " <> shell_quote(Path.join(repo_root(), "src")) <> " " <> shell_quote(Path.join(repo_copy, "src")))
+    System.run("cp " <> shell_quote(Path.join(repo_root(), "tonic.toml")) <> " " <> shell_quote(Path.join(repo_copy, "tonic.toml")))
+    System.run("cp " <> shell_quote(Path.join(repo_root(), ".tonic-version")) <> " " <> shell_quote(Path.join(repo_copy, ".tonic-version")))
+
     System.write_text(binary_path, fixture_binary())
     System.run("chmod +x " <> shell_quote(binary_path))
 
