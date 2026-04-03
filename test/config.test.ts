@@ -52,7 +52,7 @@ describe("load", () => {
     const dir = tmpDir("comments");
     writeFileSync(
       join(dir, "config.toml"),
-      "# comment\n\n[backend]\n# another comment\ncommand = pi\n",
+      "# comment\n\n[backend]\n# another comment\ncommand = \"pi\"\n",
     );
     const cfg = load(join(dir, "config.toml"));
     expect(get(cfg, "backend.command", "")).toBe("pi");

@@ -1,13 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  listContains,
-  listText,
-  skipLine,
-  stripQuotes,
-  lineSep,
-  parseStringListLiteralOrScalar,
-} from "./utils.js";
+import TOML from "@iarna/toml";
+import { listContains, listText, lineSep } from "./utils.js";
 
 export interface Role {
   id: string;
@@ -123,97 +117,39 @@ function defaultTopology(): Topology {
 
 function loadExisting(path: string, projectDir: string): Topology {
   const text = readFileSync(path, "utf-8");
-  const lines = text.split(lineSep());
-  const state = parseLines(lines);
-  return finalize(state, projectDir);
+  const parsed = TOML.parse(text);
+  return buildTopology(parsed, projectDir);
 }
 
-interface ParseState {
-  name: string;
-  completion: string;
-  roles: Role[];
-  currentRole: Role;
-  handoff: Record<string, string[]>;
-  handoffKeys: string[];
-  section: string;
-}
+function buildTopology(
+  parsed: Record<string, unknown>,
+  projectDir: string,
+): Topology {
+  const name = typeof parsed.name === "string" ? parsed.name : "";
+  const completion = typeof parsed.completion === "string" ? parsed.completion : "";
 
-function emptyRole(): Role {
-  return { id: "", prompt: "", promptFile: "", emits: [] };
-}
+  const rawRoles = (parsed.role ?? []) as Array<Record<string, unknown>>;
+  const roles: Role[] = rawRoles
+    .filter((r) => typeof r.id === "string" && r.id !== "")
+    .map((r) => {
+      const role: Role = {
+        id: r.id as string,
+        prompt: typeof r.prompt === "string" ? r.prompt : "",
+        promptFile: typeof r.prompt_file === "string" ? r.prompt_file : "",
+        emits: Array.isArray(r.emits) ? r.emits.map(String) : [],
+      };
+      return { ...role, prompt: rolePrompt(role, projectDir) };
+    });
 
-function parseLines(lines: string[]): ParseState {
-  const state: ParseState = {
-    name: "",
-    completion: "",
-    roles: [],
-    currentRole: emptyRole(),
-    handoff: {},
-    handoffKeys: [],
-    section: "root",
-  };
-
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim();
-    if (skipLine(trimmed)) continue;
-
-    if (trimmed === "[[role]]") {
-      pushCurrentRole(state);
-      state.currentRole = emptyRole();
-      state.section = "role";
-      continue;
-    }
-
-    if (trimmed === "[handoff]") {
-      pushCurrentRole(state);
-      state.currentRole = emptyRole();
-      state.section = "handoff";
-      continue;
-    }
-
-    const parts = trimmed.split("=");
-    if (parts.length < 2) continue;
-    const key = stripQuotes(parts[0].trim());
-    const value = parts.slice(1).join("=").trim();
-
-    if (state.section === "root") {
-      if (key === "name") state.name = normalizeScalar(value);
-      else if (key === "completion") state.completion = normalizeScalar(value);
-    } else if (state.section === "role") {
-      if (key === "id") state.currentRole.id = normalizeScalar(value);
-      else if (key === "prompt") state.currentRole.prompt = normalizeScalar(value);
-      else if (key === "prompt_file") state.currentRole.promptFile = normalizeScalar(value);
-      else if (key === "emits") state.currentRole.emits = normalizeList(value);
-    } else if (state.section === "handoff") {
-      state.handoff[key] = normalizeList(value);
-      if (!state.handoffKeys.includes(key)) {
-        state.handoffKeys.push(key);
-      }
-    }
+  const rawHandoff = (parsed.handoff ?? {}) as Record<string, unknown>;
+  const handoff: Record<string, string[]> = {};
+  const handoffKeys: string[] = [];
+  for (const [key, value] of Object.entries(rawHandoff)) {
+    handoff[key] = Array.isArray(value) ? value.map(String) : [String(value)];
+    handoffKeys.push(key);
   }
 
-  return state;
-}
-
-function pushCurrentRole(state: ParseState): void {
-  if (state.currentRole.id !== "") {
-    state.roles.push(state.currentRole);
-  }
-}
-
-function finalize(state: ParseState, projectDir: string): Topology {
-  pushCurrentRole(state);
-  const roles = state.roles.map((role) => ({
-    ...role,
-    prompt: rolePrompt(role, projectDir),
-  }));
-  return {
-    name: state.name,
-    completion: state.completion,
-    roles,
-    handoff: state.handoff,
-    handoffKeys: state.handoffKeys,
-  };
+  return { name, completion, roles, handoff, handoffKeys };
 }
 
 function rolePrompt(role: Role, projectDir: string): string {
@@ -303,10 +239,3 @@ function promptSummary(prompt: string): string {
   return "(none)";
 }
 
-function normalizeScalar(value: string): string {
-  return stripQuotes(value);
-}
-
-function normalizeList(value: string): string[] {
-  return parseStringListLiteralOrScalar(value);
-}

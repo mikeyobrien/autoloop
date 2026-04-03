@@ -1,15 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  skipLine,
-  sliceOuter,
-  stripQuotes,
-  lineSep,
-  splitCsv,
-  parseStringList,
-  parseStringListLiteralOrScalar,
-  joinCsv,
-} from "./utils.js";
+import TOML from "@iarna/toml";
+import { parseStringList } from "./utils.js";
 
 export type Config = Record<string, unknown>;
 
@@ -183,42 +175,35 @@ function defaults(): Config {
 }
 
 function parseToml(text: string): Config {
-  let config = defaults();
-  let section = "";
-  const lines = text.split(lineSep());
+  const parsed = TOML.parse(text);
+  return deepMerge(defaults(), stringifyValues(parsed));
+}
 
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim();
-    if (skipLine(trimmed)) continue;
-
-    if (isSectionHeader(trimmed)) {
-      section = extractSectionName(trimmed);
-      continue;
+function stringifyValues(obj: Record<string, unknown>): Config {
+  const result: Config = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (Array.isArray(value)) {
+      result[key] = value.map(String).join(",");
+    } else if (typeof value === "object" && value !== null) {
+      result[key] = stringifyValues(value as Record<string, unknown>);
+    } else {
+      result[key] = String(value);
     }
-
-    const eqIndex = trimmed.indexOf("=");
-    if (eqIndex === -1) {
-      console.log("[config] warning: skipping unparseable line (no '=' found)");
-      continue;
-    }
-
-    const rawKey = trimmed.slice(0, eqIndex).trim();
-    const rawValue = trimmed.slice(eqIndex + 1).trim();
-    const fullKey = section ? section + "." + rawKey : rawKey;
-    config = put(config, fullKey, normalizeValue(rawValue));
   }
-
-  return config;
+  return result;
 }
 
-function isSectionHeader(line: string): boolean {
-  return line.startsWith("[") && line.endsWith("]");
-}
-
-function extractSectionName(line: string): string {
-  return sliceOuter(line).trim();
-}
-
-function normalizeValue(value: string): string {
-  return joinCsv(parseStringListLiteralOrScalar(value));
+function deepMerge(base: Config, override: Config): Config {
+  const result = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (
+      typeof value === "object" && value !== null && !Array.isArray(value) &&
+      typeof result[key] === "object" && result[key] !== null
+    ) {
+      result[key] = deepMerge(result[key] as Config, value as Config);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
 }

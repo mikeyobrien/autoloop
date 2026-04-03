@@ -51,11 +51,11 @@ prompt = "You are the finalizer."
 emits = ["queue.advance", "task.complete"]
 
 [handoff]
-loop.start = ["planner"]
-tasks.ready = ["builder"]
-review.ready = ["critic"]
-/review\\..*/ = ["builder", "finalizer"]
-build.blocked = ["planner"]
+"loop.start" = ["planner"]
+"tasks.ready" = ["builder"]
+"review.ready" = ["critic"]
+"/review\\\\..*/" = ["builder", "finalizer"]
+"build.blocked" = ["planner"]
 `;
 
 function loadTestTopology(): Topology {

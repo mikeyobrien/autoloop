@@ -5,7 +5,6 @@ import {
   splitCsv,
   joinCsv,
   parseStringList,
-  parseStringListLiteralOrScalar,
   lineSep,
   joinLines,
   nonemptyOr,
@@ -15,7 +14,6 @@ import {
   stripQuotes,
   isQuoted,
   sliceOuter,
-  skipLine,
   generateCompactId,
 } from "../src/utils.js";
 
@@ -82,20 +80,6 @@ describe("parseStringList", () => {
 
   it("parses CSV without brackets", () => {
     expect(parseStringList("a, b, c")).toEqual(["a", "b", "c"]);
-  });
-});
-
-describe("parseStringListLiteralOrScalar", () => {
-  it("parses bracket list", () => {
-    expect(parseStringListLiteralOrScalar('["x", "y"]')).toEqual(["x", "y"]);
-  });
-
-  it("returns scalar as single-item list", () => {
-    expect(parseStringListLiteralOrScalar('"hello"')).toEqual(["hello"]);
-  });
-
-  it("handles unquoted scalar", () => {
-    expect(parseStringListLiteralOrScalar("world")).toEqual(["world"]);
   });
 });
 
@@ -166,20 +150,6 @@ describe("stripQuotes / isQuoted", () => {
 describe("sliceOuter", () => {
   it("removes first and last character", () => {
     expect(sliceOuter("[abc]")).toBe("abc");
-  });
-});
-
-describe("skipLine", () => {
-  it("skips empty lines", () => {
-    expect(skipLine("")).toBe(true);
-  });
-
-  it("skips comment lines", () => {
-    expect(skipLine("# comment")).toBe(true);
-  });
-
-  it("does not skip content lines", () => {
-    expect(skipLine("key = value")).toBe(false);
   });
 });
 

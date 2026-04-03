@@ -1,17 +1,12 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import TOML from "@iarna/toml";
 import * as config from "./config.js";
-import { jsonField, decodeJsonValue } from "./json.js";
+import { jsonField } from "./json.js";
 import {
-  skipLine,
-  stripQuotes,
-  lineSep,
   joinCsv,
   parseStringList,
-  parseStringListLiteralOrScalar,
   generateCompactId,
-  shellQuote,
 } from "./utils.js";
 import * as harness from "./harness/index.js";
 import { appendText, readLines, extractTopic, extractField } from "./harness/journal.js";
@@ -37,6 +32,14 @@ export interface Budget {
 export interface ChainsConfig {
   chains: ChainSpec[];
   budget: Budget;
+}
+
+export interface DynamicChainSpec {
+  steps: string[];
+  justification?: string;
+  budget?: Budget;
+  chainId?: string;
+  parentId?: string;
 }
 
 export function defaultBudget(): Budget {
@@ -123,7 +126,8 @@ export function renderChainState(projectDir: string): string {
 export function loadBudget(projectDir: string): Budget {
   const path = join(projectDir, "chains.toml");
   if (!existsSync(path)) return defaultBudget();
-  return parseBudget(readFileSync(path, "utf-8").split(lineSep()));
+  const parsed = TOML.parse(readFileSync(path, "utf-8"));
+  return parseBudgetFromToml(parsed.budget);
 }
 
 export function checkBudget(
@@ -187,68 +191,36 @@ function chainStateRoot(projectDir: string): string {
 
 function loadExisting(path: string, projectDir: string): ChainsConfig {
   const text = readFileSync(path, "utf-8");
-  const lines = text.split(lineSep());
-  return parseChains(lines, projectDir);
+  const parsed = TOML.parse(text);
+  return parseChainsFromToml(parsed, projectDir);
 }
 
-function parseChains(lines: string[], projectDir: string): ChainsConfig {
-  const chains: Array<{ name: string; steps: string[] }> = [];
-  let current: { name: string; steps: string[] } | null = null;
-  let budget = defaultBudget();
-  let section = "root";
+function parseChainsFromToml(
+  parsed: Record<string, unknown>,
+  projectDir: string,
+): ChainsConfig {
+  const rawChains = (parsed.chain ?? []) as Array<{ name?: string; steps?: string[] }>;
+  const chains = rawChains
+    .filter((c) => typeof c.name === "string" && c.name !== "")
+    .map((c) => ({
+      name: c.name as string,
+      steps: resolveSteps(c.steps ?? [], projectDir),
+    }));
 
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim();
-    if (skipLine(trimmed)) continue;
-
-    if (trimmed === "[[chain]]") {
-      if (current && current.name) chains.push(current);
-      current = { name: "", steps: [] };
-      section = "chain";
-      continue;
-    }
-    if (trimmed === "[budget]") {
-      if (current && current.name) chains.push(current);
-      current = null;
-      section = "budget";
-      continue;
-    }
-
-    const eqIndex = trimmed.indexOf("=");
-    if (eqIndex === -1) continue;
-    const key = trimmed.slice(0, eqIndex).trim();
-    const value = trimmed.slice(eqIndex + 1).trim();
-
-    if (section === "chain" && current) {
-      if (key === "name") current.name = stripQuotes(value);
-      else if (key === "steps") current.steps = parseStringListLiteralOrScalar(value);
-    } else if (section === "budget") {
-      budget = assignBudgetKey(budget, key, stripQuotes(value));
-    }
-  }
-
-  if (current && current.name) chains.push(current);
-
-  return {
-    chains: chains.map((c) => ({
-      name: c.name,
-      steps: resolveSteps(c.steps, projectDir),
-    })),
-    budget,
-  };
+  const budget = parseBudgetFromToml(parsed.budget);
+  return { chains, budget };
 }
 
-function assignBudgetKey(budget: Budget, key: string, value: string): Budget {
-  const num = parseInt(value, 10);
-  if (isNaN(num)) return budget;
-  switch (key) {
-    case "max_depth": return { ...budget, maxDepth: num };
-    case "max_steps": return { ...budget, maxSteps: num };
-    case "max_runtime_ms": return { ...budget, maxRuntimeMs: num };
-    case "max_children": return { ...budget, maxChildren: num };
-    case "max_consecutive_failures": return { ...budget, maxConsecutiveFailures: num };
-    default: return budget;
-  }
+function parseBudgetFromToml(raw: unknown): Budget {
+  const budget = defaultBudget();
+  if (typeof raw !== "object" || raw === null) return budget;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.max_depth === "number") budget.maxDepth = obj.max_depth;
+  if (typeof obj.max_steps === "number") budget.maxSteps = obj.max_steps;
+  if (typeof obj.max_runtime_ms === "number") budget.maxRuntimeMs = obj.max_runtime_ms;
+  if (typeof obj.max_children === "number") budget.maxChildren = obj.max_children;
+  if (typeof obj.max_consecutive_failures === "number") budget.maxConsecutiveFailures = obj.max_consecutive_failures;
+  return budget;
 }
 
 function resolveSteps(stepNames: string[], projectDir: string): ChainStep[] {
@@ -420,17 +392,112 @@ function renderChainEntry(topic: string, line: string): string {
   }
 }
 
-function parseBudget(lines: string[]): Budget {
-  let budget = defaultBudget();
-  let inSection = false;
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim();
-    if (trimmed === "[budget]") { inSection = true; continue; }
-    if (trimmed === "[[chain]]") { inSection = false; continue; }
-    if (!inSection || skipLine(trimmed)) continue;
-    const eqIndex = trimmed.indexOf("=");
-    if (eqIndex === -1) continue;
-    budget = assignBudgetKey(budget, trimmed.slice(0, eqIndex).trim(), stripQuotes(trimmed.slice(eqIndex + 1).trim()));
+
+// --- dynamic chain spawning ---
+
+export function spawnDynamicChain(
+  spec: DynamicChainSpec,
+  projectDir: string,
+  selfCommand: string,
+  runOptions: harness.RunOptions,
+  parentId: string,
+): { outcome: string; reason?: string; chainId?: string; completed?: StepRecord[]; failedStep?: number; failedReason?: string } {
+  const budget = spec.budget ?? defaultBudget();
+  const tracker = loadChainTracker(projectDir);
+  const budgetResult = checkBudget(budget, tracker);
+
+  if (!budgetResult.ok) {
+    return { outcome: "budget_exceeded", reason: budgetResult.reason ?? "unknown rejection" };
   }
-  return budget;
+
+  const qualityResult = checkQualityGate(projectDir);
+  if (!qualityResult.ok) {
+    return { outcome: "quality_gate_rejected", reason: qualityResult.reason ?? "unknown rejection" };
+  }
+
+  return executeDynamicChain(spec, projectDir, selfCommand, runOptions, parentId);
+}
+
+export function writeDynamicSpec(projectDir: string, spec: DynamicChainSpec): string {
+  const specsDir = join(chainStateRoot(projectDir), "specs");
+  mkdirSync(specsDir, { recursive: true });
+  const chainId = spec.chainId ?? ("dyn-" + (countDynamicSpecs(specsDir) + 1));
+  const path = join(specsDir, chainId + ".json");
+  writeFileSync(path, renderDynamicSpecJson(spec, chainId));
+  return chainId;
+}
+
+function loadChainTracker(projectDir: string): ChainTracker {
+  const journalFile = config.resolveJournalFile(projectDir);
+  const lines = readLines(journalFile);
+  const tracker: ChainTracker = { depth: 0, totalSteps: 0, children: 0, consecutiveFailures: 0 };
+
+  for (const line of lines) {
+    const topic = extractTopic(line);
+    if (topic === "chain.start") {
+      tracker.children++;
+      tracker.consecutiveFailures = 0;
+    } else if (topic === "chain.step.finish") {
+      tracker.totalSteps++;
+    } else if (topic === "chain.complete") {
+      const outcome = extractField(line, "outcome");
+      if (outcome === "all_steps_complete") {
+        tracker.consecutiveFailures = 0;
+      } else {
+        tracker.consecutiveFailures++;
+      }
+    }
+  }
+
+  return tracker;
+}
+
+function checkQualityGate(projectDir: string): { ok: boolean; reason?: string } {
+  const tracker = loadChainTracker(projectDir);
+  if (tracker.consecutiveFailures >= 2) {
+    return { ok: false, reason: `quality gate: ${tracker.consecutiveFailures} consecutive failures — consolidate before spawning` };
+  }
+  return { ok: true };
+}
+
+function executeDynamicChain(
+  spec: DynamicChainSpec,
+  projectDir: string,
+  selfCommand: string,
+  runOptions: harness.RunOptions,
+  parentId: string,
+): { outcome: string; chainId: string; completed?: StepRecord[]; failedStep?: number; failedReason?: string } {
+  const chainId = writeDynamicSpec(projectDir, { ...spec, parentId });
+  const stepsCsv = spec.steps;
+  const journalFile = config.resolveJournalFile(projectDir);
+  const justification = spec.justification ?? "";
+
+  appendChainEvent(
+    journalFile,
+    chainId,
+    "chain.spawn",
+    jsonField("chain_id", chainId) +
+      ", " + jsonField("parent_id", parentId) +
+      ", " + jsonField("steps", joinCsv(stepsCsv)) +
+      ", " + jsonField("justification", justification),
+  );
+
+  const chainSpec = parseInlineChain(joinCsv(stepsCsv), projectDir);
+  const namedSpec: ChainSpec = { ...chainSpec, name: chainId };
+  const result = runChain(namedSpec, projectDir, selfCommand, runOptions);
+  return { ...result, chainId };
+}
+
+function countDynamicSpecs(specsDir: string): number {
+  if (!existsSync(specsDir)) return 0;
+  return readdirSync(specsDir).filter((f) => f.endsWith(".json")).length;
+}
+
+function renderDynamicSpecJson(spec: DynamicChainSpec, chainId: string): string {
+  return "{" +
+    jsonField("chain_id", chainId) + ", " +
+    jsonField("parent_id", spec.parentId ?? "") + ", " +
+    jsonField("steps", joinCsv(spec.steps)) + ", " +
+    jsonField("justification", spec.justification ?? "") +
+    "}\n";
 }

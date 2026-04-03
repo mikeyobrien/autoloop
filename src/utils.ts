@@ -20,26 +20,14 @@ export function parseStringList(value: string): string[] {
   return parseStringListCsv(value.trim());
 }
 
-export function parseStringListLiteralOrScalar(value: string): string[] {
-  const trimmed = value.trim();
-  if (isStringListLiteral(trimmed)) {
-    return parseStringListCsv(sliceOuter(trimmed).trim());
-  }
-  return [stripQuotes(trimmed)];
-}
-
 function parseStringListCsv(value: string): string[] {
-  if (isStringListLiteral(value)) {
+  if (value.startsWith("[") && value.endsWith("]")) {
     return parseStringListCsv(sliceOuter(value).trim());
   }
   return value
     .split(",")
     .map((s) => stripQuotes(s.trim()))
     .filter((s) => s !== "");
-}
-
-function isStringListLiteral(value: string): boolean {
-  return value.startsWith("[") && value.endsWith("]");
 }
 
 export function joinCsv(items: string[]): string {
@@ -88,9 +76,6 @@ export function sliceOuter(text: string): string {
   return text.slice(1, -1);
 }
 
-export function skipLine(line: string): boolean {
-  return line === "" || line.startsWith("#");
-}
 
 export function generateCompactId(prefix: string): string {
   const ts = Date.now();
