@@ -1,0 +1,22 @@
+event_loop.max_iterations = 80
+event_loop.completion_event = "task.complete"
+event_loop.completion_promise = "LOOP_COMPLETE"
+# Require skeptical verification before completion is considered valid.
+event_loop.required_events = ["simplification.verified"]
+
+backend.kind = "pi"
+backend.command = "pi"
+backend.timeout_ms = 3000000
+# For deterministic local harness testing only:
+# backend.kind = "command"
+# backend.command = "../../examples/mock-backend.sh"
+
+review.enabled = true
+review.timeout_ms = 300000
+
+memory.prompt_budget_chars = 8000
+harness.instructions_file = "harness.md"
+
+core.state_dir = ".miniloop"
+core.journal_file = ".miniloop/journal.jsonl"
+core.memory_file = ".miniloop/memory.jsonl"

@@ -1,0 +1,31 @@
+name = "autoresearch"
+completion = "task.complete"
+
+[[role]]
+id = "strategist"
+emits = ["experiment.planned", "task.complete"]
+prompt_file = "roles/strategist.md"
+
+[[role]]
+id = "implementer"
+emits = ["experiment.ready", "experiment.blocked"]
+prompt_file = "roles/implementer.md"
+
+[[role]]
+id = "benchmarker"
+emits = ["experiment.measured", "experiment.blocked"]
+prompt_file = "roles/benchmarker.md"
+
+[[role]]
+id = "evaluator"
+emits = ["experiment.evaluated", "experiment.discarded"]
+prompt_file = "roles/evaluator.md"
+
+[handoff]
+"loop.start" = ["strategist"]
+"experiment.planned" = ["implementer"]
+"experiment.blocked" = ["strategist"]
+"experiment.ready" = ["benchmarker"]
+"experiment.measured" = ["evaluator"]
+"experiment.evaluated" = ["strategist"]
+"experiment.discarded" = ["strategist"]

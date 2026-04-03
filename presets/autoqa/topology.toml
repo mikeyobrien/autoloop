@@ -1,0 +1,31 @@
+name = "autoqa"
+completion = "task.complete"
+
+[[role]]
+id = "inspector"
+emits = ["surfaces.identified", "task.complete"]
+prompt_file = "roles/inspector.md"
+
+[[role]]
+id = "planner"
+emits = ["qa.planned", "qa.blocked"]
+prompt_file = "roles/planner.md"
+
+[[role]]
+id = "executor"
+emits = ["qa.executed", "qa.blocked"]
+prompt_file = "roles/executor.md"
+
+[[role]]
+id = "reporter"
+emits = ["qa.continue", "qa.failed", "task.complete"]
+prompt_file = "roles/reporter.md"
+
+[handoff]
+"loop.start" = ["inspector"]
+"surfaces.identified" = ["planner"]
+"qa.planned" = ["executor"]
+"qa.blocked" = ["inspector"]
+"qa.executed" = ["reporter"]
+"qa.failed" = ["inspector"]
+"qa.continue" = ["planner"]

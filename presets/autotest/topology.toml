@@ -1,0 +1,32 @@
+name = "autotest"
+completion = "task.complete"
+
+[[role]]
+id = "surveyor"
+emits = ["gaps.identified", "task.complete"]
+prompt_file = "roles/surveyor.md"
+
+[[role]]
+id = "writer"
+emits = ["tests.written", "write.blocked"]
+prompt_file = "roles/writer.md"
+
+[[role]]
+id = "runner"
+emits = ["tests.passed", "tests.failed"]
+prompt_file = "roles/runner.md"
+
+[[role]]
+id = "assessor"
+emits = ["coverage.improved", "coverage.stale", "task.complete"]
+prompt_file = "roles/assessor.md"
+
+[handoff]
+"loop.start" = ["surveyor"]
+"gaps.identified" = ["writer"]
+"write.blocked" = ["surveyor"]
+"tests.written" = ["runner"]
+"tests.passed" = ["assessor"]
+"tests.failed" = ["writer"]
+"coverage.improved" = ["surveyor"]
+"coverage.stale" = ["surveyor"]

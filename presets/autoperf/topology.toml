@@ -1,0 +1,32 @@
+name = "autoperf"
+completion = "task.complete"
+
+[[role]]
+id = "profiler"
+emits = ["hotspot.identified", "task.complete"]
+prompt_file = "roles/profiler.md"
+
+[[role]]
+id = "optimizer"
+emits = ["optimization.applied", "optimization.blocked"]
+prompt_file = "roles/optimizer.md"
+
+[[role]]
+id = "measurer"
+emits = ["perf.measured", "measurement.failed"]
+prompt_file = "roles/measurer.md"
+
+[[role]]
+id = "judge"
+emits = ["optimization.kept", "optimization.discarded", "task.complete"]
+prompt_file = "roles/judge.md"
+
+[handoff]
+"loop.start" = ["profiler"]
+"hotspot.identified" = ["optimizer"]
+"optimization.blocked" = ["profiler"]
+"optimization.applied" = ["measurer"]
+"measurement.failed" = ["optimizer"]
+"perf.measured" = ["judge"]
+"optimization.kept" = ["profiler"]
+"optimization.discarded" = ["profiler"]

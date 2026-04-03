@@ -1,0 +1,32 @@
+name = "autoideas"
+completion = "task.complete"
+
+[[role]]
+id = "scanner"
+emits = ["areas.identified", "task.complete"]
+prompt_file = "roles/scanner.md"
+
+[[role]]
+id = "analyst"
+emits = ["analysis.ready", "analysis.blocked"]
+prompt_file = "roles/analyst.md"
+
+[[role]]
+id = "reviewer"
+emits = ["analysis.validated", "analysis.rejected"]
+prompt_file = "roles/reviewer.md"
+
+[[role]]
+id = "synthesizer"
+emits = ["report.updated", "synthesis.blocked", "task.complete"]
+prompt_file = "roles/synthesizer.md"
+
+[handoff]
+"loop.start" = ["scanner"]
+"report.updated" = ["scanner"]
+"areas.identified" = ["analyst"]
+"analysis.ready" = ["reviewer"]
+"analysis.rejected" = ["analyst"]
+"analysis.validated" = ["synthesizer"]
+"analysis.blocked" = ["scanner"]
+"synthesis.blocked" = ["scanner"]

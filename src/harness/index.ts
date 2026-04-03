@@ -44,6 +44,11 @@ import {
   appendIterationFinish,
 } from "./parallel.js";
 import {
+  executeParallelWave,
+  continueAfterParallelJoin,
+  stopAfterParallelWave,
+} from "./wave.js";
+import {
   printSummary,
   printIterationBanner,
   printIterationFooter,
@@ -381,14 +386,17 @@ function rejectInvalidAndContinue(
 }
 
 function finishParallelIteration(
-  _loop: LoopContext,
-  _iter: IterationContext,
-  _emittedTopic: string,
-  _emittedPayload: string,
+  loop: LoopContext,
+  iter: IterationContext,
+  emittedTopic: string,
+  emittedPayload: string,
 ): RunSummary {
-  // Parallel wave execution — full implementation deferred to parallel.ts
-  // For now, continue the loop
-  return iterate(_loop, _iter.iteration + 1);
+  const result = executeParallelWave(loop, iter, emittedTopic, emittedPayload);
+
+  if (result.reason === "parallel_wave_complete") {
+    return continueAfterParallelJoin(loop, iter, result.waveId, emittedTopic, result.elapsedMs, iterate);
+  }
+  return stopAfterParallelWave(loop, iter, result.reason, result.waveId);
 }
 
 function latestAgentEventRecord(lines: string[]): { topic: string; payload: string } {
