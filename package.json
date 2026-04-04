@@ -1,11 +1,39 @@
 {
   "name": "autoloop",
-  "version": "0.0.1",
-  "description": "Autonomous LLM loop harness — TypeScript port",
+  "version": "0.1.0",
+  "description": "Autonomous LLM loop harness and control plane for long-horizon autonomous work",
   "type": "module",
   "main": "dist/main.js",
   "bin": {
     "autoloop": "bin/autoloop"
+  },
+  "files": [
+    "bin/autoloop",
+    "dist",
+    "presets",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/autoloop.git"
+  },
+  "homepage": "https://github.com/mikeyobrien/autoloop#readme",
+  "bugs": {
+    "url": "https://github.com/mikeyobrien/autoloop/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "autonomous",
+    "cli",
+    "loops",
+    "orchestration"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc",
