@@ -1,4 +1,5 @@
 import { replaceAll, shellQuote, lineSep } from "./utils.js";
+import { decodeEvent } from "./events/decode.js";
 
 export function jsonString(text: string): string {
   return '"' + encodeJsonValue(text) + '"';
@@ -17,10 +18,24 @@ export function jsonFieldRaw(key: string, rawValue: string): string {
 }
 
 export function extractTopic(line: string): string {
+  const decoded = decodeEvent(line);
+  if (decoded) return String(decoded.topic);
   return extractField(line, "topic");
 }
 
 export function extractField(line: string, key: string): string {
+  const decoded = decodeEvent(line);
+  if (decoded) {
+    if (key === "run") return decoded.run;
+    if (key === "iteration") return decoded.iteration ?? "";
+    if (key === "topic") return String(decoded.topic);
+    if (decoded.shape === "payload") {
+      if (key === "payload") return decoded.payload;
+      if (key === "source") return decoded.source ?? "";
+      return "";
+    }
+    return decoded.fields[key] ?? "";
+  }
   const marker = '"' + key + '": ';
   return decodeJsonValue(firstQuotedValue(firstAfterMarker(line.split(marker))));
 }

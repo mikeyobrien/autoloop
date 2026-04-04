@@ -1,11 +1,7 @@
-import {
-  extractTopic,
-  extractField,
-  extractIteration,
-} from "./journal.js";
+import { decodeEvent } from "../events/decode.js";
+import { isSystemEvent } from "../events/guards.js";
 import { jsonField } from "../json.js";
 import { table } from "../markdown.js";
-import { systemTopic } from "./emit.js";
 
 interface MetricsRow {
   iteration: string;
@@ -21,13 +17,14 @@ export function collectMetricsRows(lines: string[]): MetricsRow[] {
   const rows: MetricsRow[] = [];
 
   for (const line of lines) {
-    const topic = extractTopic(line);
+    const event = decodeEvent(line);
+    if (!event) continue;
 
-    if (topic === "iteration.start") {
-      const roles = extractField(line, "suggested_roles");
+    if (event.topic === "iteration.start" && event.shape === "fields") {
+      const roles = event.fields["suggested_roles"] ?? "";
       const role = firstCsvValue(roles);
       rows.push({
-        iteration: extractIteration(line),
+        iteration: event.iteration ?? "",
         role,
         event: "none",
         elapsedS: "",
@@ -35,13 +32,16 @@ export function collectMetricsRows(lines: string[]): MetricsRow[] {
         timedOut: "false",
         outcome: "continue",
       });
-    } else if (topic === "iteration.finish") {
-      const iter = extractIteration(line);
+      continue;
+    }
+
+    if (event.topic === "iteration.finish" && event.shape === "fields") {
+      const iter = event.iteration ?? "";
       for (let i = rows.length - 1; i >= 0; i--) {
         if (rows[i].iteration === iter) {
-          rows[i].exitCode = extractField(line, "exit_code");
-          rows[i].timedOut = extractField(line, "timed_out");
-          rows[i].elapsedS = extractField(line, "elapsed_s");
+          rows[i].exitCode = event.fields["exit_code"] ?? "";
+          rows[i].timedOut = event.fields["timed_out"] ?? "";
+          rows[i].elapsedS = event.fields["elapsed_s"] ?? "";
           rows[i].outcome = computeOutcome(
             rows[i].exitCode,
             rows[i].timedOut,
@@ -50,11 +50,14 @@ export function collectMetricsRows(lines: string[]): MetricsRow[] {
           break;
         }
       }
-    } else if (!systemTopic(topic)) {
-      const iter = extractIteration(line);
+      continue;
+    }
+
+    if (!isSystemEvent(event)) {
+      const iter = event.iteration ?? "";
       for (let i = rows.length - 1; i >= 0; i--) {
         if (rows[i].iteration === iter) {
-          rows[i].event = topic;
+          rows[i].event = String(event.topic);
           break;
         }
       }
@@ -155,11 +158,7 @@ function formatMetricsCsv(rows: MetricsRow[]): string {
 }
 
 function csvQuote(value: string): string {
-  if (
-    value.includes(",") ||
-    value.includes('"') ||
-    value.includes("\n")
-  ) {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
     return '"' + value.replace(/"/g, '""') + '"';
   }
   return value;
@@ -197,11 +196,7 @@ function jsonBoolField(key: string, value: string): string {
   return '"' + key + '": ' + (value === "true" ? "true" : "false");
 }
 
-function computeOutcome(
-  exitCode: string,
-  timedOut: string,
-  event: string,
-): string {
+function computeOutcome(exitCode: string, timedOut: string, event: string): string {
   if (timedOut === "true") return "timeout";
   if (exitCode === "0") return event === "none" ? "continue" : "emitted";
   return "failed";

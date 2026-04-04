@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { jsonField, jsonFieldRaw, jsonBool, extractField as jsonExtractField, extractTopic as jsonExtractTopic } from "../json.js";
+import { extractField as jsonExtractField, extractTopic as jsonExtractTopic } from "../json.js";
+import { encodeEvent } from "../events/encode.js";
 import { lineSep, shellQuote } from "../utils.js";
 
 export function appendEvent(
@@ -10,7 +11,14 @@ export function appendEvent(
   topic: string,
   fieldsJson: string,
 ): void {
-  appendText(path, eventLine(runId, iteration, topic, fieldsJson));
+  appendText(path, encodeEvent({
+    shape: "fields",
+    run: runId,
+    iteration: iteration || undefined,
+    topic,
+    fields: parsedFields(fieldsJson),
+    rawFields: parsedFieldsRaw(fieldsJson),
+  }));
 }
 
 export function appendAgentEvent(
@@ -41,52 +49,32 @@ function appendEmittedEvent(
   payload: string,
   source: string,
 ): void {
-  appendText(path, emittedEventLine(runId, iteration, topic, payload, source));
+  appendText(path, encodeEvent({
+    shape: "payload",
+    run: runId,
+    iteration: iteration || undefined,
+    topic,
+    payload,
+    source,
+  }));
 }
 
-function eventLine(
-  runId: string,
-  iteration: string,
-  topic: string,
-  fieldsJson: string,
-): string {
-  return (
-    "{" +
-    recordPrefix(runId, iteration) +
-    jsonField("topic", topic) +
-    ', "fields": {' +
-    fieldsJson +
-    "}}\n"
-  );
+function parsedFields(fieldsJson: string): Record<string, string> {
+  const parsed = parsedFieldsRaw(fieldsJson);
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    result[key] = value === null || value === undefined ? "" : String(value);
+  }
+  return result;
 }
 
-function emittedEventLine(
-  runId: string,
-  iteration: string,
-  topic: string,
-  payload: string,
-  source: string,
-): string {
-  return (
-    "{" +
-    recordPrefix(runId, iteration) +
-    jsonField("topic", topic) +
-    ", " +
-    jsonField("payload", payload) +
-    ", " +
-    jsonField("source", source) +
-    "}\n"
-  );
-}
-
-function recordPrefix(runId: string, iteration: string): string {
-  if (!iteration) return jsonField("run", runId) + ", ";
-  return (
-    jsonField("run", runId) +
-    ", " +
-    jsonField("iteration", iteration) +
-    ", "
-  );
+function parsedFieldsRaw(fieldsJson: string): Record<string, unknown> {
+  if (!fieldsJson.trim()) return {};
+  try {
+    return JSON.parse("{" + fieldsJson + "}") as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 export function readLines(path: string): string[] {

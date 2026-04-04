@@ -1,4 +1,4 @@
-import { extractTopic, extractField, extractIteration } from "./journal.js";
+import { decodeEvent } from "../events/decode.js";
 import { heading, bulletList } from "../markdown.js";
 import { lineSep } from "../utils.js";
 
@@ -32,13 +32,13 @@ export function renderRunScratchpadPrompt(lines: string[]): string {
 function collectScratchpadEntries(lines: string[]): ScratchpadEntry[] {
   const entries: ScratchpadEntry[] = [];
   for (const line of lines) {
-    if (extractTopic(line) === "iteration.finish") {
-      entries.push({
-        iteration: extractIteration(line),
-        exitCode: extractField(line, "exit_code"),
-        output: extractField(line, "output"),
-      });
-    }
+    const event = decodeEvent(line);
+    if (!event || event.shape !== "fields" || event.topic !== "iteration.finish") continue;
+    entries.push({
+      iteration: event.iteration ?? "",
+      exitCode: event.fields["exit_code"] ?? "",
+      output: event.fields["output"] ?? "",
+    });
   }
   return entries;
 }
