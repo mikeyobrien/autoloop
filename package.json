@@ -1,6 +1,6 @@
 {
-  "name": "@mikeyobrien/autoloop",
-  "version": "0.1.1",
+  "name": "@mobrienv/autoloop",
+  "version": "0.1.2",
   "description": "Autonomous LLM loop harness and control plane for long-horizon autonomous work",
   "type": "module",
   "main": "dist/main.js",

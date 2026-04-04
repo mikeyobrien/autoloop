@@ -13,7 +13,7 @@ External interfaces — CLI, chat, cron, future API — are thin shells that lau
 ## Install from npm
 
 ```bash
-npm install -g @mikeyobrien/autoloop
+npm install -g @mobrienv/autoloop
 autoloop --help
 ```
 
@@ -34,12 +34,12 @@ node bin/autoloop run autocode "Fix the login bug"
 ## Usage
 
 ```
-npx @mikeyobrien/autoloop run <preset> [prompt...] [flags]
-npx @mikeyobrien/autoloop list
-npx @mikeyobrien/autoloop emit <topic> [summary]
-npx @mikeyobrien/autoloop inspect <artifact> [selector] [--format <md|terminal|json|csv>]
-npx @mikeyobrien/autoloop memory <list|status|find|add|remove> [args]
-npx @mikeyobrien/autoloop chain <list|run> [args]
+npx @mobrienv/autoloop run <preset> [prompt...] [flags]
+npx @mobrienv/autoloop list
+npx @mobrienv/autoloop emit <topic> [summary]
+npx @mobrienv/autoloop inspect <artifact> [selector] [--format <md|terminal|json|csv>]
+npx @mobrienv/autoloop memory <list|status|find|add|remove> [args]
+npx @mobrienv/autoloop chain <list|run> [args]
 ```
 
 ### Flags
@@ -65,7 +65,7 @@ node bin/autoloop run ./my-preset "Analyze the API"
 node bin/autoloop run autoqa -b claude "Review recent changes"
 
 # List available presets
-node bin/npx @mikeyobrien/autoloop list
+node bin/npx @mobrienv/autoloop list
 
 # Run an inline chain
 node bin/autoloop run --chain autospec,autocode "Design and build feature X"
