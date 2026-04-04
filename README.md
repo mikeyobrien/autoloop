@@ -14,7 +14,7 @@ External interfaces — CLI, chat, cron, future API — are thin shells that lau
 
 ```bash
 # Clone and build
-git clone <repo-url> && cd autoloop-ts
+git clone <repo-url> && cd autoloop
 npm install
 npm run build
 
@@ -84,7 +84,7 @@ node bin/autoloop run --chain autospec,autocode "Design and build feature X"
 ## Project structure
 
 ```
-autoloop-ts/
+autoloop/
 ├── bin/autoloop       # CLI entry point (Node.js ESM)
 ├── src/                   # TypeScript source
 │   ├── main.ts            # CLI dispatch
