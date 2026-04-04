@@ -10,6 +10,13 @@ External interfaces — CLI, chat, cron, future API — are thin shells that lau
 - **npm**
 - An LLM backend on your `$PATH` — defaults to `pi`, but any CLI that accepts a prompt argument works (e.g. `claude`)
 
+## Install from npm
+
+```bash
+npm install -g @mikeyobrien/autoloop
+autoloop --help
+```
+
 ## Quick start
 
 ```bash
@@ -27,12 +34,12 @@ node bin/autoloop run autocode "Fix the login bug"
 ## Usage
 
 ```
-autoloop run <preset> [prompt...] [flags]
-autoloop list
-autoloop emit <topic> [summary]
-autoloop inspect <artifact> [selector] [--format <md|terminal|json|csv>]
-autoloop memory <list|status|find|add|remove> [args]
-autoloop chain <list|run> [args]
+npx @mikeyobrien/autoloop run <preset> [prompt...] [flags]
+npx @mikeyobrien/autoloop list
+npx @mikeyobrien/autoloop emit <topic> [summary]
+npx @mikeyobrien/autoloop inspect <artifact> [selector] [--format <md|terminal|json|csv>]
+npx @mikeyobrien/autoloop memory <list|status|find|add|remove> [args]
+npx @mikeyobrien/autoloop chain <list|run> [args]
 ```
 
 ### Flags
@@ -58,7 +65,7 @@ node bin/autoloop run ./my-preset "Analyze the API"
 node bin/autoloop run autoqa -b claude "Review recent changes"
 
 # List available presets
-node bin/autoloop list
+node bin/npx @mikeyobrien/autoloop list
 
 # Run an inline chain
 node bin/autoloop run --chain autospec,autocode "Design and build feature X"
