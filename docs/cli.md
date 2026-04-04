@@ -1,16 +1,16 @@
 # CLI Reference
 
-Autoloops exposes all functionality through a single binary with subcommands. The public CLI can come from either a compiled release binary or the source wrapper script.
+The CLI is a thin shell over the autoloops-ts control plane. It launches runs, inspects artifacts, and manages memory and chains — but contains no loop logic itself. See [Platform Architecture](platform.md) for how the CLI fits into the broader system.
+
+autoloops-ts exposes all functionality through a single binary with subcommands.
 
 ```bash
-# Via a compiled release binary or an installed source wrapper
-autoloops <subcommand> [args...]
+# Via npm/node
+node bin/autoloops-ts <subcommand> [args...]
 
-# Via the source checkout through the Tonic runtime
-tonic run <project-dir> <subcommand> [args...]
+# Or if installed globally / via npx
+autoloops-ts <subcommand> [args...]
 ```
-
-When installed from GitHub Releases, `autoloops` is a standalone compiled binary. In a source checkout, `bin/autoloops` is a thin shell wrapper that calls `tonic run` with the repo root as the project directory and forwards all arguments.
 
 ## Environment
 
@@ -33,7 +33,7 @@ When installed from GitHub Releases, `autoloops` is a standalone compiled binary
 Start a loop.
 
 ```bash
-autoloops run <preset-name|preset-dir> [prompt...] [flags]
+autoloops-ts run <preset-name|preset-dir> [prompt...] [flags]
 ```
 
 The preset argument is required. It must be one of:
@@ -55,11 +55,11 @@ If the preset argument is missing, the CLI exits with a usage error. If the argu
 **Examples:**
 
 ```bash
-autoloops run autocode
-autoloops run autocode "Fix the login bug"
-autoloops run --preset autocode "Fix the login bug"
-autoloops run . "Fix the login bug" -b pi
-autoloops run . --chain autocode,autoqa "Implement the approved change and validate it"
+autoloops-ts run autocode
+autoloops-ts run autocode "Fix the login bug"
+autoloops-ts run --preset autocode "Fix the login bug"
+autoloops-ts run . "Fix the login bug" -b pi
+autoloops-ts run . --chain autocode,autoqa "Implement the approved change and validate it"
 ```
 
 ### `emit`
@@ -67,7 +67,7 @@ autoloops run . --chain autocode,autoqa "Implement the approved change and valid
 Publish a coordination event to the journal.
 
 ```bash
-autoloops emit <topic> [payload...]
+autoloops-ts emit <topic> [payload...]
 ```
 
 The event is validated against the current iteration's allowed-event set. If the topic is not allowed and is not a built-in coordination topic, the emit is rejected and an `event.invalid` entry is written to the journal. Allowed events are derived from the topology's handoff map for the current role.
@@ -75,8 +75,8 @@ The event is validated against the current iteration's allowed-event set. If the
 **Examples:**
 
 ```bash
-autoloops emit doc.written "Wrote docs/cli.md covering all subcommands"
-autoloops emit task.complete "All documentation gaps addressed"
+autoloops-ts emit doc.written "Wrote docs/cli.md covering all subcommands"
+autoloops-ts emit task.complete "All documentation gaps addressed"
 ```
 
 ### `inspect`
@@ -84,7 +84,7 @@ autoloops emit task.complete "All documentation gaps addressed"
 Read projected artifacts from the journal and state directory.
 
 ```bash
-autoloops inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]
+autoloops-ts inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]
 ```
 
 If `--format` is omitted, inspect uses artifact-specific defaults:
@@ -120,21 +120,21 @@ When no metrics data exists, `md` outputs `"No metrics data available."`, `csv` 
 **Examples:**
 
 ```bash
-autoloops inspect scratchpad                    # defaults to terminal
-autoloops inspect scratchpad --format md
-autoloops inspect prompt 5                     # defaults to terminal
-autoloops inspect prompt 5 --format md
-autoloops inspect output 3                     # defaults to text
-autoloops inspect journal                      # defaults to json
-autoloops inspect memory                       # defaults to terminal
-autoloops inspect memory --format md
-autoloops inspect coordination                 # defaults to terminal
-autoloops inspect chain                        # defaults to terminal
-autoloops inspect metrics                      # defaults to terminal
-autoloops inspect metrics --format md
-autoloops inspect metrics --format csv
-autoloops inspect metrics --format json
-autoloops inspect metrics run-mn9d3uk0-xi0m --format md
+autoloops-ts inspect scratchpad                    # defaults to terminal
+autoloops-ts inspect scratchpad --format md
+autoloops-ts inspect prompt 5                     # defaults to terminal
+autoloops-ts inspect prompt 5 --format md
+autoloops-ts inspect output 3                     # defaults to text
+autoloops-ts inspect journal                      # defaults to json
+autoloops-ts inspect memory                       # defaults to terminal
+autoloops-ts inspect memory --format md
+autoloops-ts inspect coordination                 # defaults to terminal
+autoloops-ts inspect chain                        # defaults to terminal
+autoloops-ts inspect metrics                      # defaults to terminal
+autoloops-ts inspect metrics --format md
+autoloops-ts inspect metrics --format csv
+autoloops-ts inspect metrics --format json
+autoloops-ts inspect metrics run-mn9d3uk0-xi0m --format md
 ```
 
 ### `memory`
@@ -146,7 +146,7 @@ Manage the loop's persistent memory store.
 Print materialized memory entries with stable IDs.
 
 ```bash
-autoloops memory list [project-dir]
+autoloops-ts memory list [project-dir]
 ```
 
 #### `memory status`
@@ -154,7 +154,7 @@ autoloops memory list [project-dir]
 Print rendered size, configured budget, and active entry counts.
 
 ```bash
-autoloops memory status [project-dir]
+autoloops-ts memory status [project-dir]
 ```
 
 #### `memory find`
@@ -162,7 +162,7 @@ autoloops memory status [project-dir]
 Search active memory entries by text, category, key/value, source, or ID.
 
 ```bash
-autoloops memory find <pattern...>
+autoloops-ts memory find <pattern...>
 ```
 
 #### `memory add learning`
@@ -170,7 +170,7 @@ autoloops memory find <pattern...>
 Add a learning entry.
 
 ```bash
-autoloops memory add learning <text...>
+autoloops-ts memory add learning <text...>
 ```
 
 The entry is tagged with `source: "manual"`.
@@ -182,7 +182,7 @@ If the new entry pushes rendered memory over `memory.prompt_budget_chars`, the C
 Add a categorized preference entry.
 
 ```bash
-autoloops memory add preference <category> <text...>
+autoloops-ts memory add preference <category> <text...>
 ```
 
 #### `memory add meta`
@@ -190,7 +190,7 @@ autoloops memory add preference <category> <text...>
 Add a metadata entry.
 
 ```bash
-autoloops memory add meta <key> <value...>
+autoloops-ts memory add meta <key> <value...>
 ```
 
 #### `memory remove`
@@ -198,7 +198,7 @@ autoloops memory add meta <key> <value...>
 Tombstone an entry by ID.
 
 ```bash
-autoloops memory remove <id> [reason...]
+autoloops-ts memory remove <id> [reason...]
 ```
 
 If no reason is given, the source is recorded as `"manual"`.
@@ -214,7 +214,7 @@ Manage named chains defined in `chains.toml`.
 List all defined chains and their steps.
 
 ```bash
-autoloops chain list [project-dir]
+autoloops-ts chain list [project-dir]
 ```
 
 Output shows each chain name followed by its step sequence (e.g. `code-and-qa: autocode -> autoqa`).
@@ -224,135 +224,166 @@ Output shows each chain name followed by its step sequence (e.g. `code-and-qa: a
 Run a named chain.
 
 ```bash
-autoloops chain run <name> [project-dir] [prompt...]
+autoloops-ts chain run <name> [project-dir] [prompt...]
 ```
 
 The chain must be defined in `chains.toml`. Each step runs as an isolated loop in `.autoloop/chains/<chain-run-id>/step-<n>/`. When a prompt is provided, it is passed directly to step 1 and also written into each step's `handoff.md` as the chain entry objective. Chains advance on bounded-success stops (`completion_event`, `completion_promise`, or `max_iterations`) and stop only on real failure reasons such as backend errors or timeouts.
+
+### `loops`
+
+Operator surface for listing and inspecting runs. Reads from the run registry (`{projectDir}/.autoloop/registry.jsonl`), which is updated by the harness at lifecycle milestones.
+
+#### `loops`
+
+List active (running) loops.
+
+```bash
+autoloops-ts loops
+```
+
+Output is a concise table with columns: run ID, status, preset, iteration count, latest event, and last updated timestamp. When no runs are active, prints `No active runs.`.
+
+#### `loops --all`
+
+List all runs (any status), most recent first.
+
+```bash
+autoloops-ts loops --all
+```
+
+#### `loops show <run-id>`
+
+Show detailed information for a single run.
+
+```bash
+autoloops-ts loops show <run-id>
+```
+
+Displays: run ID, status, preset, objective, trigger, backend, iteration, latest event, stop reason (if terminal), created/updated timestamps, work directory, and state directory.
+
+Partial run-ID matching is supported: if the given string is a unique prefix of a run ID, that run is shown. If the prefix is ambiguous, all matching run IDs are listed.
+
+#### `loops artifacts <run-id>`
+
+Show artifact file paths for a run.
+
+```bash
+autoloops-ts loops artifacts <run-id>
+```
+
+Displays paths to the journal file, registry file, state directory, and work directory. Supports the same partial run-ID matching as `loops show`.
+
+#### `loops watch <run-id>`
+
+Watch a run live by polling the registry.
+
+```bash
+autoloops-ts loops watch <run-id>
+```
+
+Polls the registry every 2 seconds and prints a compact progress line whenever the run's state changes (iteration, event, or status). When the run reaches a terminal status (completed, failed, timed_out, stopped), prints a full detail view and exits.
+
+If the run is already in a terminal state when watch starts, prints the detail view immediately and exits. Supports partial run-ID matching.
+
+Press Ctrl+C to stop watching.
+
+#### `loops health`
+
+Print an exception-focused health summary of all runs.
+
+```bash
+autoloops-ts loops health [--verbose]
+```
+
+Reads the registry and categorizes runs:
+- **Active**: currently running and recently updated
+- **Stuck**: running but no registry update in the last 10 minutes
+- **Failed**: failed or timed out within the last 24 hours
+- **Completed**: completed within the last 24 hours (suppressed by default)
+
+When no exceptions exist, prints a one-line "All clear" summary. When exceptions exist, prints them grouped by category with a table header. Pass `--verbose` to also list recent completions.
+
+Designed for cron jobs and chat delivery: call this one command and forward the output.
+
+**Examples:**
+
+```bash
+autoloops-ts loops                              # active runs
+autoloops-ts loops --all                        # all runs
+autoloops-ts loops show run-mn9d3uk0-xi0m       # full run ID
+autoloops-ts loops show run-mn9d                # partial match
+autoloops-ts loops artifacts run-mn9d3uk0-xi0m  # artifact paths
+autoloops-ts loops watch run-mn9d3uk0-xi0m      # live watch
+autoloops-ts loops health                       # exception summary
+autoloops-ts loops health --verbose             # include completions
+```
 
 ### `pi-adapter`
 
 Run the Pi backend adapter directly. This is normally called by the harness, not by users.
 
 ```bash
-autoloops pi-adapter [pi-command] [extra-args...]
+autoloops-ts pi-adapter [pi-command] [extra-args...]
 ```
 
-The adapter resolves the prompt from `MINILOOPS_PROMPT`, then falls back to projecting it via `autoloops inspect prompt`, then falls back to reading `MINILOOPS_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.autoloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
-
-## `bin/autoloops` launcher
-
-The `bin/autoloops` shell script is a convenience wrapper:
-
-```bash
-#!/bin/sh
-tonic run "$REPO_DIR" "$@"
-```
-
-It resolves the repository root from its own location, runs `tonic run` with that directory as the project, and forwards all remaining arguments. It traps `INT`/`TERM` to clean up the child process.
+The adapter resolves the prompt from `MINILOOPS_PROMPT`, then falls back to projecting it via `autoloops-ts inspect prompt`, then falls back to reading `MINILOOPS_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.autoloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
 
 ## Testing
 
-### `bin/test`
-
-Run the test suite.
+Run the test suite via [Vitest](https://vitest.dev/):
 
 ```bash
-bin/test                        # run all tests in test/
-bin/test test/config_test.tn    # run a single test file
-bin/test --filter "parse"       # run tests matching a pattern
+npm test
 ```
 
-When the first argument is an existing `.tn` file, it is used as the test target instead of the default `test/` directory. All other arguments are passed through to `tonic test`.
+### Mock backend
 
-**Flags:**
-
-| Flag | Description |
-|------|-------------|
-| `--filter <pattern>` | Run only tests matching pattern |
-| `--list` | List available tests without running |
-| `--format json` | Output results as JSON |
-| `--fail-fast` | Stop on first failure (default) |
-| `--timeout <ms>` | Per-test timeout in milliseconds (default: 20000) |
-| `--verbose` | Verbose output |
-
-### `bin/test-watch`
-
-Re-run tests automatically on file changes. Requires [`entr`](https://eradman.com/entrproject/) (soft dependency).
+A deterministic mock backend is included for tests and local debugging.
+It reads a JSON fixture file and replays the specified output, exit code,
+and optional event emission — no live LLM backend required.
 
 ```bash
-bin/test-watch                       # watch and re-run all tests
-bin/test-watch test/config_test.tn   # watch and re-run a single file
+# Run a loop with the mock backend
+autoloops-ts run . -b "node dist/testing/mock-backend.js" \
+  MOCK_FIXTURE_PATH=test/fixtures/backend/complete-success.json
+
+# Or set the env var separately
+export MOCK_FIXTURE_PATH=test/fixtures/backend/complete-success.json
+autoloops-ts run . -b "node dist/testing/mock-backend.js"
 ```
 
-If `entr` is not installed, the script prints install instructions and exits. All arguments are forwarded to `bin/test`.
+Fixture schema:
 
-## Developer Scripts
-
-All developer scripts are accessible through the `bin/dev` dispatcher or individually.
-
-```bash
-bin/dev              # list available commands
-bin/dev <command>    # run a command
+```json
+{
+  "output": "text printed to stdout",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "task.complete",
+  "emit_payload": "done"
+}
 ```
 
-### `bin/dev` commands
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `output` | string | yes | Text printed to stdout |
+| `exit_code` | number | yes | Process exit code |
+| `delay_ms` | number | no | Delay before output (for timeout testing) |
+| `emit_event` | string | no | Event topic to emit via `autoloops-ts emit` |
+| `emit_payload` | string | no | Payload for the emitted event |
 
-| Command | Script | Purpose | Exit codes |
-|---------|--------|---------|------------|
-| `test [args]` | `bin/test` | Run the test suite | 0 = pass, 1 = failure |
-| `watch [args]` | `bin/test-watch` | Watch mode for tests | 1 = `entr` not installed |
-| `smoke` | `scripts/pi-smoke.sh` | Pi backend integration smoke test | 0 = pass, 1 = failure |
-| `judge` | `scripts/llm-judge.sh` | LLM judge evaluation | 0 = pass, 1 = failure |
-| `run [args]` | `bin/autoloops` | Start a autoloops run | See subcommand docs |
-| `hooks` | `bin/install-hooks` | Install git hooks | 0 = success, 1 = error |
-| `check-missing` | `bin/check-missing` | Lint for unannotated workarounds | 0 = clean, 1 = warnings |
+Bundled fixtures in `test/fixtures/backend/`:
 
-Additional release scripts live under `scripts/` and are used by `.github/workflows/release.yml`.
+| Fixture | Scenario |
+|---------|----------|
+| `complete-success.json` | Emits `task.complete`, exits 0, includes `LOOP_COMPLETE` |
+| `invalid-event.json` | Emits `bogus.not.allowed`, exits 0 |
+| `no-completion.json` | No event, no promise, exits 0 |
+| `timeout.json` | 30s delay (exceeds typical test timeout) |
+| `non-zero-exit.json` | Exits 1 |
 
-### `scripts/pi-smoke.sh`
+## Naming compatibility
 
-End-to-end Pi backend smoke test. Creates a temporary autoloops project, runs one Pi-backed iteration, and asserts that the loop completes correctly with expected journal entries.
+The canonical binary and package name is **`autoloops-ts`**. The repository directory is named `autoloop-ts` (without the trailing `s`) for historical reasons.
 
-### `scripts/llm-judge.sh`
-
-LLM judge evaluation harness. Runs evaluation prompts through the backend and scores the outputs.
-
-### `bin/install-hooks`
-
-Symlinks `hooks/pre-commit` and `hooks/pre-push` into `.git/hooks/`. Idempotent — safe to re-run.
-
-### `bin/check-missing`
-
-Scans `.tn` files for shell-out workaround patterns and cross-references them against `# TONIC_MISSING:` annotations and `TONIC_MISSING.md` entries. Warns on unannotated workarounds.
-
-### `scripts/build-release.sh`
-
-Compiles a standalone `autoloops` binary with `tonic compile` to the output path you pass in.
-
-```bash
-scripts/build-release.sh dist/autoloops
-```
-
-### `scripts/package-release.sh`
-
-Packages a compiled binary into a deterministic release archive.
-
-```bash
-scripts/package-release.sh dist/autoloops v0.1.0 linux-x64 dist
-```
-
-### `scripts/install-tonic.sh`
-
-Installs the Tonic compiler used by CI and release workflows from the git commit pinned in `.tonic-git-ref`. `.tonic-version` is not treated as a crates.io install source here.
-
-```bash
-scripts/install-tonic.sh
-```
-
-### `scripts/release-smoke.sh`
-
-Smoke-tests a compiled `autoloops` binary with the real run-path check used for release validation.
-
-```bash
-scripts/release-smoke.sh dist/autoloops
-```
+Environment variables use the `MINILOOPS_` prefix (a legacy name retained for compatibility). Preset configuration files may be named either `autoloops.toml` or `miniloops.toml` — the config loader accepts both.

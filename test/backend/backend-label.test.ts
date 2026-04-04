@@ -1,0 +1,17 @@
+import { describe, it, expect } from "vitest";
+import { normalizeBackendLabel } from "../../src/backend/index.js";
+
+describe("normalizeBackendLabel", () => {
+  it("normalizes absolute claude paths to claude", () => {
+    expect(normalizeBackendLabel("/home/mobrienv/.npm-global/bin/claude")).toBe("claude");
+  });
+
+  it("normalizes absolute pi paths to pi", () => {
+    expect(normalizeBackendLabel("/usr/local/bin/pi")).toBe("pi");
+  });
+
+  it("keeps generic commands readable", () => {
+    expect(normalizeBackendLabel("node")).toBe("node");
+    expect(normalizeBackendLabel("/usr/bin/env")).toBe("env");
+  });
+});

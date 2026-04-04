@@ -1,10 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
 import { jsonField, jsonFieldRaw, jsonBool } from "../json.js";
-import { joinCsv, splitCsv, listText, shellQuote, shellWords } from "../utils.js";
+import { joinCsv, splitCsv, listText, shellQuote } from "../utils.js";
 import { extractField, readIfExists, appendAgentEvent, appendEvent } from "./journal.js";
 import type { LoopContext } from "./types.js";
+import { buildBackendShellCommand, normalizeBackendLabel, runBackendCommand } from "../backend/index.js";
 import type { IterationContext } from "./prompt.js";
 
 export interface BranchLaunch {
@@ -99,106 +99,31 @@ export interface ProcessResult {
   timedOut: boolean;
 }
 
-export function runProcess(command: string, timeoutMs: number): ProcessResult {
-  try {
-    const output = execSync(command, {
-      encoding: "utf-8",
-      timeout: timeoutMs,
-      stdio: ["pipe", "pipe", "inherit"],
-      shell: "/bin/sh",
-      maxBuffer: 100 * 1024 * 1024,
-    });
-    return { output: output ?? "", exitCode: 0, timedOut: false };
-  } catch (err: unknown) {
-    const e = err as { status?: number; killed?: boolean; stdout?: string; signal?: string };
-    if (e.killed || e.signal === "SIGTERM") {
-      return { output: e.stdout ?? "", exitCode: 1, timedOut: true };
-    }
-    return { output: e.stdout ?? "", exitCode: e.status ?? 1, timedOut: false };
-  }
+export function runProcess(command: string, timeoutMs: number, providerKind = "command"): ProcessResult {
+  const result = runBackendCommand(providerKind, command, timeoutMs);
+  return {
+    output: result.output,
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+  };
 }
 
 export function buildBackendCommand(loop: LoopContext, iter: IterationContext): string {
-  return buildProcessCommand(
+  return buildBackendShellCommand({
     loop,
-    loop.backend,
-    iter.prompt,
-    runtimeEnvLines(loop, String(iter.iteration), iter.recentEvent, joinCsv(iter.allowedRoles), joinCsv(iter.allowedEvents), ""),
-  );
+    spec: loop.backend,
+    prompt: iter.prompt,
+    runtimeEnv: runtimeEnvLines(loop, String(iter.iteration), iter.recentEvent, joinCsv(iter.allowedRoles), joinCsv(iter.allowedEvents), ""),
+  });
 }
 
 export function buildReviewCommand(loop: LoopContext, iteration: number, reviewPrompt: string): string {
-  return buildProcessCommand(
+  return buildBackendShellCommand({
     loop,
-    loop.review,
-    reviewPrompt,
-    runtimeEnvLines(loop, String(iteration), "loop.start", "review", "__metareview_disabled__", "metareview"),
-  );
-}
-
-function buildProcessCommand(
-  loop: LoopContext,
-  spec: { kind: string; command: string; args: string[]; promptMode: string },
-  prompt: string,
-  runtimeEnv: string,
-): string {
-  const promptPath = join(loop.paths.stateDir, "active-prompt.md");
-  const envLines = runtimeEnv + promptRuntimeEnvLines(spec, prompt, promptPath);
-  const childCommand = spec.kind === "pi"
-    ? buildPiAdapterInvocation(loop, spec)
-    : buildCommandInvocation(spec, prompt);
-  return envLines + wrapProcessInvocation(childCommand);
-}
-
-function promptRuntimeEnvLines(
-  spec: { kind: string },
-  prompt: string,
-  promptPath: string,
-): string {
-  let lines =
-    "export MINILOOPS_PROMPT_PATH=" + shellQuote(promptPath) + "\n" +
-    "printf '%s' " + shellQuote(prompt) + " > " + shellQuote(promptPath) + "\n";
-  if (spec.kind !== "pi") {
-    lines += "export MINILOOPS_PROMPT=" + shellQuote(prompt) + "\n";
-  }
-  return lines;
-}
-
-function buildPiAdapterInvocation(
-  loop: LoopContext,
-  spec: { command: string; args: string[] },
-): string {
-  return shellWords([loop.paths.piAdapterPath, spec.command, ...spec.args]);
-}
-
-function buildCommandInvocation(
-  spec: { command: string; args: string[]; promptMode: string },
-  prompt: string,
-): string {
-  const argv = shellWords([spec.command, ...spec.args]);
-  if (spec.promptMode === "stdin") {
-    return "printf '%s' " + shellQuote(prompt) + " | " + argv;
-  }
-  return argv + " " + shellQuote(prompt);
-}
-
-function wrapProcessInvocation(command: string): string {
-  return (
-    "autoloops_child_pid=''\n" +
-    "autoloops_cleanup() {\n" +
-    '  if [ -n "$autoloops_child_pid" ]; then\n' +
-    '    kill "$autoloops_child_pid" 2>/dev/null || true\n' +
-    '    wait "$autoloops_child_pid" 2>/dev/null || true\n' +
-    "  fi\n" +
-    "}\n" +
-    "trap 'autoloops_cleanup; exit 130' INT TERM\n" +
-    "(\n" + command + "\n) &\n" +
-    "autoloops_child_pid=$!\n" +
-    'wait "$autoloops_child_pid"\n' +
-    "autoloops_status=$?\n" +
-    "trap - INT TERM\n" +
-    'exit "$autoloops_status"\n'
-  );
+    spec: loop.review,
+    prompt: reviewPrompt,
+    runtimeEnv: runtimeEnvLines(loop, String(iteration), "loop.start", "review", "__metareview_disabled__", "metareview"),
+  });
 }
 
 export function runtimeEnvLines(
@@ -244,7 +169,14 @@ export function appendLoopStart(loop: LoopContext): void {
       ", " + jsonField("completion_promise", loop.completion.promise) +
       ", " + jsonField("completion_event", loop.completion.event) +
       ", " + jsonField("review_every", String(loop.review.every)) +
-      ", " + jsonField("objective", loop.objective),
+      ", " + jsonField("objective", loop.objective) +
+      ", " + jsonField("preset", loop.launch.preset) +
+      ", " + jsonField("trigger", loop.launch.trigger) +
+      ", " + jsonField("created_at", loop.launch.createdAt) +
+      ", " + jsonField("project_dir", loop.paths.projectDir) +
+      ", " + jsonField("work_dir", loop.paths.workDir) +
+      ", " + jsonField("backend", normalizeBackendLabel(loop.backend.command)) +
+      ", " + jsonField("parent_run_id", loop.launch.parentRunId),
   );
 }
 
