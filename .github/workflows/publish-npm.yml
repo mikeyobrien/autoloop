@@ -6,6 +6,9 @@ on:
     tags:
       - "v*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
   id-token: write
@@ -35,5 +38,35 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Verify tag matches package version
+        if: github.event_name == 'push'
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $PACKAGE_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Check whether version is already published
+        id: npm_version
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published; skipping npm publish."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION is not published yet; continuing."
+          fi
+
       - name: Publish to npm
+        if: steps.npm_version.outputs.already_published != 'true'
         run: npm publish --provenance --access public
+
+      - name: Publish summary
+        if: steps.npm_version.outputs.already_published == 'true'
+        run: echo "Publish skipped because this version is already on npm."
