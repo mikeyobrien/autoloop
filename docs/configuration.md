@@ -2,6 +2,8 @@
 
 All runtime configuration lives in `autoloops.toml` at the root of a loop's project directory. Keys use flat dot-notation (`section.key = value`). The legacy `autoloops.conf` format is also accepted — the harness checks for `autoloops.toml` first and falls back to `autoloops.conf`.
 
+Configuration drives the control plane: iteration limits, backend selection, review policy, parallelism bounds, and memory budgets are all declarative settings in this file. See [Platform Architecture](platform.md) for how configuration fits into the broader system.
+
 Configuration is **hot-reloaded** every iteration. You can change any value mid-run and it takes effect on the next iteration without restarting.
 
 ## File format

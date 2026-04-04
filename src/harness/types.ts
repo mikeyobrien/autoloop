@@ -1,5 +1,14 @@
 import type * as topo from "../topology.js";
 
+export type TriggerSource = "cli" | "chain" | "branch";
+
+export interface LaunchMetadata {
+  preset: string;
+  trigger: TriggerSource;
+  createdAt: string;
+  parentRunId: string;
+}
+
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
@@ -10,8 +19,9 @@ export interface LoopContext {
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
   memory: { budgetChars: number };
   harness: { instructions: string };
-  paths: { projectDir: string; workDir: string; stateDir: string; journalFile: string; memoryFile: string; toolPath: string; piAdapterPath: string };
+  paths: { projectDir: string; workDir: string; stateDir: string; journalFile: string; memoryFile: string; registryFile: string; toolPath: string; piAdapterPath: string };
   runtime: { runId: string; selfCommand: string; promptOverride: string | null; backendOverride: Record<string, unknown>; logLevel: string; branchMode: boolean };
+  launch: LaunchMetadata;
   store: Record<string, unknown>;
 }
 
@@ -21,6 +31,8 @@ export interface RunOptions {
   logLevel?: string | null;
   prompt?: string | null;
   chain?: string | null;
+  trigger?: TriggerSource;
+  parentRunId?: string;
 }
 
 export interface RunSummary {

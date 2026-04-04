@@ -56,6 +56,33 @@ export function printIterationFooter(iter: IterationContext, elapsedS: number): 
   console.log("");
 }
 
+export function printProgressLine(data: {
+  runId: string;
+  iteration: number;
+  recentEvent: string;
+  allowedRoles: string[];
+  emittedTopic?: string;
+  outcome: string;
+}): void {
+  const parts = [
+    "[progress]",
+    `ts=${new Date().toISOString()}`,
+    `run_id=${data.runId}`,
+    `iter=${data.iteration}`,
+    `role=${progressRoleLabel(data.allowedRoles)}`,
+    `recent=${data.recentEvent || "(none)"}`,
+  ];
+  if (data.emittedTopic) parts.push(`emitted=${data.emittedTopic}`);
+  parts.push(`outcome=${data.outcome}`);
+  console.log(parts.join(" "));
+}
+
+function progressRoleLabel(roles: string[]): string {
+  if (roles.length === 0) return "(none)";
+  if (roles.length === 1) return roles[0];
+  return roles.join(",");
+}
+
 export function printReviewBanner(iteration: number): void {
   const label = `━━━ review before iteration ${iteration} `;
   console.log("");

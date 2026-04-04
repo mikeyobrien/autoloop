@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, basename } from "node:path";
 import * as config from "../config.js";
 import * as topo from "../topology.js";
 import { splitCsv, generateCompactId } from "../utils.js";
@@ -165,6 +165,7 @@ export function buildLoopContext(
       stateDir,
       journalFile,
       memoryFile,
+      registryFile: join(stateDir, "registry.jsonl"),
       toolPath: join(stateDir, "autoloops"),
       piAdapterPath: join(stateDir, "pi-adapter"),
     },
@@ -175,6 +176,12 @@ export function buildLoopContext(
       backendOverride,
       logLevel,
       branchMode: false,
+    },
+    launch: {
+      preset: basename(resolvedProjectDir),
+      trigger: runOptions.trigger ?? "cli",
+      createdAt: new Date().toISOString(),
+      parentRunId: runOptions.parentRunId ?? "",
     },
     store: {},
   };
@@ -223,6 +230,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     harness: { instructions: harnessText },
     paths: loop.paths,
     runtime: loop.runtime,
+    launch: loop.launch,
     store: loop.store,
   };
   return applyRuntimeModeOverrides(updated);
