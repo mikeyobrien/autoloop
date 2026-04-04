@@ -1,6 +1,7 @@
 import * as harness from "../harness/index.js";
 import * as chains from "../chains.js";
 import * as config from "../config.js";
+import { resolve } from "node:path";
 import { joinCsv } from "../utils.js";
 import { printRunUsage, missingPresetError, unknownPresetError } from "../usage.js";
 
@@ -95,13 +96,13 @@ function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
 
   if (options.presetExplicit) {
     options.prompt = positionals.join(" ") || null;
-    return options;
+    return applyGlobalBackendOverride(options);
   }
 
   if (positionals.length === 0) {
     if (options.chain) {
       options.projectDir = defaultChainProjectDir(bundleRoot);
-      return options;
+      return applyGlobalBackendOverride(options);
     }
     missingPresetError();
     options.usageError = true;
@@ -119,13 +120,13 @@ function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
       options.projectDir = defaultChainProjectDir(bundleRoot);
       options.prompt = positionals.join(" ") || null;
     }
-    return options;
+    return applyGlobalBackendOverride(options);
   }
 
   if (looksLikeProjectDir(first)) {
     options.projectDir = first;
     options.prompt = rest.join(" ") || null;
-    return options;
+    return applyGlobalBackendOverride(options);
   }
 
   const bundledPreset = config.resolveProjectDir(first, bundleRoot);
@@ -136,7 +137,21 @@ function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
   }
   options.projectDir = bundledPreset;
   options.prompt = rest.join(" ") || null;
-  return options;
+  return applyGlobalBackendOverride(options);
+}
+
+function applyGlobalBackendOverride(options: RunOptions): RunOptions {
+  const cwdProjectDir = process.cwd();
+  if (!config.projectHasConfig(cwdProjectDir)) return options;
+  if (resolve(cwdProjectDir) === resolve(options.projectDir)) return options;
+
+  const globalBackendOverride = config.backendOverrideFromProject(cwdProjectDir);
+  if (Object.keys(globalBackendOverride).length === 0) return options;
+
+  return {
+    ...options,
+    backendOverride: { ...globalBackendOverride, ...options.backendOverride },
+  };
 }
 
 function runInlineChain(

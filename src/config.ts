@@ -14,6 +14,25 @@ export function load(path: string): Config {
   return parseToml(readFileSync(path, "utf-8"));
 }
 
+export function backendOverrideFromProject(projectDir: string): Record<string, unknown> {
+  const path = resolveConfigPath(projectDir);
+  if (!existsSync(path)) return {};
+
+  const parsed = parseRawToml(readFileSync(path, "utf-8"));
+  const backend = parsed["backend"];
+  if (typeof backend !== "object" || backend === null || Array.isArray(backend)) return {};
+
+  const section = backend as Record<string, unknown>;
+  const override: Record<string, unknown> = {};
+
+  if (typeof section["kind"] === "string") override["kind"] = section["kind"];
+  if (typeof section["command"] === "string") override["command"] = section["command"];
+  if (typeof section["prompt_mode"] === "string") override["prompt_mode"] = section["prompt_mode"];
+  if (Array.isArray(section["args"])) override["args"] = (section["args"] as unknown[]).map(String);
+
+  return override;
+}
+
 export function get(config: Config, key: string, fallback: string): string {
   const parts = key.split(".");
   return getPath(config, parts, fallback);
@@ -175,8 +194,12 @@ function defaults(): Config {
 }
 
 function parseToml(text: string): Config {
-  const parsed = TOML.parse(text);
+  const parsed = parseRawToml(text);
   return deepMerge(defaults(), stringifyValues(parsed));
+}
+
+function parseRawToml(text: string): Record<string, unknown> {
+  return TOML.parse(text) as Record<string, unknown>;
 }
 
 function stringifyValues(obj: Record<string, unknown>): Config {
