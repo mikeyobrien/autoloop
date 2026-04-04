@@ -30,3 +30,4 @@ Rules:
 - Commit or revert before handing off — never leave the tree dirty.
 - False keeps are worse than false discards.
 - `held steady with qualitative improvement` is not enough unless that qualitative rubric was written down before the experiment.
+- Emit exactly one event: `experiment.evaluated` or `experiment.discarded`. Do not emit `task.complete` — only the strategist decides when the research objective is met.
