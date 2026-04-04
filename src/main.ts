@@ -71,7 +71,7 @@ function runtimeArgv(argv: string[]): string[] {
   // If first arg is a CLI command, use as-is
   if (isCliCommand(userArgs[0])) return userArgs;
 
-  // For "autoloops-ts run <project>" form, pass through
+  // For "autoloop run <project>" form, pass through
   if (userArgs[0] === "run" && userArgs.length >= 2) {
     return userArgs;
   }
@@ -85,7 +85,7 @@ function isCliCommand(value: string): boolean {
 
 function selfCommand(argv: string[]): string {
   // Return a command that re-invokes this program
-  return "'" + resolve(argv[1] ?? "autoloops-ts") + "'";
+  return "'" + resolve(argv[1] ?? "autoloop") + "'";
 }
 
 function resolveBundleRoot(argv: string[]): string {

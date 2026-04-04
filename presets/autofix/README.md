@@ -1,6 +1,6 @@
 # AutoFix miniloop
 
-An autoloops-ts-native bug diagnosis and repair loop.
+An autoloop-native bug diagnosis and repair loop.
 
 AutoFix takes a bug report or failing test, reproduces the issue, traces the root cause, implements a minimal fix, and verifies the fix — all without refactoring or improving code beyond what is needed.
 
@@ -52,5 +52,5 @@ AutoFix should reject weak fixes.
 From the repo root:
 
 ```bash
-autoloops-ts run presets/autofix "TypeError in parse_config when TOML has nested arrays"
+autoloop run presets/autofix "TypeError in parse_config when TOML has nested arrays"
 ```

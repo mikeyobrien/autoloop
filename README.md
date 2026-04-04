@@ -1,4 +1,4 @@
-# autoloops-ts
+# autoloop
 
 Autonomous LLM loop harness and control plane for long-horizon autonomous work. Runs multi-role, event-driven loops where each iteration is handled by a specialized role (planner, builder, critic, etc.) that hands off to the next via structured events. The harness manages iteration limits, event routing, memory, and completion detection so you can focus on the prompt and preset design.
 
@@ -19,7 +19,7 @@ npm install
 npm run build
 
 # Run your first autoloop
-node bin/autoloops-ts run autocode "Fix the login bug"
+node bin/autoloop run autocode "Fix the login bug"
 ```
 
 `autocode` is a bundled preset. The quoted string is the prompt passed to the loop. The harness iterates through roles (planner -> builder -> critic -> finalizer) until a `task.complete` event is emitted or the iteration limit is reached.
@@ -27,12 +27,12 @@ node bin/autoloops-ts run autocode "Fix the login bug"
 ## Usage
 
 ```
-autoloops-ts run <preset> [prompt...] [flags]
-autoloops-ts list
-autoloops-ts emit <topic> [summary]
-autoloops-ts inspect <artifact> [selector] [--format <md|terminal|json|csv>]
-autoloops-ts memory <list|status|find|add|remove> [args]
-autoloops-ts chain <list|run> [args]
+autoloop run <preset> [prompt...] [flags]
+autoloop list
+autoloop emit <topic> [summary]
+autoloop inspect <artifact> [selector] [--format <md|terminal|json|csv>]
+autoloop memory <list|status|find|add|remove> [args]
+autoloop chain <list|run> [args]
 ```
 
 ### Flags
@@ -49,19 +49,19 @@ autoloops-ts chain <list|run> [args]
 
 ```bash
 # Run a preset by name
-node bin/autoloops-ts run autocode "Refactor the auth module"
+node bin/autoloop run autocode "Refactor the auth module"
 
 # Run from a custom preset directory
-node bin/autoloops-ts run ./my-preset "Analyze the API"
+node bin/autoloop run ./my-preset "Analyze the API"
 
 # Override the backend
-node bin/autoloops-ts run autoqa -b claude "Review recent changes"
+node bin/autoloop run autoqa -b claude "Review recent changes"
 
 # List available presets
-node bin/autoloops-ts list
+node bin/autoloop list
 
 # Run an inline chain
-node bin/autoloops-ts run --chain autospec,autocode "Design and build feature X"
+node bin/autoloop run --chain autospec,autocode "Design and build feature X"
 ```
 
 ## Bundled presets
@@ -85,7 +85,7 @@ node bin/autoloops-ts run --chain autospec,autocode "Design and build feature X"
 
 ```
 autoloop-ts/
-├── bin/autoloops-ts       # CLI entry point (Node.js ESM)
+├── bin/autoloop       # CLI entry point (Node.js ESM)
 ├── src/                   # TypeScript source
 │   ├── main.ts            # CLI dispatch
 │   ├── harness/           # Loop engine (iteration, events, routing)
@@ -122,7 +122,7 @@ A deterministic mock backend (`src/testing/mock-backend.ts`) removes the need fo
 
 ```bash
 export MOCK_FIXTURE_PATH=test/fixtures/backend/complete-success.json
-node bin/autoloops-ts run . -b "node dist/testing/mock-backend.js"
+node bin/autoloop run . -b "node dist/testing/mock-backend.js"
 ```
 
 See [docs/cli.md](docs/cli.md#mock-backend) for fixture schema and bundled scenarios.

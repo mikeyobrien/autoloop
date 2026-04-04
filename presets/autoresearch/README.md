@@ -1,6 +1,6 @@
 # Autoresearch miniloop
 
-An autoloops-ts-native autonomous experiment loop inspired by Ralph's autoresearch preset.
+An autoloop-native autonomous experiment loop inspired by Ralph's autoresearch preset.
 
 Shape:
 - strategist — decides what experiment to try next
@@ -44,7 +44,7 @@ Returns `{"pass": true|false, "reason": "..."}` and exits 0 (pass) or 1 (fail).
 From the repo root:
 
 ```bash
-autoloops-ts run presets/autoresearch "Optimize test suite runtime by 30%"
+autoloop run presets/autoresearch "Optimize test suite runtime by 30%"
 ```
 
 ## Example use cases

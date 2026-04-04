@@ -28,7 +28,7 @@ export function dispatchLoops(args: string[]): void {
   if (first === "show") {
     const runId = args[1];
     if (!runId) {
-      console.log("Usage: autoloops-ts loops show <run-id>");
+      console.log("Usage: autoloop loops show <run-id>");
       return;
     }
     console.log(showRun(registryPath, runId));
@@ -38,7 +38,7 @@ export function dispatchLoops(args: string[]): void {
   if (first === "artifacts") {
     const runId = args[1];
     if (!runId) {
-      console.log("Usage: autoloops-ts loops artifacts <run-id>");
+      console.log("Usage: autoloop loops artifacts <run-id>");
       return;
     }
     console.log(showArtifacts(registryPath, runId));
@@ -48,7 +48,7 @@ export function dispatchLoops(args: string[]): void {
   if (first === "watch") {
     const runId = args[1];
     if (!runId) {
-      console.log("Usage: autoloops-ts loops watch <run-id>");
+      console.log("Usage: autoloop loops watch <run-id>");
       return;
     }
     watchRun(registryPath, runId).catch((err: unknown) => {
@@ -70,12 +70,12 @@ export function dispatchLoops(args: string[]): void {
 
 function printLoopsUsage(): void {
   console.log("Usage:");
-  console.log("  autoloops-ts loops                    List active runs");
-  console.log("  autoloops-ts loops --all               List all runs");
-  console.log("  autoloops-ts loops show <run-id>       Show run details");
-  console.log("  autoloops-ts loops artifacts <run-id>  Show artifact paths");
-  console.log("  autoloops-ts loops watch <run-id>      Watch a run live");
-  console.log("  autoloops-ts loops health [--verbose]  Health summary");
+  console.log("  autoloop loops                    List active runs");
+  console.log("  autoloop loops --all               List all runs");
+  console.log("  autoloop loops show <run-id>       Show run details");
+  console.log("  autoloop loops artifacts <run-id>  Show artifact paths");
+  console.log("  autoloop loops watch <run-id>      Watch a run live");
+  console.log("  autoloop loops health [--verbose]  Health summary");
 }
 
 function resolveProjectDir(): string {

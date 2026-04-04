@@ -1,8 +1,8 @@
-# autoloops-ts Hardening and Productization Plan
+# autoloop Hardening and Productization Plan
 
 > For Hermes: Use subagent-driven-development to execute this plan task-by-task.
 
-Goal: Make autoloops-ts coherent, testable, and easier to extend by fixing naming drift, adding deterministic end-to-end tests, introducing a mock backend, typing journal events, and modularizing the runtime.
+Goal: Make autoloop coherent, testable, and easier to extend by fixing naming drift, adding deterministic end-to-end tests, introducing a mock backend, typing journal events, and modularizing the runtime.
 
 Architecture: Keep the current event-driven loop model and append-only journal, but formalize the seams that are currently loose: CLI/docs naming, backend invocation, event encoding/decoding, and runtime execution boundaries. Build confidence first with deterministic testing and fixtures, then refactor the core behind a stable external interface.
 
@@ -50,7 +50,7 @@ Files:
 - Modify: `presets/**/harness.md`
 
 Changes:
-- Choose one canonical operator-facing name. Recommendation: keep package/bin as `autoloops-ts` and refer to legacy `autoloops` as an alias only if needed.
+- Choose one canonical operator-facing name. Recommendation: keep package/bin as `autoloop` and refer to legacy `autoloops` as an alias only if needed.
 - Update all usage/help strings to print the same binary name.
 - Add a short “naming compatibility” note in `README.md` if the repo directory remains `autoloop-ts`.
 - Remove “partially stale / pre-TypeScript runtime” caveats once docs are corrected.
@@ -65,7 +65,7 @@ Suggested verification:
 - Search for stale strings across repo
 
 Commit:
-- `git commit -m "docs: unify autoloops-ts naming and CLI references"`
+- `git commit -m "docs: unify autoloop naming and CLI references"`
 
 ### Task 2: Add smoke tests for CLI help and naming consistency
 
@@ -136,7 +136,7 @@ Changes:
   - no completion event
   - timeout simulation
   - non-zero exit
-- Document how to run autoloops-ts with the mock backend.
+- Document how to run autoloop with the mock backend.
 
 Acceptance criteria:
 - Mock backend can be launched via the existing backend override path.

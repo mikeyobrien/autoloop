@@ -1,6 +1,6 @@
 # AutoReview miniloop
 
-An autoloops-ts-native code review loop for PR diffs and change sets.
+An autoloop-native code review loop for PR diffs and change sets.
 
 AutoReview reads changes, checks for issues across correctness, security, style, performance, and maintainability, proposes concrete fixes, and compiles structured review feedback with a clear verdict.
 
@@ -47,5 +47,5 @@ AutoReview is skeptical by default.
 From the repo root:
 
 ```bash
-autoloops-ts run presets/autoreview /path/to/target-repo
+autoloop run presets/autoreview /path/to/target-repo
 ```

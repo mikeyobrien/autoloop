@@ -1,6 +1,6 @@
 # Topology Reference
 
-Topology defines the role structure and routing within an autoloops-ts loop. It is declared in `topology.toml` and controls which roles exist, what events they can emit, and how events route to the next role.
+Topology defines the role structure and routing within an autoloop loop. It is declared in `topology.toml` and controls which roles exist, what events they can emit, and how events route to the next role.
 
 Topology is **advisory** — it is not a hard workflow engine. The model receives routing suggestions and allowed events as context, and backpressure enforces the protocol at the event-emit boundary.
 
@@ -84,7 +84,7 @@ The routing model has three layers:
 
 1. **Suggested roles** — looked up from the handoff map using the most recent event. If the event has no entry, all roles are suggested.
 2. **Allowed events** — the union of `emits` arrays from all suggested roles. This is what the model may emit next.
-3. **Backpressure** — if the model emits an event not in the allowed set, `autoloops-ts emit` fails immediately and the event is logged as `event.invalid` in the journal. The model is re-prompted with routing context.
+3. **Backpressure** — if the model emits an event not in the allowed set, `autoloop emit` fails immediately and the event is logged as `event.invalid` in the journal. The model is re-prompted with routing context.
 
 This is soft routing: the model sees suggestions and constraints but is not forced into a fixed state machine. The backpressure layer prevents protocol violations without requiring hard-coded transitions.
 

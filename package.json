@@ -1,11 +1,11 @@
 {
-  "name": "autoloops-ts",
+  "name": "autoloop",
   "version": "0.0.1",
   "description": "Autonomous LLM loop harness — TypeScript port",
   "type": "module",
   "main": "dist/main.js",
   "bin": {
-    "autoloops-ts": "bin/autoloops-ts"
+    "autoloop": "bin/autoloop"
   },
   "scripts": {
     "build": "tsc",

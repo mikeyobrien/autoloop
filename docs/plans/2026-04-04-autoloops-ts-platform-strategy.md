@@ -1,18 +1,18 @@
-# autoloops-ts Platform Strategy Plan
+# autoloop Platform Strategy Plan
 
-> For Hermes: Use subagent-driven-development to execute this plan phase-by-phase. Treat autoloops-ts as the control plane, not just a loop runner.
+> For Hermes: Use subagent-driven-development to execute this plan phase-by-phase. Treat autoloop as the control plane, not just a loop runner.
 
-Goal: Turn autoloops-ts from a strong loop harness into the default execution engine for long-horizon autonomous work, with a thin intake/supervision layer, first-class preset workflows, durable run tracking, and operator-grade monitoring.
+Goal: Turn autoloop from a strong loop harness into the default execution engine for long-horizon autonomous work, with a thin intake/supervision layer, first-class preset workflows, durable run tracking, and operator-grade monitoring.
 
-Architecture: Keep the append-only journal and preset-driven event loop as the core. Build outward from that stable center: add a run registry, stronger operator surfaces, monitoring/watch flows, and a small supervisor layer that launches and tracks loops without duplicating orchestration logic. The control plane stays in autoloops-ts; external shells (CLI, chat, cron, future API/UI) become ingestion and observation layers.
+Architecture: Keep the append-only journal and preset-driven event loop as the core. Build outward from that stable center: add a run registry, stronger operator surfaces, monitoring/watch flows, and a small supervisor layer that launches and tracks loops without duplicating orchestration logic. The control plane stays in autoloop; external shells (CLI, chat, cron, future API/UI) become ingestion and observation layers.
 
-Tech Stack: TypeScript, Node.js ESM, Vitest, existing autoloops-ts CLI/runtime, JSONL journals, preset directories, cron-based monitoring, background process execution.
+Tech Stack: TypeScript, Node.js ESM, Vitest, existing autoloop CLI/runtime, JSONL journals, preset directories, cron-based monitoring, background process execution.
 
 ---
 
 ## Strategic thesis
 
-Make autoloops-ts the default engine for any task that is:
+Make autoloop the default engine for any task that is:
 - iterative
 - quality-sensitive
 - longer than a one-shot command
@@ -21,7 +21,7 @@ Make autoloops-ts the default engine for any task that is:
 Do not build a second orchestrator next to it.
 
 Instead:
-- autoloops-ts = execution engine + state model + preset runtime
+- autoloop = execution engine + state model + preset runtime
 - CLI/chat/API = thin intake layer
 - cron = supervisor and reporter
 - journals/artifacts = source of truth
@@ -44,7 +44,7 @@ This plan assumes that direction and organizes the work into platform phases.
 
 ## Desired end-state
 
-1. autoloops-ts is the default engine for long-running autonomous tasks.
+1. autoloop is the default engine for long-running autonomous tasks.
 2. Every run has a stable identity, lifecycle, and inspectable state.
 3. Operators can answer: what is running, what changed, what is stuck, and what finished?
 4. Presets become the main product surface for reusable workflows.
@@ -53,7 +53,7 @@ This plan assumes that direction and organizes the work into platform phases.
 
 ---
 
-## Phase 1 — Establish autoloops-ts as the control plane
+## Phase 1 — Establish autoloop as the control plane
 
 ### Task 1: Define the platform position in docs
 
@@ -67,24 +67,24 @@ Files:
 - Create: `docs/platform.md`
 
 Changes:
-- Add a concise “autoloops-ts as control plane” framing.
+- Add a concise “autoloop as control plane” framing.
 - Explain the architectural roles of:
   - presets
   - journals/artifacts
   - CLI/chat/API shells
   - cron/scheduled monitoring
-- Document when autoloops-ts should be used vs when a normal script/command is enough.
-- Add a short “anti-goals” section: autoloops-ts should not become a kitchen sink for trivial deterministic tasks.
+- Document when autoloop should be used vs when a normal script/command is enough.
+- Add a short “anti-goals” section: autoloop should not become a kitchen sink for trivial deterministic tasks.
 
 Acceptance criteria:
 - New contributors can explain the platform model from docs alone.
 - Docs consistently describe external shells as thin layers over the runtime.
 
 Suggested verification:
-- Read `README.md` + `docs/platform.md` together and confirm they answer: what is autoloops-ts, what launches it, what observes it?
+- Read `README.md` + `docs/platform.md` together and confirm they answer: what is autoloop, what launches it, what observes it?
 
 Commit:
-- `git commit -m "docs: define autoloops-ts platform architecture"`
+- `git commit -m "docs: define autoloop platform architecture"`
 
 ### Task 2: Standardize launch metadata for every run
 
@@ -204,7 +204,7 @@ Commit:
 
 ### Task 5: Add `loops` operator commands
 
-Objective: Make autoloops-ts usable as an actual operating surface for multiple runs.
+Objective: Make autoloop usable as an actual operating surface for multiple runs.
 
 Files:
 - Create: `src/commands/loops.ts`
@@ -218,10 +218,10 @@ Files:
 
 Changes:
 - Add commands such as:
-  - `autoloops-ts loops`
-  - `autoloops-ts loops --all`
-  - `autoloops-ts loops show <run-id>`
-  - `autoloops-ts loops artifacts <run-id>`
+  - `autoloop loops`
+  - `autoloop loops --all`
+  - `autoloop loops show <run-id>`
+  - `autoloop loops artifacts <run-id>`
 - Render concise summaries with:
   - run id
   - preset
@@ -250,7 +250,7 @@ Files:
 - Create: `test/integration/loops-watch.test.ts`
 
 Changes:
-- Add `autoloops-ts loops watch <run-id>`.
+- Add `autoloop loops watch <run-id>`.
 - Tail journal or registry updates and render compact progress summaries in real time.
 - Reuse the `[progress]` line vocabulary already introduced in the harness.
 - Show timestamps, outcome, latest event, and stop reason clearly.
@@ -406,7 +406,7 @@ Changes:
   - showing run status
   - listing presets
   - fetching health summaries
-- Keep the server thin: it should dispatch autoloops-ts runs, not reimplement loop logic.
+- Keep the server thin: it should dispatch autoloop runs, not reimplement loop logic.
 - Make this optional and local-first.
 
 Acceptance criteria:
@@ -435,7 +435,7 @@ Changes:
 - Explain how monitoring jobs should consume registry/health surfaces, not raw repo traversal.
 
 Acceptance criteria:
-- Cron jobs become predictable wrappers over autoloops-ts operator commands.
+- Cron jobs become predictable wrappers over autoloop operator commands.
 - Monitoring/reporting responsibilities are clearly separated.
 
 Commit:
@@ -496,7 +496,7 @@ Changes:
 - Keep these as operator constraints, not agent instructions.
 
 Acceptance criteria:
-- Autoloops-ts can be run safely in more automated contexts.
+- Autoloop can be run safely in more automated contexts.
 - Governance logic stays declarative and inspectable.
 
 Commit:
@@ -531,7 +531,7 @@ That order gives the fastest operator value while preserving architectural coher
 
 The strategy is working if the following become true:
 
-- Most meaningful autonomous tasks are launched via autoloops-ts presets.
+- Most meaningful autonomous tasks are launched via autoloop presets.
 - Operators can answer “what is running, what changed, what is stuck?” in under 30 seconds.
 - Monitoring messages become exception-focused instead of noisy dump logs.
 - New presets are easy to add, validate, and compare.

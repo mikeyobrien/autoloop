@@ -20,7 +20,7 @@ export function dispatchChain(args: string[], selfCmd: string): boolean {
     }
     case "run": {
       const name = args[1];
-      if (!name) { console.log("Usage: autoloops-ts chain run <name> [project-dir] [prompt...]"); return true; }
+      if (!name) { console.log("Usage: autoloop chain run <name> [project-dir] [prompt...]"); return true; }
       const projectDir = args[2] ?? resolveRuntimeProjectDir();
       const prompt = args.slice(3).join(" ") || null;
       const chainsData = chains.load(projectDir);
@@ -34,8 +34,8 @@ export function dispatchChain(args: string[], selfCmd: string): boolean {
     }
     default:
       console.log("Usage:");
-      console.log("  autoloops-ts chain list [project-dir]");
-      console.log("  autoloops-ts chain run <name> [project-dir] [prompt...]");
+      console.log("  autoloop chain list [project-dir]");
+      console.log("  autoloop chain run <name> [project-dir] [prompt...]");
       return true;
   }
 }

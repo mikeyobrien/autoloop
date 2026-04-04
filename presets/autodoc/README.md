@@ -1,6 +1,6 @@
 # AutoDoc miniloop
 
-An autoloops-ts-native documentation generation and maintenance loop.
+An autoloop-native documentation generation and maintenance loop.
 
 AutoDoc audits existing documentation against the codebase, identifies gaps and staleness, writes or updates docs, verifies accuracy, and tracks progress — iterating until documentation is current.
 
@@ -38,5 +38,5 @@ Shape:
 From the repo root:
 
 ```bash
-autoloops-ts run presets/autodoc /path/to/target-repo
+autoloop run presets/autodoc /path/to/target-repo
 ```

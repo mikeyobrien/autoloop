@@ -129,7 +129,7 @@ describe("integration: loops command", () => {
   it("prints usage for loops --help", () => {
     const project = makeTempProject("loops-help");
     const res = runCli(["loops", "--help"], {}, project);
-    expect(res.stdout).toContain("autoloops-ts loops");
+    expect(res.stdout).toContain("autoloop loops");
     expect(res.stdout).toContain("show");
     expect(res.stdout).toContain("artifacts");
   });

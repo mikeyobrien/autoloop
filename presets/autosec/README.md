@@ -1,6 +1,6 @@
 # AutoSec miniloop
 
-An autoloops-ts-native security audit and hardening loop.
+An autoloop-native security audit and hardening loop.
 
 AutoSec scans a target repo for security vulnerabilities across injection, auth, secrets, dependencies, and configuration. Candidate findings are confirmed or dismissed by an analyst, fixed by a hardener when appropriate, and tracked in a prioritized security report.
 
@@ -47,5 +47,5 @@ AutoSec should prefer open risks over fake certainty.
 From the repo root:
 
 ```bash
-autoloops-ts run presets/autosec /path/to/target-repo
+autoloop run presets/autosec /path/to/target-repo
 ```

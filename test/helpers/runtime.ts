@@ -23,7 +23,7 @@ export function ensureBuild(): void {
 }
 
 export function makeTempProject(name: string): string {
-  const dir = mkdtempSync(join(tmpdir(), `autoloops-ts-${name}-`));
+  const dir = mkdtempSync(join(tmpdir(), `autoloop-${name}-`));
   cpSync(PRESET_FIXTURE_DIR, dir, { recursive: true });
   const configPath = join(dir, "autoloops.toml");
   let config = readFileSync(configPath, "utf-8");

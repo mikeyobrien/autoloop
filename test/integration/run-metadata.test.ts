@@ -32,7 +32,7 @@ describe("integration: launch metadata in loop.start journal event", () => {
     const parsed = JSON.parse(loopStartLine!) as Record<string, unknown>;
     const fields = parsed.fields as Record<string, unknown>;
 
-    // preset is basename of the temp project dir (e.g. autoloops-ts-run-metadata-XXXX)
+    // preset is basename of the temp project dir (e.g. autoloop-run-metadata-XXXX)
     expect(typeof fields.preset).toBe("string");
     expect((fields.preset as string).length).toBeGreaterThan(0);
     expect(fields.trigger).toBe("cli");

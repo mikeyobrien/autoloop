@@ -1,6 +1,6 @@
 # AutoTest miniloop
 
-An autoloops-ts-native formal test creation and test-suite tightening loop.
+An autoloop-native formal test creation and test-suite tightening loop.
 
 AutoTest surveys a codebase for coverage gaps, writes new tests using the repo's existing framework and conventions, runs them, and assesses quality — iterating until meaningful regression-catching gaps are covered or no worthwhile gaps remain.
 
@@ -51,5 +51,5 @@ AutoTest is about better tests, not prettier coverage numbers.
 From the repo root:
 
 ```bash
-autoloops-ts run presets/autotest /path/to/target-repo
+autoloop run presets/autotest /path/to/target-repo
 ```

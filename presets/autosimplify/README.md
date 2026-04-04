@@ -1,6 +1,6 @@
 # AutoSimplify miniloop
 
-An autoloops-ts-native post-implementation cleanup loop inspired by Claude Code's `/simplify` workflow.
+An autoloop-native post-implementation cleanup loop inspired by Claude Code's `/simplify` workflow.
 
 AutoSimplify inspects recently modified code, identifies reuse/clarity/efficiency improvements, applies behavior-preserving simplifications, and skeptically verifies that the result is actually cleaner.
 
@@ -64,13 +64,13 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-autoloops-ts run presets/autosimplify "Simplify the current diff"
+autoloop run presets/autosimplify "Simplify the current diff"
 ```
 
 For a one-off Claude dogfood run without editing config:
 
 ```bash
-autoloops-ts -b claude presets/autosimplify "Simplify the current diff"
+autoloop -b claude presets/autosimplify "Simplify the current diff"
 ```
 
 ## Intended input styles

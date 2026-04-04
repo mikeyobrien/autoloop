@@ -61,13 +61,13 @@ beforeAll(() => {
 describe("top-level --help", () => {
   it("includes the canonical command name", () => {
     const out = cliOutput("--help");
-    expect(out).toContain("autoloops-ts");
+    expect(out).toContain("autoloop");
   });
 
   it("lists all subcommands", () => {
     const out = cliOutput("--help");
     for (const cmd of ["run", "emit", "inspect", "memory", "list", "chain"]) {
-      expect(out).toContain(`autoloops-ts ${cmd}`);
+      expect(out).toContain(`autoloop ${cmd}`);
     }
   });
 
@@ -82,7 +82,7 @@ describe("top-level --help", () => {
 describe("run --help", () => {
   it("includes the canonical command name and flags", () => {
     const out = cliOutput("run", "--help");
-    expect(out).toContain("autoloops-ts run");
+    expect(out).toContain("autoloop run");
     for (const flag of ["-h", "-v", "-b", "-p", "--chain"]) {
       expect(out).toContain(flag);
     }
@@ -90,7 +90,7 @@ describe("run --help", () => {
 
   it("includes examples", () => {
     const out = cliOutput("run", "--help");
-    expect(out).toContain("autoloops-ts run autocode");
+    expect(out).toContain("autoloop run autocode");
   });
 
   it("contains no legacy bare 'autoloops' references", () => {
@@ -104,14 +104,14 @@ describe("run --help", () => {
 describe("emit --help", () => {
   it("shows canonical usage", () => {
     const out = cliOutput("emit", "--help");
-    expect(out).toContain("autoloops-ts emit");
+    expect(out).toContain("autoloop emit");
   });
 });
 
 describe("inspect --help", () => {
   it("includes artifact names", () => {
     const out = cliOutput("inspect", "--help");
-    expect(out).toContain("autoloops-ts inspect");
+    expect(out).toContain("autoloop inspect");
     for (const artifact of [
       "scratchpad",
       "prompt",
@@ -130,9 +130,9 @@ describe("inspect --help", () => {
 describe("memory (no args)", () => {
   it("shows usage with all subcommands", () => {
     const out = cliOutput("memory");
-    expect(out).toContain("autoloops-ts memory");
+    expect(out).toContain("autoloop memory");
     for (const sub of ["list", "status", "find", "add", "remove"]) {
-      expect(out).toContain(`autoloops-ts memory ${sub}`);
+      expect(out).toContain(`autoloop memory ${sub}`);
     }
   });
 });
@@ -140,7 +140,7 @@ describe("memory (no args)", () => {
 describe("memory add (no args)", () => {
   it("shows usage with memory kinds", () => {
     const out = cliOutput("memory", "add");
-    expect(out).toContain("autoloops-ts memory add");
+    expect(out).toContain("autoloop memory add");
     for (const kind of ["learning", "preference", "meta"]) {
       expect(out).toContain(kind);
     }
@@ -150,7 +150,7 @@ describe("memory add (no args)", () => {
 describe("chain (no args)", () => {
   it("shows usage with subcommands", () => {
     const out = cliOutput("chain");
-    expect(out).toContain("autoloops-ts chain");
+    expect(out).toContain("autoloop chain");
     for (const sub of ["list", "run"]) {
       expect(out).toContain(sub);
     }
@@ -160,7 +160,7 @@ describe("chain (no args)", () => {
 describe("list --help", () => {
   it("shows canonical usage", () => {
     const out = cliOutput("list", "--help");
-    expect(out).toContain("autoloops-ts list");
+    expect(out).toContain("autoloop list");
   });
 });
 

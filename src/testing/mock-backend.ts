@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Deterministic mock backend for autoloops-ts integration tests.
+ * Deterministic mock backend for autoloop integration tests.
  *
  * Usage:
  *   node dist/testing/mock-backend.js [fixture-path] [prompt]

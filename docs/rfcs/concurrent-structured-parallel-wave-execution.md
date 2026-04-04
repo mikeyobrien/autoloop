@@ -6,7 +6,7 @@ Make structured parallel waves truly concurrent. The current `.parallel` protoco
 Code task: `.agents/tasks/tonic-loops/concurrent-structured-parallel-wave-execution.code-task.md`
 
 ## Problem
-Autoloops already ships a structured-parallel feature surface:
+Autoloop already ships a structured-parallel feature surface:
 - `explore.parallel`
 - `<base-event>.parallel`
 - harness-owned `*.parallel.joined`

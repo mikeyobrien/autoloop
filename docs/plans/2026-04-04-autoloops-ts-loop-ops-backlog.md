@@ -1,6 +1,6 @@
-# autoloops-ts Loop Operations Backlog
+# autoloop Loop Operations Backlog
 
-Purpose: Capture blind spots, operator pain, and control-plane improvements that would make autoloops-ts easier to supervise, recover, and scale. This is not the main product roadmap; it is the backlog for loop management debt and operational leverage.
+Purpose: Capture blind spots, operator pain, and control-plane improvements that would make autoloop easier to supervise, recover, and scale. This is not the main product roadmap; it is the backlog for loop management debt and operational leverage.
 
 Status legend:
 - `open` — identified, not started
@@ -27,7 +27,7 @@ Status legend:
 - Problem: There is no first-class operator command set for listing, inspecting, and watching active runs.
 - Why it matters: External supervisors and humans both need a stable control surface instead of bespoke repo inspection.
 - Proposed improvement:
-  - Add `autoloops-ts loops`, `loops show <run-id>`, `loops artifacts <run-id>`, and `loops watch <run-id>`.
+  - Add `autoloop loops`, `loops show <run-id>`, `loops artifacts <run-id>`, and `loops watch <run-id>`.
 
 ### LOOP-OPS-003 — Live watch mode backed by journal/registry
 - Status: next
