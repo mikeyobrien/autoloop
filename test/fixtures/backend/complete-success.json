@@ -1,0 +1,7 @@
+{
+  "output": "Task completed successfully.\n\nLOOP_COMPLETE",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "task.complete",
+  "emit_payload": "Mock backend: task completed"
+}

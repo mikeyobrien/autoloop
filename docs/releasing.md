@@ -25,13 +25,10 @@ git push origin v0.1.0
 
 ## What the workflow does
 
-- installs Tonic via `scripts/install-tonic.sh`
-  - this repo currently pins Tonic by git commit in `.tonic-git-ref`
-  - `.tonic-version` is informational here, not the active install source
-- re-runs `tonic check .`
-- re-runs `./bin/test`
-- compiles standalone `autoloops` binaries
-- smoke-tests the compiled binary with a real run-path check via `scripts/compiled-run-check.sh`
+> **Note:** The release pipeline references below are from the pre-TypeScript (Tonic) era and need to be updated for the TS port. The current TS build uses `npm run build` (tsc) and `npm test` (Vitest).
+
+- runs `npm test`
+- compiles TypeScript via `npm run build`
 - packages release archives
 - publishes the archives and checksums to GitHub Releases
 

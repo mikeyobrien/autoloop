@@ -73,7 +73,7 @@ Agents can emit `chain.spawn` coordination events to request dynamic chain creat
 ## Inspection
 
 ```bash
-autoloops inspect chain --format md    # see all chain runs including dynamic
+autoloops-ts inspect chain --format md    # see all chain runs including dynamic
 ```
 
 Chain spec files are readable at `.autoloop/chains/specs/*.json`.

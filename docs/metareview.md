@@ -71,7 +71,7 @@ Regardless of the custom prompt, every review invocation receives a system promp
 - A constraint forbidding edits to app/product source code, tests, package manifests, generated `.autoloop/` state, or journal history during review.
 - A constraint explaining that the scratchpad is projected from journal history and cannot be edited directly; the metareview should instead tighten prompts, trim working files, or archive stale context.
 - A constraint: *"Do not emit normal loop events during review."*
-- Guidance to use `autoloops memory add ...` for short durable lessons or operator notes that should persist across turns.
+- Guidance to use `autoloops-ts memory add ...` for short durable lessons or operator notes that should persist across turns.
 - The custom review instructions (if any), under **"Additional metareview instructions:"**.
 - A **Context pressure** block summarizing current memory usage vs budget, active memory entry counts, and the number of invalid emits seen in the run so far.
 - The latest backpressure note, if the loop recently rejected an invalid event.
@@ -79,7 +79,7 @@ Regardless of the custom prompt, every review invocation receives a system promp
 - The review trigger iteration number and latest routing event.
 - The full topology rendering (same format as normal iterations).
 - The current scratchpad, rendered in the compact prompt-facing form used to keep long runs under control.
-- Useful `autoloops inspect` commands for the latest iteration.
+- Useful `autoloops-ts inspect` commands for the latest iteration.
 - A fallback instruction: *"If no improvements are needed, store a short learning explaining why and exit cleanly."*
 
 ## Runtime environment
@@ -98,7 +98,7 @@ Normal iterations set `MINILOOPS_REVIEW_MODE` to an empty string. The `pi-adapte
 The review backend receives `__metareview_disabled__` as its allowed-events set and `review` as its allowed-roles set. This means:
 
 - The metareview **cannot** emit normal loop events — any attempt would be rejected by backpressure validation.
-- Review output may still include bounded hygiene edits to runtime-facing loop files plus `autoloops memory add ...` commands for durable notes.
+- Review output may still include bounded hygiene edits to runtime-facing loop files plus `autoloops-ts memory add ...` commands for durable notes.
 - It still must not edit app/product code, tests, manifests, `.autoloop/` state, or journal history during review.
 
 ## Journal events

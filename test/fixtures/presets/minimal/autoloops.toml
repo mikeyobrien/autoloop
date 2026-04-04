@@ -1,0 +1,19 @@
+# Minimal test fixture preset — two roles, one handoff, no extras.
+# Designed for deterministic integration tests with a mock backend.
+
+event_loop.max_iterations = 5
+event_loop.completion_event = "task.complete"
+event_loop.completion_promise = "LOOP_COMPLETE"
+
+backend.kind = "command"
+# Override at test time via -b flag or env var.
+backend.command = "echo"
+backend.timeout_ms = 10000
+
+review.enabled = false
+
+harness.instructions_file = "harness.md"
+
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"

@@ -1,0 +1,5 @@
+{
+  "output": "This output appears after the delay.",
+  "exit_code": 0,
+  "delay_ms": 30000
+}

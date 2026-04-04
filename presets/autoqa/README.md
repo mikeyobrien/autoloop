@@ -1,6 +1,6 @@
 # AutoQA miniloop
 
-A autoloops-native zero-dependency, domain-adaptive validation orchestrator.
+An autoloops-ts-native zero-dependency, domain-adaptive validation orchestrator.
 
 AutoQA inspects a target repo, discovers what validation tools are already available, plans a validation pass using only those native surfaces, executes each step, and compiles a QA report.
 
@@ -67,13 +67,7 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-./bin/autoloops run presets/autoqa /path/to/target-repo
-```
-
-Or with the installed shim:
-
-```bash
-autoloops run /path/to/tonic-loops/presets/autoqa /path/to/target-repo
+autoloops-ts run presets/autoqa /path/to/target-repo
 ```
 
 ## AutoQA vs AutoTest

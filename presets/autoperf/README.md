@@ -1,6 +1,6 @@
 # AutoPerf miniloop
 
-A autoloops-native performance profiling and optimization loop.
+An autoloops-ts-native performance profiling and optimization loop.
 
 AutoPerf identifies hot paths, establishes baselines, implements targeted optimizations, measures results, and keeps or discards changes — similar to autoresearch but scoped specifically to performance.
 
@@ -52,11 +52,5 @@ AutoPerf should distrust claimed wins.
 From the repo root:
 
 ```bash
-./bin/autoloops run presets/autoperf "Reduce API response latency by 30%"
-```
-
-Or with the installed shim:
-
-```bash
-autoloops run /path/to/tonic-loops/presets/autoperf /path/to/target-repo
+autoloops-ts run presets/autoperf "Reduce API response latency by 30%"
 ```

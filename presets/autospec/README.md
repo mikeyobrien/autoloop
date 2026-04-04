@@ -1,6 +1,6 @@
 # AutoSpec miniloop
 
-A autoloops-native specification loop for turning a rough idea into a durable RFC + implementation task pair.
+An autoloops-ts-native specification loop for turning a rough idea into a durable RFC + implementation task pair.
 
 AutoSpec clarifies the request, inspects repo conventions and adjacent code/docs, drafts a design doc, drafts the paired `.code-task.md`, and adversarially checks that the pair is aligned and actionable.
 
@@ -73,13 +73,7 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-./bin/autoloops run autospec "Add preset-level profiles for role tuning"
-```
-
-Or with the installed shim:
-
-```bash
-autoloops run autospec "Add preset-level profiles for role tuning"
+autoloops-ts run autospec "Add preset-level profiles for role tuning"
 ```
 
 ## Intended input styles

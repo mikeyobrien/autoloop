@@ -18,7 +18,7 @@ my-preset/
     └── ...
 ```
 
-The directory can live anywhere. Built-in presets live under `presets/<name>/`; custom presets just need a path that `autoloops run` can resolve.
+The directory can live anywhere. Built-in presets live under `presets/<name>/`; custom presets just need a path that `autoloops-ts run` can resolve.
 
 ## Step 1: Define the topology
 
@@ -165,21 +165,18 @@ See [`docs/configuration.md`](configuration.md) for the full key reference.
 ## Step 5: Run the preset
 
 ```bash
-# From the repo root, using the launcher
-./bin/autoloops run path/to/my-preset "Your objective here"
+# From the repo root
+node bin/autoloops-ts run path/to/my-preset "Your objective here"
 
 # Built-in presets can use their bundled name
-./bin/autoloops run autocode "Your objective here"
-
-# With the installed shim
-autoloops run path/to/my-preset "Your objective here"
+autoloops-ts run autocode "Your objective here"
 
 # Explicit flag form for built-in names or custom dirs
-autoloops run --preset autocode "Your objective here"
-autoloops run --preset path/to/my-preset "Your objective here"
+autoloops-ts run --preset autocode "Your objective here"
+autoloops-ts run --preset path/to/my-preset "Your objective here"
 
 # Override backend for a one-off run
-autoloops run -b claude --preset autocode "Your objective here"
+autoloops-ts run -b claude --preset autocode "Your objective here"
 ```
 
 `run` loads `autoloops.toml`, `topology.toml`, and `harness.md` from the selected preset directory. Built-in presets resolve by name through `presets/<name>/`; custom presets still use a directory path.
@@ -198,7 +195,7 @@ steps = ["autocode", "path/to/my-preset", "autotest"]
 Or compose ad hoc on the command line:
 
 ```bash
-autoloops run . --chain autocode,path/to/my-preset,autotest
+autoloops-ts run . --chain autocode,path/to/my-preset,autotest
 ```
 
 ## Design patterns

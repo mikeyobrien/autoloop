@@ -1,6 +1,6 @@
 # Journal Reference
 
-The journal is the canonical runtime source of truth for a autoloops loop. Every significant event — system lifecycle, agent actions, coordination, review, and chain execution — is appended as a single JSON line to `.autoloop/journal.jsonl`. Nothing is mutated or deleted; the file is append-only.
+The journal is the canonical runtime source of truth for an autoloops-ts loop. Every significant event — system lifecycle, agent actions, coordination, review, and chain execution — is appended as a single JSON line to `.autoloop/journal.jsonl`. Nothing is mutated or deleted; the file is append-only.
 
 Higher-level views (scratchpad, coordination state, chain progress) are **projections** — derived by reading the journal and filtering/aggregating events.
 
@@ -25,7 +25,7 @@ Emitted by the harness at lifecycle boundaries.
 
 ### Agent events
 
-Emitted by the model via `autoloops emit`.
+Emitted by the model via `autoloops-ts emit`.
 
 ```json
 {"run": "run-mn9d3uk0-xi0m", "iteration": "3", "topic": "review.ready", "payload": "initial implementation complete", "source": "agent"}
@@ -122,7 +122,7 @@ When `parallel.enabled = true`, the harness records wave events for parallel bra
 
 ### Chain events
 
-Chain events are recorded in the journal when running multi-loop compositions via `autoloops chain run`. They use the system event shape.
+Chain events are recorded in the journal when running multi-loop compositions via `autoloops-ts chain run`. They use the system event shape.
 
 | Topic | Fields | Description |
 |-------|--------|-------------|
@@ -161,7 +161,7 @@ Autoloops uses **soft routing with protocol backpressure**. The model receives a
 
 1. The topology's handoff map determines **suggested roles** from the most recent routing event.
 2. The **allowed events** are the union of all `emits` arrays from the suggested roles.
-3. When the agent emits an event (via `autoloops emit` or detected in backend output), it is checked against the allowed set.
+3. When the agent emits an event (via `autoloops-ts emit` or detected in backend output), it is checked against the allowed set.
 4. **Coordination events bypass validation** — they are always accepted.
 5. **If the allowed-events list is empty** (no topology or unmapped event), all events are accepted.
 
@@ -178,7 +178,7 @@ The harness also checks for invalid events after each iteration completes (in ca
 
 Invalid events are caught at two points:
 
-- **At emit time** — the `autoloops emit` command validates against `MINILOOPS_ALLOWED_EVENTS` environment variable and rejects immediately.
+- **At emit time** — the `autoloops-ts emit` command validates against `MINILOOPS_ALLOWED_EVENTS` environment variable and rejects immediately.
 - **After iteration** — the harness scans the iteration's journal entries for the latest agent event and validates it against the topology. This catches events emitted through non-standard paths.
 
 ## Completion detection
@@ -214,7 +214,7 @@ exit_code=0
 Each section is built from the `exit_code` and `output` fields of the corresponding `iteration.finish` journal entry. The scratchpad has two render targets:
 
 - Iteration prompts and metareview review prompts get a compact view that keeps the most recent iterations detailed and collapses older ones to short summaries.
-- `autoloops inspect scratchpad --format md` keeps the richer view for debugging.
+- `autoloops-ts inspect scratchpad --format md` keeps the richer view for debugging.
 - Both views are scoped to the current run (filtered by `run` ID).
 
 ## Run scoping
@@ -228,15 +228,15 @@ The latest run is found by scanning backward for the most recent `loop.start` en
 The journal and its projections can be inspected via CLI:
 
 ```bash
-autoloops inspect journal --format json       # raw JSONL
-autoloops inspect scratchpad --format md       # iteration summaries
-autoloops inspect coordination --format md     # issues, slices, commits, archives
-autoloops inspect metrics --format md          # per-iteration metrics table with summary
-autoloops inspect metrics --format csv         # metrics as RFC 4180 CSV
-autoloops inspect metrics --format json        # metrics as JSON array
-autoloops inspect prompt 3 --format md         # iteration 3 prompt
-autoloops inspect output 3 --format text       # iteration 3 output
-autoloops inspect chain --format md            # chain execution state
+autoloops-ts inspect journal --format json       # raw JSONL
+autoloops-ts inspect scratchpad --format md       # iteration summaries
+autoloops-ts inspect coordination --format md     # issues, slices, commits, archives
+autoloops-ts inspect metrics --format md          # per-iteration metrics table with summary
+autoloops-ts inspect metrics --format csv         # metrics as RFC 4180 CSV
+autoloops-ts inspect metrics --format json        # metrics as JSON array
+autoloops-ts inspect prompt 3 --format md         # iteration 3 prompt
+autoloops-ts inspect output 3 --format text       # iteration 3 output
+autoloops-ts inspect chain --format md            # chain execution state
 ```
 
 ## JSON encoding

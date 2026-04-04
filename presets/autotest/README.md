@@ -1,6 +1,6 @@
 # AutoTest miniloop
 
-A autoloops-native formal test creation and test-suite tightening loop.
+An autoloops-ts-native formal test creation and test-suite tightening loop.
 
 AutoTest surveys a codebase for coverage gaps, writes new tests using the repo's existing framework and conventions, runs them, and assesses quality — iterating until meaningful regression-catching gaps are covered or no worthwhile gaps remain.
 
@@ -51,11 +51,5 @@ AutoTest is about better tests, not prettier coverage numbers.
 From the repo root:
 
 ```bash
-./bin/autoloops run presets/autotest /path/to/target-repo
-```
-
-Or with the installed shim:
-
-```bash
-autoloops run /path/to/tonic-loops/presets/autotest /path/to/target-repo
+autoloops-ts run presets/autotest /path/to/target-repo
 ```

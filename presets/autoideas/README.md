@@ -1,6 +1,6 @@
 # Autoideas miniloop
 
-A autoloops-native loop that surveys a repository and generates a skeptically filtered improvement report.
+An autoloops-ts-native loop that surveys a repository and generates a skeptically filtered improvement report.
 
 Shape:
 - scanner
@@ -56,19 +56,13 @@ backend.command = "../../examples/mock-backend.sh"
 From the repo root:
 
 ```bash
-./bin/autoloops run presets/autoideas /path/to/target-repo
-```
-
-Or with the installed shim:
-
-```bash
-autoloops run /path/to/tonic-loops/presets/autoideas /path/to/target-repo
+autoloops-ts run presets/autoideas /path/to/target-repo
 ```
 
 For a one-off Claude dogfood run without editing config:
 
 ```bash
-./bin/autoloops -b claude presets/autoideas /path/to/target-repo
+autoloops-ts -b claude presets/autoideas /path/to/target-repo
 ```
 
 ## What it produces

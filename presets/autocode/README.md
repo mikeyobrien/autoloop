@@ -1,6 +1,6 @@
 # Autocode miniloop
 
-A autoloops-native port of Ralph's code-assist/autocode loop.
+An autoloops-ts-native port of Ralph's code-assist/autocode loop.
 
 Shape:
 - planner
@@ -62,19 +62,13 @@ backend.command = "../../examples/mock-backend.sh"
 From this repo root:
 
 ```bash
-./bin/autoloops run autocode "Add a --verbose flag to the CLI"
-```
-
-Or with the installed shim:
-
-```bash
-autoloops run autocode "Add a --verbose flag to the CLI"
+autoloops-ts run autocode "Add a --verbose flag to the CLI"
 ```
 
 For a one-off Claude dogfood run without editing config:
 
 ```bash
-./bin/autoloops -b claude -p autocode "Add a --verbose flag to the CLI"
+autoloops-ts -b claude -p autocode "Add a --verbose flag to the CLI"
 ```
 
 ## Intended input styles
