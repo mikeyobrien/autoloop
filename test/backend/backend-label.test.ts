@@ -3,7 +3,7 @@ import { normalizeBackendLabel } from "../../src/backend/index.js";
 
 describe("normalizeBackendLabel", () => {
   it("normalizes absolute claude paths to claude", () => {
-    expect(normalizeBackendLabel("/home/mobrienv/.npm-global/bin/claude")).toBe("claude");
+    expect(normalizeBackendLabel("/opt/tools/claude")).toBe("claude");
   });
 
   it("normalizes absolute pi paths to pi", () => {

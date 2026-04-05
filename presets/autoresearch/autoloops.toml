@@ -4,7 +4,7 @@ event_loop.completion_promise = "LOOP_COMPLETE"
 event_loop.required_events = ["experiment.measured"]
 
 backend.kind = "command"
-backend.command = "/Users/rook/.npm-global/bin/claude"
+backend.command = "claude"
 backend.timeout_ms = 3000000
 
 review.enabled = true

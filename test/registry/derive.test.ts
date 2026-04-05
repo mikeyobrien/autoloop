@@ -69,7 +69,7 @@ describe("deriveRunRecords", () => {
   });
 
   it("normalizes absolute backend paths from loop.start metadata", () => {
-    const lines = [loopStartLine("run-1", { backend: "/Users/rook/.npm-global/bin/claude" })];
+    const lines = [loopStartLine("run-1", { backend: "/opt/tools/claude" })];
     const records = deriveRunRecords(lines);
     expect(records[0].backend).toBe("claude");
   });

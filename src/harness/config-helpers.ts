@@ -82,6 +82,16 @@ export function configListWithFallback(cfg: config.Config, key: string, fallback
   return splitCsv(raw);
 }
 
+export function injectClaudePermissions(command: string, args: string[]): string[] {
+  if (!claudeBackend(command)) return args;
+  const injected = [...args];
+  if (!injected.includes("-p")) injected.unshift("-p");
+  if (!injected.includes("--dangerously-skip-permissions")) {
+    injected.push("--dangerously-skip-permissions");
+  }
+  return injected;
+}
+
 export function processStringOverride(override: Record<string, unknown>, key: string, fallback: string): string {
   const val = override[key];
   return typeof val === "string" ? val : fallback;
@@ -90,6 +100,10 @@ export function processStringOverride(override: Record<string, unknown>, key: st
 export function processListOverride(override: Record<string, unknown>, key: string, fallback: string[]): string[] {
   const val = override[key];
   return Array.isArray(val) ? val as string[] : fallback;
+}
+
+function claudeBackend(command: string): boolean {
+  return command === "claude" || command.endsWith("/claude");
 }
 
 export function nextRunId(path: string, cfg: config.Config): string {
@@ -196,7 +210,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
 
   const backendCommand = processStringOverride(bo, "command", config.get(cfg, "backend.command", "pi"));
   const backendKind = resolveProcessKind(processStringOverride(bo, "kind", config.get(cfg, "backend.kind", "")), backendCommand);
-  const backendArgs = processListOverride(bo, "args", configListWithFallback(cfg, "backend.args", []));
+  const backendArgs = injectClaudePermissions(
+    backendCommand,
+    processListOverride(bo, "args", configListWithFallback(cfg, "backend.args", [])),
+  );
   const backendPromptMode = normalizePromptMode(processStringOverride(bo, "prompt_mode", config.get(cfg, "backend.prompt_mode", "arg")));
   const maxIterations = config.getInt(cfg, "event_loop.max_iterations", 3);
   const completionPromise = config.get(cfg, "event_loop.completion_promise", "LOOP_COMPLETE");
