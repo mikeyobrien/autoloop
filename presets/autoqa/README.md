@@ -1,6 +1,6 @@
 # AutoQA miniloop
 
-An autoloop-native zero-dependency, domain-adaptive validation orchestrator.
+Use when you want comprehensive validation of a codebase without writing custom test harnesses.
 
 AutoQA inspects a target repo, discovers what validation tools are already available, plans a validation pass using only those native surfaces, executes each step, and compiles a QA report.
 

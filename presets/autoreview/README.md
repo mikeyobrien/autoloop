@@ -1,6 +1,6 @@
 # AutoReview miniloop
 
-An autoloop-native code review loop for PR diffs and change sets.
+Use when you want an automated code review of a PR diff or change set.
 
 AutoReview reads changes, checks for issues across correctness, security, style, performance, and maintainability, proposes concrete fixes, and compiles structured review feedback with a clear verdict.
 

@@ -1,6 +1,6 @@
 # AutoTest miniloop
 
-An autoloop-native formal test creation and test-suite tightening loop.
+Use when you need to create new tests or tighten an existing test suite for better coverage.
 
 AutoTest surveys a codebase for coverage gaps, writes new tests using the repo's existing framework and conventions, runs them, and assesses quality — iterating until meaningful regression-catching gaps are covered or no worthwhile gaps remain.
 

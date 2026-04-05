@@ -1,6 +1,6 @@
 # AutoFix miniloop
 
-An autoloop-native bug diagnosis and repair loop.
+Use when you have a bug to diagnose and repair with minimal collateral changes.
 
 AutoFix takes a bug report or failing test, reproduces the issue, traces the root cause, implements a minimal fix, and verifies the fix — all without refactoring or improving code beyond what is needed.
 

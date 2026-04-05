@@ -1,6 +1,6 @@
 # Autoideas miniloop
 
-An autoloop-native loop that surveys a repository and generates a skeptically filtered improvement report.
+Use when you want a skeptical audit of improvement opportunities across your repository.
 
 Shape:
 - scanner

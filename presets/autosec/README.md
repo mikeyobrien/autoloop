@@ -1,6 +1,6 @@
 # AutoSec miniloop
 
-An autoloop-native security audit and hardening loop.
+Use when you want a security audit to find vulnerabilities and harden your code.
 
 AutoSec scans a target repo for security vulnerabilities across injection, auth, secrets, dependencies, and configuration. Candidate findings are confirmed or dismissed by an analyst, fixed by a hardener when appropriate, and tracked in a prioritized security report.
 

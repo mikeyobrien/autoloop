@@ -1,6 +1,6 @@
 # Autocode miniloop
 
-An autoloop-native port of Ralph's code-assist/autocode loop.
+Use when you need to implement a feature, refactor code, or make structured changes across a codebase.
 
 Shape:
 - planner

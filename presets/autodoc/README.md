@@ -1,6 +1,6 @@
 # AutoDoc miniloop
 
-An autoloop-native documentation generation and maintenance loop.
+Use when you need to generate or update documentation to match current code.
 
 AutoDoc audits existing documentation against the codebase, identifies gaps and staleness, writes or updates docs, verifies accuracy, and tracks progress — iterating until documentation is current.
 

@@ -1,6 +1,6 @@
 # Autoresearch miniloop
 
-An autoloop-native autonomous experiment loop inspired by Ralph's autoresearch preset.
+Use when you need to explore a technical question through iterative experiments and analysis.
 
 Shape:
 - strategist — decides what experiment to try next

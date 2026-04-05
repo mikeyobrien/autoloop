@@ -22,6 +22,20 @@ describe("dispatchList", () => {
     expect(lines.some((l) => l.startsWith("autocode"))).toBe(true);
   });
 
+  it("descriptions use action-oriented 'Use when/Use after' style", () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      lines.push(args.join(" "));
+    });
+    dispatchList([], bundleRoot);
+    vi.restoreAllMocks();
+
+    for (const line of lines) {
+      const desc = line.replace(/^auto\w+\s+/, "");
+      expect(desc).toMatch(/^Use (when|after) /);
+    }
+  });
+
   it("prints help with --help", () => {
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => {

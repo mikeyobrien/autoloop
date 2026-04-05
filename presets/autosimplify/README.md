@@ -1,6 +1,6 @@
 # AutoSimplify miniloop
 
-An autoloop-native post-implementation cleanup loop inspired by Claude Code's `/simplify` workflow.
+Use after implementation to clean up duplication, reduce complexity, and improve code quality.
 
 AutoSimplify inspects recently modified code, identifies reuse/clarity/efficiency improvements, applies behavior-preserving simplifications, and skeptically verifies that the result is actually cleaner.
 

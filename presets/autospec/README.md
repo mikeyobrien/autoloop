@@ -1,6 +1,6 @@
 # AutoSpec miniloop
 
-An autoloop-native specification loop for turning a rough idea into a durable RFC + implementation task pair.
+Use when you have a rough idea and need a structured RFC and implementation task plan.
 
 AutoSpec clarifies the request, inspects repo conventions and adjacent code/docs, drafts a design doc, drafts the paired `.code-task.md`, and adversarially checks that the pair is aligned and actionable.
 

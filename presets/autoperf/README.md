@@ -1,6 +1,6 @@
 # AutoPerf miniloop
 
-An autoloop-native performance profiling and optimization loop.
+Use when you need to profile performance bottlenecks and apply targeted optimizations.
 
 AutoPerf identifies hot paths, establishes baselines, implements targeted optimizations, measures results, and keeps or discards changes — similar to autoresearch but scoped specifically to performance.
 
