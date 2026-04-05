@@ -97,6 +97,30 @@ describe("integration: run loop with mock backend", () => {
     expect(journal).toContain("bogus.not.allowed");
   });
 
+  it("prefers an accepted routing event over completion_promise within the same iteration", () => {
+    const project = makeTempProject("routed-event-over-promise");
+    const fixture = join(FIXTURES_DIR, "routed-event-and-promise.json");
+    const res = runCli(["run", project, "integration routed event over promise"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
+
+    expect(res.status).toBe(0);
+    const journal = readText(join(project, ".autoloop/journal.jsonl"));
+    expect(journal).toContain('"topic": "tasks.ready"');
+    expect(journal).toContain('"iteration": "2"');
+    expect(res.stdout).toContain("outcome=continue:routed_event");
+
+    const routedIndex = journal.indexOf('"topic": "tasks.ready"');
+    const secondIterationIndex = journal.indexOf('"iteration": "2"');
+    const completionPromiseIndex = journal.indexOf('"topic": "loop.complete", "fields": {"reason": "completion_promise"}');
+
+    expect(routedIndex).toBeGreaterThanOrEqual(0);
+    expect(secondIterationIndex).toBeGreaterThan(routedIndex);
+    if (completionPromiseIndex >= 0) {
+      expect(completionPromiseIndex).toBeGreaterThan(secondIterationIndex);
+    }
+  });
+
   it("prints a progress line when stopping at max iterations", () => {
     const project = makeTempProject("max-iterations-progress");
     const fixture = join(FIXTURES_DIR, "no-completion.json");

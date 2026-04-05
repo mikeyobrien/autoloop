@@ -1,0 +1,7 @@
+{
+  "output": "Planner emitted tasks.ready.\n\nLOOP_COMPLETE",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "tasks.ready",
+  "emit_payload": "Mock backend: tasks ready"
+}

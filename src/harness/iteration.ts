@@ -84,6 +84,18 @@ export function finishIteration(
     return completeLoop(loop, iter.iteration, "completion_event");
   }
 
+  if (shouldContinueFromAcceptedEvent(emitted.topic, loop.completion.event)) {
+    printProgressLine({
+      runId: loop.runtime.runId,
+      iteration: iter.iteration,
+      recentEvent: iter.recentEvent,
+      allowedRoles: iter.allowedRoles,
+      emittedTopic: emitted.topic,
+      outcome: "continue:routed_event",
+    });
+    return iterate(loop, iter.iteration + 1);
+  }
+
   if (completedViaPromise(output, loop.completion.promise)) {
     printProgressLine({
       runId: loop.runtime.runId,
@@ -185,4 +197,9 @@ function completedViaEvent(topics: string[], completionEvent: string, requiredEv
 function completedViaPromise(output: string, promise: string): boolean {
   if (!promise) return false;
   return output.includes(promise);
+}
+
+function shouldContinueFromAcceptedEvent(emittedTopic: string, completionEvent: string): boolean {
+  if (!emittedTopic) return false;
+  return emittedTopic !== completionEvent;
 }
