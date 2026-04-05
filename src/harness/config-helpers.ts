@@ -163,16 +163,8 @@ export function buildLoopContext(
   const configLogLevel = config.get(cfg, "core.log_level", "info");
   const logLevel = cliLogLevel || configLogLevel;
 
-  const loop: LoopContext = {
-    objective: "",
-    topology: topo.loadTopology(resolvedProjectDir),
-    limits: { maxIterations: 0 },
-    completion: { promise: "", event: "", requiredEvents: [] },
-    backend: { kind: "", command: "", args: [], promptMode: "arg", timeoutMs: 300000 },
-    review: { enabled: true, every: 1, kind: "", command: "", args: [], promptMode: "arg", prompt: "", timeoutMs: 300000 },
-    parallel: { enabled: false, maxBranches: 3, branchTimeoutMs: 180000 },
-    memory: { budgetChars: 8000 },
-    harness: { instructions: "" },
+  // Only paths, runtime, launch, and store survive — reloadLoop fills the rest from config.
+  const seed = {
     paths: {
       projectDir: resolvedProjectDir,
       workDir: resolvedWorkDir,
@@ -198,59 +190,82 @@ export function buildLoopContext(
       parentRunId: runOptions.parentRunId ?? "",
     },
     store: {},
-  };
-  return reloadLoop(loop);
+  } as LoopContext;
+  return reloadLoop(seed);
 }
 
 export function reloadLoop(loop: LoopContext): LoopContext {
   const pd = loop.paths.projectDir;
   const cfg = config.loadProject(pd);
   const topoData = topo.loadTopology(pd);
-  const bo = loop.runtime.backendOverride;
 
-  const backendCommand = processStringOverride(bo, "command", config.get(cfg, "backend.command", "pi"));
-  const backendKind = resolveProcessKind(processStringOverride(bo, "kind", config.get(cfg, "backend.kind", "")), backendCommand);
-  const backendArgs = injectClaudePermissions(
-    backendCommand,
-    processListOverride(bo, "args", configListWithFallback(cfg, "backend.args", [])),
-  );
-  const backendPromptMode = normalizePromptMode(processStringOverride(bo, "prompt_mode", config.get(cfg, "backend.prompt_mode", "arg")));
-  const maxIterations = config.getInt(cfg, "event_loop.max_iterations", 3);
-  const completionPromise = config.get(cfg, "event_loop.completion_promise", "LOOP_COMPLETE");
-  const completionEvent = topo.completionEvent(topoData, config.get(cfg, "event_loop.completion_event", "task.complete"));
-  const requiredEvents = config.getList(cfg, "event_loop.required_events");
-  const objective = resolvePrompt(pd, cfg, loop.runtime.promptOverride);
-  const parallelEnabled = truthySetting(config.get(cfg, "parallel.enabled", "false"));
-  const parallelMaxBranches = config.getInt(cfg, "parallel.max_branches", 3);
-  const parallelBranchTimeoutMs = config.getInt(cfg, "parallel.branch_timeout_ms", 180000);
-  const memoryBudgetChars = config.getInt(cfg, "memory.prompt_budget_chars", 8000);
-  const reviewEvery = resolveReviewEvery(cfg, topoData);
-  const reviewEnabled = truthySetting(config.get(cfg, "review.enabled", "true"));
-  const backendTimeoutMs = config.getInt(cfg, "backend.timeout_ms", 300000);
-  const reviewTimeoutMs = config.getInt(cfg, "review.timeout_ms", 300000);
-  const reviewCommand = config.get(cfg, "review.command", backendCommand);
-  const reviewKind = resolveProcessKind(config.get(cfg, "review.kind", backendKind), reviewCommand);
-  const reviewArgs = configListWithFallback(cfg, "review.args", backendArgs);
-  const reviewPromptMode = normalizePromptMode(config.get(cfg, "review.prompt_mode", backendPromptMode));
-  const harnessText = readOptionalProjectFile(pd, config.get(cfg, "harness.instructions_file", "harness.md"));
-  const reviewText = resolveReviewPrompt(pd, cfg);
+  const backend = readBackendConfig(cfg, loop.runtime.backendOverride);
+  const review = readReviewConfig(cfg, topoData, pd, backend);
+  const parallel = readParallelConfig(cfg);
 
   const updated: LoopContext = {
-    objective,
+    objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride),
     topology: topoData,
-    limits: { maxIterations },
-    completion: { promise: completionPromise, event: completionEvent, requiredEvents },
-    backend: { kind: backendKind, command: backendCommand, args: backendArgs, promptMode: backendPromptMode, timeoutMs: backendTimeoutMs },
-    review: { enabled: reviewEnabled, every: reviewEvery, kind: reviewKind, command: reviewCommand, args: reviewArgs, promptMode: reviewPromptMode, prompt: reviewText, timeoutMs: reviewTimeoutMs },
-    parallel: { enabled: parallelEnabled, maxBranches: parallelMaxBranches, branchTimeoutMs: parallelBranchTimeoutMs },
-    memory: { budgetChars: memoryBudgetChars },
-    harness: { instructions: harnessText },
+    limits: { maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3) },
+    completion: {
+      promise: config.get(cfg, "event_loop.completion_promise", "LOOP_COMPLETE"),
+      event: topo.completionEvent(topoData, config.get(cfg, "event_loop.completion_event", "task.complete")),
+      requiredEvents: config.getList(cfg, "event_loop.required_events"),
+    },
+    backend,
+    review,
+    parallel,
+    memory: { budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000) },
+    harness: { instructions: readOptionalProjectFile(pd, config.get(cfg, "harness.instructions_file", "harness.md")) },
     paths: loop.paths,
     runtime: loop.runtime,
     launch: loop.launch,
     store: loop.store,
   };
   return applyRuntimeModeOverrides(updated);
+}
+
+function readBackendConfig(
+  cfg: config.Config,
+  bo: Record<string, unknown>,
+): LoopContext["backend"] {
+  const command = processStringOverride(bo, "command", config.get(cfg, "backend.command", "pi"));
+  const kind = resolveProcessKind(processStringOverride(bo, "kind", config.get(cfg, "backend.kind", "")), command);
+  const args = injectClaudePermissions(
+    command,
+    processListOverride(bo, "args", configListWithFallback(cfg, "backend.args", [])),
+  );
+  const promptMode = normalizePromptMode(processStringOverride(bo, "prompt_mode", config.get(cfg, "backend.prompt_mode", "arg")));
+  const timeoutMs = config.getInt(cfg, "backend.timeout_ms", 300000);
+  return { kind, command, args, promptMode, timeoutMs };
+}
+
+function readReviewConfig(
+  cfg: config.Config,
+  topoData: topo.Topology,
+  projectDir: string,
+  backend: LoopContext["backend"],
+): LoopContext["review"] {
+  const command = config.get(cfg, "review.command", backend.command);
+  const kind = resolveProcessKind(config.get(cfg, "review.kind", backend.kind), command);
+  return {
+    enabled: truthySetting(config.get(cfg, "review.enabled", "true")),
+    every: resolveReviewEvery(cfg, topoData),
+    kind,
+    command,
+    args: configListWithFallback(cfg, "review.args", backend.args),
+    promptMode: normalizePromptMode(config.get(cfg, "review.prompt_mode", backend.promptMode)),
+    prompt: resolveReviewPrompt(projectDir, cfg),
+    timeoutMs: config.getInt(cfg, "review.timeout_ms", 300000),
+  };
+}
+
+function readParallelConfig(cfg: config.Config): LoopContext["parallel"] {
+  return {
+    enabled: truthySetting(config.get(cfg, "parallel.enabled", "false")),
+    maxBranches: config.getInt(cfg, "parallel.max_branches", 3),
+    branchTimeoutMs: config.getInt(cfg, "parallel.branch_timeout_ms", 180000),
+  };
 }
 
 export function applyRuntimeModeOverrides(loop: LoopContext): LoopContext {
