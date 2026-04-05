@@ -8,6 +8,7 @@ import { executeParallelWave, continueAfterParallelJoin, stopAfterParallelWave }
 import {
   printIterationBanner,
   printIterationFooter,
+  printBackendOutputTail,
   printProgressLine,
   log,
 } from "./display.js";
@@ -47,6 +48,7 @@ export function runIteration(
   registryProgress(loop, iteration);
   log(loop, "debug", `iteration ${iteration} finish exit_code=${exitCode}`);
   printIterationFooter(iter, elapsedS);
+  printBackendOutputTail(output);
 
   if (timedOut) return stopBackendTimeout(loop, iteration, output);
   if (exitCode !== 0) return stopBackendFailed(loop, iteration, output);

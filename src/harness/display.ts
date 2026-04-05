@@ -89,6 +89,16 @@ export function printReviewBanner(iteration: number): void {
   console.log(label.padEnd(terminalWidth(), "━"));
 }
 
+export function printBackendOutputTail(output: string, maxLines: number = 200): void {
+  const lines = output.split(lineSep());
+  const tail = lines.slice(-maxLines);
+  if (!tail.join("").trim()) return;
+  const shown = Math.min(lines.length, maxLines);
+  console.log(`── backend stdout (last ${shown} of ${lines.length} lines) ──`);
+  console.log(tail.join(lineSep()));
+  console.log("──────────────────────────────────────");
+}
+
 export function printFailureDiagnostic(output: string, stopReason: string): void {
   const lines = output.split(lineSep());
   const tail = lines.slice(-15).join(lineSep());

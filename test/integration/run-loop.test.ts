@@ -197,6 +197,19 @@ describe("integration: run loop with mock backend", () => {
     expect(journal).toContain('"topic": "loop.complete"');
   });
 
+  it("prints last 200 lines of backend stdout after each iteration", () => {
+    const project = makeTempProject("backend-output-tail");
+    const fixture = join(FIXTURES_DIR, "complete-success.json");
+    const res = runCli(["run", project, "integration backend output tail"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
+
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("── backend stdout (last");
+    expect(res.stdout).toContain("lines) ──");
+    expect(res.stdout).toContain("Task completed successfully.");
+  });
+
   it("inspect commands render metrics, scratchpad, and memory", () => {
     const project = makeTempProject("inspect");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
