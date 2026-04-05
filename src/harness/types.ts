@@ -9,6 +9,12 @@ export interface LaunchMetadata {
   parentRunId: string;
 }
 
+export interface ProfileInfo {
+  active: string[];
+  fragments: Map<string, string>;
+  warnings: string[];
+}
+
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
@@ -19,6 +25,7 @@ export interface LoopContext {
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
   memory: { budgetChars: number };
   harness: { instructions: string };
+  profiles: ProfileInfo;
   paths: { projectDir: string; workDir: string; stateDir: string; journalFile: string; memoryFile: string; registryFile: string; toolPath: string; piAdapterPath: string };
   runtime: { runId: string; selfCommand: string; promptOverride: string | null; backendOverride: Record<string, unknown>; logLevel: string; branchMode: boolean };
   launch: LaunchMetadata;
@@ -33,6 +40,8 @@ export interface RunOptions {
   chain?: string | null;
   trigger?: TriggerSource;
   parentRunId?: string;
+  profiles?: string[];
+  noDefaultProfiles?: boolean;
 }
 
 export interface RunSummary {

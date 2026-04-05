@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from "n
 import { join, resolve, basename } from "node:path";
 import * as config from "../config.js";
 import * as topo from "../topology.js";
+import * as profiles from "../profiles.js";
 import { splitCsv, generateCompactId } from "../utils.js";
 import {
   readLines,
@@ -163,7 +164,13 @@ export function buildLoopContext(
   const configLogLevel = config.get(cfg, "core.log_level", "info");
   const logLevel = cliLogLevel || configLogLevel;
 
-  // Only paths, runtime, launch, and store survive — reloadLoop fills the rest from config.
+  // Compute active profiles: config defaults (unless suppressed) + CLI explicit
+  const cliProfiles = runOptions.profiles ?? [];
+  const noDefaults = runOptions.noDefaultProfiles ?? false;
+  const configDefaults = noDefaults ? [] : config.getProfileDefaults(cfg);
+  const activeProfiles = [...configDefaults, ...cliProfiles];
+
+  // Only paths, runtime, launch, profiles, and store survive — reloadLoop fills the rest from config.
   const seed = {
     paths: {
       projectDir: resolvedProjectDir,
@@ -189,13 +196,15 @@ export function buildLoopContext(
       createdAt: new Date().toISOString(),
       parentRunId: runOptions.parentRunId ?? "",
     },
+    profiles: { active: activeProfiles, fragments: new Map<string, string>(), warnings: [] as string[] },
     store: {},
-  } as LoopContext;
+  } as unknown as LoopContext;
   return reloadLoop(seed);
 }
 
 export function reloadLoop(loop: LoopContext): LoopContext {
   const pd = loop.paths.projectDir;
+  const wd = loop.paths.workDir;
   const cfg = config.loadProject(pd);
   const topoData = topo.loadTopology(pd);
 
@@ -203,9 +212,23 @@ export function reloadLoop(loop: LoopContext): LoopContext {
   const review = readReviewConfig(cfg, topoData, pd, backend);
   const parallel = readParallelConfig(cfg);
 
+  // Resolve and apply profile fragments
+  const activeProfiles = loop.profiles?.active ?? [];
+  let profileInfo = loop.profiles ?? { active: [], fragments: new Map(), warnings: [] };
+  let finalTopology = topoData;
+  if (activeProfiles.length > 0) {
+    const presetName = loop.launch.preset;
+    const resolved = profiles.resolveProfileFragments(activeProfiles, presetName, topoData.roles, wd);
+    profileInfo = { active: activeProfiles, fragments: resolved.fragments, warnings: resolved.warnings };
+    finalTopology = { ...topoData, roles: profiles.applyProfileFragments(topoData.roles, resolved.fragments) };
+    for (const w of resolved.warnings) {
+      process.stderr.write("profile warning: " + w + "\n");
+    }
+  }
+
   const updated: LoopContext = {
     objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride),
-    topology: topoData,
+    topology: finalTopology,
     limits: { maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3) },
     completion: {
       promise: config.get(cfg, "event_loop.completion_promise", "LOOP_COMPLETE"),
@@ -217,6 +240,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     parallel,
     memory: { budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000) },
     harness: { instructions: readOptionalProjectFile(pd, config.get(cfg, "harness.instructions_file", "harness.md")) },
+    profiles: profileInfo,
     paths: loop.paths,
     runtime: loop.runtime,
     launch: loop.launch,

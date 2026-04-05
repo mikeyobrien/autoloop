@@ -15,6 +15,8 @@ interface RunOptions {
   positionals: string[];
   usageError: boolean;
   workDir?: string;
+  profiles: string[];
+  noDefaultProfiles: boolean;
 }
 
 export function dispatchRun(args: string[], argv: string[], bundleRoot: string, selfCmd: string): boolean {
@@ -34,7 +36,11 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
     options.projectDir,
     normalizePrompt(options.prompt),
     selfCmd,
-    options,
+    {
+      ...options,
+      profiles: options.profiles.length > 0 ? options.profiles : undefined,
+      noDefaultProfiles: options.noDefaultProfiles || undefined,
+    },
   );
   return true;
 }
@@ -49,6 +55,8 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     presetExplicit: false,
     positionals: [],
     usageError: false,
+    profiles: [],
+    noDefaultProfiles: false,
   };
 
   let i = 0;
@@ -77,6 +85,16 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
       if (!chainVal) { console.log("missing chain after --chain"); options.usageError = true; return options; }
       options.chain = chainVal;
       i += 2; continue;
+    }
+    if (token === "--profile") {
+      const profile = args[i + 1];
+      if (!profile) { console.log("missing profile spec after --profile"); options.usageError = true; return options; }
+      options.profiles.push(profile);
+      i += 2; continue;
+    }
+    if (token === "--no-default-profiles") {
+      options.noDefaultProfiles = true;
+      i++; continue;
     }
     if (token === "-i" || token === "--iterations") {
       console.log("unsupported flag `" + token + "`; set event_loop.max_iterations in the preset config");

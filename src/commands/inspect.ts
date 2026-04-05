@@ -1,6 +1,9 @@
 import * as harness from "../harness/index.js";
 import * as memory from "../memory.js";
 import * as chains from "../chains.js";
+import * as config from "../config.js";
+import * as topo from "../topology.js";
+import * as profiles from "../profiles.js";
 import { printInspectUsage } from "../usage.js";
 
 interface InspectSpec {
@@ -41,6 +44,9 @@ export function dispatchInspect(args: string[]): boolean {
       return true;
     case "chain":
       console.log(chains.renderChainState(projectDir));
+      return true;
+    case "profiles":
+      renderProfilesInspect(projectDir);
       return true;
     case "prompt":
       if (!selector) { console.log("inspect prompt requires an iteration selector"); return true; }
@@ -95,4 +101,45 @@ function inspectDefaultFormat(artifact: string): string {
 
 function resolveRuntimeProjectDir(): string {
   return process.env["MINILOOPS_PROJECT_DIR"] || ".";
+}
+
+function renderProfilesInspect(projectDir: string): void {
+  const cfg = config.loadProject(projectDir);
+  const defaults = config.getProfileDefaults(cfg);
+  const topoData = topo.loadTopology(projectDir);
+  const workDir = process.cwd();
+
+  console.log("## Profile Configuration");
+  console.log("");
+  console.log("Config default profiles: " + (defaults.length > 0 ? defaults.join(", ") : "(none)"));
+  console.log("");
+
+  if (defaults.length === 0) {
+    console.log("No active profiles.");
+    return;
+  }
+
+  const presetName = require("node:path").basename(projectDir);
+  try {
+    const resolved = profiles.resolveProfileFragments(defaults, presetName, topoData.roles, workDir);
+    console.log("Active profiles: " + defaults.join(", "));
+    console.log("");
+
+    if (resolved.warnings.length > 0) {
+      console.log("Warnings:");
+      for (const w of resolved.warnings) {
+        console.log("  - " + w);
+      }
+      console.log("");
+    }
+
+    if (resolved.fragments.size > 0) {
+      console.log("Fragments:");
+      for (const [roleId, fragment] of resolved.fragments) {
+        console.log("  " + roleId + ": " + fragment.trim().split("\n")[0] + "...");
+      }
+    }
+  } catch (err) {
+    console.log("Error resolving profiles: " + (err instanceof Error ? err.message : String(err)));
+  }
 }

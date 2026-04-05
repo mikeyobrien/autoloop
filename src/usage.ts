@@ -27,6 +27,8 @@ export function printUsage(): void {
   console.log("  -b, --backend    Override backend command");
   console.log("  -p, --preset     Resolve a bundled preset name or custom preset dir");
   console.log("  --chain          Run an inline chain (comma-separated presets)");
+  console.log("  --profile <spec> Activate a profile (repo:<name> or user:<name>), repeatable");
+  console.log("  --no-default-profiles  Suppress config-defined default profiles");
 }
 
 export function printRunUsage(): void {
@@ -42,6 +44,8 @@ export function printRunUsage(): void {
   console.log("  -b, --backend    Override backend command");
   console.log("  -p, --preset     Resolve a bundled preset name or custom preset dir");
   console.log("  --chain          Run an inline chain (comma-separated presets)");
+  console.log("  --profile <spec> Activate a profile (repo:<name> or user:<name>), repeatable");
+  console.log("  --no-default-profiles  Suppress config-defined default profiles");
   console.log("");
   console.log("Examples:");
   console.log("  autoloop run autocode");
@@ -67,7 +71,7 @@ export function printInspectUsage(): void {
   console.log("  journal -> json");
   console.log("");
   console.log("Artifacts:");
-  console.log("  scratchpad, prompt, output, journal, memory, coordination, chain, metrics");
+  console.log("  scratchpad, prompt, output, journal, memory, coordination, chain, metrics, profiles");
 }
 
 export function printMemoryUsage(): void {

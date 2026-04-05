@@ -65,6 +65,10 @@ export function getList(config: Config, key: string): string[] {
   return parseStringList(get(config, key, ""));
 }
 
+export function getProfileDefaults(cfg: Config): string[] {
+  return getList(cfg, "profiles.default");
+}
+
 export function put(config: Config, key: string, value: string): Config {
   const parts = key.split(".");
   return putPath(config, parts, value);
