@@ -67,58 +67,31 @@ export function finishIteration(
   const emitted = latestAgentEventRecord(turnLines);
   const hadInvalidEvents = turnLines.some((l) => extractTopic(l) === "event.invalid");
 
+  const progress = (emittedTopic: string, outcome: string) =>
+    printProgressLine({ runId: loop.runtime.runId, iteration: iter.iteration, recentEvent: iter.recentEvent, allowedRoles: iter.allowedRoles, emittedTopic, outcome });
+
   if (invalidEvent(emitted.topic, iter.allowedEvents, loop.parallel.enabled, loop.completion.event)) {
-    return rejectInvalidAndContinue(loop, iter, emitted.topic, iterate);
+    return rejectInvalidAndContinue(loop, iter, emitted.topic, iterate, progress);
   }
 
   if (parallelTriggerTopic(emitted.topic)) {
-    return finishParallelIteration(loop, iter, emitted.topic, emitted.payload, iterate);
+    return finishParallelIteration(loop, iter, emitted.topic, emitted.payload, iterate, progress);
   }
 
-  if (completedViaEvent(allTopics, loop.completion.event, loop.completion.requiredEvents)) {
-    printProgressLine({
-      runId: loop.runtime.runId,
-      iteration: iter.iteration,
-      recentEvent: iter.recentEvent,
-      allowedRoles: iter.allowedRoles,
-      emittedTopic: emitted.topic,
-      outcome: "complete:completion_event",
-    });
-    return completeLoop(loop, iter.iteration, "completion_event");
-  }
-
-  if (shouldContinueFromAcceptedEvent(emitted.topic, loop.completion.event)) {
-    printProgressLine({
-      runId: loop.runtime.runId,
-      iteration: iter.iteration,
-      recentEvent: iter.recentEvent,
-      allowedRoles: iter.allowedRoles,
-      emittedTopic: emitted.topic,
-      outcome: "continue:routed_event",
-    });
-    return iterate(loop, iter.iteration + 1);
-  }
-
-  if (!hadInvalidEvents && completedViaPromise(output, loop.completion.promise)) {
-    printProgressLine({
-      runId: loop.runtime.runId,
-      iteration: iter.iteration,
-      recentEvent: iter.recentEvent,
-      allowedRoles: iter.allowedRoles,
-      emittedTopic: emitted.topic,
-      outcome: "complete:completion_promise",
-    });
-    return completeLoop(loop, iter.iteration, "completion_promise");
-  }
-
-  printProgressLine({
-    runId: loop.runtime.runId,
-    iteration: iter.iteration,
-    recentEvent: iter.recentEvent,
-    allowedRoles: iter.allowedRoles,
+  const resolved = resolveOutcome({
     emittedTopic: emitted.topic,
-    outcome: "continue",
+    allTopics,
+    hadInvalidEvents,
+    output,
+    completionEvent: loop.completion.event,
+    requiredEvents: loop.completion.requiredEvents,
+    completionPromise: loop.completion.promise,
   });
+
+  progress(emitted.topic, resolved.outcome);
+
+  if (resolved.action === "complete_event") return completeLoop(loop, iter.iteration, "completion_event");
+  if (resolved.action === "complete_promise") return completeLoop(loop, iter.iteration, "completion_promise");
   return iterate(loop, iter.iteration + 1);
 }
 
@@ -127,6 +100,7 @@ function rejectInvalidAndContinue(
   iter: IterationContext,
   emittedTopic: string,
   iterate: (loop: LoopContext, iteration: number) => RunSummary,
+  progress: (topic: string, outcome: string) => void,
 ): RunSummary {
   appendInvalidEvent(
     loop.paths.journalFile,
@@ -140,14 +114,7 @@ function rejectInvalidAndContinue(
   console.log(
     `[reject] invalid event \`${emittedTopic}\`; recent event: \`${iter.recentEvent}\`; allowed next events: ${listText(iter.allowedEvents)}`,
   );
-  printProgressLine({
-    runId: loop.runtime.runId,
-    iteration: iter.iteration,
-    recentEvent: iter.recentEvent,
-    allowedRoles: iter.allowedRoles,
-    emittedTopic,
-    outcome: "rejected:event.invalid",
-  });
+  progress(emittedTopic, "rejected:event.invalid");
   return iterate(loop, iter.iteration + 1);
 }
 
@@ -157,29 +124,37 @@ function finishParallelIteration(
   emittedTopic: string,
   emittedPayload: string,
   iterate: (loop: LoopContext, iteration: number) => RunSummary,
+  progress: (topic: string, outcome: string) => void,
 ): RunSummary {
   const result = executeParallelWave(loop, iter, emittedTopic, emittedPayload);
 
   if (result.reason === "parallel_wave_complete") {
-    printProgressLine({
-      runId: loop.runtime.runId,
-      iteration: iter.iteration,
-      recentEvent: iter.recentEvent,
-      allowedRoles: iter.allowedRoles,
-      emittedTopic,
-      outcome: "parallel:joined",
-    });
+    progress(emittedTopic, "parallel:joined");
     return continueAfterParallelJoin(loop, iter, result.waveId, emittedTopic, result.elapsedMs, iterate);
   }
-  printProgressLine({
-    runId: loop.runtime.runId,
-    iteration: iter.iteration,
-    recentEvent: iter.recentEvent,
-    allowedRoles: iter.allowedRoles,
-    emittedTopic,
-    outcome: `parallel:stop:${result.reason}`,
-  });
+  progress(emittedTopic, `parallel:stop:${result.reason}`);
   return stopAfterParallelWave(loop, iter, result.reason, result.waveId);
+}
+
+export function resolveOutcome(ctx: {
+  emittedTopic: string;
+  allTopics: string[];
+  hadInvalidEvents: boolean;
+  output: string;
+  completionEvent: string;
+  requiredEvents: string[];
+  completionPromise: string;
+}): { action: string; outcome: string } {
+  if (completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents)) {
+    return { action: "complete_event", outcome: "complete:completion_event" };
+  }
+  if (shouldContinueFromAcceptedEvent(ctx.emittedTopic, ctx.completionEvent)) {
+    return { action: "continue_routed", outcome: "continue:routed_event" };
+  }
+  if (!ctx.hadInvalidEvents && completedViaPromise(ctx.output, ctx.completionPromise)) {
+    return { action: "complete_promise", outcome: "complete:completion_promise" };
+  }
+  return { action: "continue", outcome: "continue" };
 }
 
 function latestAgentEventRecord(lines: string[]): { topic: string; payload: string } {
