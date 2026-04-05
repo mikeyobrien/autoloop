@@ -29,6 +29,12 @@ export function printUsage(): void {
   console.log("  --chain          Run an inline chain (comma-separated presets)");
   console.log("  --profile <spec> Activate a profile (repo:<name> or user:<name>), repeatable");
   console.log("  --no-default-profiles  Suppress config-defined default profiles");
+  console.log("");
+  console.log("Developer Workflow:");
+  console.log("  npm run build        Type-check and compile (tsc)");
+  console.log("  npm test             Run the test suite (vitest)");
+  console.log("  npm run test:watch   Run tests in watch mode");
+  console.log("  bin/install-hooks    Install git pre-commit/pre-push hooks");
 }
 
 export function printRunUsage(): void {

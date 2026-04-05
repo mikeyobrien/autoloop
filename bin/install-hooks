@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Install project git hooks by symlinking hooks/* into .git/hooks/.
+# Idempotent — safe to re-run at any time.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+HOOKS_SRC="$REPO_ROOT/hooks"
+GIT_HOOKS_DIR="$REPO_ROOT/.git/hooks"
+
+if [ ! -d "$REPO_ROOT/.git" ]; then
+  echo "error: not a git repository (no .git directory at $REPO_ROOT)" >&2
+  exit 1
+fi
+
+mkdir -p "$GIT_HOOKS_DIR"
+
+installed=0
+for hook in "$HOOKS_SRC"/*; do
+  [ -f "$hook" ] || continue
+  name="$(basename "$hook")"
+  target="$GIT_HOOKS_DIR/$name"
+
+  if [ -L "$target" ]; then
+    existing="$(readlink "$target")"
+    if [ "$existing" = "$hook" ]; then
+      echo "  $name: already installed"
+      installed=$((installed + 1))
+      continue
+    fi
+    rm "$target"
+  elif [ -e "$target" ]; then
+    echo "  $name: backing up existing hook to $target.bak"
+    mv "$target" "$target.bak"
+  fi
+
+  ln -s "$hook" "$target"
+  echo "  $name: installed"
+  installed=$((installed + 1))
+done
+
+if [ "$installed" -eq 0 ]; then
+  echo "No hooks found in $HOOKS_SRC"
+else
+  echo "Done. $installed hook(s) installed."
+fi

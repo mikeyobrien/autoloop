@@ -382,6 +382,48 @@ Bundled fixtures in `test/fixtures/backend/`:
 | `timeout.json` | 30s delay (exceeds typical test timeout) |
 | `non-zero-exit.json` | Exits 1 |
 
+## Developer Scripts
+
+These npm scripts and tools support day-to-day development on the autoloop codebase.
+
+### npm scripts
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `build` | `npm run build` | Compile TypeScript via `tsc`. Also serves as a type-check gate. |
+| `test` | `npm test` | Run the full test suite with [Vitest](https://vitest.dev/) (`--experimental-vm-modules` enabled automatically). |
+| `test:watch` | `npm run test:watch` | Run Vitest in watch mode for rapid feedback during development. |
+
+### Git hooks
+
+Local git hooks live in `hooks/` and can be installed with:
+
+```bash
+bin/install-hooks
+```
+
+This creates symlinks from `.git/hooks/` to the project `hooks/` directory. The script is idempotent — safe to re-run at any time.
+
+| Hook | What it runs | Purpose |
+|------|-------------|---------|
+| `pre-commit` | `npm run build` | Catches type errors before they reach the repo. |
+| `pre-push` | `npm test` | Catches test regressions before they reach the remote. |
+
+To bypass hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`.
+
+### Vitest tips
+
+```bash
+# Run a single test file
+npm test -- test/cli.test.ts
+
+# Run tests matching a pattern
+npm test -- -t "chain"
+
+# Run with verbose output
+npm test -- --reporter=verbose
+```
+
 ## Naming compatibility
 
 The canonical binary and package name is **`autoloop`**. The repository directory is named `autoloop-ts` (without the trailing `s`) for historical reasons.

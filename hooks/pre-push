@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# pre-push hook: run the test suite before pushing.
+# Install with: bin/install-hooks
+# Bypass with: git push --no-verify
+
+set -euo pipefail
+
+echo "pre-push: running npm test..."
+npm test

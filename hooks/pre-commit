@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# pre-commit hook: type-check via tsc before committing.
+# Install with: bin/install-hooks
+
+set -euo pipefail
+
+echo "pre-commit: running npm run build..."
+npm run build

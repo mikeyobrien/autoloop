@@ -164,6 +164,35 @@ describe("list --help", () => {
   });
 });
 
+describe("top-level --help developer workflow section", () => {
+  it("includes Developer Workflow heading", () => {
+    const out = cliOutput("--help");
+    expect(out).toContain("Developer Workflow:");
+  });
+
+  it("lists npm scripts and install-hooks", () => {
+    const out = cliOutput("--help");
+    expect(out).toContain("npm run build");
+    expect(out).toContain("npm test");
+    expect(out).toContain("npm run test:watch");
+    expect(out).toContain("bin/install-hooks");
+  });
+});
+
+describe("chain --help", () => {
+  it("exits 0 and shows usage", () => {
+    const out = cliOutput("chain", "--help");
+    expect(out).toContain("autoloop chain");
+    expect(out).toContain("list");
+    expect(out).toContain("run");
+  });
+
+  it("-h also works", () => {
+    const out = cliOutput("chain", "-h");
+    expect(out).toContain("autoloop chain");
+  });
+});
+
 describe("naming consistency across all help surfaces", () => {
   for (const { name, args } of SURFACES) {
     it(`${name}: no legacy 'autoloops' without '-ts' suffix`, () => {

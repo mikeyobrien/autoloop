@@ -32,6 +32,8 @@ export function dispatchChain(args: string[], selfCmd: string): boolean {
       chains.runChain(chainSpec, projectDir, selfCmd, { prompt: normalizePrompt(prompt) });
       return true;
     }
+    case "--help":
+    case "-h":
     default:
       console.log("Usage:");
       console.log("  autoloop chain list [project-dir]");
