@@ -34,7 +34,7 @@ function dispatch(args: string[], argv: string[]): void {
       harness.emit(resolveRuntimeProjectDir(), args[1], args.slice(2).join(" "));
       return;
     case "list":
-      dispatchList(args.slice(1));
+      dispatchList(args.slice(1), bundleRoot);
       return;
     case "loops":
       dispatchLoops(args.slice(1));

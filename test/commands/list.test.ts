@@ -1,0 +1,35 @@
+import { describe, it, expect, vi } from "vitest";
+import { resolve } from "node:path";
+import { dispatchList } from "../../src/commands/list.js";
+
+const bundleRoot = resolve(import.meta.dirname, "../..");
+
+describe("dispatchList", () => {
+  it("prints each preset with its description", () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      lines.push(args.join(" "));
+    });
+    dispatchList([], bundleRoot);
+    vi.restoreAllMocks();
+
+    expect(lines.length).toBeGreaterThan(0);
+    // Each line should have the preset name followed by a description
+    for (const line of lines) {
+      expect(line).toMatch(/^auto\w+\s{2,}\S/);
+    }
+    // Verify specific preset appears
+    expect(lines.some((l) => l.startsWith("autocode"))).toBe(true);
+  });
+
+  it("prints help with --help", () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      lines.push(args.join(" "));
+    });
+    dispatchList(["--help"], bundleRoot);
+    vi.restoreAllMocks();
+
+    expect(lines.some((l) => l.includes("Usage"))).toBe(true);
+  });
+});

@@ -51,6 +51,31 @@ export function listKnownPresets(): string[] {
   ];
 }
 
+export function getPresetDescription(name: string, projectDir: string): string {
+  const dir = resolvePresetDir(name, projectDir);
+  const readme = join(dir, "README.md");
+  if (!existsSync(readme)) return "";
+  const lines = readFileSync(readme, "utf-8").split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    return trimmed;
+  }
+  return "";
+}
+
+export interface PresetInfo {
+  name: string;
+  description: string;
+}
+
+export function listPresetsWithDescriptions(projectDir: string): PresetInfo[] {
+  return listKnownPresets().map((name) => ({
+    name,
+    description: getPresetDescription(name, projectDir),
+  }));
+}
+
 export function validatePresetVocabulary(
   steps: string[],
   projectDir: string,

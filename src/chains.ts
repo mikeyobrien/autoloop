@@ -8,6 +8,8 @@ export type {
   ChainTracker,
 } from "./chains/types.js";
 
+export type { PresetInfo } from "./chains/load.js";
+
 export { defaultBudget, checkBudget, parseBudgetFromToml } from "./chains/budget.js";
 export {
   load,
@@ -17,6 +19,8 @@ export {
   loadBudget,
   resolvePresetDir,
   listKnownPresets,
+  listPresetsWithDescriptions,
+  getPresetDescription,
   validatePresetVocabulary,
 } from "./chains/load.js";
 export { renderChainState, renderChainLines } from "./chains/render.js";
