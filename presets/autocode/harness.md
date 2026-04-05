@@ -17,3 +17,10 @@ Global rules:
 - Do not invent extra phases. Stay inside planner → builder → critic → finalizer.
 - Only the finalizer may emit `task.complete`.
 - If the prompt is a path to a `.code-task.md` file or an existing implementation directory, use that as source material instead of treating it like plain prose.
+
+Role boundaries (strict):
+- The planner MUST NOT implement code, run tests, or make commits. It writes shared working files and emits `tasks.ready`.
+- The builder implements the active slice, verifies it, commits it, and emits `review.ready`. It does not plan or review.
+- The critic independently verifies the builder's work and emits `review.passed` or `review.rejected`. It does not build.
+- The finalizer checks whole-task completeness and emits `queue.advance` or `task.complete`.
+- If the routing topology says your next event is X, emit X — do not attempt completion or skip-ahead events.
