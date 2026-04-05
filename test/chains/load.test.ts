@@ -11,7 +11,7 @@ const bundleRoot = resolve(import.meta.dirname, "../..");
 describe("getPresetDescription", () => {
   it("extracts description from a preset README", () => {
     const desc = getPresetDescription("autocode", bundleRoot);
-    expect(desc).toMatch(/autoloop-native/i);
+    expect(desc).toMatch(/^Use (when|after) /);
     expect(desc.startsWith("#")).toBe(false);
   });
 
