@@ -97,6 +97,25 @@ describe("integration: run loop with mock backend", () => {
     expect(journal).toContain("bogus.not.allowed");
   });
 
+  it("does not complete via completion_promise when the iteration had invalid events", () => {
+    const project = makeTempProject("invalid-event-with-promise");
+    const fixture = join(FIXTURES_DIR, "invalid-event-with-promise.json");
+    const res = runCli(["run", project, "integration invalid event blocks promise"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
+
+    expect(res.status).toBe(0);
+    const journal = readText(join(project, ".autoloop/journal.jsonl"));
+    expect(journal).toContain('"topic": "event.invalid"');
+    expect(journal).toContain("bogus.not.allowed");
+
+    // The loop should NOT have completed via completion_promise
+    expect(journal).not.toContain('"reason": "completion_promise"');
+
+    // It should have continued past iteration 1 (rejected invalid event, kept iterating)
+    expect(journal).toContain('"iteration": "2"');
+  });
+
   it("prefers an accepted routing event over completion_promise within the same iteration", () => {
     const project = makeTempProject("routed-event-over-promise");
     const fixture = join(FIXTURES_DIR, "routed-event-and-promise.json");

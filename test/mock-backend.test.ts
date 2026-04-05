@@ -18,6 +18,7 @@ interface Fixture {
 const FIXTURE_FILES = [
   "complete-success.json",
   "invalid-event.json",
+  "invalid-event-with-promise.json",
   "no-completion.json",
   "timeout.json",
   "non-zero-exit.json",
@@ -48,9 +49,9 @@ describe("backend fixture files", () => {
     });
   }
 
-  it("complete-success emits task.complete", () => {
+  it("complete-success relies on LOOP_COMPLETE without emitting an event", () => {
     const parsed = loadFixture("complete-success.json");
-    expect(parsed.emit_event).toBe("task.complete");
+    expect(parsed.emit_event).toBeUndefined();
     expect(parsed.exit_code).toBe(0);
   });
 

@@ -1,0 +1,7 @@
+{
+  "output": "Did some work.\n\nLOOP_COMPLETE",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "bogus.not.allowed",
+  "emit_payload": "This event should be rejected and LOOP_COMPLETE in output should not cause completion"
+}

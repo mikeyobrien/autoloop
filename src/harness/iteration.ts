@@ -65,6 +65,7 @@ export function finishIteration(
   const allTopics = runLines.map(extractTopic).filter((t) => t !== "");
   const turnLines = runLines.filter((l) => extractIteration(l) === String(iter.iteration));
   const emitted = latestAgentEventRecord(turnLines);
+  const hadInvalidEvents = turnLines.some((l) => extractTopic(l) === "event.invalid");
 
   if (invalidEvent(emitted.topic, iter.allowedEvents, loop.parallel.enabled, loop.completion.event)) {
     return rejectInvalidAndContinue(loop, iter, emitted.topic, iterate);
@@ -98,7 +99,7 @@ export function finishIteration(
     return iterate(loop, iter.iteration + 1);
   }
 
-  if (completedViaPromise(output, loop.completion.promise)) {
+  if (!hadInvalidEvents && completedViaPromise(output, loop.completion.promise)) {
     printProgressLine({
       runId: loop.runtime.runId,
       iteration: iter.iteration,
