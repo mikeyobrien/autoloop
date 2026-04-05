@@ -22,6 +22,7 @@ function baseRecord(loop: LoopContext): RunRecord {
     journal_file: loop.paths.journalFile,
     parent_run_id: loop.launch.parentRunId,
     backend: normalizeBackendLabel(loop.backend.command),
+    backend_args: loop.backend.args,
     created_at: loop.launch.createdAt,
     updated_at: new Date().toISOString(),
     iteration: 0,

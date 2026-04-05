@@ -12,6 +12,7 @@ export interface RunRecord {
   journal_file: string;
   parent_run_id: string;
   backend: string;
+  backend_args: string[];
   created_at: string;
   updated_at: string;
   iteration: number;

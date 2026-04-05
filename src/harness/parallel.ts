@@ -176,6 +176,7 @@ export function appendLoopStart(loop: LoopContext): void {
       ", " + jsonField("project_dir", loop.paths.projectDir) +
       ", " + jsonField("work_dir", loop.paths.workDir) +
       ", " + jsonField("backend", normalizeBackendLabel(loop.backend.command)) +
+      ", " + jsonField("backend_args", joinCsv(loop.backend.args)) +
       ", " + jsonField("parent_run_id", loop.launch.parentRunId),
   );
 }

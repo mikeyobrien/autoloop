@@ -72,6 +72,7 @@ describe("integration: loops command", () => {
     expect(showRes.stdout).toContain("Status:");
     expect(showRes.stdout).toContain("completed");
     expect(showRes.stdout).toContain("Preset:");
+    expect(showRes.stdout).toContain("Args:");
     expect(showRes.stdout).toContain("Work dir:");
   });
 

@@ -19,6 +19,7 @@ function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     journal_file: "/tmp/proj/.autoloop/journal.jsonl",
     parent_run_id: "",
     backend: "echo",
+    backend_args: [],
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     iteration: 0,

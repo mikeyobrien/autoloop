@@ -74,6 +74,18 @@ describe("deriveRunRecords", () => {
     expect(records[0].backend).toBe("claude");
   });
 
+  it("derives backend_args from loop.start metadata", () => {
+    const lines = [loopStartLine("run-1", { backend_args: "-p,--dangerously-skip-permissions" })];
+    const records = deriveRunRecords(lines);
+    expect(records[0].backend_args).toEqual(["-p", "--dangerously-skip-permissions"]);
+  });
+
+  it("defaults backend_args to empty array when absent", () => {
+    const lines = [loopStartLine("run-1")];
+    const records = deriveRunRecords(lines);
+    expect(records[0].backend_args).toEqual([]);
+  });
+
   it("updates iteration on iteration.finish", () => {
     const lines = [
       loopStartLine("run-1"),

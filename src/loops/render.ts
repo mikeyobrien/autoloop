@@ -28,6 +28,7 @@ export function renderRunDetail(r: RunRecord): string {
     field("Objective", truncate(r.objective, 120)),
     field("Trigger", r.trigger),
     field("Backend", r.backend),
+    field("Args", r.backend_args?.length ? r.backend_args.join(" ") : "(none)"),
     field("Iteration", String(r.iteration)),
     field("Latest", r.latest_event),
   ];

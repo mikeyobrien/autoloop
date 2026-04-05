@@ -1,5 +1,6 @@
 import { decodeEvent } from "../events/decode.js";
 import { normalizeBackendLabel } from "../backend/index.js";
+import { splitCsv } from "../utils.js";
 import type { RegistryStatus, RunRecord } from "./types.js";
 
 /**
@@ -33,6 +34,7 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
         journal_file: "",
         parent_run_id: f.parent_run_id ?? "",
         backend: normalizeBackendLabel(f.backend ?? ""),
+        backend_args: f.backend_args ? splitCsv(f.backend_args) : [],
         created_at: f.created_at ?? "",
         updated_at: f.created_at ?? "",
         iteration: 0,
