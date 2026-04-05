@@ -40,6 +40,9 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
         iteration: 0,
         stop_reason: "",
         latest_event: topic,
+        isolation_mode: f.isolation_mode ?? "shared",
+        worktree_name: f.worktree_name ?? "",
+        worktree_path: f.worktree_path ?? "",
       });
       continue;
     }

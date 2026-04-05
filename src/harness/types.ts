@@ -26,8 +26,8 @@ export interface LoopContext {
   memory: { budgetChars: number };
   harness: { instructions: string };
   profiles: ProfileInfo;
-  paths: { projectDir: string; workDir: string; stateDir: string; journalFile: string; memoryFile: string; registryFile: string; toolPath: string; piAdapterPath: string };
-  runtime: { runId: string; selfCommand: string; promptOverride: string | null; backendOverride: Record<string, unknown>; logLevel: string; branchMode: boolean };
+  paths: { projectDir: string; workDir: string; stateDir: string; journalFile: string; memoryFile: string; registryFile: string; toolPath: string; piAdapterPath: string; baseStateDir: string; mainProjectDir: string };
+  runtime: { runId: string; selfCommand: string; promptOverride: string | null; backendOverride: Record<string, unknown>; logLevel: string; branchMode: boolean; isolationMode: string };
   launch: LaunchMetadata;
   store: Record<string, unknown>;
 }
@@ -42,6 +42,9 @@ export interface RunOptions {
   parentRunId?: string;
   profiles?: string[];
   noDefaultProfiles?: boolean;
+  worktree?: boolean;
+  noWorktree?: boolean;
+  isolationMode?: string;
 }
 
 export interface RunSummary {

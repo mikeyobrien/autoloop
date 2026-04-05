@@ -48,4 +48,22 @@ describe("buildLoopContext", () => {
     expect(loop.backend.args).toEqual(["-p", "--dangerously-skip-permissions"]);
     expect(loop.review.args).toEqual(["-p", "--dangerously-skip-permissions"]);
   });
+
+  it("sets isolation mode to shared by default for solo run", () => {
+    const projectDir = makeProject('event_loop.max_iterations = 1\n');
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+
+    expect(loop.runtime.isolationMode).toBe("shared");
+    expect(loop.paths.baseStateDir).toBe(loop.paths.stateDir);
+    expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
+  });
+
+  it("populates baseStateDir and mainProjectDir", () => {
+    const projectDir = makeProject('event_loop.max_iterations = 1\n');
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+
+    expect(loop.paths.baseStateDir).toBeTruthy();
+    expect(loop.paths.mainProjectDir).toBeTruthy();
+    expect(loop.paths.baseStateDir).toContain(".autoloop");
+  });
 });

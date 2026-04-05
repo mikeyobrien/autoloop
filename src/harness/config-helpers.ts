@@ -13,6 +13,9 @@ import {
   latestRunId,
 } from "./journal.js";
 import { emitToolScript, piAdapterScript } from "./tools.js";
+import { resolveIsolationMode } from "../isolation/resolve.js";
+import { createRunScopedDir, runScopedPath } from "../isolation/run-scope.js";
+import { activeRuns } from "../registry/read.js";
 import type { LoopContext, RunOptions } from "./types.js";
 
 export function resolvePrompt(projectDir: string, cfg: config.Config, override: string | null): string {
@@ -164,6 +167,23 @@ export function buildLoopContext(
   const configLogLevel = config.get(cfg, "core.log_level", "info");
   const logLevel = cliLogLevel || configLogLevel;
 
+  // Resolve isolation mode
+  const registryFile = join(stateDir, "registry.jsonl");
+  const otherActive = activeRuns(registryFile);
+  const configIsolationEnabled = config.get(cfg, "isolation.enabled", "false") === "true";
+  const isolation = resolveIsolationMode(
+    { worktree: runOptions.worktree, noWorktree: runOptions.noWorktree, configEnabled: configIsolationEnabled },
+    otherActive,
+  );
+  if (isolation.warning) {
+    process.stderr.write("isolation: " + isolation.warning + "\n");
+  }
+
+  // For run-scoped isolation, route per-run state files to runs/<runId>/
+  const effectiveStateDir = isolation.mode === "run-scoped"
+    ? createRunScopedDir(stateDir, runId)
+    : stateDir;
+
   // Compute active profiles: config defaults (unless suppressed) + CLI explicit
   const cliProfiles = runOptions.profiles ?? [];
   const noDefaults = runOptions.noDefaultProfiles ?? false;
@@ -175,12 +195,14 @@ export function buildLoopContext(
     paths: {
       projectDir: resolvedProjectDir,
       workDir: resolvedWorkDir,
-      stateDir,
-      journalFile,
+      stateDir: effectiveStateDir,
+      journalFile: isolation.mode === "run-scoped" ? join(effectiveStateDir, "journal.jsonl") : journalFile,
       memoryFile,
-      registryFile: join(stateDir, "registry.jsonl"),
-      toolPath: join(stateDir, "autoloops"),
-      piAdapterPath: join(stateDir, "pi-adapter"),
+      registryFile,
+      toolPath: join(effectiveStateDir, "autoloops"),
+      piAdapterPath: join(effectiveStateDir, "pi-adapter"),
+      baseStateDir: stateDir,
+      mainProjectDir: resolvedProjectDir,
     },
     runtime: {
       runId,
@@ -189,6 +211,7 @@ export function buildLoopContext(
       backendOverride,
       logLevel,
       branchMode: false,
+      isolationMode: isolation.mode,
     },
     launch: {
       preset: basename(resolvedProjectDir),

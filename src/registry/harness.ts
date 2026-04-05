@@ -28,6 +28,9 @@ function baseRecord(loop: LoopContext): RunRecord {
     iteration: 0,
     stop_reason: "",
     latest_event: "loop.start",
+    isolation_mode: loop.runtime.isolationMode ?? "shared",
+    worktree_name: "",
+    worktree_path: "",
   };
 }
 

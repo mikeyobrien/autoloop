@@ -149,7 +149,7 @@ export function stateDirPath(projectDir: string): string {
   return join(projectDir, stateDirName(projectDir));
 }
 
-function journalPath(config: Config): string {
+export function journalPath(config: Config): string {
   return get(
     config,
     "core.journal_file",

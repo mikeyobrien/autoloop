@@ -18,4 +18,7 @@ export interface RunRecord {
   iteration: number;
   stop_reason: string;
   latest_event: string;
+  isolation_mode: string;
+  worktree_name: string;
+  worktree_path: string;
 }
