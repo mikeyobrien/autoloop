@@ -7,7 +7,7 @@ import { readIfExists, readLines } from "./harness/journal.js";
 import { truncateText } from "./memory-render.js";
 import type { MaterializedMemory } from "./memory-render.js";
 
-interface MemoryStats {
+export interface MemoryStats {
   preferences: number;
   learnings: number;
   meta: number;

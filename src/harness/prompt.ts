@@ -1,5 +1,6 @@
 import * as topology from "../topology.js";
 import * as memory from "../memory.js";
+import type { MemoryStats } from "../memory.js";
 import { listText, joinCsv, lineSep } from "../utils.js";
 import {
   extractTopic,
@@ -31,50 +32,45 @@ export interface IterationContext {
   prompt: string;
 }
 
+interface DerivedRunContext {
+  scratchpadText: string;
+  memoryText: string;
+  memoryStats: MemoryStats;
+  routing: RoutingContext;
+  backpressure: string;
+  invalidCount: number;
+  lastRejected: string;
+}
+
+function deriveRunContext(loop: LoopContext, runLines: string[]): DerivedRunContext {
+  return {
+    scratchpadText: renderRunScratchpadPrompt(runLines),
+    memoryText: memory.renderFile(loop.paths.memoryFile, loop.memory.budgetChars),
+    memoryStats: memory.statsFile(loop.paths.memoryFile, loop.memory.budgetChars),
+    routing: iterationRoutingContext(loop.topology, runLines),
+    backpressure: latestInvalidNote(runLines),
+    invalidCount: invalidEventCount(runLines),
+    lastRejected: lastRejectedTopic(runLines),
+  };
+}
+
 export function buildIterationContext(
   loop: LoopContext,
   iteration: number,
 ): IterationContext {
-  const runLines = readRunLines(
-    loop.paths.journalFile,
-    loop.runtime.runId,
-  );
-  const scratchpadText = renderRunScratchpadPrompt(runLines);
-  const routing = iterationRoutingContext(loop.topology, runLines);
-  const backpressure = latestInvalidNote(runLines);
-  const memoryText = memory.renderFile(
-    loop.paths.memoryFile,
-    loop.memory.budgetChars,
-  );
-  const memoryStats = memory.statsFile(
-    loop.paths.memoryFile,
-    loop.memory.budgetChars,
-  );
-  const invalidCount = invalidEventCount(runLines);
-  const lastRejected = lastRejectedTopic(runLines);
+  const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
+  const derived = deriveRunContext(loop, runLines);
 
   return {
     iteration,
-    recentEvent: routing.recentEvent,
-    allowedRoles: routing.allowedRoles,
-    allowedEvents: routing.allowedEvents,
-    backpressure,
-    lastRejected,
-    scratchpadText,
-    memoryText,
-    prompt: renderIterationPromptText(
-      loop,
-      iteration,
-      routing.recentEvent,
-      routing.allowedRoles,
-      routing.allowedEvents,
-      backpressure,
-      invalidCount,
-      lastRejected,
-      scratchpadText,
-      memoryText,
-      memoryStats,
-    ),
+    recentEvent: derived.routing.recentEvent,
+    allowedRoles: derived.routing.allowedRoles,
+    allowedEvents: derived.routing.allowedEvents,
+    backpressure: derived.backpressure,
+    lastRejected: derived.lastRejected,
+    scratchpadText: derived.scratchpadText,
+    memoryText: derived.memoryText,
+    prompt: renderIterationPromptText(loop, iteration, derived),
   };
 }
 
@@ -232,16 +228,10 @@ export function lastRejectedTopic(runLines: string[]): string {
 export function renderIterationPromptText(
   loop: LoopContext,
   iteration: number,
-  recentEvent: string,
-  allowedRoles: string[],
-  allowedEvents: string[],
-  backpressure: string,
-  invalidCount: number,
-  lastRejected: string,
-  scratchpadText: string,
-  memoryText: string,
-  memoryStats: { renderedChars: number; budgetChars: number; totalEntries: number; preferences: number; learnings: number; meta: number; truncated: boolean },
+  derived: DerivedRunContext,
 ): string {
+  const { routing, backpressure, memoryStats, memoryText, scratchpadText, invalidCount, lastRejected } = derived;
+  const { allowedRoles, allowedEvents, recentEvent } = routing;
   return (
     "You are inside a bare-minimal autoloops harness.\n\n" +
     harnessInstructionsText(loop) +
@@ -303,19 +293,8 @@ export function renderReviewPromptText(
   iteration: number,
   runLines: string[],
 ): string {
-  const scratchpadText = renderRunScratchpadPrompt(runLines);
-  const memoryText = memory.renderFile(
-    loop.paths.memoryFile,
-    loop.memory.budgetChars,
-  );
-  const memoryStatsData = memory.statsFile(
-    loop.paths.memoryFile,
-    loop.memory.budgetChars,
-  );
-  const routing = iterationRoutingContext(loop.topology, runLines);
-  const backpressure = latestInvalidNote(runLines);
-  const invalidCount = invalidEventCount(runLines);
-  const lastRejected = lastRejectedTopic(runLines);
+  const derived = deriveRunContext(loop, runLines);
+  const { scratchpadText, memoryText, memoryStats, routing, backpressure, invalidCount, lastRejected } = derived;
   const latestIteration = String(maxReviewPromptIteration(runLines));
 
   return (
@@ -329,7 +308,7 @@ export function renderReviewPromptText(
     "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" +
     "Do not emit normal loop events during review.\n\n" +
     reviewInstructionsText(loop) +
-    contextPressureText(memoryStatsData, invalidCount, lastRejected) +
+    contextPressureText(memoryStats, invalidCount, lastRejected) +
     backpressureText(backpressure) +
     (memoryText ? memoryText + "\n" : "") +
     `Review trigger iteration: ${iteration}\n` +
@@ -374,7 +353,7 @@ function reviewInstructionsText(loop: LoopContext): string {
 }
 
 function contextPressureText(
-  memoryStats: { renderedChars: number; budgetChars: number; totalEntries: number; preferences: number; learnings: number; meta: number; truncated: boolean },
+  memoryStats: MemoryStats,
   invalidCount: number,
   lastRejected: string,
 ): string {
@@ -391,15 +370,7 @@ function contextPressureText(
   );
 }
 
-function memoryPressureSummary(stats: {
-  renderedChars: number;
-  budgetChars: number;
-  totalEntries: number;
-  preferences: number;
-  learnings: number;
-  meta: number;
-  truncated: boolean;
-}): string {
+function memoryPressureSummary(stats: MemoryStats): string {
   const entryDetail = `${stats.totalEntries} entries (${stats.preferences} preferences, ${stats.learnings} learnings, ${stats.meta} meta)`;
   if (stats.truncated) {
     return `${stats.renderedChars}/${stats.budgetChars} chars across ${entryDetail} — truncated by ${stats.renderedChars - stats.budgetChars} chars (drop order: meta → learnings → preferences)`;
