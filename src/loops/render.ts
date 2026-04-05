@@ -12,6 +12,7 @@ export function renderRunLine(r: RunRecord): string {
     r.preset.padEnd(14),
     ("iter:" + r.iteration).padEnd(8),
     r.latest_event.padEnd(18),
+    formatTime(r.created_at).padEnd(18),
     formatTime(r.updated_at),
   ];
   return parts.join("  ");
@@ -64,6 +65,7 @@ export function renderListHeader(): string {
     "PRESET".padEnd(14),
     "ITER".padEnd(8),
     "LATEST EVENT".padEnd(18),
+    "STARTED".padEnd(18),
     "UPDATED",
   ];
   return parts.join("  ");
@@ -85,7 +87,10 @@ function truncate(s: string, max: number): string {
   return s.slice(0, max - 3) + "...";
 }
 
-function formatTime(iso: string): string {
+export function formatTime(iso: string): string {
   if (!iso) return "-";
-  return iso;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

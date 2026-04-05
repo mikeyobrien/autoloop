@@ -36,6 +36,7 @@ describe("integration: loops command", () => {
     }, project);
     expect(res.stdout).toContain("completed");
     expect(res.stdout).toContain("RUN ID");
+    expect(res.stdout).toContain("STARTED");
   });
 
   it("shows no active runs after completed loop", () => {
