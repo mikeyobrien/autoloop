@@ -3,6 +3,7 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { metaDirForRun, writeMeta } from "./meta.js";
 import type { WorktreeMeta } from "./meta.js";
+import { shellQuote } from "../utils.js";
 
 export interface CreateWorktreeOpts {
   mainProjectDir: string;
@@ -39,7 +40,7 @@ export function createWorktree(opts: CreateWorktreeOpts): CreateWorktreeResult {
   }
 
   try {
-    execSync(`git worktree add ${quote(worktreePath)} -b ${quote(branch)}`, {
+    execSync(`git worktree add ${shellQuote(worktreePath)} -b ${shellQuote(branch)}`, {
       cwd: mainProjectDir,
       stdio: "pipe",
     });
@@ -80,7 +81,7 @@ function detectBaseBranch(projectDir: string): string {
 
 function branchExists(projectDir: string, branch: string): boolean {
   try {
-    execSync(`git rev-parse --verify refs/heads/${quote(branch)}`, {
+    execSync(`git rev-parse --verify refs/heads/${shellQuote(branch)}`, {
       cwd: projectDir,
       stdio: "pipe",
     });
@@ -90,7 +91,3 @@ function branchExists(projectDir: string, branch: string): boolean {
   }
 }
 
-function quote(s: string): string {
-  // Shell-safe quoting for paths/branch names
-  return `'${s.replace(/'/g, "'\\''")}'`;
-}

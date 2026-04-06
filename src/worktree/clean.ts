@@ -3,6 +3,7 @@ import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { readMeta, updateStatus } from "./meta.js";
 import type { WorktreeStatus } from "./meta.js";
+import { shellQuote } from "../utils.js";
 
 export interface CleanOpts {
   mainProjectDir: string;
@@ -54,7 +55,7 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
     if (existsSync(meta.worktree_path)) {
       try {
         const forceFlag = force ? " --force" : "";
-        execSync(`git worktree remove ${quote(meta.worktree_path)}${forceFlag}`, {
+        execSync(`git worktree remove ${shellQuote(meta.worktree_path)}${forceFlag}`, {
           cwd: mainProjectDir,
           stdio: "pipe",
         });
@@ -67,7 +68,7 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
     // Remove the branch
     try {
       const deleteFlag = force ? "-D" : "-d";
-      execSync(`git branch ${deleteFlag} ${quote(meta.branch)}`, {
+      execSync(`git branch ${deleteFlag} ${shellQuote(meta.branch)}`, {
         cwd: mainProjectDir,
         stdio: "pipe",
       });
@@ -93,6 +94,3 @@ function listWorktreeRunIds(worktreesDir: string): string[] {
   }
 }
 
-function quote(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`;
-}

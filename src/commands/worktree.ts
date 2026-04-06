@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { readMeta } from "../worktree/meta.js";
 import { mergeWorktree } from "../worktree/merge.js";
 import { cleanWorktrees } from "../worktree/clean.js";
+import { formatTime } from "../loops/render.js";
 import type { WorktreeMeta } from "../worktree/meta.js";
 import type { MergeOpts } from "../worktree/merge.js";
 
@@ -165,14 +166,6 @@ function field(label: string, value: string): string {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 2) + "..";
-}
-
-function formatTime(iso: string): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function parseFlag(args: string[], flag: string): string | undefined {

@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { readMeta, updateStatus } from "./meta.js";
 import type { WorktreeMeta } from "./meta.js";
+import { shellQuote } from "../utils.js";
 
 export interface MergeOpts {
   mainProjectDir: string;
@@ -26,16 +27,16 @@ export function mergeWorktree(opts: MergeOpts): MergeResult {
   const branch = meta.branch;
 
   // Checkout base branch
-  exec(mainProjectDir, `git checkout ${quote(baseBranch)}`);
+  exec(mainProjectDir, `git checkout ${shellQuote(baseBranch)}`);
 
   try {
     if (strategy === "squash") {
-      exec(mainProjectDir, `git merge --squash ${quote(branch)}`);
-      exec(mainProjectDir, `git commit --no-edit -m ${quote(`merge worktree ${meta.run_id} (squash)`)}`);
+      exec(mainProjectDir, `git merge --squash ${shellQuote(branch)}`);
+      exec(mainProjectDir, `git commit --no-edit -m ${shellQuote(`merge worktree ${meta.run_id} (squash)`)}`);
     } else if (strategy === "rebase") {
-      exec(mainProjectDir, `git rebase ${quote(branch)}`);
+      exec(mainProjectDir, `git rebase ${shellQuote(branch)}`);
     } else {
-      exec(mainProjectDir, `git merge --no-ff ${quote(branch)} -m ${quote(`merge worktree ${meta.run_id}`)}`);
+      exec(mainProjectDir, `git merge --no-ff ${shellQuote(branch)} -m ${shellQuote(`merge worktree ${meta.run_id}`)}`);
     }
   } catch (err: unknown) {
     // Attempt to detect conflicts and abort
@@ -92,6 +93,3 @@ function exec(cwd: string, cmd: string): string {
   return execSync(cmd, { cwd, encoding: "utf-8", stdio: "pipe" });
 }
 
-function quote(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`;
-}
