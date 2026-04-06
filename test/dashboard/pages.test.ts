@@ -211,6 +211,32 @@ describe("iteration.start routing disclosure", () => {
   });
 });
 
+describe("worktree merged badge and detail", () => {
+  it("run list shows merged checkmark for worktree runs", () => {
+    const html = htmlShell();
+    expect(html).toContain("run.worktree_merged");
+    expect(html).toContain("merged-badge");
+    expect(html).toContain("&#x2713;");
+  });
+
+  it("detail pane shows merge metadata section when worktree_merged", () => {
+    const html = htmlShell();
+    expect(html).toContain("selectedRunDetail.worktree_merged");
+    expect(html).toContain("merge-detail");
+    expect(html).toContain("Merge status: ");
+    expect(html).toContain("selectedRunDetail.worktree_merged_at");
+    expect(html).toContain("selectedRunDetail.worktree_merge_strategy");
+    expect(html).toContain("Merge strategy: ");
+    expect(html).toContain("Merged at: ");
+  });
+
+  it("has CSS styles for merge indicators", () => {
+    const html = htmlShell();
+    expect(html).toContain(".merged-badge");
+    expect(html).toContain(".merge-detail");
+  });
+});
+
 describe("section open/close state preservation", () => {
   it("uses sectionOpen state instead of hardcoded :open binding", () => {
     const html = htmlShell();
