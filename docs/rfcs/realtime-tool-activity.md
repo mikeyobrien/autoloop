@@ -1,219 +1,189 @@
-# RFC: Realtime Tool-Call Activity Capture via Claude Stream-JSON
+# RFC: Realtime Tool Activity via Structured Backend Adapters
 
 **Slug:** `realtime-tool-activity`  
 **Status:** Draft  
 **Date:** 2026-04-06  
 **Phase:** Design  
-**Depends on:** `progressive-activity-disclosure` (ships first as v1)
+**Depends on:** `backend-adapters`, `progressive-activity-disclosure`
 
 ---
 
 ## Summary
 
-Add streaming execution support for Claude backends so tool-call activity (start, finish, timing) is captured in realtime from Claude's `--mode json` stream. This provides live terminal feedback during iteration execution and feeds structured tool data into journal events — replacing post-hoc regex parsing for Claude while preserving it as a fallback for non-Claude backends.
+Use the structured adapter/event pipeline from [`backend-adapters`](./backend-adapters.md) to provide realtime tool activity for backends that support it, starting with Claude. This RFC does **not** define the adapter architecture itself. Instead, it defines how structured backend events feed:
+
+- live terminal tool activity
+- realtime `tool.start` / `tool.finish` journal entries
+- stable `iteration.finish.tool_calls` / `tool_summary` fields already established by `progressive-activity-disclosure`
+
+Claude is the first structured backend implementation. Non-structured backends continue to rely on the post-hoc fallback from `progressive-activity-disclosure`.
+
+---
+
+## Layering
+
+This RFC sits above two lower layers:
+
+1. **`backend-adapters`**
+   - adapter interface
+   - adapter registry / resolution
+   - normalized invocation model
+   - parser model
+   - normalized backend event union
+   - generic async executor
+
+2. **`progressive-activity-disclosure`**
+   - stable activity fields on `iteration.finish`
+   - terminal footer summary
+   - `inspect activity`
+   - dashboard rendering for activity data
+
+This RFC only specifies how structured adapter events, primarily from Claude, populate and improve those existing activity surfaces.
 
 ---
 
 ## Motivation
 
-The `progressive-activity-disclosure` RFC introduces structured tool-call data on `iteration.finish` events, parsed post-hoc from the buffered `output` string via regex. This works but has three limitations:
+`progressive-activity-disclosure` gives us the right public contract for activity, but its fallback tool capture is post-hoc and limited:
 
-1. **No live feedback.** `execSync` blocks the event loop; the terminal shows nothing until the iteration completes (which can take minutes).
-2. **No timing data.** Post-hoc parsing can extract tool names but not per-tool durations.
-3. **Fragile parsing.** Regex extraction from unstructured output is best-effort and backend-dependent.
+1. **No live feedback** — tool activity is only visible after the iteration ends.
+2. **No timing data** — regex parsing from buffered output cannot reliably measure tool duration.
+3. **Fragile extraction** — output scraping is backend-dependent and best-effort.
 
-Claude's `--mode json` emits structured, newline-delimited events including `tool_execution_start` and `tool_execution_end`. Switching from `execSync` to `spawn` for Claude backends allows the harness to consume these events in realtime.
+Once `backend-adapters` exists, structured backends can emit normalized `tool_start` / `tool_finish` events during execution. This RFC uses those events to improve UX and journal fidelity without changing the stable downstream schema.
 
 ---
 
 ## Design
 
-### 1. Streaming Execution — `runShellCommandStreaming()`
+### 1. Event Source
 
-A new async function in `src/backend/run-command.ts` alongside the existing sync `runShellCommand()`:
-
-```ts
-export async function runShellCommandStreaming(
-  providerKind: string,
-  command: string,
-  timeoutMs: number,
-  onEvent: (event: ClaudeStreamEvent) => void,
-): Promise<BackendRunResult> { ... }
-```
-
-**Behavior:**
-- Spawns the command via `child_process.spawn` with `{ shell: "/bin/sh", stdio: ["pipe", "pipe", "inherit"] }`.
-- Reads stdout line-by-line. Each line is parsed as JSON.
-- Recognized event types are dispatched to `onEvent`. Unrecognized lines are ignored.
-- `text_delta` content is accumulated into an output buffer.
-- On process exit, returns a `BackendRunResult` with the accumulated output — identical shape to `runShellCommand`.
-- Timeout via `setTimeout` + `child.kill("SIGTERM")`, same semantics as `execSync` timeout.
-
-**Event types parsed:**
+Structured adapters emit `NormalizedBackendEvent` values during execution. This RFC cares primarily about:
 
 ```ts
-type ClaudeStreamEvent =
-  | { type: "tool_start"; name: string; argsSummary: string }
-  | { type: "tool_finish"; name: string; isError: boolean; durationMs: number }
-  | { type: "text_delta"; text: string }
-  | { type: "turn_end" }
-  | { type: "agent_end" };
+{ type: "tool_start", name, argsSummary, startedAt }
+{ type: "tool_finish", name, argsSummary, durationMs, isError }
 ```
 
-**Mapping from Claude JSON:**
+The harness must consume these normalized events only. It must not parse Claude raw event names here.
 
-| Claude `--mode json` event | `type` field | Mapped to |
-|---|---|---|
-| `tool_execution_start` | `toolExecutionEvent` | `tool_start` |
-| `tool_execution_end` | `toolExecutionResponseEvent` | `tool_finish` |
-| `message_update` (text_delta) | `assistantMessageEvent` | `text_delta` |
-| `turn_end` | `message` | `turn_end` |
-| `agent_end` | `messages` | `agent_end` |
+### 2. Claude as First Structured Backend
 
-Duration is tracked internally: `tool_start` records a timestamp, `tool_finish` computes the delta.
+Claude is the first backend expected to produce structured tool events through its adapter/parser.
 
-### 2. Backend Dispatch — Claude-Only Streaming
+Responsibilities of the Claude adapter belong to `backend-adapters`:
+- choose the correct Claude structured-stream flags
+- parse raw Claude NDJSON
+- sanitize `argsSummary`
+- map raw backend output into normalized events
 
-The iteration path branches on backend kind:
+This RFC assumes those normalized events already exist when they reach harness code.
 
-```
-runIteration()
-  → buildBackendCommand()
-  → if backend.kind === "claude":
-      await runProcessStreaming(command, timeout, onEvent)  // new
-    else:
-      runProcess(command, timeout, kind)                     // existing sync
-```
+### 3. Journal Integration
 
-**Key change:** `runIteration` becomes `async`. This cascades to:
-- `runIteration` → `async runIteration` (returns `Promise<RunSummary>`)
-- `iterate` callback → `async iterate`
-- `finishIteration` → `async finishIteration`
-- `executeParallelWave` → `async executeParallelWave`
-
-The async conversion is mechanical — add `async`/`await` at each call site. No logic changes. Non-Claude backends continue using synchronous `runProcess` (wrapped in a resolved promise for type consistency).
-
-**Files touched:**
-- `src/backend/run-command.ts` — add `runShellCommandStreaming`
-- `src/harness/parallel.ts` — add `runProcessStreaming`, make `runProcess` return `Promise<BackendRunResult>` for Claude
-- `src/harness/iteration.ts` — `async runIteration`, `async finishIteration`
-- `src/harness/wave.ts` — `async executeParallelWave`
-- `src/harness/stop.ts` — no async needed (post-execution)
-- `src/main.ts` — top-level `await` on `iterate()`
-
-### 3. Journal Events — `tool.start` / `tool.finish`
-
-New system-topic journal entries emitted by the harness (not by the agent) during streaming execution:
+During execution, structured tool events produce additive system-topic entries:
 
 ```jsonl
-{"run":"run-abc","iteration":"3","topic":"tool.start","fields":{"name":"Edit","args_summary":"src/foo.ts:42"}}
-{"run":"run-abc","iteration":"3","topic":"tool.finish","fields":{"name":"Edit","args_summary":"src/foo.ts:42","duration_ms":"412","is_error":"false"}}
+{"topic":"tool.start","fields":{"name":"Edit","args_summary":"src/foo.ts"}}
+{"topic":"tool.finish","fields":{"name":"Edit","args_summary":"src/foo.ts","duration_ms":"412","is_error":"false"}}
 ```
 
-**Schema compatibility:** `FieldsEvent` with `Record<string, string>` fields — no schema change.
+Rules:
+- `tool.start` and `tool.finish` are system topics, not routing topics
+- they must not affect `latestAgentEventRecord()` or completion logic
+- they are emitted only when structured tool events are available
 
-**System topic registration:** Add `"tool.start"` and `"tool.finish"` to `CORE_SYSTEM_TOPICS` in `emit.ts`. This prevents them from being treated as agent-emitted routing events by `latestAgentEventRecord()`.
+### 4. Stable `iteration.finish` Contract
 
-**Batched summary on `iteration.finish`:** The `onEvent` callback accumulates tool calls into an array. After the stream completes, `appendIterationFinish` gains two new fields:
+Structured tool events also populate the same batched fields introduced by `progressive-activity-disclosure`:
 
-| Field | Example |
-|---|---|
-| `tool_calls` | `[{"name":"Edit","argsSummary":"src/foo.ts:42","durationMs":412,"isError":false}]` |
-| `tool_summary` | `"4 tool calls: 2x Edit, 1x Read, 1x Bash"` |
+- `tool_calls`
+- `tool_summary`
 
-These fields are identical to the schema defined in `progressive-activity-disclosure` — same field names, same format. The data source changes (stream events → structured capture vs. regex → best-effort), but downstream consumers (dashboard, `inspect activity`) are unaffected.
+Source priority:
 
-### 4. Terminal Display — Live Tool Activity
+1. structured adapter events
+2. post-hoc fallback parsing from buffered output
+3. empty / unavailable summary
 
-During streaming execution, tool events are rendered to stderr via the existing `log()` path in `display.ts`:
+This is the key compatibility rule. Dashboard, inspect, and footer code should keep reading the same fields regardless of the data source.
 
-```
+### 5. Terminal Realtime Display
+
+When TTY output is enabled, structured tool events are shown live during iteration execution.
+
+Example:
+
+```text
 ━━━ iteration 3/20 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ⟳ Read src/harness/types.ts
   ✓ Read src/harness/types.ts (0.2s)
   ⟳ Edit src/harness/parallel.ts
   ✓ Edit src/harness/parallel.ts (0.4s)
-  ⟳ Bash npm test
-  ...
 ──── end iteration 3 (42s) ────────────────────────────
   files: 2 changed (+15 -3)  tools: 4 calls (2x Edit, 1x Read, 1x Bash)
 ```
 
-**Rules:**
-- Only when `decorativeOutputEnabled()` is true (TTY).
-- `tool_start`: print `⟳ {name} {argsSummary}` to stderr.
-- `tool_finish`: overwrite the spinner line with `✓`/`✗` and duration.
-- Non-TTY: no live output. Summary appears in `iteration.finish` fields only.
-- Max 1 active spinner line. Completed tools scroll up; current tool is on the last line.
+Rules:
+- TTY only
+- one line per tool event is sufficient initially
+- non-TTY mode keeps existing behavior
+- footer summary remains sourced from `tool_summary`
 
-**Implementation:** New function `printToolEvent(event: ClaudeStreamEvent)` in `display.ts`, called from the `onEvent` callback.
+### 6. Dashboard and Inspect Surfaces
 
-### 5. Dashboard Integration
+No new dashboard or inspect schema is introduced here.
 
-No new dashboard work for this RFC. The `progressive-activity-disclosure` RFC defines the dashboard rendering (collapsible `<details>` sections for file changes and tool calls on `iteration.finish` events). This RFC provides better data into the same fields. Dashboard consumers read `tool_calls` and `tool_summary` from `iteration.finish` — they don't know or care whether the data came from stream events or regex parsing.
+This RFC improves the data source only:
+- `inspect activity` continues reading `iteration.finish.tool_calls`
+- dashboard activity details continue reading `iteration.finish.tool_calls` / `tool_summary`
 
-### 6. Completion Compatibility
+### 7. Completion Compatibility
 
-**No changes to completion detection.** Analysis:
+Completion semantics remain unchanged:
+- event-based completion still depends on agent-emitted routing events
+- promise-based completion still depends on the final accumulated output
+- `backend.finish` / `iteration.finish` still carry full output
 
-- **`completedViaEvent()`** scans `allTopics` from journal. `tool.start`/`tool.finish` are registered as system topics → excluded by `latestAgentEventRecord()`. No interference.
-- **`completedViaPromise()`** checks `output.includes(promise)`. The `output` string is accumulated from `text_delta` events and fully assembled before `resolveOutcome` runs. Identical behavior to `execSync`.
-- **`backend.finish` / `iteration.finish`** carry full `output`. Stream accumulation produces the same string that `execSync` would return. Written to journal after stream closes — same timing.
-
-**Key insight:** Streaming changes *when data becomes available during execution* but not *what data is available after execution*. All completion mechanisms operate on post-execution state.
-
-### 7. `args_summary` Sensitivity
-
-Tool arguments may contain file contents, secrets, or large data. The `argsSummary` field is:
-- Truncated to 120 characters (matching `progressive-activity-disclosure` RFC).
-- Built from the first/primary argument only (e.g., file path for Read/Edit, command for Bash).
-- Never includes `old_string`/`new_string` content for Edit or file contents for Write.
+Structured tool events are additive observability, not control-flow signals.
 
 ---
 
 ## Phasing
 
-| Phase | RFC | What ships | Backend |
-|---|---|---|---|
-| **v1** | `progressive-activity-disclosure` | Post-hoc regex parsing, journal fields (`tool_calls`, `tool_summary`, `files_changed`, `files_summary`), terminal footer, dashboard collapsible sections, `inspect activity` | All backends |
-| **v2** | `realtime-tool-activity` (this RFC) | Streaming execution for Claude, live terminal display, per-tool journal entries (`tool.start`/`tool.finish`), timing data, same batched fields on `iteration.finish` | Claude only |
+| Layer | RFC | Purpose |
+|---|---|---|
+| L0 | `backend-adapters` | execution architecture and normalized event model |
+| L1 | `progressive-activity-disclosure` | stable activity schema and presentation |
+| L2 | `realtime-tool-activity` | structured-event enhancement for supported backends |
 
-**v1 ships first.** It defines the schema and rendering that v2 feeds into. Post-hoc regex parsing becomes the fallback for non-Claude backends after v2 ships.
+Implementation order:
 
-**v2 is additive.** It does not remove or change any v1 behavior. It adds a better data source for Claude and live terminal display. The only breaking change is `runIteration` becoming async, which is internal to the harness.
+1. ship `progressive-activity-disclosure`
+2. implement `backend-adapters`
+3. wire Claude structured events into the existing activity contract
 
 ---
 
 ## Open Questions
 
-1. **`tool_execution_start` event confirmation.** The pi-adapter doesn't parse this event. The schema is inferred from `tool_execution_end`. Needs verification against actual `claude --mode json` output before implementation. Risk: low — if absent, `tool_start` journal entries are omitted and terminal shows `tool_finish` only (post-completion display).
-
-2. **Stdio buffering.** Claude's `--mode json` must flush newline-delimited events without stdio buffering for realtime display to work. If stdout is block-buffered, `stdbuf -oL` or PTY allocation may be needed. The pi-adapter uses Python `subprocess.PIPE` successfully, suggesting line-buffered behavior.
-
-3. **Parallel mode interleaving.** With async iteration, parallel branches could interleave journal writes. Current parallel mode uses worktrees with separate journals, so this is safe. Non-worktree parallel mode (sequential on same journal) is not affected because only one branch executes at a time.
-
----
-
-## Files Changed (Implementation Scope)
-
-| File | Change |
-|---|---|
-| `src/backend/run-command.ts` | Add `runShellCommandStreaming()` |
-| `src/backend/types.ts` | Add `ClaudeStreamEvent` type |
-| `src/harness/parallel.ts` | Add `runProcessStreaming()`, extend `appendIterationFinish` with tool fields |
-| `src/harness/iteration.ts` | Make `runIteration`/`finishIteration` async, branch on backend kind |
-| `src/harness/wave.ts` | Make `executeParallelWave` async |
-| `src/harness/emit.ts` | Add `tool.start`, `tool.finish` to `CORE_SYSTEM_TOPICS` |
-| `src/harness/display.ts` | Add `printToolEvent()` for live terminal display |
-| `src/main.ts` | Top-level await on iterate |
-| `test/harness/*.test.ts` | Async test wrappers, streaming mock |
+1. Which exact Claude CLI flags should the Claude adapter use for structured streaming?
+2. Should live assistant text also be surfaced, or only tool activity initially?
+3. Do any other current backends have enough structure to become second-wave structured adapters?
 
 ---
 
 ## Backward Compatibility
 
-- Non-Claude backends are completely unaffected — they continue using `runShellCommand` (sync).
-- `iteration.finish` gains new fields (`tool_calls`, `tool_summary`) — additive, same as v1.
-- Per-tool journal entries (`tool.start`, `tool.finish`) are new topics — existing consumers that filter by known topics ignore them.
-- The async conversion of `runIteration` is internal — no public API change.
-- Downstream completion detection is unchanged.
+- Non-structured backends keep using post-hoc activity capture.
+- Existing activity consumers continue reading the same `iteration.finish` fields.
+- Realtime tool journal entries are additive.
+- No routing or completion semantics change.
+
+---
+
+## Rejected Approach
+
+### Duplicating adapter architecture here
+
+Rejected. The adapter interface, executor, parser model, async migration, and backend resolution belong in `backend-adapters`. This RFC should stay focused on consuming structured events for activity disclosure.
