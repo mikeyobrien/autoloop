@@ -10,6 +10,7 @@ import { dispatchList } from "./commands/list.js";
 import { dispatchPiAdapter } from "./commands/pi-adapter.js";
 import { dispatchLoops } from "./commands/loops.js";
 import { dispatchWorktree } from "./commands/worktree.js";
+import { dispatchConfig } from "./commands/config.js";
 
 function main(): void {
   const argv = process.argv;
@@ -58,6 +59,9 @@ function dispatch(args: string[], argv: string[]): void {
     case "chain":
       dispatchChain(args.slice(1), selfCmd);
       return;
+    case "config":
+      dispatchConfig(args.slice(1));
+      return;
     default:
       dispatchRun(args, argv, bundleRoot, selfCmd);
   }
@@ -84,7 +88,7 @@ function runtimeArgv(argv: string[]): string[] {
 }
 
 function isCliCommand(value: string): boolean {
-  return ["run", "emit", "inspect", "memory", "list", "loops", "chain", "pi-adapter", "branch-run", "worktree", "--help", "-h"].includes(value);
+  return ["run", "emit", "inspect", "memory", "list", "loops", "chain", "pi-adapter", "branch-run", "worktree", "config", "--help", "-h"].includes(value);
 }
 
 function selfCommand(argv: string[]): string {

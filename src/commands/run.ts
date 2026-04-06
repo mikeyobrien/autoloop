@@ -200,6 +200,14 @@ function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
 }
 
 function applyGlobalBackendOverride(options: RunOptions): RunOptions {
+  if (config.hasUserConfig()) {
+    process.stderr.write(
+      "warning: user config found; cwd-based backend override is deprecated, configure backend in " +
+      config.userConfigPath() + "\n",
+    );
+    return options;
+  }
+
   const cwdProjectDir = process.cwd();
   if (!config.projectHasConfig(cwdProjectDir)) return options;
   if (resolve(cwdProjectDir) === resolve(options.projectDir)) return options;

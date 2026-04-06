@@ -1,12 +1,65 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import TOML from "@iarna/toml";
 import { parseStringList } from "./utils.js";
 
 export type Config = Record<string, unknown>;
 
+export type Provenance = Record<string, string>;
+
+export interface LayeredConfig {
+  config: Config;
+  provenance: Provenance;
+}
+
+export function userConfigPath(): string {
+  const envPath = process.env["AUTOLOOP_CONFIG"];
+  if (envPath) return envPath;
+  return join(homedir(), ".config", "autoloop", "config.toml");
+}
+
+export function hasUserConfig(): boolean {
+  return existsSync(userConfigPath());
+}
+
+export function loadUserConfig(): Config {
+  const path = userConfigPath();
+  if (!existsSync(path)) return {};
+  return stringifyValues(parseRawToml(readFileSync(path, "utf-8")));
+}
+
+export function loadLayered(projectDir: string): LayeredConfig {
+  const base = defaults();
+  const provenance: Provenance = {};
+
+  // Track which sections come from defaults
+  for (const key of Object.keys(base)) {
+    provenance[key] = "default";
+  }
+
+  // Layer 1: user config
+  const userCfg = loadUserConfig();
+  let merged = deepMerge(base, userCfg);
+  for (const key of Object.keys(userCfg)) {
+    provenance[key] = "user (" + userConfigPath() + ")";
+  }
+
+  // Layer 2: project config
+  const projectPath = resolveConfigPath(projectDir);
+  if (existsSync(projectPath)) {
+    const projectCfg = stringifyValues(parseRawToml(readFileSync(projectPath, "utf-8")));
+    merged = deepMerge(merged, projectCfg);
+    for (const key of Object.keys(projectCfg)) {
+      provenance[key] = "project (" + projectPath + ")";
+    }
+  }
+
+  return { config: merged, provenance };
+}
+
 export function loadProject(projectDir: string): Config {
-  return load(resolveConfigPath(projectDir));
+  return loadLayered(projectDir).config;
 }
 
 export function load(path: string): Config {
@@ -171,7 +224,7 @@ function resolveConfigPath(projectDir: string): string {
   return join(projectDir, "autoloops.conf");
 }
 
-function defaults(): Config {
+export function defaults(): Config {
   return {
     event_loop: {
       max_iterations: "3",
