@@ -172,6 +172,81 @@ describe("dashboard /api/runs/:id/events", () => {
     });
   }
 
+  it("returns events for a discovered chain child worktree run", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+    writeFileSync(registryPath, "", "utf-8");
+
+    const childStateDir = join(
+      stateDir,
+      "chains",
+      "chain-001",
+      "step-1",
+      ".autoloop",
+    );
+    const childWorktreeDir = join(
+      childStateDir,
+      "worktrees",
+      "allied-engine",
+      "tree",
+      ".autoloop",
+    );
+    mkdirSync(childWorktreeDir, { recursive: true });
+
+    const childRegistry = join(childWorktreeDir, "registry.jsonl");
+    const childJournal = join(childWorktreeDir, "journal.jsonl");
+    const updatedAt = new Date().toISOString();
+    writeFileSync(
+      childRegistry,
+      `${JSON.stringify({
+        run_id: "allied-engine",
+        status: "running",
+        preset: "autocode",
+        objective: "child worktree run",
+        trigger: "chain",
+        project_dir: projectDir,
+        work_dir: join(childWorktreeDir, ".."),
+        state_dir: childWorktreeDir,
+        journal_file: childJournal,
+        parent_run_id: "",
+        backend: "mock",
+        backend_args: [],
+        created_at: updatedAt,
+        updated_at: updatedAt,
+        iteration: 1,
+        max_iterations: 10,
+        stop_reason: "",
+        latest_event: "iteration.finish",
+        isolation_mode: "worktree",
+        worktree_name: "autoloop/allied-engine",
+        worktree_path: join(childWorktreeDir, ".."),
+      })}\n`,
+      "utf-8",
+    );
+    writeFileSync(
+      childJournal,
+      `${makeEvent("allied-engine", "loop.start", 1)}\n${makeEvent("allied-engine", "iteration.start", 2)}\n`,
+      "utf-8",
+    );
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request("/api/runs/allied-engine/events");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.events).toHaveLength(2);
+    expect(body.events[0].topic).toBe("loop.start");
+    expect(body.events[1].topic).toBe("iteration.start");
+  });
+
   it("returns events from the shared journal for a shared run", async () => {
     const { registryPath, projectDir, stateDir } = makeTempRegistry();
     const journalPath = join(stateDir, "journal.jsonl");
