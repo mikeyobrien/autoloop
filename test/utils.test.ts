@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertNoRawAutoloopPaths,
   expandTemplatePlaceholders,
   generateCompactId,
   generateReadableId,
@@ -13,7 +14,6 @@ import {
   parseStringList,
   readableIdCapacity,
   replaceAll,
-  rewriteLoopStatePaths,
   shellQuote,
   shellWords,
   sliceOuter,
@@ -127,36 +127,6 @@ describe("replaceAll", () => {
   });
 });
 
-describe("rewriteLoopStatePaths", () => {
-  it("rewrites .autoloop file paths to the effective state dir", () => {
-    expect(
-      rewriteLoopStatePaths(
-        "Use .autoloop/progress.md and .autoloop/logs/output.txt",
-        "/tmp/state/runs/swift-agent",
-      ),
-    ).toBe(
-      "Use /tmp/state/runs/swift-agent/progress.md and /tmp/state/runs/swift-agent/logs/output.txt",
-    );
-  });
-
-  it("rewrites ./.autoloop command examples without leaving a malformed prefix", () => {
-    expect(
-      rewriteLoopStatePaths(
-        'Run `./.autoloop/autoloops memory add learning "lesson"` and inspect ./.autoloop/progress.md.',
-        "/tmp/state/runs/swift-agent",
-      ),
-    ).toBe(
-      'Run `/tmp/state/runs/swift-agent/autoloops memory add learning "lesson"` and inspect /tmp/state/runs/swift-agent/progress.md.',
-    );
-  });
-
-  it("rewrites standalone .autoloop mentions", () => {
-    expect(
-      rewriteLoopStatePaths("Artifacts live under `.autoloop`.", "/tmp/state"),
-    ).toBe("Artifacts live under `/tmp/state`.");
-  });
-});
-
 describe("expandTemplatePlaceholders", () => {
   const vars = {
     STATE_DIR: "/tmp/state/runs/swift-agent/.autoloop",
@@ -174,10 +144,10 @@ describe("expandTemplatePlaceholders", () => {
     );
   });
 
-  it("leaves unknown placeholders intact", () => {
-    expect(expandTemplatePlaceholders("Hello {{UNKNOWN}} world", vars)).toBe(
-      "Hello {{UNKNOWN}} world",
-    );
+  it("throws on unknown placeholders", () => {
+    expect(() =>
+      expandTemplatePlaceholders("Hello {{UNKNOWN}} world", vars),
+    ).toThrow("Unknown template placeholder(s): {{UNKNOWN}}");
   });
 
   it("returns text unchanged when no placeholders present", () => {
@@ -193,10 +163,45 @@ describe("expandTemplatePlaceholders", () => {
     );
   });
 
-  it("handles empty vars map gracefully", () => {
-    expect(expandTemplatePlaceholders("{{STATE_DIR}}/foo", {})).toBe(
-      "{{STATE_DIR}}/foo",
+  it("throws when vars map is empty and placeholders exist", () => {
+    expect(() => expandTemplatePlaceholders("{{STATE_DIR}}/foo", {})).toThrow(
+      "Unknown template placeholder(s): {{STATE_DIR}}",
     );
+  });
+});
+
+describe("assertNoRawAutoloopPaths", () => {
+  it("throws when text contains raw .autoloop/ paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths(
+        "Use .autoloop/progress.md for tracking",
+        "harness instructions",
+      ),
+    ).toThrow("Raw .autoloop path found in harness instructions");
+  });
+
+  it("throws when text contains ./.autoloop/ paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths(
+        "Run `./.autoloop/autoloops emit task.complete`",
+        "role prompt: builder",
+      ),
+    ).toThrow("Raw .autoloop path found in role prompt: builder");
+  });
+
+  it("does not throw when text uses expanded paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths(
+        "Use /tmp/state/.autoloop/progress.md",
+        "harness instructions",
+      ),
+    ).not.toThrow();
+  });
+
+  it("does not throw when text has no autoloop paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths("Just some normal text", "test"),
+    ).not.toThrow();
   });
 });
 

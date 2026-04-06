@@ -139,7 +139,7 @@ Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` in harness instructions, role prompts, a
 
 **Why placeholders?** The concrete state directory can vary — worktrees, chains, and nested loops all change the path. Placeholders let the harness inject the correct path at runtime so presets stay portable.
 
-**Backward compatibility:** Raw `.autoloop/` references in prompt text still work — the harness rewrites them via `rewriteLoopStatePaths`. But placeholders are preferred for new and updated presets because they are explicit and avoid edge cases where a raw path matches unintended text.
+**Important:** Raw `.autoloop/` paths in prompt text are not supported and will cause a load error. Always use `{{STATE_DIR}}` and `{{TOOL_PATH}}` placeholders.
 
 ## Step 4: Configure the loop
 
