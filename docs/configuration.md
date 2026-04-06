@@ -50,13 +50,16 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `backend.kind` | string | `"pi"` | Backend type. `"pi"` for the Pi adapter (the only supported real adapter). `"command"` for mock/test backends. Auto-detected from `backend.command` if empty or unrecognized. |
+| `backend.kind` | string | `"pi"` | Backend type. `"pi"` for the Pi adapter. `"kiro"` for the Kiro ACP backend (persistent session over Agent Client Protocol). `"command"` for mock/test backends. Auto-detected from `backend.command` if empty or unrecognized. |
 | `backend.command` | string | `"pi"` | Executable to invoke. For `kind = "pi"`, this is the Pi binary path. For `kind = "command"`, any executable. |
 | `backend.timeout_ms` | int | `300000` | Timeout per backend invocation in milliseconds (default 5 minutes). |
 | `backend.args` | list | `[]` | Extra flags appended after the built-in Pi arguments (`-p --mode json --no-session`). Example: `["--model", "anthropic/claude-sonnet-4"]`. |
 | `backend.prompt_mode` | string | `"arg"` | How the prompt is passed to the backend. `"arg"` passes it as a command-line argument. `"stdin"` passes it on standard input. |
+| `backend.trust_all_tools` | bool | `true` | Auto-approve all tool permission requests. Kiro backend only. |
+| `backend.agent` | string | `""` | Agent name to set via ACP `setSessionMode`. Kiro backend only. |
+| `backend.model` | string | `""` | Model ID to set via ACP `unstable_setSessionModel`. Kiro backend only. |
 
-Kind auto-detection: if `kind` is empty or unrecognized, the harness checks whether `command` is or ends with `pi`. If so, kind is `"pi"`; otherwise `"command"`.
+Kind auto-detection: if `kind` is empty or unrecognized, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); otherwise `"command"`. The `"kiro"` kind is not auto-detected — set `backend.kind = "kiro"` explicitly, or use `-b kiro`.
 
 ### Review (metareview)
 
@@ -168,6 +171,23 @@ backend.command = "./examples/mock-backend.sh"
 ```
 
 Command mode invokes the executable directly and captures stdout. It is not a supported production adapter — use Pi for real loops.
+
+## Kiro backend
+
+The kiro backend communicates with `kiro-cli acp` over the Agent Client Protocol (ACP) — a persistent, bidirectional JSON-RPC 2.0 session over stdio. Unlike `pi` and `command` backends which shell out per iteration, the kiro backend maintains a single child process across the entire run. Session state (conversation history, tool permissions) accumulates across iterations.
+
+```toml
+backend.kind = "kiro"
+backend.command = "kiro-cli"
+backend.args = ["acp"]
+backend.trust_all_tools = true
+# backend.agent = "gpu-dev"
+# backend.model = "anthropic/claude-sonnet-4"
+```
+
+Or use the CLI flag: `autoloop run autocode -b kiro`.
+
+The `trust_all_tools` key (default `true`) auto-approves all tool permission requests from the agent. Set to `false` to reject tool calls. The `agent` and `model` keys are optional — when set, they configure the ACP session mode and model at initialization.
 
 ## Preset patterns
 
