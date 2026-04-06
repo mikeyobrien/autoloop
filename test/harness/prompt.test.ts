@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { encodeEvent } from "../../src/events/encode.js";
 import {
-  routingEventFromLines,
-  latestInvalidNote,
   invalidEventCount,
   lastRejectedTopic,
+  latestInvalidNote,
+  routingEventFromLines,
 } from "../../src/harness/prompt.js";
 
 function fieldsLine(
@@ -134,9 +134,19 @@ describe("invalidEventCount", () => {
 
   it("counts event.invalid lines", () => {
     const lines = [
-      fieldsLine("event.invalid", { emitted: "a", recent_event: "b", suggested_roles: "", allowed_events: "" }),
+      fieldsLine("event.invalid", {
+        emitted: "a",
+        recent_event: "b",
+        suggested_roles: "",
+        allowed_events: "",
+      }),
       payloadLine("task.complete", "done"),
-      fieldsLine("event.invalid", { emitted: "c", recent_event: "d", suggested_roles: "", allowed_events: "" }),
+      fieldsLine("event.invalid", {
+        emitted: "c",
+        recent_event: "d",
+        suggested_roles: "",
+        allowed_events: "",
+      }),
     ];
     expect(invalidEventCount(lines)).toBe(2);
   });
@@ -149,8 +159,18 @@ describe("lastRejectedTopic", () => {
 
   it("returns the emitted field from the last event.invalid", () => {
     const lines = [
-      fieldsLine("event.invalid", { emitted: "first.bad", recent_event: "x", suggested_roles: "", allowed_events: "" }),
-      fieldsLine("event.invalid", { emitted: "second.bad", recent_event: "y", suggested_roles: "", allowed_events: "" }),
+      fieldsLine("event.invalid", {
+        emitted: "first.bad",
+        recent_event: "x",
+        suggested_roles: "",
+        allowed_events: "",
+      }),
+      fieldsLine("event.invalid", {
+        emitted: "second.bad",
+        recent_event: "y",
+        suggested_roles: "",
+        allowed_events: "",
+      }),
     ];
     expect(lastRejectedTopic(lines)).toBe("second.bad");
   });

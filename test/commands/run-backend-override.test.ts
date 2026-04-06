@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Verify applyGlobalBackendOverride behavior:
@@ -25,9 +25,9 @@ vi.mock("../../src/chains.js", () => ({
 
 import { dispatchRun } from "../../src/commands/run.js";
 
-const TMP_BASE = join(tmpdir(), "autoloop-override-test-" + process.pid);
+const TMP_BASE = join(tmpdir(), `autoloop-override-test-${process.pid}`);
 const origCwd = process.cwd();
-const origAutoloopConfig = process.env["AUTOLOOP_CONFIG"];
+const origAutoloopConfig = process.env.AUTOLOOP_CONFIG;
 
 function tmpDir(name: string): string {
   const dir = join(TMP_BASE, name);
@@ -42,8 +42,8 @@ beforeEach(() => {
 
 afterEach(() => {
   process.chdir(origCwd);
-  if (origAutoloopConfig === undefined) delete process.env["AUTOLOOP_CONFIG"];
-  else process.env["AUTOLOOP_CONFIG"] = origAutoloopConfig;
+  if (origAutoloopConfig === undefined) delete process.env.AUTOLOOP_CONFIG;
+  else process.env.AUTOLOOP_CONFIG = origAutoloopConfig;
   rmSync(TMP_BASE, { recursive: true, force: true });
 });
 
@@ -58,18 +58,26 @@ describe("applyGlobalBackendOverride", () => {
 
     // Set up a different target project dir
     const targetDir = tmpDir("target-project");
-    writeFileSync(join(targetDir, "autoloops.toml"), "[event_loop]\nmax_iterations = 5\n");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 5\n",
+    );
 
     // Set up user config so hasUserConfig() returns true
     const userCfgPath = join(TMP_BASE, "user.toml");
-    writeFileSync(userCfgPath, '[backend]\nkind = "command"\ncommand = "user-backend"\n');
-    process.env["AUTOLOOP_CONFIG"] = userCfgPath;
+    writeFileSync(
+      userCfgPath,
+      '[backend]\nkind = "command"\ncommand = "user-backend"\n',
+    );
+    process.env.AUTOLOOP_CONFIG = userCfgPath;
 
     // Change cwd to the override project
     process.chdir(cwdDir);
 
     // Capture stderr for deprecation warning
-    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
 
     dispatchRun([targetDir], [], targetDir, "autoloop");
 
@@ -77,7 +85,10 @@ describe("applyGlobalBackendOverride", () => {
     expect(runSpy).toHaveBeenCalledTimes(1);
     const callArgs = runSpy.mock.calls[0];
     const opts = callArgs[3]; // fourth arg is the options object
-    expect(opts.backendOverride).toMatchObject({ kind: "command", command: "my-backend" });
+    expect(opts.backendOverride).toMatchObject({
+      kind: "command",
+      command: "my-backend",
+    });
 
     // Deprecation warning should have fired
     expect(stderrSpy).toHaveBeenCalledWith(
@@ -95,20 +106,28 @@ describe("applyGlobalBackendOverride", () => {
     );
 
     const targetDir = tmpDir("target-no-user");
-    writeFileSync(join(targetDir, "autoloops.toml"), "[event_loop]\nmax_iterations = 2\n");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 2\n",
+    );
 
     // Point to nonexistent user config
-    process.env["AUTOLOOP_CONFIG"] = join(TMP_BASE, "nonexistent-user.toml");
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "nonexistent-user.toml");
 
     process.chdir(cwdDir);
 
-    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
 
     dispatchRun([targetDir], [], targetDir, "autoloop");
 
     expect(runSpy).toHaveBeenCalledTimes(1);
     const opts = runSpy.mock.calls[0][3];
-    expect(opts.backendOverride).toMatchObject({ kind: "command", command: "cwd-backend" });
+    expect(opts.backendOverride).toMatchObject({
+      kind: "command",
+      command: "cwd-backend",
+    });
 
     // No deprecation warning
     expect(stderrSpy).not.toHaveBeenCalledWith(

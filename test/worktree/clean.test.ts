@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { cleanWorktrees } from "../../src/worktree/clean.js";
 import { createWorktree } from "../../src/worktree/create.js";
 import { updateStatus } from "../../src/worktree/meta.js";
-import { cleanWorktrees } from "../../src/worktree/clean.js";
 
 const GIT_ENV = {
   ...process.env,

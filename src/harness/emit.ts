@@ -1,19 +1,14 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import * as config from "../config.js";
-import * as topology from "../topology.js";
-import { splitCsv, listText, joinCsv } from "../utils.js";
 import { jsonField } from "../json.js";
+import * as topology from "../topology.js";
+import { joinCsv, listText, splitCsv } from "../utils.js";
 import {
   appendAgentEvent,
   appendEvent,
-  readRunLines,
-  readLines,
-  extractTopic,
-  extractField,
-  extractIteration,
-  latestRunId,
   latestIterationForRun,
+  latestRunId,
 } from "./journal.js";
 
 const COORDINATION_TOPICS = new Set([
@@ -70,11 +65,7 @@ export function reservedParallelJoinedTopic(topic: string): boolean {
   return topic.endsWith(".parallel.joined");
 }
 
-export function emit(
-  projectDir: string,
-  topic: string,
-  payload: string,
-): void {
+export function emit(projectDir: string, topic: string, payload: string): void {
   const journalFile = resolveEmitJournalFile(projectDir);
   mkdirSync(dirname(journalFile), { recursive: true });
   const validation = emitValidationContext(projectDir, journalFile);
@@ -156,7 +147,7 @@ export function parallelDispatchBase(topic: string): string {
 }
 
 export function parallelJoinedTopic(topic: string): string {
-  return topic + ".joined";
+  return `${topic}.joined`;
 }
 
 export function dispatchParallelJoinedTopic(topic: string): boolean {
@@ -226,17 +217,17 @@ function emitValidationContext(
 }
 
 function resolveEmitRunId(journalFile: string): string {
-  const envValue = process.env["AUTOLOOP_RUN_ID"];
+  const envValue = process.env.AUTOLOOP_RUN_ID;
   return envValue || latestRunId(journalFile);
 }
 
 function resolveEmitIteration(journalFile: string, runId: string): string {
-  const envValue = process.env["AUTOLOOP_ITERATION"];
+  const envValue = process.env.AUTOLOOP_ITERATION;
   return envValue || latestIterationForRun(journalFile, runId);
 }
 
 function emitRecentEvent(): string {
-  return process.env["AUTOLOOP_RECENT_EVENT"] || "loop.start";
+  return process.env.AUTOLOOP_RECENT_EVENT || "loop.start";
 }
 
 function envCsvList(name: string): string[] {
@@ -258,7 +249,7 @@ function acceptEmit(
     topic,
     payload,
   );
-  console.log("emitted " + topic);
+  console.log(`emitted ${topic}`);
   process.exitCode = 0;
 }
 
@@ -277,14 +268,11 @@ function rejectEmit(
     validation.allowedRoles,
     validation.allowedEvents,
   );
-  process.stderr.write(message + "\n");
+  process.stderr.write(`${message}\n`);
   process.exitCode = 1;
 }
 
-function invalidEmitMessage(
-  topic: string,
-  validation: EmitValidation,
-): string {
+function invalidEmitMessage(topic: string, validation: EmitValidation): string {
   return (
     "invalid event `" +
     topic +
@@ -322,9 +310,9 @@ export function appendInvalidEvent(
 }
 
 export function resolveEmitJournalFile(projectDir: string): string {
-  const envJournal = process.env["AUTOLOOP_JOURNAL_FILE"];
+  const envJournal = process.env.AUTOLOOP_JOURNAL_FILE;
   if (envJournal) return envJournal;
-  const envEvents = process.env["AUTOLOOP_EVENTS_FILE"];
+  const envEvents = process.env.AUTOLOOP_EVENTS_FILE;
   if (envEvents) return envEvents;
   return config.resolveJournalFile(projectDir);
 }

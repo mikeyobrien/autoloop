@@ -1,5 +1,5 @@
-import { join } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { readRegistry } from "./read.js";
 import type { RunRecord } from "./types.js";
 

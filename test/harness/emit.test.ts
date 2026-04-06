@@ -1,17 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   coordinationTopic,
   coreSystemTopic,
-  systemTopic,
-  parallelTopic,
-  parallelTriggerTopic,
-  reservedParallelJoinedTopic,
+  dispatchParallelJoinBase,
+  dispatchParallelJoinedTopic,
   invalidEvent,
   parallelDispatchBase,
   parallelJoinedTopic,
-  dispatchParallelJoinedTopic,
-  dispatchParallelJoinBase,
+  parallelTopic,
+  parallelTriggerTopic,
+  reservedParallelJoinedTopic,
   routingTopic,
+  systemTopic,
 } from "../../src/harness/emit.js";
 
 describe("coordinationTopic", () => {
@@ -93,7 +93,9 @@ describe("parallelTriggerTopic", () => {
 
 describe("reservedParallelJoinedTopic", () => {
   it("matches .parallel.joined suffix", () => {
-    expect(reservedParallelJoinedTopic("tests.written.parallel.joined")).toBe(true);
+    expect(reservedParallelJoinedTopic("tests.written.parallel.joined")).toBe(
+      true,
+    );
     expect(reservedParallelJoinedTopic("explore.parallel.joined")).toBe(true);
   });
 
@@ -105,7 +107,9 @@ describe("reservedParallelJoinedTopic", () => {
 
 describe("parallelDispatchBase", () => {
   it("strips .parallel suffix for dispatch topics", () => {
-    expect(parallelDispatchBase("tests.written.parallel")).toBe("tests.written");
+    expect(parallelDispatchBase("tests.written.parallel")).toBe(
+      "tests.written",
+    );
   });
 
   it("returns empty for explore.parallel (not a dispatch topic)", () => {
@@ -119,13 +123,17 @@ describe("parallelDispatchBase", () => {
 
 describe("parallelJoinedTopic", () => {
   it("appends .joined", () => {
-    expect(parallelJoinedTopic("tests.written.parallel")).toBe("tests.written.parallel.joined");
+    expect(parallelJoinedTopic("tests.written.parallel")).toBe(
+      "tests.written.parallel.joined",
+    );
   });
 });
 
 describe("dispatchParallelJoinedTopic", () => {
   it("returns true for dispatch joined topics", () => {
-    expect(dispatchParallelJoinedTopic("tests.written.parallel.joined")).toBe(true);
+    expect(dispatchParallelJoinedTopic("tests.written.parallel.joined")).toBe(
+      true,
+    );
   });
 
   it("returns false for explore.parallel.joined (reserved)", () => {
@@ -139,11 +147,15 @@ describe("dispatchParallelJoinedTopic", () => {
 
 describe("dispatchParallelJoinBase", () => {
   it("returns loop.start for explore.parallel.joined", () => {
-    expect(dispatchParallelJoinBase("explore.parallel.joined")).toBe("loop.start");
+    expect(dispatchParallelJoinBase("explore.parallel.joined")).toBe(
+      "loop.start",
+    );
   });
 
   it("strips .parallel.joined for dispatch joined topics", () => {
-    expect(dispatchParallelJoinBase("tests.written.parallel.joined")).toBe("tests.written");
+    expect(dispatchParallelJoinBase("tests.written.parallel.joined")).toBe(
+      "tests.written",
+    );
   });
 
   it("returns topic unchanged for non-joined topics", () => {
@@ -183,16 +195,24 @@ describe("routingTopic", () => {
 
 describe("invalidEvent", () => {
   it("returns false for empty topic", () => {
-    expect(invalidEvent("", ["task.complete"], false, "task.complete")).toBe(false);
+    expect(invalidEvent("", ["task.complete"], false, "task.complete")).toBe(
+      false,
+    );
   });
 
   it("rejects reserved .parallel.joined topics always", () => {
-    expect(invalidEvent("foo.parallel.joined", [], false, "task.complete")).toBe(true);
+    expect(
+      invalidEvent("foo.parallel.joined", [], false, "task.complete"),
+    ).toBe(true);
   });
 
   it("rejects parallel topics when parallel disabled", () => {
-    expect(invalidEvent("foo.parallel", ["foo"], false, "task.complete")).toBe(true);
-    expect(invalidEvent("explore.parallel", ["foo"], false, "task.complete")).toBe(true);
+    expect(invalidEvent("foo.parallel", ["foo"], false, "task.complete")).toBe(
+      true,
+    );
+    expect(
+      invalidEvent("explore.parallel", ["foo"], false, "task.complete"),
+    ).toBe(true);
   });
 
   it("allows any topic when allowedEvents is empty and parallel disabled", () => {
@@ -200,26 +220,58 @@ describe("invalidEvent", () => {
   });
 
   it("allows topic that matches allowedEvents", () => {
-    expect(invalidEvent("task.complete", ["task.complete"], false, "task.complete")).toBe(false);
+    expect(
+      invalidEvent("task.complete", ["task.complete"], false, "task.complete"),
+    ).toBe(false);
   });
 
   it("rejects topic not in allowedEvents", () => {
-    expect(invalidEvent("foo.bar", ["task.complete"], false, "task.complete")).toBe(true);
+    expect(
+      invalidEvent("foo.bar", ["task.complete"], false, "task.complete"),
+    ).toBe(true);
   });
 
   it("allows explore.parallel when parallel enabled", () => {
-    expect(invalidEvent("explore.parallel", ["task.complete"], true, "task.complete")).toBe(false);
+    expect(
+      invalidEvent(
+        "explore.parallel",
+        ["task.complete"],
+        true,
+        "task.complete",
+      ),
+    ).toBe(false);
   });
 
   it("rejects dispatch parallel for completion event", () => {
-    expect(invalidEvent("task.complete.parallel", ["task.complete"], true, "task.complete")).toBe(true);
+    expect(
+      invalidEvent(
+        "task.complete.parallel",
+        ["task.complete"],
+        true,
+        "task.complete",
+      ),
+    ).toBe(true);
   });
 
   it("allows dispatch parallel for allowed non-completion event", () => {
-    expect(invalidEvent("gaps.identified.parallel", ["gaps.identified", "task.complete"], true, "task.complete")).toBe(false);
+    expect(
+      invalidEvent(
+        "gaps.identified.parallel",
+        ["gaps.identified", "task.complete"],
+        true,
+        "task.complete",
+      ),
+    ).toBe(false);
   });
 
   it("rejects dispatch parallel for system topic base", () => {
-    expect(invalidEvent("iteration.start.parallel", ["iteration.start"], true, "task.complete")).toBe(true);
+    expect(
+      invalidEvent(
+        "iteration.start.parallel",
+        ["iteration.start"],
+        true,
+        "task.complete",
+      ),
+    ).toBe(true);
   });
 });

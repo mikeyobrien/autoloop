@@ -1,46 +1,54 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readRunLines, readIfExists, readAllJournals, readRunJournal } from "./journal.js";
-import { emit as emitCmd, resolveEmitJournalFile } from "./emit.js";
-import { renderRunScratchpadFull } from "./scratchpad.js";
+import * as config from "../config.js";
+import { registryStart, registryStop } from "../registry/harness.js";
+import { cleanWorktrees } from "../worktree/clean.js";
+import { mergeWorktree } from "../worktree/merge.js";
+import {
+  readMeta,
+  updateStatus as updateWorktreeStatus,
+} from "../worktree/meta.js";
+import {
+  applyRuntimeModeOverrides,
+  buildLoopContext,
+  emptyFallback,
+  ensureLayout,
+  ensureRenderRunId,
+  initStore,
+  installRuntimeTools,
+  iterationFieldForRun,
+  reloadLoop,
+  resolveJournalFileForRun,
+} from "./config-helpers.js";
 import { coordinationFromLines } from "./coordination.js";
-import { collectMetricsRows, formatMetrics } from "./metrics.js";
-import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 import {
-  loadParallelBranchLaunch,
-  parallelBranchBackendOverride,
-  writeParallelBranchSummary,
-  renderBranchResult,
-  seedBranchContext,
-  branchStopReason,
-  appendLoopStart,
-} from "./parallel.js";
-import {
-  printSummary,
   log,
   printProjectedMarkdown,
   printProjectedText,
+  printSummary,
 } from "./display.js";
-import {
-  ensureLayout,
-  installRuntimeTools,
-  iterationFieldForRun,
-  ensureRenderRunId,
-  emptyFallback,
-  resolveJournalFileForRun,
-  buildLoopContext,
-  reloadLoop,
-  applyRuntimeModeOverrides,
-  initStore,
-} from "./config-helpers.js";
-import { maybeRunMetareview } from "./metareview.js";
+import { emit as emitCmd, resolveEmitJournalFile } from "./emit.js";
 import { runIteration } from "./iteration.js";
+import {
+  readAllJournals,
+  readIfExists,
+  readRunJournal,
+  readRunLines,
+} from "./journal.js";
+import { maybeRunMetareview } from "./metareview.js";
+import { collectMetricsRows, formatMetrics } from "./metrics.js";
+import {
+  appendLoopStart,
+  branchStopReason,
+  loadParallelBranchLaunch,
+  parallelBranchBackendOverride,
+  renderBranchResult,
+  seedBranchContext,
+  writeParallelBranchSummary,
+} from "./parallel.js";
+import { renderRunScratchpadFull } from "./scratchpad.js";
 import { stopMaxIterations } from "./stop.js";
-import { registryStart, registryStop } from "../registry/harness.js";
-import { updateStatus as updateWorktreeStatus, readMeta } from "../worktree/meta.js";
-import { mergeWorktree } from "../worktree/merge.js";
-import { cleanWorktrees } from "../worktree/clean.js";
-import * as config from "../config.js";
+import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export type { LoopContext, RunOptions, RunSummary };
 
@@ -50,7 +58,12 @@ export function run(
   selfCommand: string,
   runOptions: RunOptions,
 ): RunSummary {
-  let loop = buildLoopContext(projectDir, promptOverride, selfCommand, runOptions);
+  let loop = buildLoopContext(
+    projectDir,
+    promptOverride,
+    selfCommand,
+    runOptions,
+  );
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
@@ -58,7 +71,7 @@ export function run(
   registryStart(loop);
 
   // Track current iteration for signal handler
-  let currentIteration = 0;
+  const currentIteration = 0;
   let signalHandled = false;
 
   const onSignal = (signal: NodeJS.Signals) => {
@@ -66,7 +79,9 @@ export function run(
     signalHandled = true;
     try {
       registryStop(loop, currentIteration, "interrupted");
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
     process.removeListener("SIGINT", onSignal);
     process.removeListener("SIGTERM", onSignal);
     process.kill(process.pid, signal);
@@ -75,7 +90,11 @@ export function run(
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
 
-  log(loop, "info", `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`);
+  log(
+    loop,
+    "info",
+    `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`,
+  );
   const summary = iterate(loop, 1);
 
   // Clean up signal handlers on normal exit
@@ -86,7 +105,11 @@ export function run(
   if (loop.runtime.isolationMode === "worktree" && loop.paths.worktreeMetaDir) {
     const succeeded = summary.stopReason === "completed";
     const wtStatus = succeeded ? "completed" : "failed";
-    try { updateWorktreeStatus(loop.paths.worktreeMetaDir, wtStatus); } catch { /* meta update is best-effort */ }
+    try {
+      updateWorktreeStatus(loop.paths.worktreeMetaDir, wtStatus);
+    } catch {
+      /* meta update is best-effort */
+    }
 
     const keepWorktree = runOptions.keepWorktree ?? false;
     const automerge = runOptions.automerge ?? false;
@@ -95,17 +118,29 @@ export function run(
 
     // Automerge if requested and run succeeded.
     // Skip when trigger is "chain" — chain-mode defers merge to a dedicated automerge step.
-    if (automerge && succeeded && !keepWorktree && loop.launch.trigger !== "chain") {
+    if (
+      automerge &&
+      succeeded &&
+      !keepWorktree &&
+      loop.launch.trigger !== "chain"
+    ) {
       const meta = readMeta(loop.paths.worktreeMetaDir);
       if (meta) {
-        const strategy = (meta.merge_strategy || "squash") as "squash" | "merge" | "rebase";
+        const strategy = (meta.merge_strategy || "squash") as
+          | "squash"
+          | "merge"
+          | "rebase";
         try {
           mergeWorktree({
             mainProjectDir: loop.paths.mainProjectDir,
             metaDir: loop.paths.worktreeMetaDir,
             strategy,
           });
-          log(loop, "info", `worktree merged (${strategy}) for run ${loop.runtime.runId}`);
+          log(
+            loop,
+            "info",
+            `worktree merged (${strategy}) for run ${loop.runtime.runId}`,
+          );
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           log(loop, "warn", `worktree merge failed: ${msg}`);
@@ -146,7 +181,10 @@ export function renderScratchpadFormat(
   format: string,
   runIdOverride?: string,
 ): void {
-  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
+  const { journalFile, runId } = resolveJournalAndRun(
+    projectDir,
+    runIdOverride,
+  );
   printProjectedMarkdown(
     emptyFallback(renderRunScratchpadFull(readRunLines(journalFile, runId))),
     format,
@@ -159,7 +197,10 @@ export function renderPromptFormat(
   format: string,
   runIdOverride?: string,
 ): void {
-  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
+  const { journalFile, runId } = resolveJournalAndRun(
+    projectDir,
+    runIdOverride,
+  );
   const prompt = iterationFieldForRun(
     journalFile,
     runId,
@@ -179,7 +220,10 @@ export function renderOutput(
   iteration: string,
   runIdOverride?: string,
 ): void {
-  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
+  const { journalFile, runId } = resolveJournalAndRun(
+    projectDir,
+    runIdOverride,
+  );
   const output = iterationFieldForRun(
     journalFile,
     runId,
@@ -215,7 +259,10 @@ export function renderCoordinationFormat(
   format: string,
   runIdOverride?: string,
 ): void {
-  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
+  const { journalFile, runId } = resolveJournalAndRun(
+    projectDir,
+    runIdOverride,
+  );
   const lines = readRunLines(journalFile, runId);
   printProjectedMarkdown(emptyFallback(coordinationFromLines(lines)), format);
 }
@@ -225,7 +272,10 @@ export function renderMetrics(
   format: string,
   runIdOverride?: string,
 ): void {
-  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
+  const { journalFile, runId } = resolveJournalAndRun(
+    projectDir,
+    runIdOverride,
+  );
   const lines = readRunLines(journalFile, runId);
   const rows = collectMetricsRows(lines);
   printProjectedText(formatMetrics(rows, format), format);
@@ -267,7 +317,11 @@ export function runParallelBranchCli(
     "iteration.finish",
     "output",
   );
-  const stopReason = branchStopReason(summary.stopReason, elapsedMs, seeded.parallel.branchTimeoutMs);
+  const stopReason = branchStopReason(
+    summary.stopReason,
+    elapsedMs,
+    seeded.parallel.branchTimeoutMs,
+  );
 
   const result = {
     branch_id: launch.branchId,
@@ -309,4 +363,3 @@ function iterate(loop: LoopContext, iteration: number): RunSummary {
   }
   return runIteration(reviewed, iteration, iterate);
 }
-

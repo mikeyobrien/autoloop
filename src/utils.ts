@@ -47,7 +47,7 @@ export function nonemptyOr(value: string, fallback: string): string {
 }
 
 export function shellQuote(text: string): string {
-  return "'" + replaceAll(text, "'", "'\"'\"'") + "'";
+  return `'${replaceAll(text, "'", "'\"'\"'")}'`;
 }
 
 export function replaceAll(
@@ -67,9 +67,7 @@ export function stripQuotes(value: string): string {
 }
 
 export function isQuoted(value: string): boolean {
-  return (
-    value.startsWith('"') && value.endsWith('"') && value.length >= 2
-  );
+  return value.startsWith('"') && value.endsWith('"') && value.length >= 2;
 }
 
 export function sliceOuter(text: string): string {
@@ -81,7 +79,6 @@ export function parseFlag(args: string[], flag: string): string | undefined {
   if (idx === -1 || idx + 1 >= args.length) return undefined;
   return args[idx + 1];
 }
-
 
 export function generateCompactId(prefix: string): string {
   const ts = Date.now();

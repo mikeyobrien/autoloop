@@ -1,14 +1,17 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildLoopContext, injectClaudePermissions } from "../../src/harness/config-helpers.js";
+import { describe, expect, it } from "vitest";
+import {
+  buildLoopContext,
+  injectClaudePermissions,
+} from "../../src/harness/config-helpers.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
 function makeProject(configToml: string): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-ts-config-helpers-"));
   writeFileSync(join(dir, "autoloops.toml"), configToml);
-  writeFileSync(join(dir, "topology.toml"), "[[role]]\nname = \"builder\"\n");
+  writeFileSync(join(dir, "topology.toml"), '[[role]]\nname = "builder"\n');
   mkdirSync(join(dir, ".autoloop"), { recursive: true });
   return dir;
 }
@@ -38,12 +41,15 @@ function seedRegistry(stateDir: string, records: Partial<RunRecord>[]): void {
       worktree_path: r.worktree_path ?? "",
     }),
   );
-  writeFileSync(join(stateDir, "registry.jsonl"), lines.join("\n") + "\n");
+  writeFileSync(join(stateDir, "registry.jsonl"), `${lines.join("\n")}\n`);
 }
 
 describe("injectClaudePermissions", () => {
   it("adds Claude permissions flags for Claude command backends", () => {
-    expect(injectClaudePermissions("claude", [])).toEqual(["-p", "--dangerously-skip-permissions"]);
+    expect(injectClaudePermissions("claude", [])).toEqual([
+      "-p",
+      "--dangerously-skip-permissions",
+    ]);
     expect(injectClaudePermissions("/opt/tools/claude", [])).toEqual([
       "-p",
       "--dangerously-skip-permissions",
@@ -51,27 +57,38 @@ describe("injectClaudePermissions", () => {
   });
 
   it("does not duplicate Claude permissions flags", () => {
-    expect(injectClaudePermissions("claude", ["-p", "--dangerously-skip-permissions"])).toEqual([
-      "-p",
-      "--dangerously-skip-permissions",
-    ]);
+    expect(
+      injectClaudePermissions("claude", [
+        "-p",
+        "--dangerously-skip-permissions",
+      ]),
+    ).toEqual(["-p", "--dangerously-skip-permissions"]);
   });
 
   it("leaves non-Claude backends untouched", () => {
-    expect(injectClaudePermissions("node", ["script.js"])).toEqual(["script.js"]);
+    expect(injectClaudePermissions("node", ["script.js"])).toEqual([
+      "script.js",
+    ]);
   });
 });
 
 describe("buildLoopContext", () => {
   it("injects Claude permissions for config-defined Claude backends", () => {
-    const projectDir = makeProject([
-      'event_loop.max_iterations = 1',
-      'backend.kind = "command"',
-      'backend.command = "claude"',
-      'backend.timeout_ms = 3000000',
-    ].join("\n"));
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'backend.kind = "command"',
+        'backend.command = "claude"',
+        "backend.timeout_ms = 3000000",
+      ].join("\n"),
+    );
 
-    const loop = buildLoopContext(projectDir, "test objective", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(
+      projectDir,
+      "test objective",
+      "node dist/main.js",
+      { workDir: projectDir },
+    );
 
     expect(loop.backend.command).toBe("claude");
     expect(loop.backend.args).toEqual(["-p", "--dangerously-skip-permissions"]);
@@ -79,8 +96,10 @@ describe("buildLoopContext", () => {
   });
 
   it("sets isolation mode to shared by default for solo run", () => {
-    const projectDir = makeProject('event_loop.max_iterations = 1\n');
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.runtime.isolationMode).toBe("shared");
     expect(loop.paths.baseStateDir).toBe(loop.paths.stateDir);
@@ -88,8 +107,10 @@ describe("buildLoopContext", () => {
   });
 
   it("populates baseStateDir and mainProjectDir", () => {
-    const projectDir = makeProject('event_loop.max_iterations = 1\n');
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.paths.baseStateDir).toBeTruthy();
     expect(loop.paths.mainProjectDir).toBeTruthy();
@@ -97,10 +118,9 @@ describe("buildLoopContext", () => {
   });
 
   it("honors worktree.enabled config key for isolation", () => {
-    const projectDir = makeProject([
-      'event_loop.max_iterations = 1',
-      'worktree.enabled = "true"',
-    ].join("\n"));
+    const projectDir = makeProject(
+      ["event_loop.max_iterations = 1", 'worktree.enabled = "true"'].join("\n"),
+    );
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
       noWorktree: true, // override to avoid actual git worktree creation
@@ -110,10 +130,11 @@ describe("buildLoopContext", () => {
   });
 
   it("falls back to isolation.enabled when worktree.enabled is absent", () => {
-    const projectDir = makeProject([
-      'event_loop.max_iterations = 1',
-      'isolation.enabled = "true"',
-    ].join("\n"));
+    const projectDir = makeProject(
+      ["event_loop.max_iterations = 1", 'isolation.enabled = "true"'].join(
+        "\n",
+      ),
+    );
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
       noWorktree: true,
@@ -127,21 +148,30 @@ describe("buildLoopContext run-scoped isolation", () => {
   function makeProjectWithActiveRun(configToml?: string): string {
     const dir = makeProject(configToml ?? "event_loop.max_iterations = 1\n");
     seedRegistry(join(dir, ".autoloop"), [
-      { run_id: "run-existing", status: "running", preset: "autocode", objective: "implement feature" },
+      {
+        run_id: "run-existing",
+        status: "running",
+        preset: "autocode",
+        objective: "implement feature",
+      },
     ]);
     return dir;
   }
 
   it("sets isolationMode to run-scoped when another run is active", () => {
     const projectDir = makeProjectWithActiveRun();
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.runtime.isolationMode).toBe("run-scoped");
   });
 
   it("routes stateDir under runs/<id>/ while baseStateDir stays top-level", () => {
     const projectDir = makeProjectWithActiveRun();
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.paths.stateDir).toContain("/runs/");
     expect(loop.paths.stateDir).toContain(loop.runtime.runId);
@@ -151,7 +181,9 @@ describe("buildLoopContext run-scoped isolation", () => {
 
   it("routes journalFile to run-scoped dir", () => {
     const projectDir = makeProjectWithActiveRun();
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.paths.journalFile).toContain("/runs/");
     expect(loop.paths.journalFile).toContain(loop.runtime.runId);
@@ -160,7 +192,9 @@ describe("buildLoopContext run-scoped isolation", () => {
 
   it("keeps registryFile at baseStateDir (not run-scoped)", () => {
     const projectDir = makeProjectWithActiveRun();
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.paths.registryFile).not.toContain("/runs/");
     expect(loop.paths.registryFile).toContain(".autoloop");
@@ -169,7 +203,9 @@ describe("buildLoopContext run-scoped isolation", () => {
 
   it("routes toolPath and piAdapterPath to run-scoped dir", () => {
     const projectDir = makeProjectWithActiveRun();
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.paths.toolPath).toContain("/runs/");
     expect(loop.paths.toolPath).toContain(loop.runtime.runId);
@@ -179,14 +215,18 @@ describe("buildLoopContext run-scoped isolation", () => {
 
   it("creates the run-scoped directory on disk", () => {
     const projectDir = makeProjectWithActiveRun();
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(existsSync(loop.paths.stateDir)).toBe(true);
   });
 
   it("preserves mainProjectDir as the original projectDir", () => {
     const projectDir = makeProjectWithActiveRun();
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", { workDir: projectDir });
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
 
     expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
   });

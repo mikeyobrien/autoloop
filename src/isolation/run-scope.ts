@@ -1,11 +1,14 @@
-import { mkdirSync, existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
  * Create a run-scoped state directory under `.autoloop/runs/<runId>/`.
  * Returns the absolute path to the created directory.
  */
-export function createRunScopedDir(baseStateDir: string, runId: string): string {
+export function createRunScopedDir(
+  baseStateDir: string,
+  runId: string,
+): string {
   const dir = runScopedPath(baseStateDir, runId);
   mkdirSync(dir, { recursive: true });
   return dir;
@@ -50,7 +53,9 @@ export function cleanRunScopedDirs(
       try {
         const mtime = statSync(fullPath).mtimeMs;
         if (now - mtime < thresholdMs) continue;
-      } catch { continue; }
+      } catch {
+        continue;
+      }
     }
 
     rmSync(fullPath, { recursive: true, force: true });

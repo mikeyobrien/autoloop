@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const ENTRY = resolve(ROOT, "dist/main.js");

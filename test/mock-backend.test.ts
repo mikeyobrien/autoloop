@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const FIXTURES_DIR = resolve(import.meta.dirname, "fixtures/backend");
@@ -112,7 +112,9 @@ describe("mock-backend executable behavior", () => {
       timeout: 10_000,
     });
     expect(res.status).toBe(2);
-    expect((res.stderr || "") + (res.stdout || "")).toContain("fixture path missing");
+    expect((res.stderr || "") + (res.stdout || "")).toContain(
+      "fixture path missing",
+    );
   });
 
   it("propagates non-zero fixture exit codes", () => {
@@ -128,5 +130,7 @@ describe("mock-backend executable behavior", () => {
 });
 
 function loadFixture(file: string): Fixture {
-  return JSON.parse(readFileSync(resolve(FIXTURES_DIR, file), "utf-8")) as Fixture;
+  return JSON.parse(
+    readFileSync(resolve(FIXTURES_DIR, file), "utf-8"),
+  ) as Fixture;
 }

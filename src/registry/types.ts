@@ -1,4 +1,9 @@
-export type RegistryStatus = "running" | "completed" | "failed" | "timed_out" | "stopped";
+export type RegistryStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "timed_out"
+  | "stopped";
 
 export interface RunRecord {
   run_id: string;

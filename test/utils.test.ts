@@ -1,20 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  generateCompactId,
+  isQuoted,
+  joinCsv,
+  joinLines,
+  lineSep,
   listContains,
   listText,
-  splitCsv,
-  joinCsv,
-  parseStringList,
-  lineSep,
-  joinLines,
   nonemptyOr,
-  shellQuote,
+  parseStringList,
   replaceAll,
+  shellQuote,
   shellWords,
-  stripQuotes,
-  isQuoted,
   sliceOuter,
-  generateCompactId,
+  splitCsv,
+  stripQuotes,
 } from "../src/utils.js";
 
 describe("listContains", () => {
@@ -166,7 +166,9 @@ describe("generateCompactId", () => {
   });
 
   it("generates unique ids", () => {
-    const ids = new Set(Array.from({ length: 20 }, () => generateCompactId("x")));
+    const ids = new Set(
+      Array.from({ length: 20 }, () => generateCompactId("x")),
+    );
     expect(ids.size).toBe(20);
   });
 });

@@ -1,11 +1,11 @@
 import { join } from "node:path";
-import { readMeta, isOrphanWorktree } from "../worktree/meta.js";
-import { mergeWorktree } from "../worktree/merge.js";
-import { cleanWorktrees } from "../worktree/clean.js";
-import { listWorktreeMetas } from "../worktree/list.js";
 import { formatTime } from "../loops/render.js";
 import { parseFlag } from "../utils.js";
+import { cleanWorktrees } from "../worktree/clean.js";
+import { listWorktreeMetas } from "../worktree/list.js";
 import type { MergeOpts } from "../worktree/merge.js";
+import { mergeWorktree } from "../worktree/merge.js";
+import { isOrphanWorktree, readMeta } from "../worktree/meta.js";
 
 export function dispatchWorktree(args: string[]): void {
   const projectDir = resolveProjectDir();
@@ -25,15 +25,23 @@ export function dispatchWorktree(args: string[]): void {
 
   if (sub === "show") {
     const runId = args[1];
-    if (!runId) { console.log("Usage: autoloop worktree show <run-id>"); return; }
+    if (!runId) {
+      console.log("Usage: autoloop worktree show <run-id>");
+      return;
+    }
     showWorktree(stateDir, runId);
     return;
   }
 
   if (sub === "merge") {
     const runId = args[1];
-    if (!runId) { console.log("Usage: autoloop worktree merge <run-id> [--strategy <s>]"); return; }
-    const strategy = parseFlag(args, "--strategy") as MergeOpts["strategy"] | undefined;
+    if (!runId) {
+      console.log("Usage: autoloop worktree merge <run-id> [--strategy <s>]");
+      return;
+    }
+    const strategy = parseFlag(args, "--strategy") as
+      | MergeOpts["strategy"]
+      | undefined;
     doMerge(projectDir, stateDir, runId, strategy);
     return;
   }
@@ -41,19 +49,22 @@ export function dispatchWorktree(args: string[]): void {
   if (sub === "clean") {
     const all = args.includes("--all");
     const force = args.includes("--force");
-    const runId = args.find(a => !a.startsWith("--") && a !== "clean");
+    const runId = args.find((a) => !a.startsWith("--") && a !== "clean");
     doClean(projectDir, stateDir, { runId, all, force });
     return;
   }
 
-  console.log("Unknown worktree subcommand: " + sub);
+  console.log(`Unknown worktree subcommand: ${sub}`);
   printWorktreeUsage();
 }
 
 function listWorktrees(stateDir: string): void {
   const entries = listWorktreeMetas(stateDir);
 
-  if (entries.length === 0) { console.log("No worktrees found."); return; }
+  if (entries.length === 0) {
+    console.log("No worktrees found.");
+    return;
+  }
 
   const header = [
     "RUN ID".padEnd(24),
@@ -66,7 +77,7 @@ function listWorktrees(stateDir: string): void {
   console.log(header);
 
   for (const meta of entries) {
-    const statusLabel = meta.orphan ? meta.status + " (orphan)" : meta.status;
+    const statusLabel = meta.orphan ? `${meta.status} (orphan)` : meta.status;
     const line = [
       truncate(meta.run_id, 24).padEnd(24),
       statusLabel.padEnd(18),
@@ -82,10 +93,13 @@ function listWorktrees(stateDir: string): void {
 function showWorktree(stateDir: string, runId: string): void {
   const metaDir = join(stateDir, "worktrees", runId);
   const meta = readMeta(metaDir);
-  if (!meta) { console.log(`No worktree found for run ${runId}`); return; }
+  if (!meta) {
+    console.log(`No worktree found for run ${runId}`);
+    return;
+  }
 
   const orphan = isOrphanWorktree(meta);
-  const statusLabel = orphan ? meta.status + " (orphan)" : meta.status;
+  const statusLabel = orphan ? `${meta.status} (orphan)` : meta.status;
 
   const lines = [
     field("Run ID", meta.run_id),
@@ -109,7 +123,11 @@ function doMerge(
   strategy?: MergeOpts["strategy"],
 ): void {
   const metaDir = join(stateDir, "worktrees", runId);
-  const result = mergeWorktree({ mainProjectDir: projectDir, metaDir, strategy });
+  const result = mergeWorktree({
+    mainProjectDir: projectDir,
+    metaDir,
+    strategy,
+  });
 
   if (result.success) {
     console.log(`Merged worktree ${runId} successfully.`);
@@ -117,7 +135,7 @@ function doMerge(
     console.log(`Merge failed for ${runId}.`);
     if (result.conflicts?.length) {
       console.log("Conflicting files:");
-      for (const f of result.conflicts) console.log("  " + f);
+      for (const f of result.conflicts) console.log(`  ${f}`);
     }
     if (result.recoveryHint) console.log(result.recoveryHint);
     process.exitCode = 1;
@@ -140,10 +158,14 @@ function doClean(
   if (result.removed.length === 0) {
     console.log("No worktrees to clean.");
   } else {
-    console.log(`Cleaned ${result.removed.length} worktree(s): ${result.removed.join(", ")}`);
+    console.log(
+      `Cleaned ${result.removed.length} worktree(s): ${result.removed.join(", ")}`,
+    );
   }
   if (result.skipped.length > 0) {
-    console.log(`Skipped ${result.skipped.length}: ${result.skipped.join(", ")}`);
+    console.log(
+      `Skipped ${result.skipped.length}: ${result.skipped.join(", ")}`,
+    );
   }
 }
 
@@ -151,21 +173,24 @@ function printWorktreeUsage(): void {
   console.log("Usage:");
   console.log("  autoloop worktree                         List worktrees");
   console.log("  autoloop worktree list                    List worktrees");
-  console.log("  autoloop worktree show <run-id>           Show worktree details");
-  console.log("  autoloop worktree merge <run-id> [--strategy <squash|merge|rebase>]");
+  console.log(
+    "  autoloop worktree show <run-id>           Show worktree details",
+  );
+  console.log(
+    "  autoloop worktree merge <run-id> [--strategy <squash|merge|rebase>]",
+  );
   console.log("  autoloop worktree clean [--all] [--force] [<run-id>]");
 }
 
 function resolveProjectDir(): string {
-  return process.env["AUTOLOOP_PROJECT_DIR"] || ".";
+  return process.env.AUTOLOOP_PROJECT_DIR || ".";
 }
 
 function field(label: string, value: string): string {
-  return (label + ":").padEnd(12) + value;
+  return `${label}:`.padEnd(12) + value;
 }
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
-  return s.slice(0, max - 2) + "..";
+  return `${s.slice(0, max - 2)}..`;
 }
-

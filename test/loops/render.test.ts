@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  renderListHeader,
-  renderRunLine,
-  renderRunDetail,
   formatTime,
+  renderListHeader,
+  renderRunDetail,
+  renderRunLine,
 } from "../../src/loops/render.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
@@ -44,7 +44,9 @@ describe("renderListHeader", () => {
     const header = renderListHeader();
     expect(header).toContain("ISOLATION");
     // ISOLATION should appear after PRESET and before ITER
-    expect(header.indexOf("ISOLATION")).toBeGreaterThan(header.indexOf("PRESET"));
+    expect(header.indexOf("ISOLATION")).toBeGreaterThan(
+      header.indexOf("PRESET"),
+    );
     expect(header.indexOf("ISOLATION")).toBeLessThan(header.indexOf("ITER"));
   });
 });
@@ -81,11 +83,13 @@ describe("renderRunDetail", () => {
   });
 
   it("includes worktree name when present", () => {
-    const detail = renderRunDetail(makeRun({
-      isolation_mode: "worktree",
-      worktree_name: "autoloop/run-abc",
-      worktree_path: "/tmp/wt",
-    }));
+    const detail = renderRunDetail(
+      makeRun({
+        isolation_mode: "worktree",
+        worktree_name: "autoloop/run-abc",
+        worktree_path: "/tmp/wt",
+      }),
+    );
     expect(detail).toContain("Worktree:");
     expect(detail).toContain("autoloop/run-abc");
     expect(detail).toContain("WT Path:");

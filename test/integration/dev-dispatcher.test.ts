@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { execFileSync, execFile } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const DEV = resolve(ROOT, "bin/dev");
@@ -56,7 +56,7 @@ describe("bin/dev", () => {
   });
 
   it("build subcommand runs tsc successfully", () => {
-    const out = run(["build"]);
+    const _out = run(["build"]);
     // tsc produces no output on success, but npm logs the script name
     // Just verify it exits 0 (no throw)
     expect(true).toBe(true);

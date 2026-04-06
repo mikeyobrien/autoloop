@@ -1,14 +1,22 @@
-import { describe, it, expect } from "vitest";
-import { join } from "node:path";
-import { mkdirSync, writeFileSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import { createApp } from "../../src/dashboard/app.js";
 
-function makeTempRegistry(): { registryPath: string; projectDir: string; stateDir: string } {
+function makeTempRegistry(): {
+  registryPath: string;
+  projectDir: string;
+  stateDir: string;
+} {
   const projectDir = mkdtempSync(join(tmpdir(), "dashboard-api-test-"));
   const stateDir = join(projectDir, ".autoloop");
   mkdirSync(stateDir, { recursive: true });
-  return { registryPath: join(stateDir, "registry.jsonl"), projectDir, stateDir };
+  return {
+    registryPath: join(stateDir, "registry.jsonl"),
+    projectDir,
+    stateDir,
+  };
 }
 
 describe("dashboard /api/runs", () => {
@@ -37,7 +45,7 @@ describe("dashboard /api/runs", () => {
       stop_reason: "",
       latest_event: "iteration.finish",
     });
-    writeFileSync(registryPath, record + "\n", "utf-8");
+    writeFileSync(registryPath, `${record}\n`, "utf-8");
 
     const app = createApp({
       registryPath,
@@ -81,7 +89,7 @@ describe("dashboard /api/runs", () => {
       stop_reason: "",
       latest_event: "iteration.finish",
     });
-    writeFileSync(registryPath, record + "\n", "utf-8");
+    writeFileSync(registryPath, `${record}\n`, "utf-8");
 
     const app = createApp({
       registryPath,
@@ -102,7 +110,12 @@ describe("dashboard /api/runs", () => {
 
 describe("dashboard /api/runs/:id/events", () => {
   function makeEvent(runId: string, topic: string, seq: number) {
-    return JSON.stringify({ run: runId, topic, seq, timestamp: new Date().toISOString() });
+    return JSON.stringify({
+      run: runId,
+      topic,
+      seq,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   it("returns events from the shared journal for a shared run", async () => {
@@ -114,7 +127,7 @@ describe("dashboard /api/runs/:id/events", () => {
       makeEvent("run-shared-001", "iteration.start", 2),
       makeEvent("run-other-999", "loop.start", 1),
     ];
-    writeFileSync(journalPath, events.join("\n") + "\n", "utf-8");
+    writeFileSync(journalPath, `${events.join("\n")}\n`, "utf-8");
 
     const app = createApp({
       registryPath,
@@ -138,7 +151,11 @@ describe("dashboard /api/runs/:id/events", () => {
     const journalPath = join(stateDir, "journal.jsonl");
 
     // Write a decoy event to the shared journal
-    writeFileSync(journalPath, makeEvent("run-scoped-001", "decoy", 0) + "\n", "utf-8");
+    writeFileSync(
+      journalPath,
+      `${makeEvent("run-scoped-001", "decoy", 0)}\n`,
+      "utf-8",
+    );
 
     // Write real events to the run-scoped journal
     const runDir = join(stateDir, "runs", "run-scoped-001");
@@ -149,7 +166,7 @@ describe("dashboard /api/runs/:id/events", () => {
       makeEvent("run-scoped-001", "tasks.ready", 2),
       makeEvent("run-scoped-001", "review.passed", 3),
     ];
-    writeFileSync(runJournal, events.join("\n") + "\n", "utf-8");
+    writeFileSync(runJournal, `${events.join("\n")}\n`, "utf-8");
 
     const app = createApp({
       registryPath,
@@ -175,14 +192,20 @@ describe("dashboard /api/runs/:id/events", () => {
     writeFileSync(journalPath, "", "utf-8");
 
     // Write events to the worktree journal path
-    const wtJournalDir = join(stateDir, "worktrees", "run-wt-001", "tree", ".autoloop");
+    const wtJournalDir = join(
+      stateDir,
+      "worktrees",
+      "run-wt-001",
+      "tree",
+      ".autoloop",
+    );
     mkdirSync(wtJournalDir, { recursive: true });
     const wtJournal = join(wtJournalDir, "journal.jsonl");
     const events = [
       makeEvent("run-wt-001", "loop.start", 1),
       makeEvent("run-wt-001", "build.blocked", 2),
     ];
-    writeFileSync(wtJournal, events.join("\n") + "\n", "utf-8");
+    writeFileSync(wtJournal, `${events.join("\n")}\n`, "utf-8");
 
     const app = createApp({
       registryPath,

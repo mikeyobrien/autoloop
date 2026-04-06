@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { join } from "node:path";
-import { mkdirSync, writeFileSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { createApp, type DashboardContext } from "../../src/dashboard/app.js";
 
 function makeCtx(overrides: Partial<DashboardContext> = {}): DashboardContext {
@@ -44,7 +44,7 @@ describe("API response wrapping", () => {
   it("GET /api/runs/:id/events returns { events }", async () => {
     const ctx = makeCtx();
     // Write a journal line so we get something back
-    writeFileSync(ctx.journalPath, JSON.stringify({ type: "test" }) + "\n");
+    writeFileSync(ctx.journalPath, `${JSON.stringify({ type: "test" })}\n`);
     const app = createApp(ctx);
     const res = await app.request("/api/runs/fake-id/events");
     expect(res.status).toBe(200);
@@ -128,7 +128,10 @@ describe("POST /api/runs input validation", () => {
     const res = await app.request("/api/runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: "hello", preset: "nonexistent-preset-xyz" }),
+      body: JSON.stringify({
+        prompt: "hello",
+        preset: "nonexistent-preset-xyz",
+      }),
     });
     expect(res.status).toBe(400);
     const body = await res.json();

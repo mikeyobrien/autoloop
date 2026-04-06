@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readAllJournals, readRunJournal } from "../../src/harness/journal.js";
 
 const tmpDir = join(import.meta.dirname, "__tmp_journal_test__");
@@ -20,7 +20,10 @@ afterEach(() => {
 describe("readAllJournals", () => {
   it("reads top-level journal when no runs/ dir exists", () => {
     const journalFile = join(tmpDir, "journal.jsonl");
-    writeFileSync(journalFile, journalLine("r1", "loop.start", "2026-01-01T00:00:00Z") + "\n");
+    writeFileSync(
+      journalFile,
+      `${journalLine("r1", "loop.start", "2026-01-01T00:00:00Z")}\n`,
+    );
 
     const lines = readAllJournals(tmpDir);
     expect(lines).toHaveLength(1);
@@ -29,14 +32,19 @@ describe("readAllJournals", () => {
 
   it("merges top-level and per-run journals sorted by timestamp", () => {
     const journalFile = join(tmpDir, "journal.jsonl");
-    writeFileSync(journalFile, journalLine("r1", "loop.start", "2026-01-01T00:00:00Z") + "\n");
+    writeFileSync(
+      journalFile,
+      `${journalLine("r1", "loop.start", "2026-01-01T00:00:00Z")}\n`,
+    );
 
     const runDir = join(tmpDir, "runs", "r2");
     mkdirSync(runDir, { recursive: true });
     writeFileSync(
       join(runDir, "journal.jsonl"),
-      journalLine("r2", "loop.start", "2026-01-01T00:00:01Z") + "\n" +
-      journalLine("r2", "iteration.start", "2026-01-01T00:00:02Z") + "\n",
+      journalLine("r2", "loop.start", "2026-01-01T00:00:01Z") +
+        "\n" +
+        journalLine("r2", "iteration.start", "2026-01-01T00:00:02Z") +
+        "\n",
     );
 
     const lines = readAllJournals(tmpDir);
@@ -59,7 +67,7 @@ describe("readRunJournal", () => {
     mkdirSync(runDir, { recursive: true });
     writeFileSync(
       join(runDir, "journal.jsonl"),
-      journalLine("r1", "loop.start", "2026-01-01T00:00:00Z") + "\n",
+      `${journalLine("r1", "loop.start", "2026-01-01T00:00:00Z")}\n`,
     );
 
     const lines = readRunJournal(tmpDir, "r1");
@@ -74,8 +82,10 @@ describe("readRunJournal", () => {
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "journal.jsonl"),
-      journalLine("wt-run-1", "loop.start", "2026-01-01T00:00:00Z") + "\n" +
-      journalLine("wt-run-1", "iteration.start", "2026-01-01T00:00:01Z") + "\n",
+      journalLine("wt-run-1", "loop.start", "2026-01-01T00:00:00Z") +
+        "\n" +
+        journalLine("wt-run-1", "iteration.start", "2026-01-01T00:00:01Z") +
+        "\n",
     );
 
     const lines = readRunJournal(tmpDir, "wt-run-1");
@@ -89,7 +99,7 @@ describe("readRunJournal", () => {
     mkdirSync(runDir, { recursive: true });
     writeFileSync(
       join(runDir, "journal.jsonl"),
-      journalLine("dual-run", "loop.start", "2026-01-01T00:00:00Z") + "\n",
+      `${journalLine("dual-run", "loop.start", "2026-01-01T00:00:00Z")}\n`,
     );
 
     const stateDirName = tmpDir.split("/").pop()!;
@@ -97,8 +107,10 @@ describe("readRunJournal", () => {
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "journal.jsonl"),
-      journalLine("dual-run", "loop.start", "2026-01-01T00:00:00Z") + "\n" +
-      journalLine("dual-run", "extra", "2026-01-01T00:00:01Z") + "\n",
+      journalLine("dual-run", "loop.start", "2026-01-01T00:00:00Z") +
+        "\n" +
+        journalLine("dual-run", "extra", "2026-01-01T00:00:01Z") +
+        "\n",
     );
 
     // Should get 1 line (run-scoped), not 2 (worktree)
@@ -117,7 +129,7 @@ describe("readAllJournals with worktree journals", () => {
     // Top-level journal
     writeFileSync(
       join(tmpDir, "journal.jsonl"),
-      journalLine("r1", "loop.start", "2026-01-01T00:00:00Z") + "\n",
+      `${journalLine("r1", "loop.start", "2026-01-01T00:00:00Z")}\n`,
     );
 
     // Worktree journal
@@ -126,7 +138,7 @@ describe("readAllJournals with worktree journals", () => {
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "journal.jsonl"),
-      journalLine("wt-1", "loop.start", "2026-01-01T00:00:02Z") + "\n",
+      `${journalLine("wt-1", "loop.start", "2026-01-01T00:00:02Z")}\n`,
     );
 
     const lines = readAllJournals(tmpDir);

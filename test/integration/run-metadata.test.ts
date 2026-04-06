@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
-  makeTempProject,
-  runCli,
-  readText,
   FIXTURES_DIR,
+  makeTempProject,
+  readText,
+  runCli,
 } from "../helpers/runtime.js";
 
 beforeAll(() => {

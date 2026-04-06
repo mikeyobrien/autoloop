@@ -1,11 +1,20 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { jsonField, jsonFieldRaw, jsonBool } from "../json.js";
-import { joinCsv, splitCsv, listText, shellQuote } from "../utils.js";
-import { extractField, readIfExists, appendAgentEvent, appendEvent } from "./journal.js";
-import type { LoopContext } from "./types.js";
-import { buildBackendShellCommand, normalizeBackendLabel, runBackendCommand } from "../backend/index.js";
+import {
+  buildBackendShellCommand,
+  normalizeBackendLabel,
+  runBackendCommand,
+} from "../backend/index.js";
+import { jsonBool, jsonField, jsonFieldRaw } from "../json.js";
+import { joinCsv, listText, shellQuote, splitCsv } from "../utils.js";
+import {
+  appendAgentEvent,
+  appendEvent,
+  extractField,
+  readIfExists,
+} from "./journal.js";
 import type { IterationContext } from "./prompt.js";
+import type { LoopContext } from "./types.js";
 
 export interface BranchLaunch {
   branchId: string;
@@ -46,47 +55,89 @@ export function csvFieldList(line: string, field: string): string[] {
   return splitCsv(value);
 }
 
-export function parallelBranchBackendOverride(launch: BranchLaunch): Record<string, unknown> {
+export function parallelBranchBackendOverride(
+  launch: BranchLaunch,
+): Record<string, unknown> {
   const override: Record<string, unknown> = {};
-  if (launch.backendKind) override["kind"] = launch.backendKind;
-  if (launch.backendCommand) override["command"] = launch.backendCommand;
-  if (launch.backendArgs.length > 0) override["args"] = launch.backendArgs;
-  if (launch.backendPromptMode) override["prompt_mode"] = launch.backendPromptMode;
+  if (launch.backendKind) override.kind = launch.backendKind;
+  if (launch.backendCommand) override.command = launch.backendCommand;
+  if (launch.backendArgs.length > 0) override.args = launch.backendArgs;
+  if (launch.backendPromptMode) override.prompt_mode = launch.backendPromptMode;
   return override;
 }
 
-export function writeParallelBranchSummary(branchDir: string, result: Record<string, unknown>): void {
+export function writeParallelBranchSummary(
+  branchDir: string,
+  result: Record<string, unknown>,
+): void {
   const fields =
-    jsonField("branch_id", String(result["branch_id"] ?? "")) + ", " +
-    jsonField("objective", String(result["objective"] ?? "")) + ", " +
-    jsonField("stop_reason", String(result["stop_reason"] ?? "unknown")) + ", " +
-    jsonField("output", String(result["output"] ?? "")) + ", " +
-    jsonField("routing_event", String(result["routing_event"] ?? "")) + ", " +
-    jsonField("allowed_roles", joinCsv((result["allowed_roles"] ?? []) as string[])) + ", " +
-    jsonField("allowed_events", joinCsv((result["allowed_events"] ?? []) as string[])) + ", " +
-    jsonField("elapsed_ms", String(result["elapsed_ms"] ?? 0)) + ", " +
-    jsonField("finished_at_ms", String(result["finished_at_ms"] ?? 0));
-  writeFileSync(join(branchDir, "summary.json"), "{" + fields + "}\n");
+    jsonField("branch_id", String(result.branch_id ?? "")) +
+    ", " +
+    jsonField("objective", String(result.objective ?? "")) +
+    ", " +
+    jsonField("stop_reason", String(result.stop_reason ?? "unknown")) +
+    ", " +
+    jsonField("output", String(result.output ?? "")) +
+    ", " +
+    jsonField("routing_event", String(result.routing_event ?? "")) +
+    ", " +
+    jsonField(
+      "allowed_roles",
+      joinCsv((result.allowed_roles ?? []) as string[]),
+    ) +
+    ", " +
+    jsonField(
+      "allowed_events",
+      joinCsv((result.allowed_events ?? []) as string[]),
+    ) +
+    ", " +
+    jsonField("elapsed_ms", String(result.elapsed_ms ?? 0)) +
+    ", " +
+    jsonField("finished_at_ms", String(result.finished_at_ms ?? 0));
+  writeFileSync(join(branchDir, "summary.json"), `{${fields}}\n`);
 }
 
 export function renderBranchResult(result: Record<string, unknown>): string {
   return (
     "# Branch Result\n\n" +
-    "Stop reason: `" + (result["stop_reason"] ?? "unknown") + "`\n" +
-    "Elapsed: `" + (result["elapsed_ms"] ?? 0) + "ms`\n" +
-    "Routing event: `" + (result["routing_event"] ?? "") + "`\n" +
-    "Allowed events: " + listText((result["allowed_events"] ?? []) as string[]) + "\n\n" +
-    "## Output\n\n" + (result["output"] ?? "") + "\n"
+    "Stop reason: `" +
+    (result.stop_reason ?? "unknown") +
+    "`\n" +
+    "Elapsed: `" +
+    (result.elapsed_ms ?? 0) +
+    "ms`\n" +
+    "Routing event: `" +
+    (result.routing_event ?? "") +
+    "`\n" +
+    "Allowed events: " +
+    listText((result.allowed_events ?? []) as string[]) +
+    "\n\n" +
+    "## Output\n\n" +
+    (result.output ?? "") +
+    "\n"
   );
 }
 
-export function seedBranchContext(loop: LoopContext, routingEvent: string): LoopContext {
+export function seedBranchContext(
+  loop: LoopContext,
+  routingEvent: string,
+): LoopContext {
   if (routingEvent === "loop.start") return loop;
-  appendAgentEvent(loop.paths.journalFile, loop.runtime.runId, "", routingEvent, "branch routing seed");
+  appendAgentEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    "",
+    routingEvent,
+    "branch routing seed",
+  );
   return loop;
 }
 
-export function branchStopReason(stopReason: string, elapsedMs: number, timeoutMs: number): string {
+export function branchStopReason(
+  stopReason: string,
+  elapsedMs: number,
+  timeoutMs: number,
+): string {
   if (stopReason === "backend_timeout") return "backend_timeout";
   return elapsedMs > timeoutMs ? "backend_timeout" : stopReason;
 }
@@ -99,7 +150,11 @@ export interface ProcessResult {
   timedOut: boolean;
 }
 
-export function runProcess(command: string, timeoutMs: number, providerKind = "command"): ProcessResult {
+export function runProcess(
+  command: string,
+  timeoutMs: number,
+  providerKind = "command",
+): ProcessResult {
   const result = runBackendCommand(providerKind, command, timeoutMs);
   return {
     output: result.output,
@@ -108,21 +163,42 @@ export function runProcess(command: string, timeoutMs: number, providerKind = "c
   };
 }
 
-export function buildBackendCommand(loop: LoopContext, iter: IterationContext): string {
+export function buildBackendCommand(
+  loop: LoopContext,
+  iter: IterationContext,
+): string {
   return buildBackendShellCommand({
     loop,
     spec: loop.backend,
     prompt: iter.prompt,
-    runtimeEnv: runtimeEnvLines(loop, String(iter.iteration), iter.recentEvent, joinCsv(iter.allowedRoles), joinCsv(iter.allowedEvents), ""),
+    runtimeEnv: runtimeEnvLines(
+      loop,
+      String(iter.iteration),
+      iter.recentEvent,
+      joinCsv(iter.allowedRoles),
+      joinCsv(iter.allowedEvents),
+      "",
+    ),
   });
 }
 
-export function buildReviewCommand(loop: LoopContext, iteration: number, reviewPrompt: string): string {
+export function buildReviewCommand(
+  loop: LoopContext,
+  iteration: number,
+  reviewPrompt: string,
+): string {
   return buildBackendShellCommand({
     loop,
     spec: loop.review,
     prompt: reviewPrompt,
-    runtimeEnv: runtimeEnvLines(loop, String(iteration), "loop.start", "review", "__metareview_disabled__", "metareview"),
+    runtimeEnv: runtimeEnvLines(
+      loop,
+      String(iteration),
+      "loop.start",
+      "review",
+      "__metareview_disabled__",
+      "metareview",
+    ),
   });
 }
 
@@ -135,25 +211,55 @@ export function runtimeEnvLines(
   reviewMode: string,
 ): string {
   let lines =
-    "export AUTOLOOP_RUN_ID=" + shellQuote(loop.runtime.runId) + "\n" +
-    "export AUTOLOOP_ITERATION=" + shellQuote(iteration) + "\n";
+    "export AUTOLOOP_RUN_ID=" +
+    shellQuote(loop.runtime.runId) +
+    "\n" +
+    "export AUTOLOOP_ITERATION=" +
+    shellQuote(iteration) +
+    "\n";
   if (reviewMode) {
-    lines += "export AUTOLOOP_REVIEW_MODE=" + shellQuote(reviewMode) + "\n";
+    lines += `export AUTOLOOP_REVIEW_MODE=${shellQuote(reviewMode)}\n`;
   }
   lines +=
-    "export AUTOLOOP_LOG_LEVEL=" + shellQuote(loop.runtime.logLevel) + "\n" +
-    "export AUTOLOOP_COMPLETION_PROMISE=" + shellQuote(loop.completion.promise) + "\n" +
-    "export AUTOLOOP_COMPLETION_EVENT=" + shellQuote(loop.completion.event) + "\n" +
-    "export AUTOLOOP_STATE_DIR=" + shellQuote(loop.paths.stateDir) + "\n" +
-    "export AUTOLOOP_PROJECT_DIR=" + shellQuote(loop.paths.projectDir) + "\n" +
-    "export AUTOLOOP_JOURNAL_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
-    "export AUTOLOOP_EVENTS_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
-    "export AUTOLOOP_MEMORY_FILE=" + shellQuote(loop.paths.memoryFile) + "\n" +
-    "export AUTOLOOP_REQUIRED_EVENTS=" + shellQuote(joinCsv(loop.completion.requiredEvents)) + "\n" +
-    "export AUTOLOOP_RECENT_EVENT=" + shellQuote(recentEvent) + "\n" +
-    "export AUTOLOOP_ALLOWED_ROLES=" + shellQuote(allowedRoles) + "\n" +
-    "export AUTOLOOP_ALLOWED_EVENTS=" + shellQuote(allowedEvents) + "\n" +
-    "export AUTOLOOP_BIN=" + shellQuote(loop.paths.toolPath) + "\n";
+    "export AUTOLOOP_LOG_LEVEL=" +
+    shellQuote(loop.runtime.logLevel) +
+    "\n" +
+    "export AUTOLOOP_COMPLETION_PROMISE=" +
+    shellQuote(loop.completion.promise) +
+    "\n" +
+    "export AUTOLOOP_COMPLETION_EVENT=" +
+    shellQuote(loop.completion.event) +
+    "\n" +
+    "export AUTOLOOP_STATE_DIR=" +
+    shellQuote(loop.paths.stateDir) +
+    "\n" +
+    "export AUTOLOOP_PROJECT_DIR=" +
+    shellQuote(loop.paths.projectDir) +
+    "\n" +
+    "export AUTOLOOP_JOURNAL_FILE=" +
+    shellQuote(loop.paths.journalFile) +
+    "\n" +
+    "export AUTOLOOP_EVENTS_FILE=" +
+    shellQuote(loop.paths.journalFile) +
+    "\n" +
+    "export AUTOLOOP_MEMORY_FILE=" +
+    shellQuote(loop.paths.memoryFile) +
+    "\n" +
+    "export AUTOLOOP_REQUIRED_EVENTS=" +
+    shellQuote(joinCsv(loop.completion.requiredEvents)) +
+    "\n" +
+    "export AUTOLOOP_RECENT_EVENT=" +
+    shellQuote(recentEvent) +
+    "\n" +
+    "export AUTOLOOP_ALLOWED_ROLES=" +
+    shellQuote(allowedRoles) +
+    "\n" +
+    "export AUTOLOOP_ALLOWED_EVENTS=" +
+    shellQuote(allowedEvents) +
+    "\n" +
+    "export AUTOLOOP_BIN=" +
+    shellQuote(loop.paths.toolPath) +
+    "\n";
   return lines;
 }
 
@@ -166,48 +272,76 @@ export function appendLoopStart(loop: LoopContext): void {
     "",
     "loop.start",
     jsonField("max_iterations", String(loop.limits.maxIterations)) +
-      ", " + jsonField("completion_promise", loop.completion.promise) +
-      ", " + jsonField("completion_event", loop.completion.event) +
-      ", " + jsonField("review_every", String(loop.review.every)) +
-      ", " + jsonField("objective", loop.objective) +
-      ", " + jsonField("preset", loop.launch.preset) +
-      ", " + jsonField("trigger", loop.launch.trigger) +
-      ", " + jsonField("created_at", loop.launch.createdAt) +
-      ", " + jsonField("project_dir", loop.paths.projectDir) +
-      ", " + jsonField("work_dir", loop.paths.workDir) +
-      ", " + jsonField("backend", normalizeBackendLabel(loop.backend.command)) +
-      ", " + jsonField("backend_args", joinCsv(loop.backend.args)) +
-      ", " + jsonField("parent_run_id", loop.launch.parentRunId) +
-      ", " + jsonField("isolation_mode", loop.runtime.isolationMode ?? "shared") +
-      ", " + jsonField("worktree_name", loop.paths.worktreeBranch || "") +
-      ", " + jsonField("worktree_path", loop.paths.worktreePath || ""),
+      ", " +
+      jsonField("completion_promise", loop.completion.promise) +
+      ", " +
+      jsonField("completion_event", loop.completion.event) +
+      ", " +
+      jsonField("review_every", String(loop.review.every)) +
+      ", " +
+      jsonField("objective", loop.objective) +
+      ", " +
+      jsonField("preset", loop.launch.preset) +
+      ", " +
+      jsonField("trigger", loop.launch.trigger) +
+      ", " +
+      jsonField("created_at", loop.launch.createdAt) +
+      ", " +
+      jsonField("project_dir", loop.paths.projectDir) +
+      ", " +
+      jsonField("work_dir", loop.paths.workDir) +
+      ", " +
+      jsonField("backend", normalizeBackendLabel(loop.backend.command)) +
+      ", " +
+      jsonField("backend_args", joinCsv(loop.backend.args)) +
+      ", " +
+      jsonField("parent_run_id", loop.launch.parentRunId) +
+      ", " +
+      jsonField("isolation_mode", loop.runtime.isolationMode ?? "shared") +
+      ", " +
+      jsonField("worktree_name", loop.paths.worktreeBranch || "") +
+      ", " +
+      jsonField("worktree_path", loop.paths.worktreePath || ""),
   );
 }
 
-export function appendIterationStart(loop: LoopContext, iter: IterationContext): void {
+export function appendIterationStart(
+  loop: LoopContext,
+  iter: IterationContext,
+): void {
   appendEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
     String(iter.iteration),
     "iteration.start",
     jsonField("recent_event", iter.recentEvent) +
-      ", " + jsonField("suggested_roles", joinCsv(iter.allowedRoles)) +
-      ", " + jsonField("allowed_events", joinCsv(iter.allowedEvents)) +
-      ", " + jsonField("backpressure", iter.backpressure) +
-      ", " + jsonField("prompt", iter.prompt),
+      ", " +
+      jsonField("suggested_roles", joinCsv(iter.allowedRoles)) +
+      ", " +
+      jsonField("allowed_events", joinCsv(iter.allowedEvents)) +
+      ", " +
+      jsonField("backpressure", iter.backpressure) +
+      ", " +
+      jsonField("prompt", iter.prompt),
   );
 }
 
-export function appendBackendStart(loop: LoopContext, iter: IterationContext): void {
+export function appendBackendStart(
+  loop: LoopContext,
+  iter: IterationContext,
+): void {
   appendEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
     String(iter.iteration),
     "backend.start",
     jsonField("backend_kind", loop.backend.kind) +
-      ", " + jsonField("command", loop.backend.command) +
-      ", " + jsonField("prompt_mode", loop.backend.promptMode) +
-      ", " + jsonField("timeout_ms", String(loop.backend.timeoutMs)),
+      ", " +
+      jsonField("command", loop.backend.command) +
+      ", " +
+      jsonField("prompt_mode", loop.backend.promptMode) +
+      ", " +
+      jsonField("timeout_ms", String(loop.backend.timeoutMs)),
   );
 }
 
@@ -224,8 +358,10 @@ export function appendBackendFinish(
     String(iter.iteration),
     "backend.finish",
     jsonField("exit_code", String(exitCode)) +
-      ", " + jsonFieldRaw("timed_out", jsonBool(timedOut)) +
-      ", " + jsonField("output", output),
+      ", " +
+      jsonFieldRaw("timed_out", jsonBool(timedOut)) +
+      ", " +
+      jsonField("output", output),
   );
 }
 
@@ -243,8 +379,11 @@ export function appendIterationFinish(
     String(iter.iteration),
     "iteration.finish",
     jsonField("exit_code", String(exitCode)) +
-      ", " + jsonFieldRaw("timed_out", jsonBool(timedOut)) +
-      ", " + jsonField("elapsed_s", String(elapsedS)) +
-      ", " + jsonField("output", output),
+      ", " +
+      jsonFieldRaw("timed_out", jsonBool(timedOut)) +
+      ", " +
+      jsonField("elapsed_s", String(elapsedS)) +
+      ", " +
+      jsonField("output", output),
   );
 }

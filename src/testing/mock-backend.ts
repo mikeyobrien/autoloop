@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Deterministic mock backend for autoloop integration tests.
  *
@@ -9,8 +10,8 @@
  * or accepts a fixture path as the first positional argument.
  */
 
-import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,9 +28,11 @@ function fixturePathFromArgs(): string {
 }
 
 function loadFixture(): Fixture {
-  const fixturePath = process.env["MOCK_FIXTURE_PATH"] || fixturePathFromArgs();
+  const fixturePath = process.env.MOCK_FIXTURE_PATH || fixturePathFromArgs();
   if (!fixturePath) {
-    process.stderr.write("mock-backend: fixture path missing (set MOCK_FIXTURE_PATH or pass a fixture path argument)\n");
+    process.stderr.write(
+      "mock-backend: fixture path missing (set MOCK_FIXTURE_PATH or pass a fixture path argument)\n",
+    );
     process.exit(2);
   }
 

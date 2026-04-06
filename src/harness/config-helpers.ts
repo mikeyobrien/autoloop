@@ -1,28 +1,36 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
-import { join, resolve, basename } from "node:path";
-import * as config from "../config.js";
-import * as topo from "../topology.js";
-import * as profiles from "../profiles.js";
-import { splitCsv, generateCompactId } from "../utils.js";
 import {
-  readLines,
-  readRunLines,
-  extractTopic,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, join, resolve } from "node:path";
+import * as config from "../config.js";
+import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
+import { createRunScopedDir } from "../isolation/run-scope.js";
+import * as profiles from "../profiles.js";
+import { activeRuns } from "../registry/read.js";
+import * as topo from "../topology.js";
+import { generateCompactId, splitCsv } from "../utils.js";
+import { createWorktree } from "../worktree/create.js";
+import {
   extractField,
   extractIteration,
+  extractTopic,
   latestRunId,
-  readRunJournal,
+  readLines,
+  readRunLines,
   resolveRunJournalPath,
 } from "./journal.js";
 import { emitToolScript, piAdapterScript } from "./tools.js";
-import { resolveIsolationMode, presetCategory } from "../isolation/resolve.js";
-import { createRunScopedDir, runScopedPath } from "../isolation/run-scope.js";
-import { createWorktree } from "../worktree/create.js";
-import { metaDirForRun } from "../worktree/meta.js";
-import { activeRuns } from "../registry/read.js";
 import type { LoopContext, RunOptions } from "./types.js";
 
-export function resolvePrompt(projectDir: string, cfg: config.Config, override: string | null): string {
+export function resolvePrompt(
+  projectDir: string,
+  cfg: config.Config,
+  override: string | null,
+): string {
   if (override !== null) return override;
   const inlinePrompt = config.get(cfg, "event_loop.prompt", "");
   if (inlinePrompt) return inlinePrompt;
@@ -34,20 +42,32 @@ export function resolvePrompt(projectDir: string, cfg: config.Config, override: 
   return "Do the task and publish the completion event when finished.";
 }
 
-export function resolveReviewPrompt(projectDir: string, cfg: config.Config): string {
+export function resolveReviewPrompt(
+  projectDir: string,
+  cfg: config.Config,
+): string {
   const inlinePrompt = config.get(cfg, "review.prompt", "");
   if (inlinePrompt) return inlinePrompt;
-  return readOptionalProjectFile(projectDir, config.get(cfg, "review.prompt_file", "metareview.md"));
+  return readOptionalProjectFile(
+    projectDir,
+    config.get(cfg, "review.prompt_file", "metareview.md"),
+  );
 }
 
-export function readOptionalProjectFile(projectDir: string, relativePath: string): string {
+export function readOptionalProjectFile(
+  projectDir: string,
+  relativePath: string,
+): string {
   if (!relativePath) return "";
   const fullPath = join(projectDir, relativePath);
   if (!existsSync(fullPath)) return "";
   return readFileSync(fullPath, "utf-8");
 }
 
-export function resolveReviewEvery(cfg: config.Config, topoData: topo.Topology): number {
+export function resolveReviewEvery(
+  cfg: config.Config,
+  topoData: topo.Topology,
+): number {
   const configured = config.getInt(cfg, "review.every_iterations", 0);
   if (configured > 0) return configured;
   const count = topo.roleCount(topoData);
@@ -83,14 +103,21 @@ export function normalizePromptMode(value: string): string {
   return value === "stdin" ? "stdin" : "arg";
 }
 
-export function configListWithFallback(cfg: config.Config, key: string, fallback: string[]): string[] {
+export function configListWithFallback(
+  cfg: config.Config,
+  key: string,
+  fallback: string[],
+): string[] {
   const marker = "__missing__";
   const raw = config.get(cfg, key, marker);
   if (raw === marker) return fallback;
   return splitCsv(raw);
 }
 
-export function injectClaudePermissions(command: string, args: string[]): string[] {
+export function injectClaudePermissions(
+  command: string,
+  args: string[],
+): string[] {
   if (!claudeBackend(command)) return args;
   const injected = [...args];
   if (!injected.includes("-p")) injected.unshift("-p");
@@ -100,14 +127,22 @@ export function injectClaudePermissions(command: string, args: string[]): string
   return injected;
 }
 
-export function processStringOverride(override: Record<string, unknown>, key: string, fallback: string): string {
+export function processStringOverride(
+  override: Record<string, unknown>,
+  key: string,
+  fallback: string,
+): string {
   const val = override[key];
   return typeof val === "string" ? val : fallback;
 }
 
-export function processListOverride(override: Record<string, unknown>, key: string, fallback: string[]): string[] {
+export function processListOverride(
+  override: Record<string, unknown>,
+  key: string,
+  fallback: string[],
+): string[] {
   const val = override[key];
-  return Array.isArray(val) ? val as string[] : fallback;
+  return Array.isArray(val) ? (val as string[]) : fallback;
 }
 
 export function claudeBackend(command: string): boolean {
@@ -118,7 +153,7 @@ export function nextRunId(path: string, cfg: config.Config): string {
   if (config.get(cfg, "core.run_id_format", "compact") === "counter") {
     const lines = readLines(path);
     const count = lines.filter((l) => extractTopic(l) === "loop.start").length;
-    return "run-" + (count + 1);
+    return `run-${count + 1}`;
   }
   return generateCompactId("run");
 }
@@ -141,7 +176,7 @@ export function iterationFieldForRun(
 }
 
 export function ensureRenderRunId(journalFile: string): string {
-  return process.env["AUTOLOOP_RUN_ID"] || latestRunId(journalFile);
+  return process.env.AUTOLOOP_RUN_ID || latestRunId(journalFile);
 }
 
 export function absolutePath(path: string): string {
@@ -177,12 +212,22 @@ export function buildLoopContext(
   const resolvedProjectDir = absolutePath(projectDir);
   const resolvedWorkDir = absolutePath(runOptions.workDir || ".");
   const cfg = config.loadProject(resolvedProjectDir);
-  const stateDir = join(resolvedWorkDir, config.get(cfg, "core.state_dir", ".miniloop"));
-  const journalFile = config.resolveJournalFileIn(resolvedProjectDir, resolvedWorkDir);
-  const memoryFile = config.resolveMemoryFileIn(resolvedProjectDir, resolvedWorkDir);
+  const stateDir = join(
+    resolvedWorkDir,
+    config.get(cfg, "core.state_dir", ".miniloop"),
+  );
+  const journalFile = config.resolveJournalFileIn(
+    resolvedProjectDir,
+    resolvedWorkDir,
+  );
+  const memoryFile = config.resolveMemoryFileIn(
+    resolvedProjectDir,
+    resolvedWorkDir,
+  );
   const runId = nextRunId(journalFile, cfg);
   const backendOverride = runOptions.backendOverride || {};
-  const logLevel = runOptions.logLevel || config.get(cfg, "core.log_level", "info");
+  const logLevel =
+    runOptions.logLevel || config.get(cfg, "core.log_level", "info");
 
   // Resolve isolation mode
   const registryFile = join(stateDir, "registry.jsonl");
@@ -193,17 +238,23 @@ export function buildLoopContext(
   const currentPresetName = basename(resolvedProjectDir);
   const currentCat = presetCategory(currentPresetName, resolvedProjectDir);
   const isolation = resolveIsolationMode(
-    { worktree: runOptions.worktree, noWorktree: runOptions.noWorktree, configEnabled: configIsolationEnabled, currentCategory: currentCat },
+    {
+      worktree: runOptions.worktree,
+      noWorktree: runOptions.noWorktree,
+      configEnabled: configIsolationEnabled,
+      currentCategory: currentCat,
+    },
     otherActive,
   );
   if (isolation.warning) {
-    process.stderr.write("\n" + isolation.warning + "\n\n");
+    process.stderr.write(`\n${isolation.warning}\n\n`);
   }
 
   // For run-scoped isolation, route per-run state files to runs/<runId>/
-  let effectiveStateDir = isolation.mode === "run-scoped"
-    ? createRunScopedDir(stateDir, runId)
-    : stateDir;
+  let effectiveStateDir =
+    isolation.mode === "run-scoped"
+      ? createRunScopedDir(stateDir, runId)
+      : stateDir;
 
   // Worktree mode: create git worktree and redirect workDir + stateDir
   let effectiveWorkDir = resolvedWorkDir;
@@ -213,7 +264,9 @@ export function buildLoopContext(
 
   if (isolation.mode === "worktree") {
     const branchPrefix = config.get(cfg, "worktree.branch_prefix", "autoloop");
-    const mergeStrategy = runOptions.mergeStrategy || config.get(cfg, "worktree.merge_strategy", "squash");
+    const mergeStrategy =
+      runOptions.mergeStrategy ||
+      config.get(cfg, "worktree.merge_strategy", "squash");
     const wt = createWorktree({
       mainProjectDir: resolvedProjectDir,
       mainStateDir: stateDir,
@@ -225,7 +278,10 @@ export function buildLoopContext(
     worktreeBranch = wt.branch;
     worktreePath = wt.worktreePath;
     worktreeMetaDir = wt.metaDir;
-    effectiveStateDir = join(wt.worktreePath, config.get(cfg, "core.state_dir", ".miniloop"));
+    effectiveStateDir = join(
+      wt.worktreePath,
+      config.get(cfg, "core.state_dir", ".miniloop"),
+    );
   }
 
   // Compute active profiles: config defaults (unless suppressed) + CLI explicit
@@ -240,7 +296,10 @@ export function buildLoopContext(
       projectDir: resolvedProjectDir,
       workDir: effectiveWorkDir,
       stateDir: effectiveStateDir,
-      journalFile: (isolation.mode === "run-scoped" || isolation.mode === "worktree") ? join(effectiveStateDir, "journal.jsonl") : journalFile,
+      journalFile:
+        isolation.mode === "run-scoped" || isolation.mode === "worktree"
+          ? join(effectiveStateDir, "journal.jsonl")
+          : journalFile,
       memoryFile,
       registryFile,
       toolPath: join(effectiveStateDir, "autoloops"),
@@ -266,7 +325,11 @@ export function buildLoopContext(
       createdAt: new Date().toISOString(),
       parentRunId: runOptions.parentRunId ?? "",
     },
-    profiles: { active: activeProfiles, fragments: new Map<string, string>(), warnings: [] as string[] },
+    profiles: {
+      active: activeProfiles,
+      fragments: new Map<string, string>(),
+      warnings: [] as string[],
+    },
     store: {},
   } as unknown as LoopContext;
   return reloadLoop(seed);
@@ -284,32 +347,64 @@ export function reloadLoop(loop: LoopContext): LoopContext {
 
   // Resolve and apply profile fragments
   const activeProfiles = loop.profiles?.active ?? [];
-  let profileInfo = loop.profiles ?? { active: [], fragments: new Map(), warnings: [] };
+  let profileInfo = loop.profiles ?? {
+    active: [],
+    fragments: new Map(),
+    warnings: [],
+  };
   let finalTopology = topoData;
   if (activeProfiles.length > 0) {
     const presetName = loop.launch.preset;
-    const resolved = profiles.resolveProfileFragments(activeProfiles, presetName, topoData.roles, wd);
-    profileInfo = { active: activeProfiles, fragments: resolved.fragments, warnings: resolved.warnings };
-    finalTopology = { ...topoData, roles: profiles.applyProfileFragments(topoData.roles, resolved.fragments) };
+    const resolved = profiles.resolveProfileFragments(
+      activeProfiles,
+      presetName,
+      topoData.roles,
+      wd,
+    );
+    profileInfo = {
+      active: activeProfiles,
+      fragments: resolved.fragments,
+      warnings: resolved.warnings,
+    };
+    finalTopology = {
+      ...topoData,
+      roles: profiles.applyProfileFragments(topoData.roles, resolved.fragments),
+    };
     for (const w of resolved.warnings) {
-      process.stderr.write("profile warning: " + w + "\n");
+      process.stderr.write(`profile warning: ${w}\n`);
     }
   }
 
   const updated: LoopContext = {
     objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride),
     topology: finalTopology,
-    limits: { maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3) },
+    limits: {
+      maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3),
+    },
     completion: {
-      promise: config.get(cfg, "event_loop.completion_promise", "LOOP_COMPLETE"),
-      event: topo.completionEvent(topoData, config.get(cfg, "event_loop.completion_event", "task.complete")),
+      promise: config.get(
+        cfg,
+        "event_loop.completion_promise",
+        "LOOP_COMPLETE",
+      ),
+      event: topo.completionEvent(
+        topoData,
+        config.get(cfg, "event_loop.completion_event", "task.complete"),
+      ),
       requiredEvents: config.getList(cfg, "event_loop.required_events"),
     },
     backend,
     review,
     parallel,
-    memory: { budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000) },
-    harness: { instructions: readOptionalProjectFile(pd, config.get(cfg, "harness.instructions_file", "harness.md")) },
+    memory: {
+      budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
+    },
+    harness: {
+      instructions: readOptionalProjectFile(
+        pd,
+        config.get(cfg, "harness.instructions_file", "harness.md"),
+      ),
+    },
     profiles: profileInfo,
     paths: loop.paths,
     runtime: loop.runtime,
@@ -323,13 +418,30 @@ function readBackendConfig(
   cfg: config.Config,
   bo: Record<string, unknown>,
 ): LoopContext["backend"] {
-  const command = processStringOverride(bo, "command", config.get(cfg, "backend.command", "pi"));
-  const kind = resolveProcessKind(processStringOverride(bo, "kind", config.get(cfg, "backend.kind", "")), command);
+  const command = processStringOverride(
+    bo,
+    "command",
+    config.get(cfg, "backend.command", "pi"),
+  );
+  const kind = resolveProcessKind(
+    processStringOverride(bo, "kind", config.get(cfg, "backend.kind", "")),
+    command,
+  );
   const args = injectClaudePermissions(
     command,
-    processListOverride(bo, "args", configListWithFallback(cfg, "backend.args", [])),
+    processListOverride(
+      bo,
+      "args",
+      configListWithFallback(cfg, "backend.args", []),
+    ),
   );
-  const promptMode = normalizePromptMode(processStringOverride(bo, "prompt_mode", config.get(cfg, "backend.prompt_mode", "arg")));
+  const promptMode = normalizePromptMode(
+    processStringOverride(
+      bo,
+      "prompt_mode",
+      config.get(cfg, "backend.prompt_mode", "arg"),
+    ),
+  );
   const timeoutMs = config.getInt(cfg, "backend.timeout_ms", 300000);
   return { kind, command, args, promptMode, timeoutMs };
 }
@@ -341,14 +453,19 @@ function readReviewConfig(
   backend: LoopContext["backend"],
 ): LoopContext["review"] {
   const command = config.get(cfg, "review.command", backend.command);
-  const kind = resolveProcessKind(config.get(cfg, "review.kind", backend.kind), command);
+  const kind = resolveProcessKind(
+    config.get(cfg, "review.kind", backend.kind),
+    command,
+  );
   return {
     enabled: truthySetting(config.get(cfg, "review.enabled", "true")),
     every: resolveReviewEvery(cfg, topoData),
     kind,
     command,
     args: configListWithFallback(cfg, "review.args", backend.args),
-    promptMode: normalizePromptMode(config.get(cfg, "review.prompt_mode", backend.promptMode)),
+    promptMode: normalizePromptMode(
+      config.get(cfg, "review.prompt_mode", backend.promptMode),
+    ),
     prompt: resolveReviewPrompt(projectDir, cfg),
     timeoutMs: config.getInt(cfg, "review.timeout_ms", 300000),
   };
@@ -369,7 +486,13 @@ export function applyRuntimeModeOverrides(loop: LoopContext): LoopContext {
     limits: { maxIterations: 1 },
     review: { ...loop.review, enabled: false },
     parallel: { ...loop.parallel, enabled: false },
-    backend: { ...loop.backend, timeoutMs: Math.min(loop.backend.timeoutMs, loop.parallel.branchTimeoutMs) },
+    backend: {
+      ...loop.backend,
+      timeoutMs: Math.min(
+        loop.backend.timeoutMs,
+        loop.parallel.branchTimeoutMs,
+      ),
+    },
   };
 }
 

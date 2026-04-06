@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
+  FIXTURES_DIR,
   makeTempProject,
   runCli,
-  FIXTURES_DIR,
 } from "../helpers/runtime.js";
 
 beforeAll(() => {
@@ -15,19 +15,29 @@ describe("integration: loops watch", () => {
   it("prints detail and exits for already-completed run", () => {
     const project = makeTempProject("watch-completed");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    runCli(["run", project, "watch completed test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "watch completed test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
     // Get the run ID
-    const listRes = runCli(["loops", "--all"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const listRes = runCli(
+      ["loops", "--all"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     const lines = listRes.stdout.trim().split("\n");
     expect(lines.length).toBeGreaterThanOrEqual(2);
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
-    const watchRes = runCli(["loops", "watch", runId], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const watchRes = runCli(
+      ["loops", "watch", runId],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(watchRes.stdout).toContain("[watch] Run already completed.");
     expect(watchRes.stdout).toContain("Run:");
     expect(watchRes.stdout).toContain("Status:");
@@ -36,18 +46,28 @@ describe("integration: loops watch", () => {
   it("supports partial run-id matching", () => {
     const project = makeTempProject("watch-partial");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    runCli(["run", project, "watch partial test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "watch partial test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
-    const listRes = runCli(["loops", "--all"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const listRes = runCli(
+      ["loops", "--all"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     const lines = listRes.stdout.trim().split("\n");
     const runId = lines[1].trim().split(/\s{2,}/)[0];
     const partial = runId.slice(0, 8);
 
-    const watchRes = runCli(["loops", "watch", partial], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const watchRes = runCli(
+      ["loops", "watch", partial],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(watchRes.stdout).toContain("[watch] Run already completed.");
     expect(watchRes.stdout).toContain(runId);
   });
@@ -55,11 +75,17 @@ describe("integration: loops watch", () => {
   it("shows error for non-existent run", () => {
     const project = makeTempProject("watch-notfound");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    runCli(["run", project, "watch notfound test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "watch notfound test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
-    const watchRes = runCli(["loops", "watch", "run-nonexistent-id"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const watchRes = runCli(
+      ["loops", "watch", "run-nonexistent-id"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(watchRes.stdout).toContain("No run matching");
   });
 
@@ -73,18 +99,28 @@ describe("integration: loops watch", () => {
   it("prints detail for failed run", () => {
     const project = makeTempProject("watch-failed");
     const fixture = join(FIXTURES_DIR, "non-zero-exit.json");
-    runCli(["run", project, "watch failed test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "watch failed test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
-    const listRes = runCli(["loops", "--all"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const listRes = runCli(
+      ["loops", "--all"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     const lines = listRes.stdout.trim().split("\n");
     if (lines.length < 2) return; // no runs registered
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
-    const watchRes = runCli(["loops", "watch", runId], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const watchRes = runCli(
+      ["loops", "watch", runId],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(watchRes.stdout).toContain("[watch] Run already");
     expect(watchRes.stdout).toContain("Run:");
   });

@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { listRuns } from "../loops/list.js";
-import { showRun, showArtifacts } from "../loops/show.js";
-import { watchRun } from "../loops/watch.js";
 import { healthSummary } from "../loops/health.js";
+import { listRuns } from "../loops/list.js";
+import { showArtifacts, showRun } from "../loops/show.js";
+import { watchRun } from "../loops/watch.js";
 
 export function dispatchLoops(args: string[]): void {
   const projectDir = resolveProjectDir();
@@ -64,7 +64,7 @@ export function dispatchLoops(args: string[]): void {
     return;
   }
 
-  console.log("Unknown loops subcommand: " + first);
+  console.log(`Unknown loops subcommand: ${first}`);
   printLoopsUsage();
 }
 
@@ -79,5 +79,5 @@ function printLoopsUsage(): void {
 }
 
 function resolveProjectDir(): string {
-  return process.env["AUTOLOOP_PROJECT_DIR"] || ".";
+  return process.env.AUTOLOOP_PROJECT_DIR || ".";
 }

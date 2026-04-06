@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { healthSummary } from "../../src/loops/health.js";
 import { listRuns } from "../../src/loops/list.js";
 import { showRun } from "../../src/loops/show.js";
-import { healthSummary } from "../../src/loops/health.js";
 import { watchRun } from "../../src/loops/watch.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
@@ -19,7 +19,8 @@ function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     project_dir: "/tmp/project",
     work_dir: "/tmp/project",
     state_dir: "/tmp/project/.autoloop/chains/chain-1/step-1/.autoloop",
-    journal_file: "/tmp/project/.autoloop/chains/chain-1/step-1/.autoloop/journal.jsonl",
+    journal_file:
+      "/tmp/project/.autoloop/chains/chain-1/step-1/.autoloop/journal.jsonl",
     parent_run_id: "parent-run-001",
     backend: "mock",
     backend_args: [],
@@ -36,13 +37,20 @@ function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
 }
 
 function writeJsonl(path: string, records: RunRecord[]): void {
-  writeFileSync(path, records.map((record) => JSON.stringify(record)).join("\n") + "\n", "utf-8");
+  writeFileSync(
+    path,
+    `${records.map((record) => JSON.stringify(record)).join("\n")}\n`,
+    "utf-8",
+  );
 }
 
 let stateDir: string;
 
 beforeEach(() => {
-  stateDir = join(tmpdir(), "loops-chain-child-" + Math.random().toString(36).slice(2));
+  stateDir = join(
+    tmpdir(),
+    `loops-chain-child-${Math.random().toString(36).slice(2)}`,
+  );
   mkdirSync(stateDir, { recursive: true });
   writeJsonl(join(stateDir, "registry.jsonl"), []);
 });
@@ -53,7 +61,13 @@ afterEach(() => {
 });
 
 function writeStepRegistry(records: RunRecord[]): void {
-  const stepStateDir = join(stateDir, "chains", "chain-inline-1", "step-1", ".autoloop");
+  const stepStateDir = join(
+    stateDir,
+    "chains",
+    "chain-inline-1",
+    "step-1",
+    ".autoloop",
+  );
   mkdirSync(stepStateDir, { recursive: true });
   writeJsonl(join(stepStateDir, "registry.jsonl"), records);
 }
@@ -90,7 +104,11 @@ describe("chain child registry visibility in loops surfaces", () => {
 
   it("resolves a chain child run in watch mode", async () => {
     writeStepRegistry([
-      makeRecord({ status: "completed", stop_reason: "done", latest_event: "loop.complete" }),
+      makeRecord({
+        status: "completed",
+        stop_reason: "done",
+        latest_event: "loop.complete",
+      }),
     ]);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 

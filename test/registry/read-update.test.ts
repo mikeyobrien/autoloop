@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtempSync, readFileSync, appendFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  activeRuns,
+  getRun,
+  readRegistry,
+  recentRuns,
+} from "../../src/registry/read.js";
 import type { RunRecord } from "../../src/registry/types.js";
 import { appendRegistryEntry } from "../../src/registry/update.js";
-import { readRegistry, getRun, activeRuns, recentRuns } from "../../src/registry/read.js";
 
 function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
   return {
@@ -54,9 +59,22 @@ describe("registry read/update", () => {
   });
 
   it("deduplicates by run_id, keeping last entry", () => {
-    appendRegistryEntry(registryPath, makeRecord({ status: "running", iteration: 0 }));
-    appendRegistryEntry(registryPath, makeRecord({ status: "running", iteration: 1 }));
-    appendRegistryEntry(registryPath, makeRecord({ status: "completed", iteration: 1, stop_reason: "completion_event" }));
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ status: "running", iteration: 0 }),
+    );
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ status: "running", iteration: 1 }),
+    );
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({
+        status: "completed",
+        iteration: 1,
+        stop_reason: "completion_event",
+      }),
+    );
     const records = readRegistry(registryPath);
     expect(records).toHaveLength(1);
     expect(records[0].status).toBe("completed");
@@ -64,8 +82,14 @@ describe("registry read/update", () => {
   });
 
   it("tracks multiple runs independently", () => {
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-1", status: "completed" }));
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-2", status: "running" }));
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-1", status: "completed" }),
+    );
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-2", status: "running" }),
+    );
     const records = readRegistry(registryPath);
     expect(records).toHaveLength(2);
   });
@@ -83,18 +107,36 @@ describe("registry read/update", () => {
   });
 
   it("activeRuns filters to running status", () => {
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-1", status: "completed" }));
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-2", status: "running" }));
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-3", status: "failed" }));
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-1", status: "completed" }),
+    );
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-2", status: "running" }),
+    );
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-3", status: "failed" }),
+    );
     const active = activeRuns(registryPath);
     expect(active).toHaveLength(1);
     expect(active[0].run_id).toBe("run-2");
   });
 
   it("recentRuns returns sorted by updated_at descending, limited", () => {
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-1", updated_at: "2026-01-01T00:00:00.000Z" }));
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-2", updated_at: "2026-01-03T00:00:00.000Z" }));
-    appendRegistryEntry(registryPath, makeRecord({ run_id: "run-3", updated_at: "2026-01-02T00:00:00.000Z" }));
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-1", updated_at: "2026-01-01T00:00:00.000Z" }),
+    );
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-2", updated_at: "2026-01-03T00:00:00.000Z" }),
+    );
+    appendRegistryEntry(
+      registryPath,
+      makeRecord({ run_id: "run-3", updated_at: "2026-01-02T00:00:00.000Z" }),
+    );
     const recent = recentRuns(registryPath, 2);
     expect(recent).toHaveLength(2);
     expect(recent[0].run_id).toBe("run-2");

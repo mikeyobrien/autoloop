@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
 import {
-  listKnownPresets,
   getPresetDescription,
+  listKnownPresets,
   listPresetsWithDescriptions,
   validatePresetVocabulary,
 } from "../../src/chains/load.js";
@@ -51,7 +51,10 @@ describe("automerge preset", () => {
   });
 
   it("passes vocabulary validation", () => {
-    const result = validatePresetVocabulary(["autocode", "automerge"], bundleRoot);
+    const result = validatePresetVocabulary(
+      ["autocode", "automerge"],
+      bundleRoot,
+    );
     expect(result.ok).toBe(true);
   });
 });

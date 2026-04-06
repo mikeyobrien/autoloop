@@ -1,23 +1,23 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  loadTopology,
-  suggestedRoles,
+  allEmittedEvents,
   allowedEvents,
+  completionEvent,
   eventMatchesAny,
   getRoleIds,
-  allEmittedEvents,
-  roleCount,
+  loadTopology,
   render,
-  completionEvent,
-  validateTopology,
   renderTopologyInspect,
+  roleCount,
+  suggestedRoles,
   type Topology,
+  validateTopology,
 } from "../src/topology.js";
 
-const TMP_BASE = join(tmpdir(), "autoloop-ts-test-topology-" + process.pid);
+const TMP_BASE = join(tmpdir(), `autoloop-ts-test-topology-${process.pid}`);
 
 function tmpDir(name: string): string {
   const dir = join(TMP_BASE, name);
@@ -61,7 +61,7 @@ emits = ["queue.advance", "task.complete"]
 `;
 
 function loadTestTopology(): Topology {
-  const dir = tmpDir("topo-" + Math.random().toString(36).slice(2));
+  const dir = tmpDir(`topo-${Math.random().toString(36).slice(2)}`);
   writeFileSync(join(dir, "topology.toml"), TOPOLOGY_TOML);
   return loadTopology(dir);
 }
@@ -83,15 +83,24 @@ describe("loadTopology", () => {
 
   it("parses role IDs", () => {
     const topo = loadTestTopology();
-    expect(getRoleIds(topo)).toEqual(["planner", "builder", "critic", "finalizer"]);
+    expect(getRoleIds(topo)).toEqual([
+      "planner",
+      "builder",
+      "critic",
+      "finalizer",
+    ]);
   });
 
   it("parses role emits", () => {
     const topo = loadTestTopology();
     expect(allEmittedEvents(topo)).toEqual([
-      "tasks.ready", "review.ready", "build.blocked",
-      "review.passed", "review.rejected",
-      "queue.advance", "task.complete",
+      "tasks.ready",
+      "review.ready",
+      "build.blocked",
+      "review.passed",
+      "review.rejected",
+      "queue.advance",
+      "task.complete",
     ]);
   });
 
@@ -133,9 +142,7 @@ describe("suggestedRoles", () => {
 
   it("returns all roles for unknown event", () => {
     const topo = loadTestTopology();
-    expect(suggestedRoles(topo, "unknown.event")).toEqual(
-      getRoleIds(topo),
-    );
+    expect(suggestedRoles(topo, "unknown.event")).toEqual(getRoleIds(topo));
   });
 });
 
@@ -165,7 +172,9 @@ describe("allowedEvents", () => {
 
 describe("eventMatchesAny", () => {
   it("matches exact event", () => {
-    expect(eventMatchesAny("loop.start", ["loop.start", "tasks.ready"])).toBe(true);
+    expect(eventMatchesAny("loop.start", ["loop.start", "tasks.ready"])).toBe(
+      true,
+    );
   });
 
   it("does not match absent event", () => {
@@ -173,13 +182,11 @@ describe("eventMatchesAny", () => {
   });
 
   it("matches regex pattern", () => {
-    expect(eventMatchesAny("review.passed", ["/review\\..*/"]))
-      .toBe(true);
+    expect(eventMatchesAny("review.passed", ["/review\\..*/"])).toBe(true);
   });
 
   it("does not match non-matching regex", () => {
-    expect(eventMatchesAny("tasks.ready", ["/review\\..*/"]))
-      .toBe(false);
+    expect(eventMatchesAny("tasks.ready", ["/review\\..*/"])).toBe(false);
   });
 });
 
@@ -218,7 +225,9 @@ describe("render", () => {
 describe("validateTopology", () => {
   it("reports orphan roles not targeted by any handoff", () => {
     const dir = tmpDir("validate-orphan");
-    writeFileSync(join(dir, "topology.toml"), `
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
 name = "orphan-test"
 completion = "done"
 
@@ -234,15 +243,22 @@ emits = ["done"]
 
 [handoff]
 "start" = ["alpha"]
-`);
+`,
+    );
     const topo = loadTopology(dir);
     const warnings = validateTopology(topo);
-    expect(warnings.some((w) => w.kind === "orphan-role" && w.message.includes("beta"))).toBe(true);
+    expect(
+      warnings.some(
+        (w) => w.kind === "orphan-role" && w.message.includes("beta"),
+      ),
+    ).toBe(true);
   });
 
   it("reports unreachable events with no handoff rule", () => {
     const dir = tmpDir("validate-unreachable");
-    writeFileSync(join(dir, "topology.toml"), `
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
 name = "unreachable-test"
 completion = "task.complete"
 
@@ -253,17 +269,30 @@ emits = ["orphan.event", "task.complete"]
 
 [handoff]
 "start" = ["worker"]
-`);
+`,
+    );
     const topo = loadTopology(dir);
     const warnings = validateTopology(topo);
-    expect(warnings.some((w) => w.kind === "unreachable-event" && w.message.includes("orphan.event"))).toBe(true);
+    expect(
+      warnings.some(
+        (w) =>
+          w.kind === "unreachable-event" && w.message.includes("orphan.event"),
+      ),
+    ).toBe(true);
     // task.complete should not be flagged since it matches the completion event
-    expect(warnings.some((w) => w.kind === "unreachable-event" && w.message.includes("task.complete"))).toBe(false);
+    expect(
+      warnings.some(
+        (w) =>
+          w.kind === "unreachable-event" && w.message.includes("task.complete"),
+      ),
+    ).toBe(false);
   });
 
   it("reports roles with no emits", () => {
     const dir = tmpDir("validate-no-emits");
-    writeFileSync(join(dir, "topology.toml"), `
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
 name = "no-emits-test"
 completion = "done"
 
@@ -274,10 +303,15 @@ emits = []
 
 [handoff]
 "start" = ["silent"]
-`);
+`,
+    );
     const topo = loadTopology(dir);
     const warnings = validateTopology(topo);
-    expect(warnings.some((w) => w.kind === "no-emits" && w.message.includes("silent"))).toBe(true);
+    expect(
+      warnings.some(
+        (w) => w.kind === "no-emits" && w.message.includes("silent"),
+      ),
+    ).toBe(true);
   });
 
   it("returns no warnings for well-formed topology", () => {

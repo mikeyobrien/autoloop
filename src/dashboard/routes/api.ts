@@ -1,9 +1,13 @@
-import { Hono } from "hono";
 import { spawn } from "node:child_process";
+import { Hono } from "hono";
+import { listPresetsWithDescriptions } from "../../chains/load.js";
+import {
+  readLines,
+  readRunLines,
+  resolveRunJournalPath,
+} from "../../harness/journal.js";
 import { categorizeRuns } from "../../loops/health.js";
 import { mergedFindRunByPrefix } from "../../registry/discover.js";
-import { readRunLines, resolveRunJournalPath, readLines } from "../../harness/journal.js";
-import { listPresetsWithDescriptions } from "../../chains/load.js";
 import type { DashboardContext } from "../app.js";
 
 export function apiRoutes(ctx: DashboardContext): Hono {
@@ -21,7 +25,10 @@ export function apiRoutes(ctx: DashboardContext): Hono {
       return c.json({ error: "not found" }, 404);
     }
     if (Array.isArray(result)) {
-      return c.json({ error: "ambiguous prefix", candidates: result.map((r) => r.run_id) }, 409);
+      return c.json(
+        { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
+        409,
+      );
     }
     return c.json(result);
   });
@@ -29,9 +36,15 @@ export function apiRoutes(ctx: DashboardContext): Hono {
   api.get("/runs/:id/events", (c) => {
     const id = c.req.param("id");
     const runJournal = resolveRunJournalPath(ctx.stateDir, id);
-    const lines = runJournal ? readLines(runJournal) : readRunLines(ctx.journalPath, id);
+    const lines = runJournal
+      ? readLines(runJournal)
+      : readRunLines(ctx.journalPath, id);
     const events = lines.map((line) => {
-      try { return JSON.parse(line); } catch { return { raw: line }; }
+      try {
+        return JSON.parse(line);
+      } catch {
+        return { raw: line };
+      }
     });
     return c.json({ events });
   });

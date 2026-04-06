@@ -1,10 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { load, get, getInt, getList, put, loadProject, projectHasConfig, userConfigPath, hasUserConfig, loadUserConfig, loadLayered, defaults } from "../src/config.js";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  get,
+  getInt,
+  getList,
+  hasUserConfig,
+  load,
+  loadLayered,
+  loadProject,
+  loadUserConfig,
+  projectHasConfig,
+  put,
+  userConfigPath,
+} from "../src/config.js";
 
-const TMP_BASE = join(tmpdir(), "autoloop-ts-test-config-" + process.pid);
+const TMP_BASE = join(tmpdir(), `autoloop-ts-test-config-${process.pid}`);
 
 function tmpDir(name: string): string {
   const dir = join(TMP_BASE, name);
@@ -26,7 +38,7 @@ describe("load", () => {
     const dir = tmpDir("toml");
     writeFileSync(
       join(dir, "config.toml"),
-      "[event_loop]\nmax_iterations = 10\ncompletion_event = \"done\"\n\n[backend]\ncommand = \"claude\"\nkind = \"command\"\n",
+      '[event_loop]\nmax_iterations = 10\ncompletion_event = "done"\n\n[backend]\ncommand = "claude"\nkind = "command"\n',
     );
     const cfg = load(join(dir, "config.toml"));
     expect(get(cfg, "event_loop.max_iterations", "0")).toBe("10");
@@ -52,7 +64,7 @@ describe("load", () => {
     const dir = tmpDir("comments");
     writeFileSync(
       join(dir, "config.toml"),
-      "# comment\n\n[backend]\n# another comment\ncommand = \"pi\"\n",
+      '# comment\n\n[backend]\n# another comment\ncommand = "pi"\n',
     );
     const cfg = load(join(dir, "config.toml"));
     expect(get(cfg, "backend.command", "")).toBe("pi");
@@ -126,7 +138,7 @@ describe("loadProject integration", () => {
     const dir = tmpDir("project");
     writeFileSync(
       join(dir, "autoloops.toml"),
-      "[event_loop]\nmax_iterations = 5\ncompletion_event = \"task.complete\"\n",
+      '[event_loop]\nmax_iterations = 5\ncompletion_event = "task.complete"\n',
     );
     const cfg = loadProject(dir);
     expect(getInt(cfg, "event_loop.max_iterations", 0)).toBe(5);
@@ -134,86 +146,89 @@ describe("loadProject integration", () => {
 });
 
 describe("userConfigPath", () => {
-  const origAutoloop = process.env["AUTOLOOP_CONFIG"];
-  const origXdg = process.env["XDG_CONFIG_HOME"];
+  const origAutoloop = process.env.AUTOLOOP_CONFIG;
+  const origXdg = process.env.XDG_CONFIG_HOME;
   afterEach(() => {
-    if (origAutoloop === undefined) delete process.env["AUTOLOOP_CONFIG"];
-    else process.env["AUTOLOOP_CONFIG"] = origAutoloop;
-    if (origXdg === undefined) delete process.env["XDG_CONFIG_HOME"];
-    else process.env["XDG_CONFIG_HOME"] = origXdg;
+    if (origAutoloop === undefined) delete process.env.AUTOLOOP_CONFIG;
+    else process.env.AUTOLOOP_CONFIG = origAutoloop;
+    if (origXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = origXdg;
   });
 
   it("returns AUTOLOOP_CONFIG env when set", () => {
-    process.env["AUTOLOOP_CONFIG"] = "/custom/path/config.toml";
+    process.env.AUTOLOOP_CONFIG = "/custom/path/config.toml";
     expect(userConfigPath()).toBe("/custom/path/config.toml");
   });
 
   it("honors XDG_CONFIG_HOME when set", () => {
-    delete process.env["AUTOLOOP_CONFIG"];
-    process.env["XDG_CONFIG_HOME"] = "/tmp/xdg-test";
+    delete process.env.AUTOLOOP_CONFIG;
+    process.env.XDG_CONFIG_HOME = "/tmp/xdg-test";
     const path = userConfigPath();
     expect(path).toBe(join("/tmp/xdg-test", "autoloop", "config.toml"));
   });
 
   it("falls back to ~/.config when XDG_CONFIG_HOME not set", () => {
-    delete process.env["AUTOLOOP_CONFIG"];
-    delete process.env["XDG_CONFIG_HOME"];
+    delete process.env.AUTOLOOP_CONFIG;
+    delete process.env.XDG_CONFIG_HOME;
     const path = userConfigPath();
     expect(path).toContain(".config/autoloop/config.toml");
   });
 });
 
 describe("hasUserConfig", () => {
-  const origEnv = process.env["AUTOLOOP_CONFIG"];
+  const origEnv = process.env.AUTOLOOP_CONFIG;
   afterEach(() => {
-    if (origEnv === undefined) delete process.env["AUTOLOOP_CONFIG"];
-    else process.env["AUTOLOOP_CONFIG"] = origEnv;
+    if (origEnv === undefined) delete process.env.AUTOLOOP_CONFIG;
+    else process.env.AUTOLOOP_CONFIG = origEnv;
   });
 
   it("returns false when file does not exist", () => {
-    process.env["AUTOLOOP_CONFIG"] = join(TMP_BASE, "nonexistent.toml");
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "nonexistent.toml");
     expect(hasUserConfig()).toBe(false);
   });
 
   it("returns true when file exists", () => {
     const userCfgPath = join(TMP_BASE, "user-config.toml");
-    writeFileSync(userCfgPath, "[backend]\nkind = \"command\"\n");
-    process.env["AUTOLOOP_CONFIG"] = userCfgPath;
+    writeFileSync(userCfgPath, '[backend]\nkind = "command"\n');
+    process.env.AUTOLOOP_CONFIG = userCfgPath;
     expect(hasUserConfig()).toBe(true);
   });
 });
 
 describe("loadUserConfig", () => {
-  const origEnv = process.env["AUTOLOOP_CONFIG"];
+  const origEnv = process.env.AUTOLOOP_CONFIG;
   afterEach(() => {
-    if (origEnv === undefined) delete process.env["AUTOLOOP_CONFIG"];
-    else process.env["AUTOLOOP_CONFIG"] = origEnv;
+    if (origEnv === undefined) delete process.env.AUTOLOOP_CONFIG;
+    else process.env.AUTOLOOP_CONFIG = origEnv;
   });
 
   it("returns empty object when file missing", () => {
-    process.env["AUTOLOOP_CONFIG"] = join(TMP_BASE, "nonexistent.toml");
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "nonexistent.toml");
     expect(loadUserConfig()).toEqual({});
   });
 
   it("parses user config file", () => {
     const userCfgPath = join(TMP_BASE, "user-cfg.toml");
-    writeFileSync(userCfgPath, '[backend]\nkind = "command"\ncommand = "claude"\n');
-    process.env["AUTOLOOP_CONFIG"] = userCfgPath;
+    writeFileSync(
+      userCfgPath,
+      '[backend]\nkind = "command"\ncommand = "claude"\n',
+    );
+    process.env.AUTOLOOP_CONFIG = userCfgPath;
     const cfg = loadUserConfig();
-    expect((cfg["backend"] as Record<string, unknown>)["kind"]).toBe("command");
-    expect((cfg["backend"] as Record<string, unknown>)["command"]).toBe("claude");
+    expect((cfg.backend as Record<string, unknown>).kind).toBe("command");
+    expect((cfg.backend as Record<string, unknown>).command).toBe("claude");
   });
 });
 
 describe("loadLayered", () => {
-  const origEnv = process.env["AUTOLOOP_CONFIG"];
+  const origEnv = process.env.AUTOLOOP_CONFIG;
   afterEach(() => {
-    if (origEnv === undefined) delete process.env["AUTOLOOP_CONFIG"];
-    else process.env["AUTOLOOP_CONFIG"] = origEnv;
+    if (origEnv === undefined) delete process.env.AUTOLOOP_CONFIG;
+    else process.env.AUTOLOOP_CONFIG = origEnv;
   });
 
   it("returns defaults when no user or project config", () => {
-    process.env["AUTOLOOP_CONFIG"] = join(TMP_BASE, "nonexistent.toml");
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "nonexistent.toml");
     const dir = tmpDir("empty-project");
     const { config: cfg, provenance } = loadLayered(dir);
     expect(get(cfg, "backend.kind", "")).toBe("pi");
@@ -223,8 +238,11 @@ describe("loadLayered", () => {
 
   it("user config overrides defaults", () => {
     const userCfgPath = join(TMP_BASE, "user-layered.toml");
-    writeFileSync(userCfgPath, '[backend]\nkind = "command"\ncommand = "claude"\n');
-    process.env["AUTOLOOP_CONFIG"] = userCfgPath;
+    writeFileSync(
+      userCfgPath,
+      '[backend]\nkind = "command"\ncommand = "claude"\n',
+    );
+    process.env.AUTOLOOP_CONFIG = userCfgPath;
     const dir = tmpDir("no-project-cfg");
     const { config: cfg, provenance } = loadLayered(dir);
     expect(get(cfg, "backend.kind", "")).toBe("command");
@@ -235,8 +253,11 @@ describe("loadLayered", () => {
 
   it("project config overrides user config", () => {
     const userCfgPath = join(TMP_BASE, "user-override.toml");
-    writeFileSync(userCfgPath, '[backend]\nkind = "command"\ncommand = "claude"\n');
-    process.env["AUTOLOOP_CONFIG"] = userCfgPath;
+    writeFileSync(
+      userCfgPath,
+      '[backend]\nkind = "command"\ncommand = "claude"\n',
+    );
+    process.env.AUTOLOOP_CONFIG = userCfgPath;
 
     const dir = tmpDir("project-override");
     writeFileSync(
@@ -252,12 +273,12 @@ describe("loadLayered", () => {
   it("non-overlapping sections preserve their sources", () => {
     const userCfgPath = join(TMP_BASE, "user-partial.toml");
     writeFileSync(userCfgPath, '[memory]\nprompt_budget_chars = "16000"\n');
-    process.env["AUTOLOOP_CONFIG"] = userCfgPath;
+    process.env.AUTOLOOP_CONFIG = userCfgPath;
 
     const dir = tmpDir("project-partial");
     writeFileSync(
       join(dir, "autoloops.toml"),
-      '[event_loop]\nmax_iterations = 10\n',
+      "[event_loop]\nmax_iterations = 10\n",
     );
 
     const { provenance } = loadLayered(dir);
@@ -267,7 +288,7 @@ describe("loadLayered", () => {
   });
 
   it("provenance uses dot-path keys not section names", () => {
-    process.env["AUTOLOOP_CONFIG"] = join(TMP_BASE, "nonexistent.toml");
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "nonexistent.toml");
     const dir = tmpDir("dot-path-check");
     writeFileSync(
       join(dir, "autoloops.toml"),
@@ -279,16 +300,22 @@ describe("loadLayered", () => {
     // Unchanged keys should still have default provenance
     expect(provenance["backend.kind"]).toBe("default");
     // No bare section key
-    expect(provenance["backend"]).toBeUndefined();
+    expect(provenance.backend).toBeUndefined();
   });
 
   it("loadProject returns layered config transparently", () => {
     const userCfgPath = join(TMP_BASE, "user-transparent.toml");
-    writeFileSync(userCfgPath, '[backend]\nkind = "command"\ncommand = "claude"\n');
-    process.env["AUTOLOOP_CONFIG"] = userCfgPath;
+    writeFileSync(
+      userCfgPath,
+      '[backend]\nkind = "command"\ncommand = "claude"\n',
+    );
+    process.env.AUTOLOOP_CONFIG = userCfgPath;
 
     const dir = tmpDir("project-transparent");
-    writeFileSync(join(dir, "autoloops.toml"), "[event_loop]\nmax_iterations = 7\n");
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 7\n",
+    );
 
     const cfg = loadProject(dir);
     // User config backend is picked up

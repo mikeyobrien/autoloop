@@ -1,8 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readlinkSync, existsSync, statSync, rmSync } from "node:fs";
-import { resolve, join } from "node:path";
+import {
+  existsSync,
+  mkdtempSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const INSTALL_HOOKS = resolve(ROOT, "bin/install-hooks");
@@ -33,7 +39,7 @@ describe("bin/install-hooks", () => {
   it("creates symlinks for pre-commit and pre-push", () => {
     // We need to point the script at the real repo hooks, but run in the temp git repo.
     // The script uses its own dirname to find the repo root, so we create a wrapper.
-    const gitHooksDir = join(tempDir, ".git", "hooks");
+    const _gitHooksDir = join(tempDir, ".git", "hooks");
 
     // Run the installer from the real repo root (it resolves REPO_ROOT from its own location)
     const out = runInstaller(ROOT);

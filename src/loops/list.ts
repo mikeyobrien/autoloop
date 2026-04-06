@@ -1,5 +1,5 @@
-import { readMergedRegistry, mergedActiveRuns } from "../registry/discover.js";
-import { renderRunLine, renderListHeader } from "./render.js";
+import { mergedActiveRuns, readMergedRegistry } from "../registry/discover.js";
+import { renderListHeader, renderRunLine } from "./render.js";
 
 /**
  * List runs from the merged registry (root + chain/worktree children).
@@ -8,7 +8,9 @@ import { renderRunLine, renderListHeader } from "./render.js";
  */
 export function listRuns(stateDir: string, all: boolean): string {
   const runs = all
-    ? readMergedRegistry(stateDir).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    ? readMergedRegistry(stateDir).sort((a, b) =>
+        b.updated_at.localeCompare(a.updated_at),
+      )
     : mergedActiveRuns(stateDir);
 
   if (runs.length === 0) {

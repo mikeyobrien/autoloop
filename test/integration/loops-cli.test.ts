@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
+  FIXTURES_DIR,
   makeTempProject,
   runCli,
-  FIXTURES_DIR,
 } from "../helpers/runtime.js";
 
 beforeAll(() => {
@@ -31,9 +31,13 @@ describe("integration: loops command", () => {
     runCli(["run", project, "loops list test"], { MOCK_FIXTURE_PATH: fixture });
 
     // Now list all runs
-    const res = runCli(["loops", "--all"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const res = runCli(
+      ["loops", "--all"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(res.stdout).toContain("completed");
     expect(res.stdout).toContain("RUN ID");
     expect(res.stdout).toContain("STARTED");
@@ -44,9 +48,13 @@ describe("integration: loops command", () => {
     const fixture = join(FIXTURES_DIR, "complete-success.json");
     runCli(["run", project, "active test"], { MOCK_FIXTURE_PATH: fixture });
 
-    const res = runCli(["loops"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const res = runCli(
+      ["loops"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     // Completed runs should not appear in the active list
     expect(res.stdout.trim()).toBe("No active runs.");
   });
@@ -54,21 +62,31 @@ describe("integration: loops command", () => {
   it("shows run detail with loops show <run-id>", () => {
     const project = makeTempProject("loops-show");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    runCli(["run", project, "show detail test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "show detail test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
     // Get the run ID from --all listing
-    const listRes = runCli(["loops", "--all"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const listRes = runCli(
+      ["loops", "--all"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
 
     // Extract a run ID from the output (first data line after header)
     const lines = listRes.stdout.trim().split("\n");
     expect(lines.length).toBeGreaterThanOrEqual(2);
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
-    const showRes = runCli(["loops", "show", runId], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const showRes = runCli(
+      ["loops", "show", runId],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(showRes.stdout).toContain("Run:");
     expect(showRes.stdout).toContain("Status:");
     expect(showRes.stdout).toContain("completed");
@@ -80,19 +98,29 @@ describe("integration: loops command", () => {
   it("supports partial run-id matching in loops show", () => {
     const project = makeTempProject("loops-partial");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    runCli(["run", project, "partial match test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "partial match test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
-    const listRes = runCli(["loops", "--all"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const listRes = runCli(
+      ["loops", "--all"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     const lines = listRes.stdout.trim().split("\n");
     const runId = lines[1].trim().split(/\s{2,}/)[0];
     // Use first 8 chars as partial ID
     const partial = runId.slice(0, 8);
 
-    const showRes = runCli(["loops", "show", partial], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const showRes = runCli(
+      ["loops", "show", partial],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(showRes.stdout).toContain("Run:");
     expect(showRes.stdout).toContain(runId);
   });
@@ -102,15 +130,23 @@ describe("integration: loops command", () => {
     const fixture = join(FIXTURES_DIR, "complete-success.json");
     runCli(["run", project, "artifacts test"], { MOCK_FIXTURE_PATH: fixture });
 
-    const listRes = runCli(["loops", "--all"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const listRes = runCli(
+      ["loops", "--all"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     const lines = listRes.stdout.trim().split("\n");
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
-    const artRes = runCli(["loops", "artifacts", runId], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const artRes = runCli(
+      ["loops", "artifacts", runId],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(artRes.stdout).toContain("Journal:");
     expect(artRes.stdout).toContain("State dir:");
     expect(artRes.stdout).toContain("Work dir:");
@@ -121,9 +157,13 @@ describe("integration: loops command", () => {
     const fixture = join(FIXTURES_DIR, "complete-success.json");
     runCli(["run", project, "not found test"], { MOCK_FIXTURE_PATH: fixture });
 
-    const res = runCli(["loops", "show", "run-nonexistent-id"], {
-      AUTOLOOP_PROJECT_DIR: project,
-    }, project);
+    const res = runCli(
+      ["loops", "show", "run-nonexistent-id"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(res.stdout).toContain("No run matching");
   });
 

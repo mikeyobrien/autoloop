@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeMeta } from "../../src/worktree/meta.js";
-import type { WorktreeMeta } from "../../src/worktree/meta.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchWorktree } from "../../src/commands/worktree.js";
+import type { WorktreeMeta } from "../../src/worktree/meta.js";
+import { writeMeta } from "../../src/worktree/meta.js";
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "autoloop-ts-wt-cmd-"));
@@ -28,7 +28,7 @@ function sampleMeta(overrides: Partial<WorktreeMeta> = {}): WorktreeMeta {
 describe("worktree list output", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    delete process.env["AUTOLOOP_PROJECT_DIR"];
+    delete process.env.AUTOLOOP_PROJECT_DIR;
   });
 
   it("renders BASE column in header and data rows", () => {
@@ -37,7 +37,7 @@ describe("worktree list output", () => {
     const metaDir = join(stateDir, "worktrees", "run-abc12345");
     writeMeta(metaDir, sampleMeta({ worktree_path: metaDir }));
 
-    process.env["AUTOLOOP_PROJECT_DIR"] = projectDir;
+    process.env.AUTOLOOP_PROJECT_DIR = projectDir;
 
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => {
@@ -71,22 +71,28 @@ describe("worktree list output", () => {
     const stateDir = join(projectDir, ".autoloop");
 
     const metaDirA = join(stateDir, "worktrees", "run-aaa");
-    writeMeta(metaDirA, sampleMeta({
-      run_id: "run-aaa",
-      branch: "autoloop/run-aaa",
-      base_branch: "develop",
-      worktree_path: metaDirA,
-    }));
+    writeMeta(
+      metaDirA,
+      sampleMeta({
+        run_id: "run-aaa",
+        branch: "autoloop/run-aaa",
+        base_branch: "develop",
+        worktree_path: metaDirA,
+      }),
+    );
 
     const metaDirB = join(stateDir, "worktrees", "run-bbb");
-    writeMeta(metaDirB, sampleMeta({
-      run_id: "run-bbb",
-      branch: "autoloop/run-bbb",
-      base_branch: "release/v2",
-      worktree_path: "/nonexistent",
-    }));
+    writeMeta(
+      metaDirB,
+      sampleMeta({
+        run_id: "run-bbb",
+        branch: "autoloop/run-bbb",
+        base_branch: "release/v2",
+        worktree_path: "/nonexistent",
+      }),
+    );
 
-    process.env["AUTOLOOP_PROJECT_DIR"] = projectDir;
+    process.env.AUTOLOOP_PROJECT_DIR = projectDir;
 
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => {
@@ -97,7 +103,7 @@ describe("worktree list output", () => {
 
     // Should have header + 2 data rows
     expect(lines).toHaveLength(3);
-    expect(lines.some(l => l.includes("develop"))).toBe(true);
-    expect(lines.some(l => l.includes("release/v2"))).toBe(true);
+    expect(lines.some((l) => l.includes("develop"))).toBe(true);
+    expect(lines.some((l) => l.includes("release/v2"))).toBe(true);
   });
 });

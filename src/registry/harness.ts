@@ -1,9 +1,9 @@
-import type { LoopContext } from "../harness/types.js";
 import { normalizeBackendLabel } from "../backend/index.js";
-import type { RunRecord, RegistryStatus } from "./types.js";
-import { appendRegistryEntry } from "./update.js";
-import { getRun } from "./read.js";
+import type { LoopContext } from "../harness/types.js";
 import { stopReasonToStatus } from "./derive.js";
+import { getRun } from "./read.js";
+import type { RegistryStatus, RunRecord } from "./types.js";
+import { appendRegistryEntry } from "./update.js";
 
 function registryPath(loop: LoopContext): string {
   return loop.paths.registryFile;
@@ -49,7 +49,13 @@ export function registryProgress(loop: LoopContext, iteration: number): void {
   appendRegistryEntry(path, record);
 }
 
-export function registryTerminal(loop: LoopContext, iteration: number, status: RegistryStatus, stopReason: string, latestEvent: string): void {
+export function registryTerminal(
+  loop: LoopContext,
+  iteration: number,
+  status: RegistryStatus,
+  stopReason: string,
+  latestEvent: string,
+): void {
   const path = registryPath(loop);
   const existing = getRun(path, loop.runtime.runId);
   const record: RunRecord = existing ? { ...existing } : baseRecord(loop);
@@ -61,10 +67,24 @@ export function registryTerminal(loop: LoopContext, iteration: number, status: R
   appendRegistryEntry(path, record);
 }
 
-export function registryComplete(loop: LoopContext, iteration: number, reason: string): void {
+export function registryComplete(
+  loop: LoopContext,
+  iteration: number,
+  reason: string,
+): void {
   registryTerminal(loop, iteration, "completed", reason, "loop.complete");
 }
 
-export function registryStop(loop: LoopContext, iteration: number, reason: string): void {
-  registryTerminal(loop, iteration, stopReasonToStatus(reason), reason, "loop.stop");
+export function registryStop(
+  loop: LoopContext,
+  iteration: number,
+  reason: string,
+): void {
+  registryTerminal(
+    loop,
+    iteration,
+    stopReasonToStatus(reason),
+    reason,
+    "loop.stop",
+  );
 }

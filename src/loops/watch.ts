@@ -1,11 +1,16 @@
 import { mergedFindRunByPrefix } from "../registry/discover.js";
 import type { RunRecord } from "../registry/types.js";
 import { policyForPreset } from "./policy.js";
-import { renderRunDetail, renderRunLine, renderListHeader } from "./render.js";
+import { renderListHeader, renderRunDetail, renderRunLine } from "./render.js";
 
 const DEFAULT_INTERVAL_MS = 2000;
 
-const TERMINAL_STATUSES = new Set(["completed", "failed", "timed_out", "stopped"]);
+const TERMINAL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "timed_out",
+  "stopped",
+]);
 
 type HealthState = "active" | "watching" | "stuck";
 
@@ -13,7 +18,10 @@ type HealthState = "active" | "watching" | "stuck";
  * Compute a health advisory string for a run, or null if the run is healthy.
  * Returns a message only when the run is in the watching or stuck band.
  */
-export function healthAdvisory(r: RunRecord, nowMs: number = Date.now()): string | null {
+export function healthAdvisory(
+  r: RunRecord,
+  nowMs: number = Date.now(),
+): string | null {
   if (r.status !== "running") return null;
   if (!r.updated_at) return null;
   const updatedMs = new Date(r.updated_at).getTime();
@@ -22,11 +30,23 @@ export function healthAdvisory(r: RunRecord, nowMs: number = Date.now()): string
   const policy = policyForPreset(r.preset);
   if (elapsed > policy.stuckAfterMs) {
     const mins = Math.round(elapsed / 60000);
-    return "[watch] " + r.preset + ": no progress for " + mins + "m — likely stuck, investigate now";
+    return (
+      "[watch] " +
+      r.preset +
+      ": no progress for " +
+      mins +
+      "m — likely stuck, investigate now"
+    );
   }
   if (elapsed > policy.warningAfterMs) {
     const mins = Math.round(elapsed / 60000);
-    return "[watch] " + r.preset + ": no progress for " + mins + "m — investigate soon";
+    return (
+      "[watch] " +
+      r.preset +
+      ": no progress for " +
+      mins +
+      "m — investigate soon"
+    );
   }
   return null;
 }
@@ -61,12 +81,18 @@ export async function watchRun(
   }
 
   if (isTerminal(initial)) {
-    console.log("[watch] Run already " + initial.status + ".");
+    console.log(`[watch] Run already ${initial.status}.`);
     console.log(renderRunDetail(initial));
     return;
   }
 
-  console.log("[watch] Watching " + initial.run_id + " (poll every " + (intervalMs / 1000) + "s)");
+  console.log(
+    "[watch] Watching " +
+      initial.run_id +
+      " (poll every " +
+      intervalMs / 1000 +
+      "s)",
+  );
   console.log(renderListHeader());
   console.log(renderRunLine(initial));
 
@@ -85,7 +111,7 @@ export async function watchRun(
       const current = resolveRun(stateDir, initial.run_id);
       if (typeof current === "string") {
         // Run disappeared from registry — unusual but handle gracefully
-        console.log("[watch] " + current);
+        console.log(`[watch] ${current}`);
         clearInterval(timer);
         process.off("SIGINT", onSigint);
         resolve();
@@ -109,7 +135,7 @@ export async function watchRun(
 
       if (isTerminal(current)) {
         console.log("");
-        console.log("[watch] Run " + current.status + ".");
+        console.log(`[watch] Run ${current.status}.`);
         console.log(renderRunDetail(current));
         clearInterval(timer);
         process.off("SIGINT", onSigint);
@@ -122,11 +148,11 @@ export async function watchRun(
 function resolveRun(stateDir: string, partial: string): RunRecord | string {
   const result = mergedFindRunByPrefix(stateDir, partial);
   if (result === undefined) {
-    return "No run matching '" + partial + "'.";
+    return `No run matching '${partial}'.`;
   }
   if (Array.isArray(result)) {
-    const ids = result.map((r: RunRecord) => "  " + r.run_id).join("\n");
-    return "Ambiguous run ID '" + partial + "'. Matches:\n" + ids;
+    const ids = result.map((r: RunRecord) => `  ${r.run_id}`).join("\n");
+    return `Ambiguous run ID '${partial}'. Matches:\n${ids}`;
   }
   return result;
 }
@@ -136,5 +162,5 @@ function isTerminal(r: RunRecord): boolean {
 }
 
 function snapshot(r: RunRecord): string {
-  return r.iteration + "|" + r.latest_event + "|" + r.status + "|" + r.updated_at;
+  return `${r.iteration}|${r.latest_event}|${r.status}|${r.updated_at}`;
 }

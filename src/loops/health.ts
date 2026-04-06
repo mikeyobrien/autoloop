@@ -1,7 +1,7 @@
 import { readMergedRegistry } from "../registry/discover.js";
 import type { RunRecord } from "../registry/types.js";
 import { policyForPreset } from "./policy.js";
-import { renderRunLine, renderListHeader } from "./render.js";
+import { renderListHeader, renderRunLine } from "./render.js";
 
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -28,7 +28,10 @@ export function categorizeRuns(stateDir: string): HealthResult {
   return categorizeRecords(all);
 }
 
-export function categorizeRecords(records: RunRecord[], nowMs: number = Date.now()): HealthResult {
+export function categorizeRecords(
+  records: RunRecord[],
+  nowMs: number = Date.now(),
+): HealthResult {
   const active: RunRecord[] = [];
   const watching: RunRecord[] = [];
   const stuck: RunRecord[] = [];
@@ -92,27 +95,43 @@ function isRecent(r: RunRecord, nowMs: number): boolean {
   if (!r.updated_at) return false;
   const updatedMs = new Date(r.updated_at).getTime();
   if (Number.isNaN(updatedMs)) return false;
-  return (nowMs - updatedMs) <= RECENT_WINDOW_MS;
+  return nowMs - updatedMs <= RECENT_WINDOW_MS;
 }
 
 function renderHealth(h: HealthResult, verbose: boolean): string {
-  const hasExceptions = h.stuck.length > 0 || h.recentFailed.length > 0 || h.watching.length > 0;
+  const hasExceptions =
+    h.stuck.length > 0 || h.recentFailed.length > 0 || h.watching.length > 0;
 
   if (!hasExceptions && h.active.length === 0) {
-    return "All clear. 0 active, " + h.recentCompleted.length + " completed in last 24h.";
+    return (
+      "All clear. 0 active, " +
+      h.recentCompleted.length +
+      " completed in last 24h."
+    );
   }
 
   if (!hasExceptions) {
-    return "All clear. " + h.active.length + " active, " + h.recentCompleted.length + " completed in last 24h.";
+    return (
+      "All clear. " +
+      h.active.length +
+      " active, " +
+      h.recentCompleted.length +
+      " completed in last 24h."
+    );
   }
 
   const lines: string[] = [];
 
   lines.push(
-    "Health: " + h.active.length + " active, " +
-    h.watching.length + " watching, " +
-    h.stuck.length + " stuck, " +
-    h.recentFailed.length + " failed (last 24h)",
+    "Health: " +
+      h.active.length +
+      " active, " +
+      h.watching.length +
+      " watching, " +
+      h.stuck.length +
+      " stuck, " +
+      h.recentFailed.length +
+      " failed (last 24h)",
   );
   lines.push("");
 

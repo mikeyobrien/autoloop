@@ -1,10 +1,19 @@
-import { describe, it, expect } from "vitest";
-import { buildBackendShellCommand, normalizeProviderKind } from "../../src/backend/index.js";
+import { describe, expect, it } from "vitest";
+import {
+  buildBackendShellCommand,
+  normalizeProviderKind,
+} from "../../src/backend/index.js";
 import { runShellCommand } from "../../src/backend/run-command.js";
 
 describe("backend runner", () => {
   it("normalizes mock provider kind", () => {
-    expect(normalizeProviderKind({ kind: "command", command: "node", args: ["dist/testing/mock-backend.js"] })).toBe("mock");
+    expect(
+      normalizeProviderKind({
+        kind: "command",
+        command: "node",
+        args: ["dist/testing/mock-backend.js"],
+      }),
+    ).toBe("mock");
   });
 
   it("builds command backend shell invocation", () => {
@@ -21,13 +30,21 @@ describe("backend runner", () => {
   });
 
   it("reports non-zero exit failures", () => {
-    const result = runShellCommand("command", "sh -c 'echo nope; exit 3'", 5000);
+    const result = runShellCommand(
+      "command",
+      "sh -c 'echo nope; exit 3'",
+      5000,
+    );
     expect(result.exitCode).toBe(3);
     expect(result.errorCategory).toBe("non_zero_exit");
   });
 
   it("classifies exec timeouts as timeout errors", () => {
-    const result = runShellCommand("command", "node -e \"setTimeout(() => {}, 1000)\"", 10);
+    const result = runShellCommand(
+      "command",
+      'node -e "setTimeout(() => {}, 1000)"',
+      10,
+    );
     expect(result.timedOut).toBe(true);
     expect(result.errorCategory).toBe("timeout");
   });

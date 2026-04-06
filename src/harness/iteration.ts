@@ -1,27 +1,41 @@
+import { registryProgress } from "../registry/harness.js";
 import { listText } from "../utils.js";
-import { readRunLines, extractTopic, extractField, extractIteration } from "./journal.js";
-import { invalidEvent, systemTopic, parallelTriggerTopic, appendInvalidEvent } from "./emit.js";
-import { buildIterationContext } from "./prompt.js";
-import type { IterationContext } from "./prompt.js";
-import type { LoopContext, RunSummary } from "./types.js";
-import { executeParallelWave, continueAfterParallelJoin, stopAfterParallelWave } from "./wave.js";
 import {
+  log,
+  printBackendOutputTail,
   printIterationBanner,
   printIterationFooter,
-  printBackendOutputTail,
   printProgressLine,
-  log,
 } from "./display.js";
 import {
-  buildBackendCommand,
-  appendIterationStart,
-  appendBackendStart,
+  appendInvalidEvent,
+  invalidEvent,
+  parallelTriggerTopic,
+  systemTopic,
+} from "./emit.js";
+import {
+  extractField,
+  extractIteration,
+  extractTopic,
+  readRunLines,
+} from "./journal.js";
+import {
   appendBackendFinish,
+  appendBackendStart,
   appendIterationFinish,
+  appendIterationStart,
+  buildBackendCommand,
   runProcess,
 } from "./parallel.js";
-import { stopBackendFailed, stopBackendTimeout, completeLoop } from "./stop.js";
-import { registryProgress } from "../registry/harness.js";
+import type { IterationContext } from "./prompt.js";
+import { buildIterationContext } from "./prompt.js";
+import { completeLoop, stopBackendFailed, stopBackendTimeout } from "./stop.js";
+import type { LoopContext, RunSummary } from "./types.js";
+import {
+  continueAfterParallelJoin,
+  executeParallelWave,
+  stopAfterParallelWave,
+} from "./wave.js";
 
 export function runIteration(
   loop: LoopContext,
@@ -63,19 +77,50 @@ export function finishIteration(
 ): RunSummary {
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
   const allTopics = runLines.map(extractTopic).filter((t) => t !== "");
-  const turnLines = runLines.filter((l) => extractIteration(l) === String(iter.iteration));
+  const turnLines = runLines.filter(
+    (l) => extractIteration(l) === String(iter.iteration),
+  );
   const emitted = latestAgentEventRecord(turnLines);
-  const hadInvalidEvents = turnLines.some((l) => extractTopic(l) === "event.invalid");
+  const hadInvalidEvents = turnLines.some(
+    (l) => extractTopic(l) === "event.invalid",
+  );
 
   const progress = (emittedTopic: string, outcome: string) =>
-    printProgressLine({ runId: loop.runtime.runId, iteration: iter.iteration, recentEvent: iter.recentEvent, allowedRoles: iter.allowedRoles, emittedTopic, outcome });
+    printProgressLine({
+      runId: loop.runtime.runId,
+      iteration: iter.iteration,
+      recentEvent: iter.recentEvent,
+      allowedRoles: iter.allowedRoles,
+      emittedTopic,
+      outcome,
+    });
 
-  if (invalidEvent(emitted.topic, iter.allowedEvents, loop.parallel.enabled, loop.completion.event)) {
-    return rejectInvalidAndContinue(loop, iter, emitted.topic, iterate, progress);
+  if (
+    invalidEvent(
+      emitted.topic,
+      iter.allowedEvents,
+      loop.parallel.enabled,
+      loop.completion.event,
+    )
+  ) {
+    return rejectInvalidAndContinue(
+      loop,
+      iter,
+      emitted.topic,
+      iterate,
+      progress,
+    );
   }
 
   if (parallelTriggerTopic(emitted.topic)) {
-    return finishParallelIteration(loop, iter, emitted.topic, emitted.payload, iterate, progress);
+    return finishParallelIteration(
+      loop,
+      iter,
+      emitted.topic,
+      emitted.payload,
+      iterate,
+      progress,
+    );
   }
 
   const resolved = resolveOutcome({
@@ -90,8 +135,10 @@ export function finishIteration(
 
   progress(emitted.topic, resolved.outcome);
 
-  if (resolved.action === "complete_event") return completeLoop(loop, iter.iteration, "completion_event");
-  if (resolved.action === "complete_promise") return completeLoop(loop, iter.iteration, "completion_promise");
+  if (resolved.action === "complete_event")
+    return completeLoop(loop, iter.iteration, "completion_event");
+  if (resolved.action === "complete_promise")
+    return completeLoop(loop, iter.iteration, "completion_promise");
   return iterate(loop, iter.iteration + 1);
 }
 
@@ -130,7 +177,14 @@ function finishParallelIteration(
 
   if (result.reason === "parallel_wave_complete") {
     progress(emittedTopic, "parallel:joined");
-    return continueAfterParallelJoin(loop, iter, result.waveId, emittedTopic, result.elapsedMs, iterate);
+    return continueAfterParallelJoin(
+      loop,
+      iter,
+      result.waveId,
+      emittedTopic,
+      result.elapsedMs,
+      iterate,
+    );
   }
   progress(emittedTopic, `parallel:stop:${result.reason}`);
   return stopAfterParallelWave(loop, iter, result.reason, result.waveId);
@@ -145,19 +199,30 @@ export function resolveOutcome(ctx: {
   requiredEvents: string[];
   completionPromise: string;
 }): { action: string; outcome: string } {
-  if (completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents)) {
+  if (
+    completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents)
+  ) {
     return { action: "complete_event", outcome: "complete:completion_event" };
   }
   if (shouldContinueFromAcceptedEvent(ctx.emittedTopic, ctx.completionEvent)) {
     return { action: "continue_routed", outcome: "continue:routed_event" };
   }
-  if (!ctx.hadInvalidEvents && completedViaPromise(ctx.output, ctx.completionPromise)) {
-    return { action: "complete_promise", outcome: "complete:completion_promise" };
+  if (
+    !ctx.hadInvalidEvents &&
+    completedViaPromise(ctx.output, ctx.completionPromise)
+  ) {
+    return {
+      action: "complete_promise",
+      outcome: "complete:completion_promise",
+    };
   }
   return { action: "continue", outcome: "continue" };
 }
 
-function latestAgentEventRecord(lines: string[]): { topic: string; payload: string } {
+function latestAgentEventRecord(lines: string[]): {
+  topic: string;
+  payload: string;
+} {
   for (let i = lines.length - 1; i >= 0; i--) {
     const topic = extractTopic(lines[i]);
     if (!systemTopic(topic)) {
@@ -167,7 +232,11 @@ function latestAgentEventRecord(lines: string[]): { topic: string; payload: stri
   return { topic: "", payload: "" };
 }
 
-function completedViaEvent(topics: string[], completionEvent: string, requiredEvents: string[]): boolean {
+function completedViaEvent(
+  topics: string[],
+  completionEvent: string,
+  requiredEvents: string[],
+): boolean {
   if (!topics.includes(completionEvent)) return false;
   return requiredEvents.every((e) => topics.includes(e));
 }
@@ -177,7 +246,10 @@ function completedViaPromise(output: string, promise: string): boolean {
   return output.includes(promise);
 }
 
-function shouldContinueFromAcceptedEvent(emittedTopic: string, completionEvent: string): boolean {
+function shouldContinueFromAcceptedEvent(
+  emittedTopic: string,
+  completionEvent: string,
+): boolean {
   if (!emittedTopic) return false;
   return emittedTopic !== completionEvent;
 }

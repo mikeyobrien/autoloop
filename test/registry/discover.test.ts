@@ -1,15 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   discoverChainRegistries,
-  readMergedRegistry,
   mergedActiveRuns,
   mergedFindRunByPrefix,
+  readMergedRegistry,
 } from "../../src/registry/discover.js";
 
-function makeRecord(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function makeRecord(
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
   return {
     run_id: "run-1",
     status: "completed",
@@ -36,13 +38,20 @@ function makeRecord(overrides: Partial<Record<string, unknown>> = {}): Record<st
 }
 
 function writeJsonl(path: string, records: Record<string, unknown>[]) {
-  writeFileSync(path, records.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf-8");
+  writeFileSync(
+    path,
+    `${records.map((r) => JSON.stringify(r)).join("\n")}\n`,
+    "utf-8",
+  );
 }
 
 let stateDir: string;
 
 beforeEach(() => {
-  stateDir = join(tmpdir(), "discover-test-" + Math.random().toString(36).slice(2));
+  stateDir = join(
+    tmpdir(),
+    `discover-test-${Math.random().toString(36).slice(2)}`,
+  );
   mkdirSync(stateDir, { recursive: true });
 });
 
@@ -56,9 +65,17 @@ describe("discoverChainRegistries", () => {
   });
 
   it("discovers chain step registries", () => {
-    const chainReg = join(stateDir, "chains", "chain-abc", "step-1", ".autoloop");
+    const chainReg = join(
+      stateDir,
+      "chains",
+      "chain-abc",
+      "step-1",
+      ".autoloop",
+    );
     mkdirSync(chainReg, { recursive: true });
-    writeJsonl(join(chainReg, "registry.jsonl"), [makeRecord({ run_id: "chain-run-1" })]);
+    writeJsonl(join(chainReg, "registry.jsonl"), [
+      makeRecord({ run_id: "chain-run-1" }),
+    ]);
     const found = discoverChainRegistries(stateDir);
     expect(found).toHaveLength(1);
     expect(found[0]).toContain("chain-abc");
@@ -66,11 +83,20 @@ describe("discoverChainRegistries", () => {
 
   it("discovers worktree-isolated registries", () => {
     const wtReg = join(
-      stateDir, "chains", "chain-xyz", "step-0", ".autoloop",
-      "worktrees", "run-wt1", "tree", ".autoloop",
+      stateDir,
+      "chains",
+      "chain-xyz",
+      "step-0",
+      ".autoloop",
+      "worktrees",
+      "run-wt1",
+      "tree",
+      ".autoloop",
     );
     mkdirSync(wtReg, { recursive: true });
-    writeJsonl(join(wtReg, "registry.jsonl"), [makeRecord({ run_id: "wt-run-1" })]);
+    writeJsonl(join(wtReg, "registry.jsonl"), [
+      makeRecord({ run_id: "wt-run-1" }),
+    ]);
     const found = discoverChainRegistries(stateDir);
     expect(found).toHaveLength(1);
     expect(found[0]).toContain("worktrees");
@@ -91,7 +117,13 @@ describe("readMergedRegistry", () => {
     writeJsonl(join(stateDir, "registry.jsonl"), [
       makeRecord({ run_id: "root-1" }),
     ]);
-    const chainReg = join(stateDir, "chains", "chain-abc", "step-1", ".autoloop");
+    const chainReg = join(
+      stateDir,
+      "chains",
+      "chain-abc",
+      "step-1",
+      ".autoloop",
+    );
     mkdirSync(chainReg, { recursive: true });
     writeJsonl(join(chainReg, "registry.jsonl"), [
       makeRecord({ run_id: "chain-child-1", status: "running" }),
@@ -104,12 +136,26 @@ describe("readMergedRegistry", () => {
 
   it("deduplicates by run_id with freshest updated_at winning", () => {
     writeJsonl(join(stateDir, "registry.jsonl"), [
-      makeRecord({ run_id: "dup-1", status: "running", updated_at: "2025-01-01T00:00:00Z" }),
+      makeRecord({
+        run_id: "dup-1",
+        status: "running",
+        updated_at: "2025-01-01T00:00:00Z",
+      }),
     ]);
-    const chainReg = join(stateDir, "chains", "chain-abc", "step-1", ".autoloop");
+    const chainReg = join(
+      stateDir,
+      "chains",
+      "chain-abc",
+      "step-1",
+      ".autoloop",
+    );
     mkdirSync(chainReg, { recursive: true });
     writeJsonl(join(chainReg, "registry.jsonl"), [
-      makeRecord({ run_id: "dup-1", status: "completed", updated_at: "2025-01-02T00:00:00Z" }),
+      makeRecord({
+        run_id: "dup-1",
+        status: "completed",
+        updated_at: "2025-01-02T00:00:00Z",
+      }),
     ]);
     const merged = readMergedRegistry(stateDir);
     expect(merged).toHaveLength(1);
@@ -121,10 +167,20 @@ describe("readMergedRegistry", () => {
     // Root has no runs
     writeJsonl(join(stateDir, "registry.jsonl"), []);
     // Chain step has an active child
-    const chainReg = join(stateDir, "chains", "chain-active", "step-0", ".autoloop");
+    const chainReg = join(
+      stateDir,
+      "chains",
+      "chain-active",
+      "step-0",
+      ".autoloop",
+    );
     mkdirSync(chainReg, { recursive: true });
     writeJsonl(join(chainReg, "registry.jsonl"), [
-      makeRecord({ run_id: "active-child", status: "running", updated_at: "2025-06-01T00:00:00Z" }),
+      makeRecord({
+        run_id: "active-child",
+        status: "running",
+        updated_at: "2025-06-01T00:00:00Z",
+      }),
     ]);
     const active = mergedActiveRuns(stateDir);
     expect(active).toHaveLength(1);
@@ -136,31 +192,50 @@ describe("readMergedRegistry", () => {
       makeRecord({ run_id: "root-run" }),
     ]);
     const wtReg = join(
-      stateDir, "chains", "chain-wt", "step-1", ".autoloop",
-      "worktrees", "run-isolated", "tree", ".autoloop",
+      stateDir,
+      "chains",
+      "chain-wt",
+      "step-1",
+      ".autoloop",
+      "worktrees",
+      "run-isolated",
+      "tree",
+      ".autoloop",
     );
     mkdirSync(wtReg, { recursive: true });
     writeJsonl(join(wtReg, "registry.jsonl"), [
-      makeRecord({ run_id: "isolated-child", status: "running", isolation_mode: "worktree" }),
+      makeRecord({
+        run_id: "isolated-child",
+        status: "running",
+        isolation_mode: "worktree",
+      }),
     ]);
     const merged = readMergedRegistry(stateDir);
     expect(merged).toHaveLength(2);
     const found = merged.find((r) => r.run_id === "isolated-child");
     expect(found).toBeDefined();
-    expect(found!.isolation_mode).toBe("worktree");
+    expect(found?.isolation_mode).toBe("worktree");
   });
 });
 
 describe("mergedFindRunByPrefix", () => {
   it("finds a run from a chain child registry by prefix", () => {
     writeJsonl(join(stateDir, "registry.jsonl"), []);
-    const chainReg = join(stateDir, "chains", "chain-find", "step-0", ".autoloop");
+    const chainReg = join(
+      stateDir,
+      "chains",
+      "chain-find",
+      "step-0",
+      ".autoloop",
+    );
     mkdirSync(chainReg, { recursive: true });
     writeJsonl(join(chainReg, "registry.jsonl"), [
       makeRecord({ run_id: "chain-find-run-xyz" }),
     ]);
     const result = mergedFindRunByPrefix(stateDir, "chain-find-run");
     expect(result).toBeDefined();
-    expect(!Array.isArray(result) && (result as any).run_id).toBe("chain-find-run-xyz");
+    expect(!Array.isArray(result) && (result as any).run_id).toBe(
+      "chain-find-run-xyz",
+    );
   });
 });

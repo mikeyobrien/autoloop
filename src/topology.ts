@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import TOML from "@iarna/toml";
-import { listContains, listText, lineSep } from "./utils.js";
+import { lineSep, listContains, listText } from "./utils.js";
 
 export interface Role {
   id: string;
@@ -59,10 +59,7 @@ export function loadTopology(projectDir: string): Topology {
   return loadExisting(path, projectDir);
 }
 
-export function completionEvent(
-  topology: Topology,
-  fallback: string,
-): string {
+export function completionEvent(topology: Topology, fallback: string): string {
   return topology.completion || fallback;
 }
 
@@ -103,9 +100,15 @@ export function renderWithContext(
   if (topology.roles.length === 0) return "";
   return (
     "Topology (advisory):\n" +
-    "Recent routing event: " + recentEvent + "\n" +
-    "Suggested next roles: " + listText(suggested) + "\n" +
-    "Allowed next events: " + listText(allowed) + "\n\n" +
+    "Recent routing event: " +
+    recentEvent +
+    "\n" +
+    "Suggested next roles: " +
+    listText(suggested) +
+    "\n" +
+    "Allowed next events: " +
+    listText(allowed) +
+    "\n\n" +
     "Role deck:\n" +
     renderRoles(topology.roles)
   );
@@ -126,7 +129,8 @@ function buildTopology(
   projectDir: string,
 ): Topology {
   const name = typeof parsed.name === "string" ? parsed.name : "";
-  const completion = typeof parsed.completion === "string" ? parsed.completion : "";
+  const completion =
+    typeof parsed.completion === "string" ? parsed.completion : "";
 
   const rawRoles = (parsed.role ?? []) as Array<Record<string, unknown>>;
   const roles: Role[] = rawRoles
@@ -164,10 +168,7 @@ function readPromptFile(projectDir: string, promptFile: string): string {
   return readFileSync(fullPath, "utf-8");
 }
 
-function collectMatchingRoles(
-  topology: Topology,
-  event: string,
-): string[] {
+function collectMatchingRoles(topology: Topology, event: string): string[] {
   const acc: string[] = [];
   for (const key of topology.handoffKeys) {
     if (eventMatchesPattern(event, key)) {
@@ -179,10 +180,7 @@ function collectMatchingRoles(
   return acc;
 }
 
-function collectEventsForRoles(
-  roles: Role[],
-  roleIds: string[],
-): string[] {
+function collectEventsForRoles(roles: Role[], roleIds: string[]): string[] {
   const acc: string[] = [];
   for (const role of roles) {
     if (listContains(roleIds, role.id)) {
@@ -211,7 +209,7 @@ function stripRegexDelimiters(value: string): string {
 
 function regexMatch(topic: string, pattern: string): boolean {
   try {
-    const re = new RegExp("^" + pattern + "$");
+    const re = new RegExp(`^${pattern}$`);
     return re.test(topic);
   } catch {
     return false;
@@ -222,9 +220,15 @@ function renderRoles(roles: Role[]): string {
   let result = "";
   for (const role of roles) {
     result +=
-      "- role `" + role.id + "`\n" +
-      "  emits: " + listText(role.emits) + "\n" +
-      "  prompt: " + promptSummary(role.prompt) + "\n";
+      "- role `" +
+      role.id +
+      "`\n" +
+      "  emits: " +
+      listText(role.emits) +
+      "\n" +
+      "  prompt: " +
+      promptSummary(role.prompt) +
+      "\n";
   }
   return result;
 }
@@ -252,24 +256,39 @@ export function validateTopology(topology: Topology): TopologyWarning[] {
   const targetedRoleIds = handoffTargetIds(topology);
   for (const role of topology.roles) {
     if (!targetedRoleIds.includes(role.id)) {
-      warnings.push({ kind: "orphan-role", message: `role \`${role.id}\` is not targeted by any handoff rule` });
+      warnings.push({
+        kind: "orphan-role",
+        message: `role \`${role.id}\` is not targeted by any handoff rule`,
+      });
     }
     if (role.emits.length === 0) {
-      warnings.push({ kind: "no-emits", message: `role \`${role.id}\` has no emits` });
+      warnings.push({
+        kind: "no-emits",
+        message: `role \`${role.id}\` has no emits`,
+      });
     }
   }
 
   const emitted = allEmittedEvents(topology);
   for (const event of emitted) {
-    if (!eventMatchesAny(event, topology.handoffKeys) && event !== topology.completion) {
-      warnings.push({ kind: "unreachable-event", message: `event \`${event}\` is emitted but has no matching handoff rule` });
+    if (
+      !eventMatchesAny(event, topology.handoffKeys) &&
+      event !== topology.completion
+    ) {
+      warnings.push({
+        kind: "unreachable-event",
+        message: `event \`${event}\` is emitted but has no matching handoff rule`,
+      });
     }
   }
 
   return warnings;
 }
 
-export function renderTopologyInspect(projectDir: string, format: string): void {
+export function renderTopologyInspect(
+  projectDir: string,
+  format: string,
+): void {
   const topology = loadTopology(projectDir);
 
   if (topology.roles.length === 0) {
@@ -325,15 +344,15 @@ function renderTopologyGraph(topology: Topology): void {
 
 function renderTopologyTerminal(topology: Topology): void {
   const lines: string[] = [];
-  lines.push("## Topology: " + (topology.name || "(unnamed)"));
+  lines.push(`## Topology: ${topology.name || "(unnamed)"}`);
   lines.push("");
-  lines.push("Completion event: " + (topology.completion || "(none)"));
+  lines.push(`Completion event: ${topology.completion || "(none)"}`);
   lines.push("");
 
   lines.push("### Roles");
   for (const role of topology.roles) {
-    lines.push("- `" + role.id + "` — emits: " + listText(role.emits));
-    lines.push("  prompt: " + promptSummary(role.prompt));
+    lines.push(`- \`${role.id}\` — emits: ${listText(role.emits)}`);
+    lines.push(`  prompt: ${promptSummary(role.prompt)}`);
   }
   lines.push("");
 
@@ -342,7 +361,7 @@ function renderTopologyTerminal(topology: Topology): void {
     const targets = topology.handoff[key] ?? [];
     const isRegex = key.startsWith("/") && key.endsWith("/");
     const annotation = isRegex ? " (regex)" : "";
-    lines.push("- " + key + annotation + " → [" + targets.join(", ") + "]");
+    lines.push(`- ${key}${annotation} → [${targets.join(", ")}]`);
   }
   lines.push("");
 
@@ -350,10 +369,9 @@ function renderTopologyTerminal(topology: Topology): void {
   if (warnings.length > 0) {
     lines.push("### Warnings");
     for (const w of warnings) {
-      lines.push("- " + w.message);
+      lines.push(`- ${w.message}`);
     }
   }
 
   console.log(lines.join("\n"));
 }
-

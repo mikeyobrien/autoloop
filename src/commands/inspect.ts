@@ -1,15 +1,23 @@
-import * as harness from "../harness/index.js";
-import * as memory from "../memory.js";
+import { basename } from "node:path";
 import * as chains from "../chains.js";
 import * as config from "../config.js";
-import * as topo from "../topology.js";
+import * as harness from "../harness/index.js";
+import * as memory from "../memory.js";
 import * as profiles from "../profiles.js";
-import { basename } from "node:path";
+import * as topo from "../topology.js";
 import { printInspectUsage } from "../usage.js";
 
 const INSPECT_TARGETS = [
-  "scratchpad", "prompt", "output", "journal", "memory",
-  "coordination", "chain", "metrics", "profiles", "topology",
+  "scratchpad",
+  "prompt",
+  "output",
+  "journal",
+  "memory",
+  "coordination",
+  "chain",
+  "metrics",
+  "profiles",
+  "topology",
 ];
 
 interface InspectSpec {
@@ -62,21 +70,27 @@ export function dispatchInspect(args: string[]): boolean {
       renderProfilesInspect(projectDir);
       return true;
     case "prompt":
-      if (!selector) { console.log("inspect prompt requires an iteration selector"); return true; }
+      if (!selector) {
+        console.log("inspect prompt requires an iteration selector");
+        return true;
+      }
       harness.renderPromptFormat(projectDir, selector, format, spec.run);
       return true;
     case "output":
-      if (!selector) { console.log("inspect output requires an iteration selector"); return true; }
+      if (!selector) {
+        console.log("inspect output requires an iteration selector");
+        return true;
+      }
       harness.renderOutput(projectDir, selector, spec.run);
       return true;
     default: {
       const suggestion = findClosestTarget(artifact, INSPECT_TARGETS);
-      console.log("Unknown inspect target `" + artifact + "`.");
+      console.log(`Unknown inspect target \`${artifact}\`.`);
       if (suggestion) {
-        console.log("Did you mean `" + suggestion + "`?");
+        console.log(`Did you mean \`${suggestion}\`?`);
       }
       console.log("");
-      console.log("Valid targets: " + INSPECT_TARGETS.join(", "));
+      console.log(`Valid targets: ${INSPECT_TARGETS.join(", ")}`);
       return true;
     }
   }
@@ -107,12 +121,13 @@ function parseInspectArgs(args: string[]): InspectSpec {
   }
 
   const needsSelector = artifact === "prompt" || artifact === "output";
-  const selector = needsSelector || artifact === "metrics" ? (positionals[0] ?? "") : "";
+  const selector =
+    needsSelector || artifact === "metrics" ? (positionals[0] ?? "") : "";
   const projectDir = needsSelector
     ? (positionals[1] ?? resolveRuntimeProjectDir())
-    : (artifact === "metrics" && positionals.length > 1
-        ? positionals[1]
-        : (positionals[0] ?? resolveRuntimeProjectDir()));
+    : artifact === "metrics" && positionals.length > 1
+      ? positionals[1]
+      : (positionals[0] ?? resolveRuntimeProjectDir());
 
   return { artifact, selector, projectDir, format, run };
 }
@@ -124,7 +139,7 @@ function inspectDefaultFormat(artifact: string): string {
 }
 
 function resolveRuntimeProjectDir(): string {
-  return process.env["AUTOLOOP_PROJECT_DIR"] || ".";
+  return process.env.AUTOLOOP_PROJECT_DIR || ".";
 }
 
 function renderProfilesInspect(projectDir: string): void {
@@ -135,7 +150,10 @@ function renderProfilesInspect(projectDir: string): void {
 
   console.log("## Profile Configuration");
   console.log("");
-  console.log("Config default profiles: " + (defaults.length > 0 ? defaults.join(", ") : "(none)"));
+  console.log(
+    "Config default profiles: " +
+      (defaults.length > 0 ? defaults.join(", ") : "(none)"),
+  );
   console.log("");
 
   if (defaults.length === 0) {
@@ -145,14 +163,19 @@ function renderProfilesInspect(projectDir: string): void {
 
   const presetName = basename(projectDir);
   try {
-    const resolved = profiles.resolveProfileFragments(defaults, presetName, topoData.roles, workDir);
-    console.log("Active profiles: " + defaults.join(", "));
+    const resolved = profiles.resolveProfileFragments(
+      defaults,
+      presetName,
+      topoData.roles,
+      workDir,
+    );
+    console.log(`Active profiles: ${defaults.join(", ")}`);
     console.log("");
 
     if (resolved.warnings.length > 0) {
       console.log("Warnings:");
       for (const w of resolved.warnings) {
-        console.log("  - " + w);
+        console.log(`  - ${w}`);
       }
       console.log("");
     }
@@ -160,11 +183,14 @@ function renderProfilesInspect(projectDir: string): void {
     if (resolved.fragments.size > 0) {
       console.log("Fragments:");
       for (const [roleId, fragment] of resolved.fragments) {
-        console.log("  " + roleId + ": " + fragment.trim().split("\n")[0] + "...");
+        console.log(`  ${roleId}: ${fragment.trim().split("\n")[0]}...`);
       }
     }
   } catch (err) {
-    console.log("Error resolving profiles: " + (err instanceof Error ? err.message : String(err)));
+    console.log(
+      "Error resolving profiles: " +
+        (err instanceof Error ? err.message : String(err)),
+    );
   }
 }
 
@@ -174,16 +200,24 @@ function findClosestTarget(input: string, targets: string[]): string | null {
   for (const t of targets) {
     if (t.startsWith(input) || input.startsWith(t)) {
       const d = Math.abs(t.length - input.length);
-      if (d < bestScore) { bestScore = d; best = t; }
+      if (d < bestScore) {
+        bestScore = d;
+        best = t;
+      }
     }
   }
   if (best) return best;
   // simple character overlap heuristic
   for (const t of targets) {
     let overlap = 0;
-    for (const ch of input) { if (t.includes(ch)) overlap++; }
+    for (const ch of input) {
+      if (t.includes(ch)) overlap++;
+    }
     const score = input.length - overlap;
-    if (score < bestScore) { bestScore = score; best = t; }
+    if (score < bestScore) {
+      bestScore = score;
+      best = t;
+    }
   }
   return bestScore <= 2 ? best : null;
 }

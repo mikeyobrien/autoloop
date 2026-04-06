@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { readMeta, isOrphanWorktree } from "./meta.js";
 import type { WorktreeMeta } from "./meta.js";
+import { isOrphanWorktree, readMeta } from "./meta.js";
 
 export interface WorktreeListEntry extends WorktreeMeta {
   orphan: boolean;

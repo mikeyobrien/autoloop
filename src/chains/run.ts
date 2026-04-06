@@ -1,21 +1,36 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as config from "../config.js";
-import { jsonField } from "../json.js";
-import { joinCsv, generateCompactId } from "../utils.js";
 import * as harness from "../harness/index.js";
-import { appendText, readLines, extractTopic, extractField } from "../harness/journal.js";
+import {
+  appendText,
+  extractField,
+  extractTopic,
+  readLines,
+} from "../harness/journal.js";
+import { presetCategory } from "../isolation/resolve.js";
+import { jsonField } from "../json.js";
+import { generateCompactId, joinCsv } from "../utils.js";
 import { checkBudget, defaultBudget } from "./budget.js";
 import { parseInlineChain } from "./load.js";
-import { presetCategory } from "../isolation/resolve.js";
-import type { ChainSpec, DynamicChainSpec, StepRecord, ChainTracker } from "./types.js";
+import type {
+  ChainSpec,
+  ChainTracker,
+  DynamicChainSpec,
+  StepRecord,
+} from "./types.js";
 
 export function runChain(
   chainSpec: ChainSpec,
   projectDir: string,
   selfCommand: string,
   runOptions: harness.RunOptions,
-): { completed: StepRecord[]; outcome: string; failedStep?: number; failedReason?: string } {
+): {
+  completed: StepRecord[];
+  outcome: string;
+  failedStep?: number;
+  failedReason?: string;
+} {
   const chainName = chainSpec.name;
   const steps = chainSpec.steps;
   const cfg = config.loadProject(projectDir);
@@ -29,19 +44,33 @@ export function runChain(
     chainRunId,
     "chain.start",
     jsonField("name", chainName) +
-      ", " + jsonField("steps", joinCsv(steps.map((s) => s.name))) +
-      ", " + jsonField("step_count", String(steps.length)),
+      ", " +
+      jsonField("steps", joinCsv(steps.map((s) => s.name))) +
+      ", " +
+      jsonField("step_count", String(steps.length)),
   );
 
-  const result = runSteps(steps, 1, projectDir, chainDir, chainRunId, selfCommand, runOptions, journalFile, []);
+  const result = runSteps(
+    steps,
+    1,
+    projectDir,
+    chainDir,
+    chainRunId,
+    selfCommand,
+    runOptions,
+    journalFile,
+    [],
+  );
 
   appendChainEvent(
     journalFile,
     chainRunId,
     "chain.complete",
     jsonField("name", chainName) +
-      ", " + jsonField("steps_completed", String(result.completed.length)) +
-      ", " + jsonField("outcome", result.outcome),
+      ", " +
+      jsonField("steps_completed", String(result.completed.length)) +
+      ", " +
+      jsonField("outcome", result.outcome),
   );
 
   return result;
@@ -53,28 +82,50 @@ export function spawnDynamicChain(
   selfCommand: string,
   runOptions: harness.RunOptions,
   parentId: string,
-): { outcome: string; reason?: string; chainId?: string; completed?: StepRecord[]; failedStep?: number; failedReason?: string } {
+): {
+  outcome: string;
+  reason?: string;
+  chainId?: string;
+  completed?: StepRecord[];
+  failedStep?: number;
+  failedReason?: string;
+} {
   const budget = spec.budget ?? defaultBudget();
   const tracker = loadChainTracker(projectDir);
   const budgetResult = checkBudget(budget, tracker);
 
   if (!budgetResult.ok) {
-    return { outcome: "budget_exceeded", reason: budgetResult.reason ?? "unknown rejection" };
+    return {
+      outcome: "budget_exceeded",
+      reason: budgetResult.reason ?? "unknown rejection",
+    };
   }
 
   const qualityResult = checkQualityGate(projectDir);
   if (!qualityResult.ok) {
-    return { outcome: "quality_gate_rejected", reason: qualityResult.reason ?? "unknown rejection" };
+    return {
+      outcome: "quality_gate_rejected",
+      reason: qualityResult.reason ?? "unknown rejection",
+    };
   }
 
-  return executeDynamicChain(spec, projectDir, selfCommand, runOptions, parentId);
+  return executeDynamicChain(
+    spec,
+    projectDir,
+    selfCommand,
+    runOptions,
+    parentId,
+  );
 }
 
-export function writeDynamicSpec(projectDir: string, spec: DynamicChainSpec): string {
+export function writeDynamicSpec(
+  projectDir: string,
+  spec: DynamicChainSpec,
+): string {
   const specsDir = join(chainStateRoot(projectDir), "specs");
   mkdirSync(specsDir, { recursive: true });
-  const chainId = spec.chainId ?? ("dyn-" + (countDynamicSpecs(specsDir) + 1));
-  const path = join(specsDir, chainId + ".json");
+  const chainId = spec.chainId ?? `dyn-${countDynamicSpecs(specsDir) + 1}`;
+  const path = join(specsDir, `${chainId}.json`);
   writeFileSync(path, renderDynamicSpecJson(spec, chainId));
   return chainId;
 }
@@ -93,7 +144,12 @@ function runSteps(
   runOptions: harness.RunOptions,
   journalFile: string,
   completed: StepRecord[],
-): { completed: StepRecord[]; outcome: string; failedStep?: number; failedReason?: string } {
+): {
+  completed: StepRecord[];
+  outcome: string;
+  failedStep?: number;
+  failedReason?: string;
+} {
   if (steps.length === 0) {
     return { completed, outcome: "all_steps_complete" };
   }
@@ -101,18 +157,26 @@ function runSteps(
   const [step, ...rest] = steps;
   const stepName = step.name;
   const presetDir = step.presetDir;
-  const stepWorkDir = join(chainDir, "step-" + stepNum);
+  const stepWorkDir = join(chainDir, `step-${stepNum}`);
   mkdirSync(stepWorkDir, { recursive: true });
 
-  writeHandoffArtifact(stepWorkDir, stepNum, completed, runOptions.prompt ?? null);
+  writeHandoffArtifact(
+    stepWorkDir,
+    stepNum,
+    completed,
+    runOptions.prompt ?? null,
+  );
   appendChainEvent(
     journalFile,
     chainRunId,
     "chain.step.start",
     jsonField("step", String(stepNum)) +
-      ", " + jsonField("preset", stepName) +
-      ", " + jsonField("preset_dir", presetDir) +
-      ", " + jsonField("work_dir", stepWorkDir),
+      ", " +
+      jsonField("preset", stepName) +
+      ", " +
+      jsonField("preset_dir", presetDir) +
+      ", " +
+      jsonField("work_dir", stepWorkDir),
   );
 
   const category = presetCategory(stepName, projectDir);
@@ -133,50 +197,102 @@ function runSteps(
     chainRunId,
     "chain.step.finish",
     jsonField("step", String(stepNum)) +
-      ", " + jsonField("preset", stepName) +
-      ", " + jsonField("stop_reason", stopReason),
+      ", " +
+      jsonField("preset", stepName) +
+      ", " +
+      jsonField("stop_reason", stopReason),
   );
 
-  const record: StepRecord = { step: stepNum, name: stepName, stopReason, runId: result.runId };
+  const record: StepRecord = {
+    step: stepNum,
+    name: stepName,
+    stopReason,
+    runId: result.runId,
+  };
   const updatedCompleted = [...completed, record];
 
   if (chainStepSuccess(stopReason)) {
-    return runSteps(rest, stepNum + 1, projectDir, chainDir, chainRunId, selfCommand, runOptions, journalFile, updatedCompleted);
+    return runSteps(
+      rest,
+      stepNum + 1,
+      projectDir,
+      chainDir,
+      chainRunId,
+      selfCommand,
+      runOptions,
+      journalFile,
+      updatedCompleted,
+    );
   }
-  return { completed: updatedCompleted, outcome: "step_failed", failedStep: stepNum, failedReason: stopReason };
+  return {
+    completed: updatedCompleted,
+    outcome: "step_failed",
+    failedStep: stepNum,
+    failedReason: stopReason,
+  };
 }
 
 function chainStepSuccess(stopReason: string): boolean {
-  return stopReason === "max_iterations" || stopReason === "completion_event" || stopReason === "completion_promise";
+  return (
+    stopReason === "max_iterations" ||
+    stopReason === "completion_event" ||
+    stopReason === "completion_promise"
+  );
 }
 
-function writeHandoffArtifact(stepWorkDir: string, stepNum: number, completed: StepRecord[], prompt: string | null): void {
-  let content = "# Chain Handoff — Step " + stepNum + "\n\n";
-  if (prompt) content += "## Entry Objective\n\n" + prompt + "\n\n";
+function writeHandoffArtifact(
+  stepWorkDir: string,
+  stepNum: number,
+  completed: StepRecord[],
+  prompt: string | null,
+): void {
+  let content = `# Chain Handoff — Step ${stepNum}\n\n`;
+  if (prompt) content += `## Entry Objective\n\n${prompt}\n\n`;
   if (completed.length === 0) {
     content += "First step in chain. No prior results.\n";
   } else {
     content += "## Prior Steps\n";
     for (const rec of completed) {
-      const runTag = rec.runId ? " [run_id=" + rec.runId + "]" : "";
-      content += "- Step " + rec.step + " (" + rec.name + "): " + rec.stopReason + runTag + "\n";
+      const runTag = rec.runId ? ` [run_id=${rec.runId}]` : "";
+      content +=
+        "- Step " +
+        rec.step +
+        " (" +
+        rec.name +
+        "): " +
+        rec.stopReason +
+        runTag +
+        "\n";
     }
     // Expose the most recent run ID as parent_run_id for downstream steps (e.g. automerge)
     const lastWithRunId = [...completed].reverse().find((r) => r.runId);
     if (lastWithRunId) {
       content += "\n## Parent Run\n";
-      content += "parent_run_id: " + lastWithRunId.runId + "\n";
+      content += `parent_run_id: ${lastWithRunId.runId}\n`;
     }
   }
   writeFileSync(join(stepWorkDir, "handoff.md"), content);
 }
 
-function writeResultArtifact(stepWorkDir: string, stepNum: number, stepName: string, result: harness.RunSummary): void {
+function writeResultArtifact(
+  stepWorkDir: string,
+  stepNum: number,
+  stepName: string,
+  result: harness.RunSummary,
+): void {
   const content =
-    "# Chain Result — Step " + stepNum + " (" + stepName + ")\n\n" +
-    "Stop reason: " + result.stopReason + "\n" +
-    "Iterations: " + result.iterations + "\n" +
-    (result.runId ? "Run ID: " + result.runId + "\n" : "");
+    "# Chain Result — Step " +
+    stepNum +
+    " (" +
+    stepName +
+    ")\n\n" +
+    "Stop reason: " +
+    result.stopReason +
+    "\n" +
+    "Iterations: " +
+    result.iterations +
+    "\n" +
+    (result.runId ? `Run ID: ${result.runId}\n` : "");
   writeFileSync(join(stepWorkDir, "result.md"), content);
 }
 
@@ -185,22 +301,37 @@ function nextChainRunId(projectDir: string, cfg: config.Config): string {
     const journalFile = config.resolveJournalFile(projectDir);
     const lines = readLines(journalFile);
     const count = lines.filter((l) => extractTopic(l) === "chain.start").length;
-    return "chain-" + (count + 1);
+    return `chain-${count + 1}`;
   }
   return generateCompactId("chain");
 }
 
-function appendChainEvent(journalFile: string, chainRunId: string, topic: string, fieldsJson: string): void {
+function appendChainEvent(
+  journalFile: string,
+  chainRunId: string,
+  topic: string,
+  fieldsJson: string,
+): void {
   const line =
-    "{" + jsonField("chain_run", chainRunId) + ", " +
-    jsonField("topic", topic) + ', "fields": {' + fieldsJson + "}}\n";
+    "{" +
+    jsonField("chain_run", chainRunId) +
+    ", " +
+    jsonField("topic", topic) +
+    ', "fields": {' +
+    fieldsJson +
+    "}}\n";
   appendText(journalFile, line);
 }
 
 function loadChainTracker(projectDir: string): ChainTracker {
   const journalFile = config.resolveJournalFile(projectDir);
   const lines = readLines(journalFile);
-  const tracker: ChainTracker = { depth: 0, totalSteps: 0, children: 0, consecutiveFailures: 0 };
+  const tracker: ChainTracker = {
+    depth: 0,
+    totalSteps: 0,
+    children: 0,
+    consecutiveFailures: 0,
+  };
 
   for (const line of lines) {
     const topic = extractTopic(line);
@@ -219,10 +350,16 @@ function loadChainTracker(projectDir: string): ChainTracker {
   return tracker;
 }
 
-function checkQualityGate(projectDir: string): { ok: boolean; reason?: string } {
+function checkQualityGate(projectDir: string): {
+  ok: boolean;
+  reason?: string;
+} {
   const tracker = loadChainTracker(projectDir);
   if (tracker.consecutiveFailures >= 2) {
-    return { ok: false, reason: `quality gate: ${tracker.consecutiveFailures} consecutive failures — consolidate before spawning` };
+    return {
+      ok: false,
+      reason: `quality gate: ${tracker.consecutiveFailures} consecutive failures — consolidate before spawning`,
+    };
   }
   return { ok: true };
 }
@@ -233,7 +370,13 @@ function executeDynamicChain(
   selfCommand: string,
   runOptions: harness.RunOptions,
   parentId: string,
-): { outcome: string; chainId: string; completed?: StepRecord[]; failedStep?: number; failedReason?: string } {
+): {
+  outcome: string;
+  chainId: string;
+  completed?: StepRecord[];
+  failedStep?: number;
+  failedReason?: string;
+} {
   const chainId = writeDynamicSpec(projectDir, { ...spec, parentId });
   const stepsCsv = spec.steps;
   const journalFile = config.resolveJournalFile(projectDir);
@@ -244,9 +387,12 @@ function executeDynamicChain(
     chainId,
     "chain.spawn",
     jsonField("chain_id", chainId) +
-      ", " + jsonField("parent_id", parentId) +
-      ", " + jsonField("steps", joinCsv(stepsCsv)) +
-      ", " + jsonField("justification", justification),
+      ", " +
+      jsonField("parent_id", parentId) +
+      ", " +
+      jsonField("steps", joinCsv(stepsCsv)) +
+      ", " +
+      jsonField("justification", justification),
   );
 
   const chainSpec = parseInlineChain(joinCsv(stepsCsv), projectDir);
@@ -260,11 +406,19 @@ function countDynamicSpecs(specsDir: string): number {
   return readdirSync(specsDir).filter((f) => f.endsWith(".json")).length;
 }
 
-function renderDynamicSpecJson(spec: DynamicChainSpec, chainId: string): string {
-  return "{" +
-    jsonField("chain_id", chainId) + ", " +
-    jsonField("parent_id", spec.parentId ?? "") + ", " +
-    jsonField("steps", joinCsv(spec.steps)) + ", " +
+function renderDynamicSpecJson(
+  spec: DynamicChainSpec,
+  chainId: string,
+): string {
+  return (
+    "{" +
+    jsonField("chain_id", chainId) +
+    ", " +
+    jsonField("parent_id", spec.parentId ?? "") +
+    ", " +
+    jsonField("steps", joinCsv(spec.steps)) +
+    ", " +
     jsonField("justification", spec.justification ?? "") +
-    "}\n";
+    "}\n"
+  );
 }

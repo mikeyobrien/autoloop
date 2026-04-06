@@ -1,6 +1,12 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
-import { ensureBuild, makeTempProject, runCli, inspectCli, FIXTURES_DIR } from "../helpers/runtime.js";
+import { beforeAll, describe, expect, it } from "vitest";
+import {
+  ensureBuild,
+  FIXTURES_DIR,
+  inspectCli,
+  makeTempProject,
+  runCli,
+} from "../helpers/runtime.js";
 
 beforeAll(() => {
   ensureBuild();
@@ -15,9 +21,19 @@ describe("integration: inspect artifact formats", () => {
     });
     expect(res.status).toBe(0);
 
-    const csv = inspectCli(["inspect", "metrics", "--format", "csv"], {}, project);
-    const json = inspectCli(["inspect", "metrics", "--format", "json"], {}, project);
-    expect(csv).toContain("iteration,role,event,elapsed_s,exit_code,timed_out,outcome");
+    const csv = inspectCli(
+      ["inspect", "metrics", "--format", "csv"],
+      {},
+      project,
+    );
+    const json = inspectCli(
+      ["inspect", "metrics", "--format", "json"],
+      {},
+      project,
+    );
+    expect(csv).toContain(
+      "iteration,role,event,elapsed_s,exit_code,timed_out,outcome",
+    );
     expect(json.trim().startsWith("[")).toBe(true);
   });
 });

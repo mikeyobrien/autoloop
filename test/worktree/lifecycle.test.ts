@@ -1,12 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createWorktree } from "../../src/worktree/create.js";
-import { readMeta, updateStatus } from "../../src/worktree/meta.js";
-import { mergeWorktree } from "../../src/worktree/merge.js";
+import { describe, expect, it } from "vitest";
 import { cleanWorktrees } from "../../src/worktree/clean.js";
+import { createWorktree } from "../../src/worktree/create.js";
+import { mergeWorktree } from "../../src/worktree/merge.js";
+import { readMeta, updateStatus } from "../../src/worktree/meta.js";
 
 const GIT_ENV = {
   ...process.env,
@@ -26,7 +26,12 @@ function makeGitRepo(): string {
   return dir;
 }
 
-function addFileAndCommit(dir: string, name: string, content: string, message: string): void {
+function addFileAndCommit(
+  dir: string,
+  name: string,
+  content: string,
+  message: string,
+): void {
   writeFileSync(join(dir, name), content);
   execSync(`git add ${name} && git commit -m '${message}'`, {
     cwd: dir,
@@ -48,7 +53,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     });
 
     const meta = readMeta(wt.metaDir);
-    expect(meta!.merge_strategy).toBe("rebase");
+    expect(meta?.merge_strategy).toBe("rebase");
   });
 
   it("automerge + cleanup on_success: merges then cleans on success", () => {
@@ -99,7 +104,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     // Verify worktree still exists
     expect(existsSync(wt.worktreePath)).toBe(true);
     const meta = readMeta(wt.metaDir);
-    expect(meta!.status).toBe("completed");
+    expect(meta?.status).toBe("completed");
   });
 
   it("cleanup never: worktree preserved even on success", () => {

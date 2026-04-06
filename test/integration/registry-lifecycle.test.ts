@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
+import { readRegistry } from "../../src/registry/read.js";
 import {
   ensureBuild,
-  makeTempProject,
-  runCli,
-  pathExists,
   FIXTURES_DIR,
+  makeTempProject,
+  pathExists,
+  runCli,
 } from "../helpers/runtime.js";
-import { readRegistry } from "../../src/registry/read.js";
 
 beforeAll(() => {
   ensureBuild();
@@ -42,7 +42,7 @@ describe("integration: registry lifecycle", () => {
   it("records failed status when backend exits non-zero", () => {
     const project = makeTempProject("registry-fail");
     const fixture = join(FIXTURES_DIR, "non-zero-exit.json");
-    const res = runCli(["run", project, "fail test"], {
+    const _res = runCli(["run", project, "fail test"], {
       MOCK_FIXTURE_PATH: fixture,
     });
 

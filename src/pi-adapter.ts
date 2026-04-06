@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { shellWords } from "./utils.js";
 
 const BRIDGE_SCRIPT = `
@@ -161,7 +161,7 @@ export function run(args: string[]): void {
 }
 
 function resolvePrompt(): string {
-  const envPrompt = process.env["AUTOLOOP_PROMPT"];
+  const envPrompt = process.env.AUTOLOOP_PROMPT;
   if (envPrompt) return envPrompt;
 
   const pathPrompt = promptFromPath();
@@ -171,8 +171,8 @@ function resolvePrompt(): string {
 }
 
 function projectedPrompt(): string {
-  const bin = process.env["AUTOLOOP_BIN"] || "";
-  const iteration = process.env["AUTOLOOP_ITERATION"] || "";
+  const bin = process.env.AUTOLOOP_BIN || "";
+  const iteration = process.env.AUTOLOOP_ITERATION || "";
   if (!bin || !iteration) return "";
 
   try {
@@ -187,7 +187,7 @@ function projectedPrompt(): string {
 }
 
 function promptFromPath(): string {
-  const path = process.env["AUTOLOOP_PROMPT_PATH"] || "";
+  const path = process.env.AUTOLOOP_PROMPT_PATH || "";
   if (!path || !existsSync(path)) return "";
   return readFileSync(path, "utf-8");
 }
@@ -215,7 +215,7 @@ function materializePromptPath(prompt: string): string {
 }
 
 function promptStoragePath(): string {
-  const configured = process.env["AUTOLOOP_PROMPT_PATH"] || "";
+  const configured = process.env.AUTOLOOP_PROMPT_PATH || "";
   return configured || "/tmp/autoloop-pi-adapter-prompt.md";
 }
 

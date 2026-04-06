@@ -11,7 +11,7 @@ export function renderRunLine(r: RunRecord): string {
     r.status.padEnd(10),
     r.preset.padEnd(14),
     (r.isolation_mode || "shared").padEnd(12),
-    ("iter:" + r.iteration).padEnd(8),
+    `iter:${r.iteration}`.padEnd(8),
     r.latest_event.padEnd(18),
     formatTime(r.created_at).padEnd(18),
     formatTime(r.updated_at),
@@ -76,25 +76,25 @@ export function renderListHeader(): string {
 }
 
 function field(label: string, value: string): string {
-  return (label + ":").padEnd(12) + value;
+  return `${label}:`.padEnd(12) + value;
 }
 
 function shortRunId(id: string): string {
   // run-abc12345-xyz0 → keep full id but it's already short enough
   // If run IDs are long, truncate to 16 chars
   if (id.length <= 24) return id;
-  return id.slice(0, 22) + "..";
+  return `${id.slice(0, 22)}..`;
 }
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
-  return s.slice(0, max - 3) + "...";
+  return `${s.slice(0, max - 3)}...`;
 }
 
 export function formatTime(iso: string): string {
   if (!iso) return "-";
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
+  if (Number.isNaN(d.getTime())) return iso;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
