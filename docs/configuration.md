@@ -126,7 +126,7 @@ parallel.branch_timeout_ms = 180000
 | `core.memory_file` | string | `".autoloop/memory.jsonl"` | Path to the memory file. |
 | `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. Still accepted; prefer `journal_file`. |
 | `core.log_level` | string | `"info"` | Log verbosity. Valid levels: `debug`, `info`, `warn`, `error`, `none`. Overridden by `-v`/`--verbose` (sets `debug`). Exported as `AUTOLOOP_LOG_LEVEL`. |
-| `core.run_id_format` | string | `"compact"` | Run ID format: `"compact"` for timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
+| `core.run_id_format` | string | `"human"` | Run ID format: `"human"` for readable `<word>-<word>` ids, `"compact"` for legacy timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
 
 ## Full example
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   generateCompactId,
+  generateReadableId,
   isQuoted,
   joinCsv,
   joinLines,
@@ -9,6 +10,7 @@ import {
   listText,
   nonemptyOr,
   parseStringList,
+  readableIdCapacity,
   replaceAll,
   shellQuote,
   shellWords,
@@ -170,5 +172,21 @@ describe("generateCompactId", () => {
       Array.from({ length: 20 }, () => generateCompactId("x")),
     );
     expect(ids.size).toBe(20);
+  });
+});
+
+describe("generateReadableId", () => {
+  it("returns a simple adjective-noun pair", () => {
+    const id = generateReadableId();
+    expect(id).toMatch(/^[a-z]+-[a-z]+$/);
+  });
+
+  it("keeps ids short", () => {
+    const id = generateReadableId();
+    expect(id.length).toBeLessThanOrEqual(15);
+  });
+
+  it("offers a large readable id space", () => {
+    expect(readableIdCapacity()).toBeGreaterThanOrEqual(10000);
   });
 });

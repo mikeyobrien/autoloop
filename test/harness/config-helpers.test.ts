@@ -142,6 +142,28 @@ describe("buildLoopContext", () => {
     // noWorktree overrides config, so still shared
     expect(loop.runtime.isolationMode).toBe("shared");
   });
+
+  it("defaults run ids to human-readable word pairs", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.runId).toMatch(/^[a-z]+-[a-z]+$/);
+  });
+
+  it("keeps legacy compact run ids when configured", () => {
+    const projectDir = makeProject(
+      ["event_loop.max_iterations = 1", 'core.run_id_format = "compact"'].join(
+        "\n",
+      ),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.runId).toMatch(/^run-[0-9a-z]+-[0-9a-f]{4}$/);
+  });
 });
 
 describe("buildLoopContext run-scoped isolation", () => {
