@@ -168,15 +168,18 @@ function renderMaterialized(memory: MaterializedMemory): string {
 
 function renderPreferences(entries: string[]): string {
   if (entries.length === 0) return "";
-  const items = entries.map(
-    (e) =>
+  const items = entries.map((e) => {
+    const created = extractField(e, "created");
+    return (
       "[" +
       extractField(e, "id") +
       "] [" +
       extractField(e, "category") +
       "] " +
-      extractField(e, "text"),
-  );
+      extractField(e, "text") +
+      (created ? " (created: " + created + ")" : "")
+    );
+  });
   return "Preferences:\n" + bulletList(items) + "\n";
 }
 
@@ -185,22 +188,29 @@ function renderLearnings(entries: string[]): string {
   const items = entries.map((e) => {
     const source = extractField(e, "source");
     const prefix = source ? "(" + source + ") " : "";
-    return "[" + extractField(e, "id") + "] " + prefix + extractField(e, "text");
+    const created = extractField(e, "created");
+    return (
+      "[" + extractField(e, "id") + "] " + prefix + extractField(e, "text") +
+      (created ? " (created: " + created + ")" : "")
+    );
   });
   return "Learnings:\n" + bulletList(items) + "\n";
 }
 
 function renderMeta(entries: string[]): string {
   if (entries.length === 0) return "";
-  const items = entries.map(
-    (e) =>
+  const items = entries.map((e) => {
+    const created = extractField(e, "created");
+    return (
       "[" +
       extractField(e, "id") +
       "] " +
       extractField(e, "key") +
       ": " +
-      extractField(e, "value"),
-  );
+      extractField(e, "value") +
+      (created ? " (created: " + created + ")" : "")
+    );
+  });
   return "Meta:\n" + bulletList(items) + "\n";
 }
 
