@@ -49,14 +49,13 @@ export function dispatchInspect(args: string[]): boolean {
       harness.renderCoordinationFormat(projectDir, format, spec.run);
       return true;
     case "metrics":
-      if (selector) harness.renderMetricsForRun(projectDir, selector, format);
-      else harness.renderMetrics(projectDir, format, spec.run);
+      harness.renderMetrics(projectDir, format, selector || spec.run);
       return true;
     case "chain":
       console.log(chains.renderChainState(projectDir));
       return true;
     case "topology":
-      topo.renderTopologyInspect(projectDir, format, spec.run);
+      topo.renderTopologyInspect(projectDir, format);
       return true;
     case "profiles":
       renderProfilesInspect(projectDir);
@@ -70,14 +69,13 @@ export function dispatchInspect(args: string[]): boolean {
       harness.renderOutput(projectDir, selector, spec.run);
       return true;
     default: {
-      const validTargets = INSPECT_TARGETS;
-      const suggestion = findClosestTarget(artifact, validTargets);
+      const suggestion = findClosestTarget(artifact, INSPECT_TARGETS);
       console.log("Unknown inspect target `" + artifact + "`.");
       if (suggestion) {
         console.log("Did you mean `" + suggestion + "`?");
       }
       console.log("");
-      console.log("Valid targets: " + validTargets.join(", "));
+      console.log("Valid targets: " + INSPECT_TARGETS.join(", "));
       return true;
     }
   }

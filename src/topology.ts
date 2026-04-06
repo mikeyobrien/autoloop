@@ -269,7 +269,7 @@ export function validateTopology(topology: Topology): TopologyWarning[] {
   return warnings;
 }
 
-export function renderTopologyInspect(projectDir: string, format: string, _runId?: string): void {
+export function renderTopologyInspect(projectDir: string, format: string): void {
   const topology = loadTopology(projectDir);
 
   if (topology.roles.length === 0) {
@@ -310,7 +310,7 @@ function renderTopologyGraph(topology: Topology): void {
   const lines: string[] = [];
   for (const role of topology.roles) {
     for (const event of role.emits) {
-      const targets = resolveEventTargets(topology, event);
+      const targets = collectMatchingRoles(topology, event);
       if (event === topology.completion) {
         lines.push(`[${role.id}] --${event}--> (done)`);
       } else if (targets.length > 0) {
@@ -321,18 +321,6 @@ function renderTopologyGraph(topology: Topology): void {
     }
   }
   console.log(lines.join("\n"));
-}
-
-function resolveEventTargets(topology: Topology, event: string): string[] {
-  const targets: string[] = [];
-  for (const key of topology.handoffKeys) {
-    if (eventMatchesPattern(event, key)) {
-      for (const t of topology.handoff[key] ?? []) {
-        if (!targets.includes(t)) targets.push(t);
-      }
-    }
-  }
-  return targets;
 }
 
 function renderTopologyTerminal(topology: Topology): void {

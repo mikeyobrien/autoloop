@@ -10,7 +10,6 @@ vi.mock("../../src/harness/index.js", () => ({
   renderScratchpadFormat: vi.fn(),
   renderCoordinationFormat: vi.fn(),
   renderMetrics: vi.fn(),
-  renderMetricsForRun: vi.fn(),
   renderPromptFormat: vi.fn(),
   renderOutput: vi.fn(),
 }));
@@ -86,28 +85,28 @@ describe("dispatchInspect topology", () => {
   it("dispatches 'inspect topology' to renderTopologyInspect", () => {
     dispatchInspect(["topology"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "terminal", undefined,
+      expect.any(String), "terminal",
     );
   });
 
   it("dispatches 'inspect topology --format graph'", () => {
     dispatchInspect(["topology", "--format", "graph"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "graph", undefined,
+      expect.any(String), "graph",
     );
   });
 
   it("dispatches 'inspect topology --format json'", () => {
     dispatchInspect(["topology", "--format", "json"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "json", undefined,
+      expect.any(String), "json",
     );
   });
 
-  it("dispatches 'inspect topology --run <id>'", () => {
+  it("dispatches 'inspect topology --run <id>' (run ignored, topology is static)", () => {
     dispatchInspect(["topology", "--run", "run-abc"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "terminal", "run-abc",
+      expect.any(String), "terminal",
     );
   });
 });

@@ -37,7 +37,6 @@ import {
   renderOutput,
   renderCoordinationFormat,
   renderMetrics,
-  renderMetricsForRun,
 } from "../../src/harness/index.js";
 
 function journalLine(
@@ -123,11 +122,11 @@ describe("inspect projection surfaces with --run for run-scoped journals", () =>
     spy.mockRestore();
   });
 
-  it("renderMetricsForRun reads from run-scoped journal", () => {
+  it("renderMetrics with explicit runId reads from run-scoped journal", () => {
     const runId = "run-scoped-6";
     setupRunScopedJournal(runId);
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
-    renderMetricsForRun(tmpDir, runId, "terminal");
+    renderMetrics(tmpDir, "terminal", runId);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });

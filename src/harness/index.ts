@@ -208,17 +208,6 @@ export function renderMetrics(
   printProjectedText(formatMetrics(rows, format), format);
 }
 
-export function renderMetricsForRun(
-  projectDir: string,
-  runId: string,
-  format: string,
-): void {
-  const { journalFile } = resolveJournalAndRun(projectDir, runId);
-  const lines = readRunLines(journalFile, runId);
-  const rows = collectMetricsRows(lines);
-  printProjectedText(formatMetrics(rows, format), format);
-}
-
 export function runParallelBranchCli(
   projectDir: string,
   branchDir: string,
