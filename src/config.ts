@@ -26,6 +26,11 @@ export function userConfigPath(): string {
   return join(xdgHome, "autoloop", "config.toml");
 }
 
+export function userPresetsDir(): string {
+  const xdgHome = process.env["XDG_CONFIG_HOME"] || join(homedir(), ".config");
+  return join(xdgHome, "autoloop", "presets");
+}
+
 export function hasUserConfig(): boolean {
   return existsSync(userConfigPath());
 }
@@ -231,6 +236,8 @@ function resolveBundledPresetDir(name: string, bundleRoot: string): string {
   if (projectHasConfig(bundleCandidate)) return bundleCandidate;
   const cwdCandidate = join(".", `presets/${name}`);
   if (projectHasConfig(cwdCandidate)) return cwdCandidate;
+  const userCandidate = join(userPresetsDir(), name);
+  if (projectHasConfig(userCandidate)) return userCandidate;
   return "";
 }
 
