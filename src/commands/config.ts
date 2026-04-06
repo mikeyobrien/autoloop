@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import * as config from "../config.js";
-import { get } from "../config.js";
+
 
 export function dispatchConfig(args: string[]): boolean {
   const sub = args[0] ?? "";
@@ -52,8 +52,7 @@ function configShow(args: string[]): boolean {
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
         const dotPath = section + "." + k;
         const source = provenance[dotPath] ?? "default";
-        const pad = "  ";
-        console.log(pad + k + " = " + JSON.stringify(String(v)) + "    # " + source);
+        console.log("  " + k + " = " + JSON.stringify(String(v)) + "    # " + source);
       }
     } else {
       const source = provenance[section] ?? "default";

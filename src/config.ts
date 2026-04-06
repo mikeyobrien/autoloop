@@ -180,10 +180,6 @@ export function resolveJournalFileIn(
   return join(workDir, journalPath(config));
 }
 
-export function resolveEventsFile(projectDir: string): string {
-  return resolveJournalFile(projectDir);
-}
-
 export function resolveMemoryFile(projectDir: string): string {
   const config = loadProject(projectDir);
   return join(
