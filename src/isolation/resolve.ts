@@ -9,6 +9,7 @@ export interface IsolationRequest {
   worktree?: boolean;
   noWorktree?: boolean;
   configEnabled?: boolean;
+  currentCategory?: PresetCategory;
 }
 
 export interface IsolationResult {
@@ -49,6 +50,13 @@ export function resolveIsolationMode(
   }
 
   const hasCodeRuns = otherActiveRuns.some((r) => isCodeModifyingRun(r));
+
+  // Planning/read-only presets are safe to run concurrently — no warning needed
+  if (request.currentCategory === "planning") {
+    return { mode: "run-scoped" };
+  }
+
+  // Code or unknown presets warn when concurrent code-modifying runs exist
   if (hasCodeRuns) {
     return {
       mode: "run-scoped",

@@ -78,6 +78,42 @@ describe("resolveIsolationMode", () => {
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toBeUndefined();
   });
+
+  it("planning preset + code-modifying active run → run-scoped, no warning", () => {
+    const result = resolveIsolationMode(
+      { currentCategory: "planning" },
+      [makeRecord({ preset: "autocode" })],
+    );
+    expect(result.mode).toBe("run-scoped");
+    expect(result.warning).toBeUndefined();
+  });
+
+  it("code preset + code-modifying active run → run-scoped, warning", () => {
+    const result = resolveIsolationMode(
+      { currentCategory: "code" },
+      [makeRecord({ preset: "autocode" })],
+    );
+    expect(result.mode).toBe("run-scoped");
+    expect(result.warning).toContain("code-modifying");
+  });
+
+  it("planning preset + non-code active run → run-scoped, no warning", () => {
+    const result = resolveIsolationMode(
+      { currentCategory: "planning" },
+      [makeRecord({ preset: "diagnostics", objective: "check logs" })],
+    );
+    expect(result.mode).toBe("run-scoped");
+    expect(result.warning).toBeUndefined();
+  });
+
+  it("unknown preset + code-modifying active run → run-scoped, warning", () => {
+    const result = resolveIsolationMode(
+      { currentCategory: "unknown" },
+      [makeRecord({ preset: "autocode" })],
+    );
+    expect(result.mode).toBe("run-scoped");
+    expect(result.warning).toContain("code-modifying");
+  });
 });
 
 describe("isCodeModifyingRun", () => {

@@ -13,7 +13,7 @@ import {
   latestRunId,
 } from "./journal.js";
 import { emitToolScript, piAdapterScript } from "./tools.js";
-import { resolveIsolationMode } from "../isolation/resolve.js";
+import { resolveIsolationMode, presetCategory } from "../isolation/resolve.js";
 import { createRunScopedDir, runScopedPath } from "../isolation/run-scope.js";
 import { createWorktree } from "../worktree/create.js";
 import { metaDirForRun } from "../worktree/meta.js";
@@ -175,8 +175,10 @@ export function buildLoopContext(
   const configIsolationEnabled =
     config.get(cfg, "worktree.enabled", "") === "true" ||
     config.get(cfg, "isolation.enabled", "false") === "true";
+  const currentPresetName = basename(resolvedProjectDir);
+  const currentCat = presetCategory(currentPresetName, resolvedProjectDir);
   const isolation = resolveIsolationMode(
-    { worktree: runOptions.worktree, noWorktree: runOptions.noWorktree, configEnabled: configIsolationEnabled },
+    { worktree: runOptions.worktree, noWorktree: runOptions.noWorktree, configEnabled: configIsolationEnabled, currentCategory: currentCat },
     otherActive,
   );
   if (isolation.warning) {

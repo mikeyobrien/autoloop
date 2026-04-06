@@ -238,7 +238,14 @@ function runInlineChain(
     console.log("Known presets: " + joinCsv(chains.listKnownPresets()));
     return;
   }
-  chains.runChain(chainSpec, projectDir, selfCmd, { prompt: normalizePrompt(options.prompt) });
+  chains.runChain(chainSpec, projectDir, selfCmd, {
+    prompt: normalizePrompt(options.prompt),
+    worktree: options.worktree || undefined,
+    noWorktree: options.noWorktree || undefined,
+    mergeStrategy: options.mergeStrategy,
+    automerge: options.automerge || undefined,
+    keepWorktree: options.keepWorktree || undefined,
+  });
 }
 
 function normalizePrompt(prompt: string | null): string | null {
