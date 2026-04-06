@@ -55,13 +55,14 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .event-item { font-size: 0.75rem; font-family: monospace; padding: 0.2rem 0; border-bottom: 1px solid var(--border); word-break: break-all; }
 .event-item summary { cursor: pointer; }
 .event-item.ev-system { border-left: 3px solid var(--muted); padding-left: 0.4rem; }
+.event-item.ev-backend { border-left: 3px solid var(--muted); padding-left: 0.4rem; }
 .event-item.ev-error { border-left: 3px solid var(--failed); padding-left: 0.4rem; background: rgba(220,38,38,0.05); }
 .event-item.ev-coordination { border-left: 3px solid var(--active); padding-left: 0.4rem; }
 .event-item.ev-completion { border-left: 3px solid var(--completed); padding-left: 0.4rem; }
 .event-item.ev-highlight { border-left-color: var(--active); }
-.event-item.ev-system summary { opacity: 0.6; }
+.event-item.ev-backend summary { opacity: 0.6; }
 .event-item.ev-highlight summary { opacity: 1; }
-.event-item.ev-system:hover summary { opacity: 1; }
+.event-item.ev-backend:hover summary { opacity: 1; }
 .event-field { margin: 0.15rem 0; font-size: 0.7rem; }
 .event-field strong { color: var(--muted); margin-right: 0.3rem; }
 .event-field pre { display: inline; white-space: pre-wrap; }
@@ -186,8 +187,11 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
     </div>
   </template>
   <div class="events-list">
-    <h3>Events</h3>
-    <template x-for="(ev, idx) in selectedRunEvents" :key="idx">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Events</h3>
+      <label style="font-size:0.75rem;cursor:pointer"><input type="checkbox" x-model="showVerbose" style="margin-right:0.3rem">Show backend events</label>
+    </div>
+    <template x-for="(ev, idx) in visibleRunEvents()" :key="idx">
       <details :class="eventClasses(ev)">
         <summary x-text="eventSummary(ev)"></summary>
         <div style="padding:0.3rem">
@@ -295,7 +299,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
         </div>
       </details>
     </template>
-    <p class="empty" x-show="selectedRunEvents.length === 0">No events</p>
+    <p class="empty" x-show="visibleRunEvents().length === 0">No events</p>
   </div>
 </div>
 
@@ -314,6 +318,7 @@ function dashboard() {
     lastUpdated: null,
     sectionOpen: { active: false, watching: false, stuck: false, failed: false, completed: false },
     sectionUserToggled: {},
+    showVerbose: false,
 
     get categories() {
       return [
@@ -625,11 +630,21 @@ function dashboard() {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
 
+    visibleRunEvents() {
+      return this.selectedRunEvents.filter(ev => this.showVerbose || !this.isBackendEvent(ev));
+    },
+
+    isBackendEvent(ev) {
+      const t = String(ev?.topic || '');
+      return t.startsWith('backend.');
+    },
+
     eventCategory(ev) {
       const t = ev.topic || '';
       if (['event.invalid','wave.timeout','wave.failed','loop.stop'].includes(t)) return 'ev-error';
       if (t === 'task.complete' || t === 'loop.complete') return 'ev-completion';
-      if (t.startsWith('iteration.') || t.startsWith('backend.')) return 'ev-system';
+      if (t.startsWith('backend.')) return 'ev-backend';
+      if (t.startsWith('iteration.')) return 'ev-system';
       return 'ev-coordination';
     },
 
@@ -668,6 +683,7 @@ function dashboard() {
         if (f.exit_code !== undefined) hint.push('exit=' + f.exit_code);
         if (f.timed_out === 'true' || f.timed_out === true) hint.push('TIMEOUT');
         if (f.elapsed_s !== undefined) hint.push(f.elapsed_s + 's');
+        if (f.output) hint.push(String(f.output).replace(/\\s+/g, ' ').trim().slice(0, 80));
         if (hint.length) parts.push('\\u2014 ' + hint.join(' '));
       } else if (ev.payload) {
         parts.push('\\u2014 ' + String(ev.payload).slice(0, 60));

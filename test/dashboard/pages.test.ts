@@ -235,6 +235,42 @@ describe("worktree merged badge and detail", () => {
   });
 });
 
+describe("backend event verbose toggle", () => {
+  it("initializes showVerbose state and renders backend-event toggle", () => {
+    const html = htmlShell();
+    expect(html).toContain("showVerbose: false");
+    expect(html).toContain('x-model="showVerbose"');
+    expect(html).toContain("Show backend events");
+  });
+
+  it("filters visible events using backend-only helper", () => {
+    const html = htmlShell();
+    expect(html).toContain("visibleRunEvents()");
+    expect(html).toContain("showVerbose || !this.isBackendEvent(ev)");
+    expect(html).toContain("return t.startsWith('backend.')");
+    expect(html).not.toContain(
+      "isBackendEvent(ev) {\n      const t = String(ev?.topic || '');\n      return t.startsWith('iteration.')",
+    );
+  });
+
+  it("keeps iteration events visible while backend events get their own dimmed class", () => {
+    const html = htmlShell();
+    expect(html).toContain(
+      "if (t.startsWith('backend.')) return 'ev-backend';",
+    );
+    expect(html).toContain(
+      "if (t.startsWith('iteration.')) return 'ev-system';",
+    );
+    expect(html).toContain(".event-item.ev-backend summary { opacity: 0.6; }");
+  });
+
+  it("adds output preview to finish-event summaries", () => {
+    const html = htmlShell();
+    expect(html).toContain("if (f.output) hint.push(String(f.output)");
+    expect(html).toContain(".slice(0, 80)");
+  });
+});
+
 describe("section open/close state preservation", () => {
   it("uses sectionOpen state instead of hardcoded :open binding", () => {
     const html = htmlShell();
