@@ -28,7 +28,7 @@ function sampleMeta(overrides: Partial<WorktreeMeta> = {}): WorktreeMeta {
 describe("worktree list output", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    delete process.env["MINILOOPS_PROJECT_DIR"];
+    delete process.env["AUTOLOOP_PROJECT_DIR"];
   });
 
   it("renders BASE column in header and data rows", () => {
@@ -37,7 +37,7 @@ describe("worktree list output", () => {
     const metaDir = join(stateDir, "worktrees", "run-abc12345");
     writeMeta(metaDir, sampleMeta({ worktree_path: metaDir }));
 
-    process.env["MINILOOPS_PROJECT_DIR"] = projectDir;
+    process.env["AUTOLOOP_PROJECT_DIR"] = projectDir;
 
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => {
@@ -86,7 +86,7 @@ describe("worktree list output", () => {
       worktree_path: "/nonexistent",
     }));
 
-    process.env["MINILOOPS_PROJECT_DIR"] = projectDir;
+    process.env["AUTOLOOP_PROJECT_DIR"] = projectDir;
 
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => {

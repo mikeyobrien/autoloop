@@ -16,7 +16,7 @@ describe("integration: loops health", () => {
   it("shows all clear when no runs exist", () => {
     const project = makeTempProject("health-empty");
     const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(res.stdout.trim()).toBe("All clear. 0 active, 0 completed in last 24h.");
   });
@@ -27,7 +27,7 @@ describe("integration: loops health", () => {
     runCli(["run", project, "health completed test"], { MOCK_FIXTURE_PATH: fixture });
 
     const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(res.stdout).toContain("All clear.");
     expect(res.stdout).toContain("completed in last 24h.");
@@ -39,7 +39,7 @@ describe("integration: loops health", () => {
     runCli(["run", project, "health verbose test"], { MOCK_FIXTURE_PATH: fixture });
 
     const res = runCli(["loops", "health", "--verbose"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     // When healthy, --verbose doesn't change the one-liner
     expect(res.stdout).toContain("All clear.");
@@ -72,7 +72,7 @@ describe("integration: loops health", () => {
     writeFileSync(join(registryDir, "registry.jsonl"), record + "\n", "utf-8");
 
     const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(res.stdout).toContain("FAILED:");
     expect(res.stdout).toContain("run-test-failed-001");
@@ -107,7 +107,7 @@ describe("integration: loops health", () => {
     writeFileSync(join(registryDir, "registry.jsonl"), record + "\n", "utf-8");
 
     const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(res.stdout).toContain("STUCK:");
     expect(res.stdout).toContain("run-test-stuck-001");

@@ -135,25 +135,25 @@ export function runtimeEnvLines(
   reviewMode: string,
 ): string {
   let lines =
-    "export MINILOOPS_RUN_ID=" + shellQuote(loop.runtime.runId) + "\n" +
-    "export MINILOOPS_ITERATION=" + shellQuote(iteration) + "\n";
+    "export AUTOLOOP_RUN_ID=" + shellQuote(loop.runtime.runId) + "\n" +
+    "export AUTOLOOP_ITERATION=" + shellQuote(iteration) + "\n";
   if (reviewMode) {
-    lines += "export MINILOOPS_REVIEW_MODE=" + shellQuote(reviewMode) + "\n";
+    lines += "export AUTOLOOP_REVIEW_MODE=" + shellQuote(reviewMode) + "\n";
   }
   lines +=
-    "export MINILOOPS_LOG_LEVEL=" + shellQuote(loop.runtime.logLevel) + "\n" +
-    "export MINILOOPS_COMPLETION_PROMISE=" + shellQuote(loop.completion.promise) + "\n" +
-    "export MINILOOPS_COMPLETION_EVENT=" + shellQuote(loop.completion.event) + "\n" +
-    "export MINILOOPS_STATE_DIR=" + shellQuote(loop.paths.stateDir) + "\n" +
-    "export MINILOOPS_PROJECT_DIR=" + shellQuote(loop.paths.projectDir) + "\n" +
-    "export MINILOOPS_JOURNAL_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
-    "export MINILOOPS_EVENTS_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
-    "export MINILOOPS_MEMORY_FILE=" + shellQuote(loop.paths.memoryFile) + "\n" +
-    "export MINILOOPS_REQUIRED_EVENTS=" + shellQuote(joinCsv(loop.completion.requiredEvents)) + "\n" +
-    "export MINILOOPS_RECENT_EVENT=" + shellQuote(recentEvent) + "\n" +
-    "export MINILOOPS_ALLOWED_ROLES=" + shellQuote(allowedRoles) + "\n" +
-    "export MINILOOPS_ALLOWED_EVENTS=" + shellQuote(allowedEvents) + "\n" +
-    "export MINILOOPS_BIN=" + shellQuote(loop.paths.toolPath) + "\n";
+    "export AUTOLOOP_LOG_LEVEL=" + shellQuote(loop.runtime.logLevel) + "\n" +
+    "export AUTOLOOP_COMPLETION_PROMISE=" + shellQuote(loop.completion.promise) + "\n" +
+    "export AUTOLOOP_COMPLETION_EVENT=" + shellQuote(loop.completion.event) + "\n" +
+    "export AUTOLOOP_STATE_DIR=" + shellQuote(loop.paths.stateDir) + "\n" +
+    "export AUTOLOOP_PROJECT_DIR=" + shellQuote(loop.paths.projectDir) + "\n" +
+    "export AUTOLOOP_JOURNAL_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
+    "export AUTOLOOP_EVENTS_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
+    "export AUTOLOOP_MEMORY_FILE=" + shellQuote(loop.paths.memoryFile) + "\n" +
+    "export AUTOLOOP_REQUIRED_EVENTS=" + shellQuote(joinCsv(loop.completion.requiredEvents)) + "\n" +
+    "export AUTOLOOP_RECENT_EVENT=" + shellQuote(recentEvent) + "\n" +
+    "export AUTOLOOP_ALLOWED_ROLES=" + shellQuote(allowedRoles) + "\n" +
+    "export AUTOLOOP_ALLOWED_EVENTS=" + shellQuote(allowedEvents) + "\n" +
+    "export AUTOLOOP_BIN=" + shellQuote(loop.paths.toolPath) + "\n";
   return lines;
 }
 

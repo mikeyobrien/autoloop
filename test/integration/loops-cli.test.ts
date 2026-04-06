@@ -32,7 +32,7 @@ describe("integration: loops command", () => {
 
     // Now list all runs
     const res = runCli(["loops", "--all"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(res.stdout).toContain("completed");
     expect(res.stdout).toContain("RUN ID");
@@ -45,7 +45,7 @@ describe("integration: loops command", () => {
     runCli(["run", project, "active test"], { MOCK_FIXTURE_PATH: fixture });
 
     const res = runCli(["loops"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     // Completed runs should not appear in the active list
     expect(res.stdout.trim()).toBe("No active runs.");
@@ -58,7 +58,7 @@ describe("integration: loops command", () => {
 
     // Get the run ID from --all listing
     const listRes = runCli(["loops", "--all"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
 
     // Extract a run ID from the output (first data line after header)
@@ -67,7 +67,7 @@ describe("integration: loops command", () => {
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
     const showRes = runCli(["loops", "show", runId], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(showRes.stdout).toContain("Run:");
     expect(showRes.stdout).toContain("Status:");
@@ -83,7 +83,7 @@ describe("integration: loops command", () => {
     runCli(["run", project, "partial match test"], { MOCK_FIXTURE_PATH: fixture });
 
     const listRes = runCli(["loops", "--all"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     const lines = listRes.stdout.trim().split("\n");
     const runId = lines[1].trim().split(/\s{2,}/)[0];
@@ -91,7 +91,7 @@ describe("integration: loops command", () => {
     const partial = runId.slice(0, 8);
 
     const showRes = runCli(["loops", "show", partial], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(showRes.stdout).toContain("Run:");
     expect(showRes.stdout).toContain(runId);
@@ -103,13 +103,13 @@ describe("integration: loops command", () => {
     runCli(["run", project, "artifacts test"], { MOCK_FIXTURE_PATH: fixture });
 
     const listRes = runCli(["loops", "--all"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     const lines = listRes.stdout.trim().split("\n");
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
     const artRes = runCli(["loops", "artifacts", runId], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(artRes.stdout).toContain("Journal:");
     expect(artRes.stdout).toContain("Registry:");
@@ -123,7 +123,7 @@ describe("integration: loops command", () => {
     runCli(["run", project, "not found test"], { MOCK_FIXTURE_PATH: fixture });
 
     const res = runCli(["loops", "show", "run-nonexistent-id"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(res.stdout).toContain("No run matching");
   });

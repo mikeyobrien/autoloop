@@ -19,14 +19,14 @@ describe("integration: loops watch", () => {
 
     // Get the run ID
     const listRes = runCli(["loops", "--all"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     const lines = listRes.stdout.trim().split("\n");
     expect(lines.length).toBeGreaterThanOrEqual(2);
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
     const watchRes = runCli(["loops", "watch", runId], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(watchRes.stdout).toContain("[watch] Run already completed.");
     expect(watchRes.stdout).toContain("Run:");
@@ -39,14 +39,14 @@ describe("integration: loops watch", () => {
     runCli(["run", project, "watch partial test"], { MOCK_FIXTURE_PATH: fixture });
 
     const listRes = runCli(["loops", "--all"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     const lines = listRes.stdout.trim().split("\n");
     const runId = lines[1].trim().split(/\s{2,}/)[0];
     const partial = runId.slice(0, 8);
 
     const watchRes = runCli(["loops", "watch", partial], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(watchRes.stdout).toContain("[watch] Run already completed.");
     expect(watchRes.stdout).toContain(runId);
@@ -58,7 +58,7 @@ describe("integration: loops watch", () => {
     runCli(["run", project, "watch notfound test"], { MOCK_FIXTURE_PATH: fixture });
 
     const watchRes = runCli(["loops", "watch", "run-nonexistent-id"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(watchRes.stdout).toContain("No run matching");
   });
@@ -76,14 +76,14 @@ describe("integration: loops watch", () => {
     runCli(["run", project, "watch failed test"], { MOCK_FIXTURE_PATH: fixture });
 
     const listRes = runCli(["loops", "--all"], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     const lines = listRes.stdout.trim().split("\n");
     if (lines.length < 2) return; // no runs registered
     const runId = lines[1].trim().split(/\s{2,}/)[0];
 
     const watchRes = runCli(["loops", "watch", runId], {
-      MINILOOPS_PROJECT_DIR: project,
+      AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(watchRes.stdout).toContain("[watch] Run already");
     expect(watchRes.stdout).toContain("Run:");

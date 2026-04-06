@@ -52,7 +52,7 @@ function inferCwd(args: string[]): string {
 function cleanEnv(env: Record<string, string>): Record<string, string | undefined> {
   const base: Record<string, string | undefined> = { ...process.env };
   for (const key of Object.keys(base)) {
-    if (key.startsWith("MINILOOPS_")) delete base[key];
+    if (key.startsWith("AUTOLOOP_")) delete base[key];
   }
   return { ...base, ...env };
 }

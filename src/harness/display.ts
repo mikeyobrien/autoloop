@@ -135,7 +135,7 @@ export function printFailureDiagnostic(output: string, stopReason: string): void
 }
 
 export function terminalWidth(): number {
-  const envWidth = parseInt(process.env["MINILOOPS_WIDTH"] ?? "", 10);
+  const envWidth = parseInt(process.env["AUTOLOOP_WIDTH"] ?? "", 10);
   if (envWidth > 0) return envWidth;
   const cols = parseInt(process.env["COLUMNS"] ?? "", 10);
   if (cols > 0) return cols;

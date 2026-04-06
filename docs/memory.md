@@ -194,7 +194,7 @@ autoloop inspect memory --format json   # raw JSONL content
 
 ## Environment
 
-The harness exports `MINILOOPS_MEMORY_FILE` into the backend process environment, containing the absolute path to the memory file. This allows subprocesses and scripts to read or append to memory directly.
+The harness exports `AUTOLOOP_MEMORY_FILE` into the backend process environment, containing the absolute path to the memory file. This allows subprocesses and scripts to read or append to memory directly.
 
 ## JSON encoding
 

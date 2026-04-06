@@ -50,5 +50,5 @@ function dispatchMemoryAdd(args: string[]): void {
 }
 
 function resolveRuntimeProjectDir(): string {
-  return process.env["MINILOOPS_PROJECT_DIR"] || ".";
+  return process.env["AUTOLOOP_PROJECT_DIR"] || ".";
 }

@@ -16,7 +16,7 @@ describe("backend runner", () => {
       prompt: "hello",
       runtimeEnv: "export X=1\n",
     });
-    expect(command).toContain("export MINILOOPS_PROMPT_PATH=");
+    expect(command).toContain("export AUTOLOOP_PROMPT_PATH=");
     expect(command).toContain("'echo' 'hello'");
   });
 

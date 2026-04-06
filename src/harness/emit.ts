@@ -218,25 +218,25 @@ function emitValidationContext(
     runId,
     iteration: resolveEmitIteration(journalFile, runId),
     recentEvent: emitRecentEvent(),
-    allowedRoles: envCsvList("MINILOOPS_ALLOWED_ROLES"),
-    allowedEvents: envCsvList("MINILOOPS_ALLOWED_EVENTS"),
+    allowedRoles: envCsvList("AUTOLOOP_ALLOWED_ROLES"),
+    allowedEvents: envCsvList("AUTOLOOP_ALLOWED_EVENTS"),
     parallelEnabled,
     completionEvent: compEvent,
   };
 }
 
 function resolveEmitRunId(journalFile: string): string {
-  const envValue = process.env["MINILOOPS_RUN_ID"];
+  const envValue = process.env["AUTOLOOP_RUN_ID"];
   return envValue || latestRunId(journalFile);
 }
 
 function resolveEmitIteration(journalFile: string, runId: string): string {
-  const envValue = process.env["MINILOOPS_ITERATION"];
+  const envValue = process.env["AUTOLOOP_ITERATION"];
   return envValue || latestIterationForRun(journalFile, runId);
 }
 
 function emitRecentEvent(): string {
-  return process.env["MINILOOPS_RECENT_EVENT"] || "loop.start";
+  return process.env["AUTOLOOP_RECENT_EVENT"] || "loop.start";
 }
 
 function envCsvList(name: string): string[] {
@@ -322,9 +322,9 @@ export function appendInvalidEvent(
 }
 
 export function resolveEmitJournalFile(projectDir: string): string {
-  const envJournal = process.env["MINILOOPS_JOURNAL_FILE"];
+  const envJournal = process.env["AUTOLOOP_JOURNAL_FILE"];
   if (envJournal) return envJournal;
-  const envEvents = process.env["MINILOOPS_EVENTS_FILE"];
+  const envEvents = process.env["AUTOLOOP_EVENTS_FILE"];
   if (envEvents) return envEvents;
   return config.resolveJournalFile(projectDir);
 }

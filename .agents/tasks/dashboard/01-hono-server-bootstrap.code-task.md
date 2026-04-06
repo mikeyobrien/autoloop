@@ -45,7 +45,7 @@ export function dispatchDashboard(
 ): void {
   const port = parseFlag(args, "--port", 4800);
   const host = parseFlag(args, "--host", "127.0.0.1");
-  const projectDir = parseFlag(args, "--project-dir", process.env["MINILOOPS_PROJECT_DIR"] || ".");
+  const projectDir = parseFlag(args, "--project-dir", process.env["AUTOLOOP_PROJECT_DIR"] || ".");
 
   const app = createApp();
 

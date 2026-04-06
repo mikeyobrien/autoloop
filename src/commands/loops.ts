@@ -79,5 +79,5 @@ function printLoopsUsage(): void {
 }
 
 function resolveProjectDir(): string {
-  return process.env["MINILOOPS_PROJECT_DIR"] || ".";
+  return process.env["AUTOLOOP_PROJECT_DIR"] || ".";
 }

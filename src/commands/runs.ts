@@ -6,7 +6,7 @@ import { parseFlag } from "../utils.js";
 const DEFAULT_MAX_AGE_DAYS = 7;
 
 export function dispatchRuns(args: string[]): void {
-  const projectDir = process.env["MINILOOPS_PROJECT_DIR"] || ".";
+  const projectDir = process.env["AUTOLOOP_PROJECT_DIR"] || ".";
   const stateDir = join(projectDir, ".autoloop");
 
   const sub = args[0] ?? "";

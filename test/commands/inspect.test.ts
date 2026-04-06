@@ -50,7 +50,7 @@ describe("dispatchInspect journal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Set a fallback project dir
-    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+    process.env["AUTOLOOP_PROJECT_DIR"] = "/tmp/test-project";
   });
 
   it("dispatches 'inspect journal' to renderAllJournals", () => {
@@ -79,7 +79,7 @@ describe("dispatchInspect journal", () => {
 describe("dispatchInspect topology", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+    process.env["AUTOLOOP_PROJECT_DIR"] = "/tmp/test-project";
   });
 
   it("dispatches 'inspect topology' to renderTopologyInspect", () => {
@@ -114,7 +114,7 @@ describe("dispatchInspect topology", () => {
 describe("dispatchInspect catch-all error", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+    process.env["AUTOLOOP_PROJECT_DIR"] = "/tmp/test-project";
   });
 
   it("prints valid targets for unknown artifact", () => {

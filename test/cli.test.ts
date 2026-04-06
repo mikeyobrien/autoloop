@@ -12,7 +12,7 @@ function cli(...args: string[]): string {
     cwd: ROOT,
     encoding: "utf-8",
     timeout: 10_000,
-    env: { ...process.env, MINILOOPS_PROJECT_DIR: undefined },
+    env: { ...process.env, AUTOLOOP_PROJECT_DIR: undefined },
   });
 }
 

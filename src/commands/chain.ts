@@ -43,7 +43,7 @@ export function dispatchChain(args: string[], selfCmd: string): boolean {
 }
 
 function resolveRuntimeProjectDir(): string {
-  return process.env["MINILOOPS_PROJECT_DIR"] || ".";
+  return process.env["AUTOLOOP_PROJECT_DIR"] || ".";
 }
 
 function normalizePrompt(prompt: string | null): string | null {

@@ -141,7 +141,7 @@ export function iterationFieldForRun(
 }
 
 export function ensureRenderRunId(journalFile: string): string {
-  return process.env["MINILOOPS_RUN_ID"] || latestRunId(journalFile);
+  return process.env["AUTOLOOP_RUN_ID"] || latestRunId(journalFile);
 }
 
 export function absolutePath(path: string): string {

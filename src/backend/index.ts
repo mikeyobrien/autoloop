@@ -47,10 +47,10 @@ function promptRuntimeEnvLines(
 ): string {
   let lines =
     runtimeEnv +
-    "export MINILOOPS_PROMPT_PATH=" + shellQuote(promptPath) + "\n" +
+    "export AUTOLOOP_PROMPT_PATH=" + shellQuote(promptPath) + "\n" +
     "printf '%s' " + shellQuote(prompt) + " > " + shellQuote(promptPath) + "\n";
   if (spec.kind !== "pi") {
-    lines += "export MINILOOPS_PROMPT=" + shellQuote(prompt) + "\n";
+    lines += "export AUTOLOOP_PROMPT=" + shellQuote(prompt) + "\n";
   }
   return lines;
 }

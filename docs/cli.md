@@ -16,15 +16,15 @@ autoloop <subcommand> [args...]
 
 | Variable | Purpose |
 |----------|---------|
-| `MINILOOPS_PROJECT_DIR` | Override the project directory for subcommands that default to `.` |
-| `MINILOOPS_STATE_DIR` | State directory — used by the Pi adapter to write stream logs |
-| `MINILOOPS_ITERATION` | Current iteration number — set by the harness during runs |
-| `MINILOOPS_PROMPT` | Override the prompt sent to the backend |
-| `MINILOOPS_PROMPT_PATH` | Fallback prompt file path when `MINILOOPS_PROMPT` is unset |
-| `MINILOOPS_BIN` | Path to the autoloops binary — used by the Pi adapter for prompt projection |
-| `MINILOOPS_LOG_LEVEL` | Current log level — exported by the harness. One of `debug`, `info`, `warn`, `error`, `none`. |
-| `MINILOOPS_REVIEW_MODE` | Set to `metareview` during review turns — changes the Pi stream log prefix |
-| `MINILOOPS_MEMORY_FILE` | Exported by the harness so agents can locate the memory file |
+| `AUTOLOOP_PROJECT_DIR` | Override the project directory for subcommands that default to `.` |
+| `AUTOLOOP_STATE_DIR` | State directory — used by the Pi adapter to write stream logs |
+| `AUTOLOOP_ITERATION` | Current iteration number — set by the harness during runs |
+| `AUTOLOOP_PROMPT` | Override the prompt sent to the backend |
+| `AUTOLOOP_PROMPT_PATH` | Fallback prompt file path when `AUTOLOOP_PROMPT` is unset |
+| `AUTOLOOP_BIN` | Path to the autoloops binary — used by the Pi adapter for prompt projection |
+| `AUTOLOOP_LOG_LEVEL` | Current log level — exported by the harness. One of `debug`, `info`, `warn`, `error`, `none`. |
+| `AUTOLOOP_REVIEW_MODE` | Set to `metareview` during review turns — changes the Pi stream log prefix |
+| `AUTOLOOP_MEMORY_FILE` | Exported by the harness so agents can locate the memory file |
 
 ## Subcommands
 
@@ -331,7 +331,7 @@ Run the Pi backend adapter directly. This is normally called by the harness, not
 autoloop pi-adapter [pi-command] [extra-args...]
 ```
 
-The adapter resolves the prompt from `MINILOOPS_PROMPT`, then falls back to projecting it via `autoloop inspect prompt`, then falls back to reading `MINILOOPS_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.autoloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
+The adapter resolves the prompt from `AUTOLOOP_PROMPT`, then falls back to projecting it via `autoloop inspect prompt`, then falls back to reading `AUTOLOOP_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.autoloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
 
 ## Testing
 
@@ -433,4 +433,4 @@ npm test -- --reporter=verbose
 
 The canonical binary and package name is **`autoloop`**. The repository directory is named `autoloop-ts` (without the trailing `s`) for historical reasons.
 
-Environment variables use the `MINILOOPS_` prefix (a legacy name retained for compatibility). Preset configuration files may be named either `autoloops.toml` or `miniloops.toml` — the config loader accepts both.
+Environment variables use the `AUTOLOOP_` prefix. Preset configuration files may be named either `autoloops.toml` or `miniloops.toml` — the config loader accepts both.

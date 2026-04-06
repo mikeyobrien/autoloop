@@ -18,7 +18,7 @@ export interface MemoryStats {
 }
 
 export function resolveFile(projectDir: string): string {
-  const envPath = process.env["MINILOOPS_MEMORY_FILE"];
+  const envPath = process.env["AUTOLOOP_MEMORY_FILE"];
   if (envPath) return envPath;
   const cfg = config.loadProject(projectDir);
   return join(

@@ -124,7 +124,7 @@ function inspectDefaultFormat(artifact: string): string {
 }
 
 function resolveRuntimeProjectDir(): string {
-  return process.env["MINILOOPS_PROJECT_DIR"] || ".";
+  return process.env["AUTOLOOP_PROJECT_DIR"] || ".";
 }
 
 function renderProfilesInspect(projectDir: string): void {
