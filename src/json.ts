@@ -34,7 +34,8 @@ export function extractField(line: string, key: string): string {
       if (key === "source") return decoded.source ?? "";
       return "";
     }
-    return decoded.fields[key] ?? "";
+    const value = decoded.fields[key];
+    if (value !== undefined) return value;
   }
   const marker = '"' + key + '": ';
   return decodeJsonValue(firstQuotedValue(firstAfterMarker(line.split(marker))));
