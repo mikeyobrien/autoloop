@@ -1,4 +1,6 @@
 import type * as topo from "../topology.js";
+import type { KiroSessionHandle } from "../backend/kiro-bridge.js";
+import type { AgentMap } from "../agent-map.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
 
@@ -69,6 +71,8 @@ export interface LoopContext {
   };
   launch: LaunchMetadata;
   store: Record<string, unknown>;
+  agentMap: AgentMap | null;
+  kiroSession?: KiroSessionHandle;
 }
 
 export interface RunOptions {

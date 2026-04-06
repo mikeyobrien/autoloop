@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import TOML from "@iarna/toml";
 import * as config from "../config.js";
@@ -46,11 +46,13 @@ export function resolvePresetDir(name: string, projectDir: string): string {
   if (existsSync(candidate)) return candidate;
   const cwdCandidate = join(".", `presets/${name}`);
   if (existsSync(cwdCandidate)) return cwdCandidate;
+  const userCandidate = join(config.userPresetsDir(), name);
+  if (existsSync(userCandidate)) return userCandidate;
   return name;
 }
 
 export function listKnownPresets(): string[] {
-  return [
+  const builtIn = [
     "autocode",
     "autosimplify",
     "autoideas",
@@ -66,6 +68,18 @@ export function listKnownPresets(): string[] {
     "automerge",
     "autopr",
   ];
+  const userDir = config.userPresetsDir();
+  if (!existsSync(userDir)) return builtIn;
+  try {
+    const entries = readdirSync(userDir, { withFileTypes: true });
+    const userNames = entries
+      .filter((e) => e.isDirectory() && config.projectHasConfig(join(userDir, e.name)))
+      .map((e) => e.name)
+      .filter((n) => !builtIn.includes(n));
+    return [...builtIn, ...userNames];
+  } catch {
+    return builtIn;
+  }
 }
 
 export function getPresetDescription(name: string, projectDir: string): string {

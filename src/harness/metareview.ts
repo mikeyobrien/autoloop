@@ -5,6 +5,7 @@ import { appendEvent, readRunLines } from "./journal.js";
 import { buildReviewCommand, runProcess } from "./parallel.js";
 import { renderReviewPromptText } from "./prompt.js";
 import type { LoopContext } from "./types.js";
+import { runKiroIterationSync } from "../backend/kiro-bridge.js";
 
 export function maybeRunMetareview(
   loop: LoopContext,
@@ -12,7 +13,9 @@ export function maybeRunMetareview(
 ): LoopContext {
   if (shouldRunMetareview(loop, iteration)) {
     runMetareviewReview(loop, iteration);
-    return reloadLoop(loop);
+    const reloaded = reloadLoop(loop);
+    reloaded.kiroSession = loop.kiroSession;
+    return reloaded;
   }
   return loop;
 }
@@ -54,11 +57,13 @@ export function runMetareviewReview(
       jsonField("timeout_ms", String(loop.review.timeoutMs)),
   );
 
-  const { output, exitCode, timedOut } = runProcess(
-    buildReviewCommand(loop, iteration, reviewPrompt),
-    loop.review.timeoutMs,
-    loop.review.kind,
-  );
+  const { output, exitCode, timedOut } = loop.review.kind === "kiro" && loop.kiroSession
+    ? runKiroIterationSync(loop.kiroSession, reviewPrompt, loop.review.timeoutMs)
+    : runProcess(
+        buildReviewCommand(loop, iteration, reviewPrompt),
+        loop.review.timeoutMs,
+        loop.review.kind,
+      );
 
   appendEvent(
     loop.paths.journalFile,
