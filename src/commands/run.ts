@@ -17,6 +17,8 @@ interface RunOptions {
   workDir?: string;
   profiles: string[];
   noDefaultProfiles: boolean;
+  worktree?: boolean;
+  noWorktree?: boolean;
 }
 
 export function dispatchRun(args: string[], argv: string[], bundleRoot: string, selfCmd: string): boolean {
@@ -40,6 +42,8 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
       ...options,
       profiles: options.profiles.length > 0 ? options.profiles : undefined,
       noDefaultProfiles: options.noDefaultProfiles || undefined,
+      worktree: options.worktree || undefined,
+      noWorktree: options.noWorktree || undefined,
     },
   );
   return true;
@@ -94,6 +98,14 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     }
     if (token === "--no-default-profiles") {
       options.noDefaultProfiles = true;
+      i++; continue;
+    }
+    if (token === "--worktree") {
+      options.worktree = true;
+      i++; continue;
+    }
+    if (token === "--no-worktree") {
+      options.noWorktree = true;
       i++; continue;
     }
     if (token === "-i" || token === "--iterations") {

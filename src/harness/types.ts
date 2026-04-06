@@ -26,7 +26,7 @@ export interface LoopContext {
   memory: { budgetChars: number };
   harness: { instructions: string };
   profiles: ProfileInfo;
-  paths: { projectDir: string; workDir: string; stateDir: string; journalFile: string; memoryFile: string; registryFile: string; toolPath: string; piAdapterPath: string; baseStateDir: string; mainProjectDir: string };
+  paths: { projectDir: string; workDir: string; stateDir: string; journalFile: string; memoryFile: string; registryFile: string; toolPath: string; piAdapterPath: string; baseStateDir: string; mainProjectDir: string; worktreeBranch: string; worktreePath: string; worktreeMetaDir: string };
   runtime: { runId: string; selfCommand: string; promptOverride: string | null; backendOverride: Record<string, unknown>; logLevel: string; branchMode: boolean; isolationMode: string };
   launch: LaunchMetadata;
   store: Record<string, unknown>;

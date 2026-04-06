@@ -15,6 +15,8 @@ import {
 import { emitToolScript, piAdapterScript } from "./tools.js";
 import { resolveIsolationMode } from "../isolation/resolve.js";
 import { createRunScopedDir, runScopedPath } from "../isolation/run-scope.js";
+import { createWorktree } from "../worktree/create.js";
+import { metaDirForRun } from "../worktree/meta.js";
 import { activeRuns } from "../registry/read.js";
 import type { LoopContext, RunOptions } from "./types.js";
 
@@ -180,9 +182,32 @@ export function buildLoopContext(
   }
 
   // For run-scoped isolation, route per-run state files to runs/<runId>/
-  const effectiveStateDir = isolation.mode === "run-scoped"
+  let effectiveStateDir = isolation.mode === "run-scoped"
     ? createRunScopedDir(stateDir, runId)
     : stateDir;
+
+  // Worktree mode: create git worktree and redirect workDir + stateDir
+  let effectiveWorkDir = resolvedWorkDir;
+  let worktreeBranch = "";
+  let worktreePath = "";
+  let worktreeMetaDir = "";
+
+  if (isolation.mode === "worktree") {
+    const branchPrefix = config.get(cfg, "worktree.branch_prefix", "autoloop");
+    const mergeStrategy = config.get(cfg, "worktree.merge_strategy", "squash");
+    const wt = createWorktree({
+      mainProjectDir: resolvedProjectDir,
+      mainStateDir: stateDir,
+      runId,
+      branchPrefix,
+      mergeStrategy,
+    });
+    effectiveWorkDir = wt.worktreePath;
+    worktreeBranch = wt.branch;
+    worktreePath = wt.worktreePath;
+    worktreeMetaDir = wt.metaDir;
+    effectiveStateDir = join(wt.worktreePath, config.get(cfg, "core.state_dir", ".miniloop"));
+  }
 
   // Compute active profiles: config defaults (unless suppressed) + CLI explicit
   const cliProfiles = runOptions.profiles ?? [];
@@ -194,15 +219,18 @@ export function buildLoopContext(
   const seed = {
     paths: {
       projectDir: resolvedProjectDir,
-      workDir: resolvedWorkDir,
+      workDir: effectiveWorkDir,
       stateDir: effectiveStateDir,
-      journalFile: isolation.mode === "run-scoped" ? join(effectiveStateDir, "journal.jsonl") : journalFile,
+      journalFile: (isolation.mode === "run-scoped" || isolation.mode === "worktree") ? join(effectiveStateDir, "journal.jsonl") : journalFile,
       memoryFile,
       registryFile,
       toolPath: join(effectiveStateDir, "autoloops"),
       piAdapterPath: join(effectiveStateDir, "pi-adapter"),
       baseStateDir: stateDir,
       mainProjectDir: resolvedProjectDir,
+      worktreeBranch,
+      worktreePath,
+      worktreeMetaDir,
     },
     runtime: {
       runId,

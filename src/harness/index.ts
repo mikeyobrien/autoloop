@@ -36,6 +36,7 @@ import { maybeRunMetareview } from "./metareview.js";
 import { runIteration } from "./iteration.js";
 import { stopMaxIterations } from "./stop.js";
 import { registryStart } from "../registry/harness.js";
+import { updateStatus as updateWorktreeStatus } from "../worktree/meta.js";
 
 export type { LoopContext, RunOptions, RunSummary };
 
@@ -54,6 +55,13 @@ export function run(
   registryStart(loop);
   log(loop, "info", `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`);
   const summary = iterate(loop, 1);
+
+  // Post-run worktree status update
+  if (loop.runtime.isolationMode === "worktree" && loop.paths.worktreeMetaDir) {
+    const wtStatus = summary.stopReason === "completed" ? "completed" : "failed";
+    try { updateWorktreeStatus(loop.paths.worktreeMetaDir, wtStatus); } catch { /* meta update is best-effort */ }
+  }
+
   printSummary(summary, loop);
   return summary;
 }
