@@ -134,10 +134,13 @@ describe("loadProject integration", () => {
 });
 
 describe("userConfigPath", () => {
-  const origEnv = process.env["AUTOLOOP_CONFIG"];
+  const origAutoloop = process.env["AUTOLOOP_CONFIG"];
+  const origXdg = process.env["XDG_CONFIG_HOME"];
   afterEach(() => {
-    if (origEnv === undefined) delete process.env["AUTOLOOP_CONFIG"];
-    else process.env["AUTOLOOP_CONFIG"] = origEnv;
+    if (origAutoloop === undefined) delete process.env["AUTOLOOP_CONFIG"];
+    else process.env["AUTOLOOP_CONFIG"] = origAutoloop;
+    if (origXdg === undefined) delete process.env["XDG_CONFIG_HOME"];
+    else process.env["XDG_CONFIG_HOME"] = origXdg;
   });
 
   it("returns AUTOLOOP_CONFIG env when set", () => {
@@ -145,8 +148,16 @@ describe("userConfigPath", () => {
     expect(userConfigPath()).toBe("/custom/path/config.toml");
   });
 
-  it("returns default path when env not set", () => {
+  it("honors XDG_CONFIG_HOME when set", () => {
     delete process.env["AUTOLOOP_CONFIG"];
+    process.env["XDG_CONFIG_HOME"] = "/tmp/xdg-test";
+    const path = userConfigPath();
+    expect(path).toBe(join("/tmp/xdg-test", "autoloop", "config.toml"));
+  });
+
+  it("falls back to ~/.config when XDG_CONFIG_HOME not set", () => {
+    delete process.env["AUTOLOOP_CONFIG"];
+    delete process.env["XDG_CONFIG_HOME"];
     const path = userConfigPath();
     expect(path).toContain(".config/autoloop/config.toml");
   });

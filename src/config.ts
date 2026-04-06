@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { homedir, platform } from "node:os";
 import TOML from "@iarna/toml";
 import { parseStringList } from "./utils.js";
 
@@ -16,7 +16,14 @@ export interface LayeredConfig {
 export function userConfigPath(): string {
   const envPath = process.env["AUTOLOOP_CONFIG"];
   if (envPath) return envPath;
-  return join(homedir(), ".config", "autoloop", "config.toml");
+
+  if (platform() === "win32") {
+    const appData = process.env["APPDATA"];
+    if (appData) return join(appData, "autoloop", "config.toml");
+  }
+
+  const xdgHome = process.env["XDG_CONFIG_HOME"] || join(homedir(), ".config");
+  return join(xdgHome, "autoloop", "config.toml");
 }
 
 export function hasUserConfig(): boolean {
