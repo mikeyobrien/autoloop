@@ -33,29 +33,39 @@ export function loadLayered(projectDir: string): LayeredConfig {
   const base = defaults();
   const provenance: Provenance = {};
 
-  // Track which sections come from defaults
-  for (const key of Object.keys(base)) {
-    provenance[key] = "default";
-  }
+  // Track which keys come from defaults
+  recordProvenance(base, "default", provenance, "");
 
   // Layer 1: user config
   const userCfg = loadUserConfig();
   let merged = deepMerge(base, userCfg);
-  for (const key of Object.keys(userCfg)) {
-    provenance[key] = "user (" + userConfigPath() + ")";
-  }
+  recordProvenance(userCfg, "user (" + userConfigPath() + ")", provenance, "");
 
   // Layer 2: project config
   const projectPath = resolveConfigPath(projectDir);
   if (existsSync(projectPath)) {
     const projectCfg = stringifyValues(parseRawToml(readFileSync(projectPath, "utf-8")));
     merged = deepMerge(merged, projectCfg);
-    for (const key of Object.keys(projectCfg)) {
-      provenance[key] = "project (" + projectPath + ")";
-    }
+    recordProvenance(projectCfg, "project (" + projectPath + ")", provenance, "");
   }
 
   return { config: merged, provenance };
+}
+
+function recordProvenance(
+  layer: Config,
+  label: string,
+  provenance: Provenance,
+  prefix: string,
+): void {
+  for (const [key, value] of Object.entries(layer)) {
+    const path = prefix ? prefix + "." + key : key;
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      recordProvenance(value as Config, label, provenance, path);
+    } else {
+      provenance[path] = label;
+    }
+  }
 }
 
 export function loadProject(projectDir: string): Config {

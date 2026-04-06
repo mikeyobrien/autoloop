@@ -206,7 +206,8 @@ describe("loadLayered", () => {
     const dir = tmpDir("empty-project");
     const { config: cfg, provenance } = loadLayered(dir);
     expect(get(cfg, "backend.kind", "")).toBe("pi");
-    expect(provenance["backend"]).toBe("default");
+    expect(provenance["backend.kind"]).toBe("default");
+    expect(provenance["backend.command"]).toBe("default");
   });
 
   it("user config overrides defaults", () => {
@@ -217,7 +218,8 @@ describe("loadLayered", () => {
     const { config: cfg, provenance } = loadLayered(dir);
     expect(get(cfg, "backend.kind", "")).toBe("command");
     expect(get(cfg, "backend.command", "")).toBe("claude");
-    expect(provenance["backend"]).toContain("user");
+    expect(provenance["backend.kind"]).toContain("user");
+    expect(provenance["backend.command"]).toContain("user");
   });
 
   it("project config overrides user config", () => {
@@ -233,7 +235,7 @@ describe("loadLayered", () => {
 
     const { config: cfg, provenance } = loadLayered(dir);
     expect(get(cfg, "backend.command", "")).toBe("custom-backend");
-    expect(provenance["backend"]).toContain("project");
+    expect(provenance["backend.command"]).toContain("project");
   });
 
   it("non-overlapping sections preserve their sources", () => {
@@ -248,9 +250,25 @@ describe("loadLayered", () => {
     );
 
     const { provenance } = loadLayered(dir);
-    expect(provenance["memory"]).toContain("user");
-    expect(provenance["event_loop"]).toContain("project");
-    expect(provenance["backend"]).toBe("default");
+    expect(provenance["memory.prompt_budget_chars"]).toContain("user");
+    expect(provenance["event_loop.max_iterations"]).toContain("project");
+    expect(provenance["backend.kind"]).toBe("default");
+  });
+
+  it("provenance uses dot-path keys not section names", () => {
+    process.env["AUTOLOOP_CONFIG"] = join(TMP_BASE, "nonexistent.toml");
+    const dir = tmpDir("dot-path-check");
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      '[backend]\ncommand = "custom"\n',
+    );
+    const { provenance } = loadLayered(dir);
+    // Should have dot-path keys, not bare section names
+    expect(provenance["backend.command"]).toContain("project");
+    // Unchanged keys should still have default provenance
+    expect(provenance["backend.kind"]).toBe("default");
+    // No bare section key
+    expect(provenance["backend"]).toBeUndefined();
   });
 
   it("loadProject returns layered config transparently", () => {
