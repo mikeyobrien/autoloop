@@ -1,13 +1,33 @@
-import { describe, it, expect } from "vitest";
-import { collectMetricsRows } from "../../src/harness/metrics.js";
+import { describe, expect, it } from "vitest";
 import { encodeEvent } from "../../src/events/encode.js";
+import { collectMetricsRows } from "../../src/harness/metrics.js";
 
 describe("collectMetricsRows", () => {
   it("collects rows from typed journal events", () => {
     const lines = [
-      encodeEvent({ shape: "fields", run: "r1", iteration: "1", topic: "iteration.start", fields: { suggested_roles: "planner" } }),
-      encodeEvent({ shape: "payload", run: "r1", iteration: "1", topic: "tasks.ready", payload: "planned", source: "agent" }),
-      encodeEvent({ shape: "fields", run: "r1", iteration: "1", topic: "iteration.finish", fields: { exit_code: "0", timed_out: "false", elapsed_s: "1" }, rawFields: { exit_code: 0, timed_out: false, elapsed_s: 1 } }),
+      encodeEvent({
+        shape: "fields",
+        run: "r1",
+        iteration: "1",
+        topic: "iteration.start",
+        fields: { suggested_roles: "planner" },
+      }),
+      encodeEvent({
+        shape: "payload",
+        run: "r1",
+        iteration: "1",
+        topic: "tasks.ready",
+        payload: "planned",
+        source: "agent",
+      }),
+      encodeEvent({
+        shape: "fields",
+        run: "r1",
+        iteration: "1",
+        topic: "iteration.finish",
+        fields: { exit_code: "0", timed_out: "false", elapsed_s: "1" },
+        rawFields: { exit_code: 0, timed_out: false, elapsed_s: 1 },
+      }),
     ];
     const rows = collectMetricsRows(lines);
     expect(rows).toHaveLength(1);

@@ -1,8 +1,8 @@
-import { replaceAll, shellQuote, lineSep } from "./utils.js";
 import { decodeEvent } from "./events/decode.js";
+import { lineSep, replaceAll } from "./utils.js";
 
 export function jsonString(text: string): string {
-  return '"' + encodeJsonValue(text) + '"';
+  return `"${encodeJsonValue(text)}"`;
 }
 
 export function jsonBool(value: boolean): string {
@@ -10,11 +10,11 @@ export function jsonBool(value: boolean): string {
 }
 
 export function jsonField(key: string, value: string): string {
-  return '"' + key + '": ' + jsonString(value);
+  return `"${key}": ${jsonString(value)}`;
 }
 
 export function jsonFieldRaw(key: string, rawValue: string): string {
-  return '"' + key + '": ' + rawValue;
+  return `"${key}": ${rawValue}`;
 }
 
 export function extractTopic(line: string): string {
@@ -37,8 +37,10 @@ export function extractField(line: string, key: string): string {
     const value = decoded.fields[key];
     if (value !== undefined) return value;
   }
-  const marker = '"' + key + '": ';
-  return decodeJsonValue(firstQuotedValue(firstAfterMarker(line.split(marker))));
+  const marker = `"${key}": `;
+  return decodeJsonValue(
+    firstQuotedValue(firstAfterMarker(line.split(marker))),
+  );
 }
 
 export function encodeJsonValue(text: string): string {
@@ -53,9 +55,9 @@ export function encodeJsonValue(text: string): string {
 function escapeRemainingControlChars(text: string): string {
   // Replace control chars \x00-\x08, \x0b, \x0c, \x0e-\x1f
   return text.replace(
-    // eslint-disable-next-line no-control-regex
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char stripping
     /[\x00-\x08\x0b\x0c\x0e-\x1f]/g,
-    (ch) => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0"),
+    (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`,
   );
 }
 

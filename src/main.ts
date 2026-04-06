@@ -1,18 +1,19 @@
-import { existsSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
-import * as harness from "./harness/index.js";
-import { printUsage, printEmitUsage } from "./usage.js";
-import { dispatchRun } from "./commands/run.js";
-import { dispatchMemory } from "./commands/memory.js";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { dispatchChain } from "./commands/chain.js";
-import { dispatchInspect } from "./commands/inspect.js";
-import { dispatchList } from "./commands/list.js";
-import { dispatchPiAdapter } from "./commands/pi-adapter.js";
-import { dispatchLoops } from "./commands/loops.js";
-import { dispatchWorktree } from "./commands/worktree.js";
-import { dispatchRuns } from "./commands/runs.js";
 import { dispatchConfig } from "./commands/config.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
+import { dispatchInspect } from "./commands/inspect.js";
+import { dispatchList } from "./commands/list.js";
+import { dispatchLoops } from "./commands/loops.js";
+import { dispatchMemory } from "./commands/memory.js";
+import { dispatchPiAdapter } from "./commands/pi-adapter.js";
+import { dispatchRun } from "./commands/run.js";
+import { dispatchRuns } from "./commands/runs.js";
+import { dispatchTask } from "./commands/task.js";
+import { dispatchWorktree } from "./commands/worktree.js";
+import * as harness from "./harness/index.js";
+import { printEmitUsage, printUsage } from "./usage.js";
 
 function main(): void {
   const argv = process.argv;
@@ -34,8 +35,15 @@ function dispatch(args: string[], argv: string[]): void {
       dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
       return;
     case "emit":
-      if (!args[1] || args[1] === "--help" || args[1] === "-h") { printEmitUsage(); return; }
-      harness.emit(resolveRuntimeProjectDir(), args[1], args.slice(2).join(" "));
+      if (!args[1] || args[1] === "--help" || args[1] === "-h") {
+        printEmitUsage();
+        return;
+      }
+      harness.emit(
+        resolveRuntimeProjectDir(),
+        args[1],
+        args.slice(2).join(" "),
+      );
       return;
     case "list":
       dispatchList(args.slice(1), bundleRoot);
@@ -54,6 +62,9 @@ function dispatch(args: string[], argv: string[]): void {
       return;
     case "memory":
       dispatchMemory(args.slice(1));
+      return;
+    case "task":
+      dispatchTask(args.slice(1));
       return;
     case "worktree":
       dispatchWorktree(args.slice(1));
@@ -76,7 +87,7 @@ function dispatch(args: string[], argv: string[]): void {
 }
 
 function resolveRuntimeProjectDir(): string {
-  return process.env["MINILOOPS_PROJECT_DIR"] || ".";
+  return process.env.AUTOLOOP_PROJECT_DIR || ".";
 }
 
 function runtimeArgv(argv: string[]): string[] {
@@ -96,16 +107,33 @@ function runtimeArgv(argv: string[]): string[] {
 }
 
 function isCliCommand(value: string): boolean {
-  return ["run", "emit", "inspect", "memory", "list", "loops", "runs", "chain", "pi-adapter", "branch-run", "worktree", "config", "dashboard", "--help", "-h"].includes(value);
+  return [
+    "run",
+    "emit",
+    "inspect",
+    "memory",
+    "task",
+    "list",
+    "loops",
+    "runs",
+    "chain",
+    "pi-adapter",
+    "branch-run",
+    "worktree",
+    "config",
+    "dashboard",
+    "--help",
+    "-h",
+  ].includes(value);
 }
 
 function selfCommand(argv: string[]): string {
   // Return a command that re-invokes this program
-  return "'" + resolve(argv[1] ?? "autoloop") + "'";
+  return `'${resolve(argv[1] ?? "autoloop")}'`;
 }
 
 function resolveBundleRoot(argv: string[]): string {
-  const envRoot = process.env["AUTOLOOPS_BUNDLE_ROOT"];
+  const envRoot = process.env.AUTOLOOPS_BUNDLE_ROOT;
   if (envRoot) return envRoot;
   // Try to resolve from the script location
   const scriptPath = argv[1] ?? "";

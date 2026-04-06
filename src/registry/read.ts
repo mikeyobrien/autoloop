@@ -37,7 +37,10 @@ export function recentRuns(path: string, limit: number): RunRecord[] {
  * Returns the matched record, or an array of candidates if ambiguous.
  * Returns undefined if no match.
  */
-export function findRunByPrefix(path: string, partial: string): RunRecord | RunRecord[] | undefined {
+export function findRunByPrefix(
+  path: string,
+  partial: string,
+): RunRecord | RunRecord[] | undefined {
   const all = readRegistry(path);
   const exact = all.find((r) => r.run_id === partial);
   if (exact) return exact;

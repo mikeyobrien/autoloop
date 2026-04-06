@@ -21,7 +21,7 @@ export function collectMetricsRows(lines: string[]): MetricsRow[] {
     if (!event) continue;
 
     if (event.topic === "iteration.start" && event.shape === "fields") {
-      const roles = event.fields["suggested_roles"] ?? "";
+      const roles = event.fields.suggested_roles ?? "";
       const role = firstCsvValue(roles);
       rows.push({
         iteration: event.iteration ?? "",
@@ -39,9 +39,9 @@ export function collectMetricsRows(lines: string[]): MetricsRow[] {
       const iter = event.iteration ?? "";
       for (let i = rows.length - 1; i >= 0; i--) {
         if (rows[i].iteration === iter) {
-          rows[i].exitCode = event.fields["exit_code"] ?? "";
-          rows[i].timedOut = event.fields["timed_out"] ?? "";
-          rows[i].elapsedS = event.fields["elapsed_s"] ?? "";
+          rows[i].exitCode = event.fields.exit_code ?? "";
+          rows[i].timedOut = event.fields.timed_out ?? "";
+          rows[i].elapsedS = event.fields.elapsed_s ?? "";
           rows[i].outcome = computeOutcome(
             rows[i].exitCode,
             rows[i].timedOut,
@@ -98,7 +98,7 @@ function formatMetricsMd(rows: MetricsRow[]): string {
     r.timedOut,
     r.outcome,
   ]);
-  return table(headers, tableRows) + "\n\n" + metricsSummary(rows);
+  return `${table(headers, tableRows)}\n\n${metricsSummary(rows)}`;
 }
 
 function metricsSummary(rows: MetricsRow[]): string {
@@ -121,7 +121,7 @@ function sumElapsed(rows: MetricsRow[]): string {
   for (const row of rows) {
     if (row.elapsedS) {
       const val = parseFloat(row.elapsedS);
-      if (!isNaN(val)) sum += val;
+      if (!Number.isNaN(val)) sum += val;
     }
   }
   return String(sum);
@@ -154,12 +154,12 @@ function formatMetricsCsv(rows: MetricsRow[]): string {
       "," +
       csvQuote(r.outcome),
   );
-  return header + "\n" + csvRows.join("\n");
+  return `${header}\n${csvRows.join("\n")}`;
 }
 
 function csvQuote(value: string): string {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return '"' + value.replace(/"/g, '""') + '"';
+    return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
 }
@@ -184,19 +184,23 @@ function formatMetricsJson(rows: MetricsRow[]): string {
       jsonField("outcome", r.outcome) +
       "}",
   );
-  return "[" + items.join(", ") + "]";
+  return `[${items.join(", ")}]`;
 }
 
 function jsonNumberOrNull(key: string, value: string): string {
-  if (!value) return '"' + key + '": null';
-  return '"' + key + '": ' + value;
+  if (!value) return `"${key}": null`;
+  return `"${key}": ${value}`;
 }
 
 function jsonBoolField(key: string, value: string): string {
-  return '"' + key + '": ' + (value === "true" ? "true" : "false");
+  return `"${key}": ${value === "true" ? "true" : "false"}`;
 }
 
-function computeOutcome(exitCode: string, timedOut: string, event: string): string {
+function computeOutcome(
+  exitCode: string,
+  timedOut: string,
+  event: string,
+): string {
   if (timedOut === "true") return "timeout";
   if (exitCode === "0") return event === "none" ? "continue" : "emitted";
   return "failed";

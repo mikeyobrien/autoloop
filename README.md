@@ -115,6 +115,19 @@ autoloop/
 
 A preset is a directory containing `autoloops.toml`, `topology.toml`, `harness.md`, and a `roles/` folder. See [docs/creating-presets.md](docs/creating-presets.md) for the full guide, or examine any `presets/<name>/` directory as a working example.
 
+## Developer scripts
+
+A convenience dispatcher lives at `bin/dev`. It wraps common dev commands so you don't have to remember the exact incantation:
+
+```bash
+bin/dev build          # compile TypeScript
+bin/dev test           # run the test suite
+bin/dev test:watch     # vitest in watch mode
+bin/dev hooks          # install git hooks
+bin/dev run [args]     # run autoloop
+bin/dev --help         # list all subcommands
+```
+
 ## Running tests
 
 ```bash

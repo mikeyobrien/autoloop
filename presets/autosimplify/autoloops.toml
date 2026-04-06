@@ -1,8 +1,12 @@
 event_loop.max_iterations = 80
 event_loop.completion_event = "task.complete"
 event_loop.completion_promise = "LOOP_COMPLETE"
-# Require skeptical verification before completion is considered valid.
-event_loop.required_events = ["simplification.verified"]
+# NOTE: required_events removed — it blocked the no-op path where scoper
+# emits task.complete without any simplification occurring. The topology
+# already enforces scoper → reviewer → simplifier → verifier flow when
+# changes exist. The harness rule "no-op is valid only when the reviewer
+# and verifier both conclude the scoped code is already appropriately
+# simple" provides the soft guard; metareview catches violations.
 
 backend.kind = "command"
 backend.command = "claude"

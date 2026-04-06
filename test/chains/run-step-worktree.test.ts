@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Verify that planning-category chain steps (e.g. automerge) do NOT
@@ -53,8 +53,8 @@ vi.mock("node:fs", async () => {
 });
 
 import { runChain } from "../../src/chains/run.js";
-import * as harness from "../../src/harness/index.js";
 import type { ChainSpec } from "../../src/chains/types.js";
+import * as harness from "../../src/harness/index.js";
 
 describe("runChain worktree suppression for planning steps", () => {
   beforeEach(() => {
@@ -89,9 +89,7 @@ describe("runChain worktree suppression for planning steps", () => {
   it("does not suppress worktree when worktree is not requested", () => {
     const spec: ChainSpec = {
       name: "test-chain",
-      steps: [
-        { name: "automerge", presetDir: "/presets/automerge" },
-      ],
+      steps: [{ name: "automerge", presetDir: "/presets/automerge" }],
     };
 
     runChain(spec, ".", "autoloop", {});

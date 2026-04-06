@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  parseParallelObjectives,
   parseObjectiveLine,
+  parseParallelObjectives,
 } from "../../src/harness/wave/parse-objectives.js";
 
 describe("parseObjectiveLine", () => {
@@ -36,12 +36,20 @@ describe("parseObjectiveLine", () => {
 describe("parseParallelObjectives", () => {
   it("parses a valid bullet list", () => {
     const result = parseParallelObjectives("- task A\n- task B", 5);
-    expect(result).toEqual({ ok: true, objectives: ["task A", "task B"], reason: "" });
+    expect(result).toEqual({
+      ok: true,
+      objectives: ["task A", "task B"],
+      reason: "",
+    });
   });
 
   it("parses a valid numbered list", () => {
     const result = parseParallelObjectives("1. first\n2. second", 5);
-    expect(result).toEqual({ ok: true, objectives: ["first", "second"], reason: "" });
+    expect(result).toEqual({
+      ok: true,
+      objectives: ["first", "second"],
+      reason: "",
+    });
   });
 
   it("skips blank lines between items", () => {

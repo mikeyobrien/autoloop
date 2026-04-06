@@ -1,5 +1,5 @@
-import { decodeEvent } from "../events/decode.js";
 import { normalizeBackendLabel } from "../backend/index.js";
+import { decodeEvent } from "../events/decode.js";
 import { splitCsv } from "../utils.js";
 import type { RegistryStatus, RunRecord } from "./types.js";
 
@@ -51,7 +51,9 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
     if (!record) continue;
 
     if (topic === "iteration.finish") {
-      const iter = event.iteration ? parseInt(event.iteration, 10) : record.iteration;
+      const iter = event.iteration
+        ? parseInt(event.iteration, 10)
+        : record.iteration;
       record.iteration = Number.isNaN(iter) ? record.iteration : iter;
       record.updated_at = record.created_at;
       record.latest_event = topic;
@@ -71,14 +73,16 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
       record.stop_reason = fieldValue(event, "reason");
       record.updated_at = record.created_at;
       record.latest_event = topic;
-      continue;
     }
   }
 
   return Array.from(runs.values());
 }
 
-function fieldValue(event: ReturnType<typeof decodeEvent>, key: string): string {
+function fieldValue(
+  event: ReturnType<typeof decodeEvent>,
+  key: string,
+): string {
   if (!event) return "";
   if (event.shape === "fields") return event.fields[key] ?? "";
   return "";

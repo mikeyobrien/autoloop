@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import { createWorktree } from "../../src/worktree/create.js";
-import { readMeta, updateStatus } from "../../src/worktree/meta.js";
 import { mergeWorktree } from "../../src/worktree/merge.js";
+import { readMeta, updateStatus } from "../../src/worktree/meta.js";
 
 const GIT_ENV = {
   ...process.env,
@@ -25,7 +25,12 @@ function makeGitRepo(): string {
   return dir;
 }
 
-function addFileAndCommit(dir: string, name: string, content: string, message: string): void {
+function addFileAndCommit(
+  dir: string,
+  name: string,
+  content: string,
+  message: string,
+): void {
   writeFileSync(join(dir, name), content);
   execSync(`git add ${name} && git commit -m '${message}'`, {
     cwd: dir,
@@ -60,8 +65,8 @@ describe("mergeWorktree", () => {
 
     // Meta should be "merged"
     const meta = readMeta(wt.metaDir);
-    expect(meta!.status).toBe("merged");
-    expect(meta!.merged_at).toBeTruthy();
+    expect(meta?.status).toBe("merged");
+    expect(meta?.merged_at).toBeTruthy();
   });
 
   it("merge strategy works", () => {
@@ -85,7 +90,7 @@ describe("mergeWorktree", () => {
     });
 
     expect(result.success).toBe(true);
-    expect(readMeta(wt.metaDir)!.status).toBe("merged");
+    expect(readMeta(wt.metaDir)?.status).toBe("merged");
   });
 
   it("rejects merging a running worktree", () => {
@@ -136,10 +141,20 @@ describe("mergeWorktree", () => {
     });
 
     // Modify the same file differently in the worktree
-    addFileAndCommit(wt.worktreePath, "shared.txt", "worktree content", "edit shared in wt");
+    addFileAndCommit(
+      wt.worktreePath,
+      "shared.txt",
+      "worktree content",
+      "edit shared in wt",
+    );
 
     // Modify on main to create conflict
-    addFileAndCommit(repo, "shared.txt", "different main content", "edit shared on main");
+    addFileAndCommit(
+      repo,
+      "shared.txt",
+      "different main content",
+      "edit shared on main",
+    );
 
     updateStatus(wt.metaDir, "completed");
 
@@ -151,11 +166,11 @@ describe("mergeWorktree", () => {
 
     expect(result.success).toBe(false);
     expect(result.conflicts).toBeDefined();
-    expect(result.conflicts!.length).toBeGreaterThan(0);
+    expect(result.conflicts?.length).toBeGreaterThan(0);
     expect(result.recoveryHint).toBeTruthy();
 
     // Meta should still be "completed" (not merged)
     const meta = readMeta(wt.metaDir);
-    expect(meta!.status).toBe("completed");
+    expect(meta?.status).toBe("completed");
   });
 });

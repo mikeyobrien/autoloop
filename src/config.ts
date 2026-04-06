@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { homedir, platform } from "node:os";
+import { join } from "node:path";
 import TOML from "@iarna/toml";
 import { parseStringList } from "./utils.js";
 
@@ -14,15 +14,15 @@ export interface LayeredConfig {
 }
 
 export function userConfigPath(): string {
-  const envPath = process.env["AUTOLOOP_CONFIG"];
+  const envPath = process.env.AUTOLOOP_CONFIG;
   if (envPath) return envPath;
 
   if (platform() === "win32") {
-    const appData = process.env["APPDATA"];
+    const appData = process.env.APPDATA;
     if (appData) return join(appData, "autoloop", "config.toml");
   }
 
-  const xdgHome = process.env["XDG_CONFIG_HOME"] || join(homedir(), ".config");
+  const xdgHome = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
   return join(xdgHome, "autoloop", "config.toml");
 }
 
@@ -46,14 +46,16 @@ export function loadLayered(projectDir: string): LayeredConfig {
   // Layer 1: user config
   const userCfg = loadUserConfig();
   let merged = deepMerge(base, userCfg);
-  recordProvenance(userCfg, "user (" + userConfigPath() + ")", provenance, "");
+  recordProvenance(userCfg, `user (${userConfigPath()})`, provenance, "");
 
   // Layer 2: project config
   const projectPath = resolveConfigPath(projectDir);
   if (existsSync(projectPath)) {
-    const projectCfg = stringifyValues(parseRawToml(readFileSync(projectPath, "utf-8")));
+    const projectCfg = stringifyValues(
+      parseRawToml(readFileSync(projectPath, "utf-8")),
+    );
     merged = deepMerge(merged, projectCfg);
-    recordProvenance(projectCfg, "project (" + projectPath + ")", provenance, "");
+    recordProvenance(projectCfg, `project (${projectPath})`, provenance, "");
   }
 
   return { config: merged, provenance };
@@ -66,7 +68,7 @@ function recordProvenance(
   prefix: string,
 ): void {
   for (const [key, value] of Object.entries(layer)) {
-    const path = prefix ? prefix + "." + key : key;
+    const path = prefix ? `${prefix}.${key}` : key;
     if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       recordProvenance(value as Config, label, provenance, path);
     } else {
@@ -84,21 +86,26 @@ export function load(path: string): Config {
   return parseToml(readFileSync(path, "utf-8"));
 }
 
-export function backendOverrideFromProject(projectDir: string): Record<string, unknown> {
+export function backendOverrideFromProject(
+  projectDir: string,
+): Record<string, unknown> {
   const path = resolveConfigPath(projectDir);
   if (!existsSync(path)) return {};
 
   const parsed = parseRawToml(readFileSync(path, "utf-8"));
-  const backend = parsed["backend"];
-  if (typeof backend !== "object" || backend === null || Array.isArray(backend)) return {};
+  const backend = parsed.backend;
+  if (typeof backend !== "object" || backend === null || Array.isArray(backend))
+    return {};
 
   const section = backend as Record<string, unknown>;
   const override: Record<string, unknown> = {};
 
-  if (typeof section["kind"] === "string") override["kind"] = section["kind"];
-  if (typeof section["command"] === "string") override["command"] = section["command"];
-  if (typeof section["prompt_mode"] === "string") override["prompt_mode"] = section["prompt_mode"];
-  if (Array.isArray(section["args"])) override["args"] = (section["args"] as unknown[]).map(String);
+  if (typeof section.kind === "string") override.kind = section.kind;
+  if (typeof section.command === "string") override.command = section.command;
+  if (typeof section.prompt_mode === "string")
+    override.prompt_mode = section.prompt_mode;
+  if (Array.isArray(section.args))
+    override.args = (section.args as unknown[]).map(String);
 
   return override;
 }
@@ -120,15 +127,11 @@ function getPath(config: Config, path: string[], fallback: string): string {
   return fallback;
 }
 
-export function getInt(
-  config: Config,
-  key: string,
-  fallback: number,
-): number {
+export function getInt(config: Config, key: string, fallback: number): number {
   const raw = get(config, key, "");
   if (raw === "") return fallback;
   const parsed = parseInt(raw, 10);
-  return isNaN(parsed) ? fallback : parsed;
+  return Number.isNaN(parsed) ? fallback : parsed;
 }
 
 export function getList(config: Config, key: string): string[] {
@@ -224,9 +227,9 @@ export function journalPath(config: Config): string {
 }
 
 function resolveBundledPresetDir(name: string, bundleRoot: string): string {
-  const bundleCandidate = join(bundleRoot, "presets/" + name);
+  const bundleCandidate = join(bundleRoot, `presets/${name}`);
   if (projectHasConfig(bundleCandidate)) return bundleCandidate;
-  const cwdCandidate = join(".", "presets/" + name);
+  const cwdCandidate = join(".", `presets/${name}`);
   if (projectHasConfig(cwdCandidate)) return cwdCandidate;
   return "";
 }
@@ -290,8 +293,11 @@ function deepMerge(base: Config, override: Config): Config {
   const result = { ...base };
   for (const [key, value] of Object.entries(override)) {
     if (
-      typeof value === "object" && value !== null && !Array.isArray(value) &&
-      typeof result[key] === "object" && result[key] !== null
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      typeof result[key] === "object" &&
+      result[key] !== null
     ) {
       result[key] = deepMerge(result[key] as Config, value as Config);
     } else {

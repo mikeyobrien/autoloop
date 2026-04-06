@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { shellWords } from "./utils.js";
 
 const BRIDGE_SCRIPT = `
@@ -34,11 +34,11 @@ def extract_tool_error(response):
 
 
 def stream_log_path():
-    state_dir = os.environ.get("MINILOOPS_STATE_DIR", "")
+    state_dir = os.environ.get("AUTOLOOP_STATE_DIR", "")
     if not state_dir:
         return None
-    prefix = "pi-review" if os.environ.get("MINILOOPS_REVIEW_MODE", "") == "hyperagent" else "pi-stream"
-    iteration = os.environ.get("MINILOOPS_ITERATION", "")
+    prefix = "pi-review" if os.environ.get("AUTOLOOP_REVIEW_MODE", "") == "hyperagent" else "pi-stream"
+    iteration = os.environ.get("AUTOLOOP_ITERATION", "")
     name = prefix + (("." + iteration) if iteration else "") + ".jsonl"
     return pathlib.Path(state_dir) / name
 
@@ -107,7 +107,7 @@ if not text:
     text = fallback_text
 
 failed = exit_code != 0 or (not saw_turn_end and not saw_agent_end) or bool(error)
-verbose = os.environ.get("MINILOOPS_LOG_LEVEL", "") == "debug"
+verbose = os.environ.get("AUTOLOOP_LOG_LEVEL", "") == "debug"
 output = ""
 
 if failed:
@@ -161,7 +161,7 @@ export function run(args: string[]): void {
 }
 
 function resolvePrompt(): string {
-  const envPrompt = process.env["MINILOOPS_PROMPT"];
+  const envPrompt = process.env.AUTOLOOP_PROMPT;
   if (envPrompt) return envPrompt;
 
   const pathPrompt = promptFromPath();
@@ -171,8 +171,8 @@ function resolvePrompt(): string {
 }
 
 function projectedPrompt(): string {
-  const bin = process.env["MINILOOPS_BIN"] || "";
-  const iteration = process.env["MINILOOPS_ITERATION"] || "";
+  const bin = process.env.AUTOLOOP_BIN || "";
+  const iteration = process.env.AUTOLOOP_ITERATION || "";
   if (!bin || !iteration) return "";
 
   try {
@@ -187,7 +187,7 @@ function projectedPrompt(): string {
 }
 
 function promptFromPath(): string {
-  const path = process.env["MINILOOPS_PROMPT_PATH"] || "";
+  const path = process.env.AUTOLOOP_PROMPT_PATH || "";
   if (!path || !existsSync(path)) return "";
   return readFileSync(path, "utf-8");
 }
@@ -215,8 +215,8 @@ function materializePromptPath(prompt: string): string {
 }
 
 function promptStoragePath(): string {
-  const configured = process.env["MINILOOPS_PROMPT_PATH"] || "";
-  return configured || "/tmp/miniloops-pi-adapter-prompt.md";
+  const configured = process.env.AUTOLOOP_PROMPT_PATH || "";
+  return configured || "/tmp/autoloop-pi-adapter-prompt.md";
 }
 
 function defaultPiArgs(): string[] {

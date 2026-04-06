@@ -1,22 +1,22 @@
 export function bold(text: string): string {
-  return "**" + text + "**";
+  return `**${text}**`;
 }
 
 export function italic(text: string): string {
-  return "_" + text + "_";
+  return `_${text}_`;
 }
 
 export function code(text: string): string {
-  return "`" + text + "`";
+  return `\`${text}\``;
 }
 
 export function heading(level: number, text: string): string {
   const prefix = "#".repeat(Math.min(Math.max(level, 1), 5));
-  return prefix + " " + text;
+  return `${prefix} ${text}`;
 }
 
 export function codeBlock(text: string, lang = ""): string {
-  return "```" + lang + "\n" + text + "\n```";
+  return `\`\`\`${lang}\n${text}\n\`\`\``;
 }
 
 export function blockquote(text: string): string {
@@ -24,17 +24,17 @@ export function blockquote(text: string): string {
 }
 
 export function section(title: string, body: string, level = 2): string {
-  return heading(level, title) + "\n\n" + body;
+  return `${heading(level, title)}\n\n${body}`;
 }
 
 export function bulletList(items: string[]): string {
   if (items.length === 0) return "";
-  return items.map((item) => "- " + item).join("\n");
+  return items.map((item) => `- ${item}`).join("\n");
 }
 
 export function numberedList(items: string[]): string {
   if (items.length === 0) return "";
-  return items.map((item, i) => (i + 1) + ". " + item).join("\n");
+  return items.map((item, i) => `${i + 1}. ${item}`).join("\n");
 }
 
 export function table(headers: string[], rows: string[][]): string {
@@ -42,14 +42,14 @@ export function table(headers: string[], rows: string[][]): string {
   const headerRow = tableRow(headers, widths);
   const separator = separatorRow(widths);
   const body = rows.map((row) => tableRow(row, widths)).join("\n");
-  return headerRow + "\n" + separator + (rows.length > 0 ? "\n" + body : "");
+  return `${headerRow}\n${separator}${rows.length > 0 ? `\n${body}` : ""}`;
 }
 
 function tableRow(cells: string[], widths: number[]): string {
   const padded = cells.map((cell, i) =>
     padCell(cell, widths[i] ?? cell.length),
   );
-  return "| " + padded.join(" | ") + " |";
+  return `| ${padded.join(" | ")} |`;
 }
 
 function padCell(cell: string, width: number): string {
@@ -58,7 +58,7 @@ function padCell(cell: string, width: number): string {
 
 function separatorRow(widths: number[]): string {
   const dashes = widths.map((w) => "-".repeat(w));
-  return "| " + dashes.join(" | ") + " |";
+  return `| ${dashes.join(" | ")} |`;
 }
 
 function columnWidths(headers: string[], rows: string[][]): number[] {

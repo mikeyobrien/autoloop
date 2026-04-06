@@ -1,11 +1,11 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import * as config from "./config.js";
-import { jsonField, extractField } from "./json.js";
-import { bulletList } from "./markdown.js";
 import { readIfExists, readLines } from "./harness/journal.js";
-import { truncateText } from "./memory-render.js";
+import { extractField, jsonField } from "./json.js";
+import { bulletList } from "./markdown.js";
 import type { MaterializedMemory } from "./memory-render.js";
+import { truncateText } from "./memory-render.js";
 
 export interface MemoryStats {
   preferences: number;
@@ -18,7 +18,7 @@ export interface MemoryStats {
 }
 
 export function resolveFile(projectDir: string): string {
-  const envPath = process.env["MINILOOPS_MEMORY_FILE"];
+  const envPath = process.env.AUTOLOOP_MEMORY_FILE;
   if (envPath) return envPath;
   const cfg = config.loadProject(projectDir);
   return join(
@@ -27,10 +27,7 @@ export function resolveFile(projectDir: string): string {
   );
 }
 
-export function renderProject(
-  projectDir: string,
-  budgetChars: number,
-): string {
+export function renderProject(projectDir: string, budgetChars: number): string {
   return renderFile(resolveFile(projectDir), budgetChars);
 }
 
@@ -114,11 +111,7 @@ export function addPreference(
   printBudgetWarning(projectDir);
 }
 
-export function addMeta(
-  projectDir: string,
-  key: string,
-  value: string,
-): void {
+export function addMeta(projectDir: string, key: string, value: string): void {
   const path = resolveFile(projectDir);
   appendMemoryEntry(
     path,
@@ -136,17 +129,13 @@ export function addMeta(
   printBudgetWarning(projectDir);
 }
 
-export function remove(
-  projectDir: string,
-  id: string,
-  reason: string,
-): void {
+export function remove(projectDir: string, id: string, reason: string): void {
   const path = resolveFile(projectDir);
   const memory = materialize(readLines(path));
   if (activeEntryExists(memory, id)) {
     removeExistingEntry(path, id, reason);
   } else {
-    console.log("warning: no active entry with ID " + id + " found");
+    console.log(`warning: no active entry with ID ${id} found`);
   }
 }
 
@@ -168,40 +157,54 @@ function renderMaterialized(memory: MaterializedMemory): string {
 
 function renderPreferences(entries: string[]): string {
   if (entries.length === 0) return "";
-  const items = entries.map(
-    (e) =>
+  const items = entries.map((e) => {
+    const created = extractField(e, "created");
+    return (
       "[" +
       extractField(e, "id") +
       "] [" +
       extractField(e, "category") +
       "] " +
-      extractField(e, "text"),
-  );
-  return "Preferences:\n" + bulletList(items) + "\n";
+      extractField(e, "text") +
+      (created ? ` (created: ${created})` : "")
+    );
+  });
+  return `Preferences:\n${bulletList(items)}\n`;
 }
 
 function renderLearnings(entries: string[]): string {
   if (entries.length === 0) return "";
   const items = entries.map((e) => {
     const source = extractField(e, "source");
-    const prefix = source ? "(" + source + ") " : "";
-    return "[" + extractField(e, "id") + "] " + prefix + extractField(e, "text");
+    const prefix = source ? `(${source}) ` : "";
+    const created = extractField(e, "created");
+    return (
+      "[" +
+      extractField(e, "id") +
+      "] " +
+      prefix +
+      extractField(e, "text") +
+      (created ? ` (created: ${created})` : "")
+    );
   });
-  return "Learnings:\n" + bulletList(items) + "\n";
+  return `Learnings:\n${bulletList(items)}\n`;
 }
 
 function renderMeta(entries: string[]): string {
   if (entries.length === 0) return "";
-  const items = entries.map(
-    (e) =>
+  const items = entries.map((e) => {
+    const created = extractField(e, "created");
+    return (
       "[" +
       extractField(e, "id") +
       "] " +
       extractField(e, "key") +
       ": " +
-      extractField(e, "value"),
-  );
-  return "Meta:\n" + bulletList(items) + "\n";
+      extractField(e, "value") +
+      (created ? ` (created: ${created})` : "")
+    );
+  });
+  return `Meta:\n${bulletList(items)}\n`;
 }
 
 function memoryStats(
@@ -214,9 +217,7 @@ function memoryStats(
     learnings: memory.learnings.length,
     meta: memory.meta.length,
     totalEntries:
-      memory.preferences.length +
-      memory.learnings.length +
-      memory.meta.length,
+      memory.preferences.length + memory.learnings.length + memory.meta.length,
     renderedChars,
     budgetChars,
     truncated: budgetChars > 0 && renderedChars > budgetChars,
@@ -237,9 +238,7 @@ function formatStatus(stats: MemoryStats): string {
           "% over)"
         : stats.budgetChars +
           " char budget (" +
-          Math.floor(
-            (stats.renderedChars * 100) / stats.budgetChars,
-          ) +
+          Math.floor((stats.renderedChars * 100) / stats.budgetChars) +
           "% used)";
   return (
     "Memory: " +
@@ -277,15 +276,8 @@ function projectBudgetChars(projectDir: string): number {
   return config.getInt(cfg, "memory.prompt_budget_chars", 8000);
 }
 
-function findEntries(
-  memory: MaterializedMemory,
-  pattern: string,
-): string[] {
-  const all = [
-    ...memory.preferences,
-    ...memory.learnings,
-    ...memory.meta,
-  ];
+function findEntries(memory: MaterializedMemory, pattern: string): string[] {
+  const all = [...memory.preferences, ...memory.learnings, ...memory.meta];
   return all.filter((entry) => entryMatches(entry, pattern));
 }
 
@@ -307,7 +299,7 @@ function searchText(entry: string): string {
 
 function renderMatches(entries: string[], pattern: string): string {
   if (entries.length === 0) {
-    return "No active memory entries matching `" + pattern + "`.";
+    return `No active memory entries matching \`${pattern}\`.`;
   }
   return entries.map(renderMatch).join("\n");
 }
@@ -326,8 +318,8 @@ function renderMatch(entry: string): string {
   }
   if (type === "learning") {
     const source = extractField(entry, "source");
-    const prefix = source ? "(" + source + ") " : "";
-    return id + ": learning " + prefix + extractField(entry, "text");
+    const prefix = source ? `(${source}) ` : "";
+    return `${id}: learning ${prefix}${extractField(entry, "text")}`;
   }
   if (type === "meta") {
     return (
@@ -338,15 +330,11 @@ function renderMatch(entry: string): string {
       extractField(entry, "value")
     );
   }
-  return id + ": " + extractField(entry, "text");
+  return `${id}: ${extractField(entry, "text")}`;
 }
 
 function activeEntryExists(memory: MaterializedMemory, id: string): boolean {
-  const all = [
-    ...memory.preferences,
-    ...memory.learnings,
-    ...memory.meta,
-  ];
+  const all = [...memory.preferences, ...memory.learnings, ...memory.meta];
   return all.some((entry) => extractField(entry, "id") === id);
 }
 
@@ -401,19 +389,15 @@ function appendMemoryEntry(path: string, content: string): void {
 
 function nextId(path: string, prefix: string): string {
   const count = readLines(path).length;
-  return prefix + "-" + (count + 1);
+  return `${prefix}-${count + 1}`;
 }
 
-function removeExistingEntry(
-  path: string,
-  id: string,
-  reason: string,
-): void {
+function removeExistingEntry(path: string, id: string, reason: string): void {
   appendMemoryEntry(
     path,
     memoryLine(nextId(path, "ts"), "tombstone", tombstoneFields(id, reason)),
   );
-  console.log("removed " + id);
+  console.log(`removed ${id}`);
 }
 
 function currentTime(): string {
@@ -441,4 +425,3 @@ function tombstoneFields(id: string, reason: string): string {
     jsonField("created", currentTime())
   );
 }
-

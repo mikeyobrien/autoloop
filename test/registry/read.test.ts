@@ -1,18 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  readRegistry,
-  getRun,
   activeRuns,
-  recentRuns,
   findRunByPrefix,
+  getRun,
+  readRegistry,
+  recentRuns,
 } from "../../src/registry/read.js";
 
 const tmpDir = join(import.meta.dirname ?? ".", ".tmp-registry-read-test");
 const regFile = join(tmpDir, "registry.jsonl");
 
-function makeRecord(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function makeRecord(
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
   return {
     run_id: "run-1",
     status: "completed",
@@ -39,7 +41,11 @@ function makeRecord(overrides: Partial<Record<string, unknown>> = {}): Record<st
 }
 
 function writeReg(records: Record<string, unknown>[]) {
-  writeFileSync(regFile, records.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf-8");
+  writeFileSync(
+    regFile,
+    `${records.map((r) => JSON.stringify(r)).join("\n")}\n`,
+    "utf-8",
+  );
 }
 
 beforeEach(() => mkdirSync(tmpDir, { recursive: true }));
@@ -69,13 +75,21 @@ describe("readRegistry", () => {
   });
 
   it("skips malformed lines", () => {
-    writeFileSync(regFile, "not json\n" + JSON.stringify(makeRecord({ run_id: "r1" })) + "\n", "utf-8");
+    writeFileSync(
+      regFile,
+      `not json\n${JSON.stringify(makeRecord({ run_id: "r1" }))}\n`,
+      "utf-8",
+    );
     const records = readRegistry(regFile);
     expect(records).toHaveLength(1);
   });
 
   it("skips lines without run_id", () => {
-    writeFileSync(regFile, JSON.stringify({ status: "running" }) + "\n", "utf-8");
+    writeFileSync(
+      regFile,
+      `${JSON.stringify({ status: "running" })}\n`,
+      "utf-8",
+    );
     expect(readRegistry(regFile)).toHaveLength(0);
   });
 });
@@ -85,7 +99,7 @@ describe("getRun", () => {
     writeReg([makeRecord({ run_id: "r1" }), makeRecord({ run_id: "r2" })]);
     const run = getRun(regFile, "r2");
     expect(run).toBeDefined();
-    expect(run!.run_id).toBe("r2");
+    expect(run?.run_id).toBe("r2");
   });
 
   it("returns undefined for missing id", () => {
@@ -130,14 +144,20 @@ describe("findRunByPrefix", () => {
   });
 
   it("finds unique prefix match", () => {
-    writeReg([makeRecord({ run_id: "run-abc123" }), makeRecord({ run_id: "run-xyz789" })]);
+    writeReg([
+      makeRecord({ run_id: "run-abc123" }),
+      makeRecord({ run_id: "run-xyz789" }),
+    ]);
     const result = findRunByPrefix(regFile, "run-abc");
     expect(result).toBeDefined();
     expect(!Array.isArray(result) && (result as any).run_id).toBe("run-abc123");
   });
 
   it("returns array for ambiguous prefix", () => {
-    writeReg([makeRecord({ run_id: "run-abc123" }), makeRecord({ run_id: "run-abc456" })]);
+    writeReg([
+      makeRecord({ run_id: "run-abc123" }),
+      makeRecord({ run_id: "run-abc456" }),
+    ]);
     const result = findRunByPrefix(regFile, "run-abc");
     expect(Array.isArray(result)).toBe(true);
     expect((result as any[]).length).toBe(2);
@@ -149,7 +169,10 @@ describe("findRunByPrefix", () => {
   });
 
   it("prefers exact match over prefix match", () => {
-    writeReg([makeRecord({ run_id: "run-abc" }), makeRecord({ run_id: "run-abc123" })]);
+    writeReg([
+      makeRecord({ run_id: "run-abc" }),
+      makeRecord({ run_id: "run-abc123" }),
+    ]);
     const result = findRunByPrefix(regFile, "run-abc");
     expect(!Array.isArray(result) && (result as any).run_id).toBe("run-abc");
   });

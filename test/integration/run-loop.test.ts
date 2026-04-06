@@ -1,40 +1,45 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync, writeFileSync, mkdtempSync, cpSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
-  makeTempProject,
-  runCli,
+  FIXTURES_DIR,
   inspectCli,
+  MOCK_BACKEND,
+  makeTempProject,
+  PRESET_FIXTURE_DIR,
   pathExists,
   readText,
-  FIXTURES_DIR,
-  MOCK_BACKEND,
-  PRESET_FIXTURE_DIR,
+  runCli,
 } from "../helpers/runtime.js";
 
 beforeAll(() => {
   ensureBuild();
 });
 
-function makeWorkspaceWithGlobalBackend(name: string): { workspace: string; presetDir: string } {
-  const workspace = mkdtempSync(join(tmpdir(), `autoloop-global-backend-${name}-`));
+function makeWorkspaceWithGlobalBackend(name: string): {
+  workspace: string;
+  presetDir: string;
+} {
+  const workspace = mkdtempSync(
+    join(tmpdir(), `autoloop-global-backend-${name}-`),
+  );
   const presetDir = join(workspace, "presets", "fixture");
   cpSync(PRESET_FIXTURE_DIR, presetDir, { recursive: true });
 
   writeFileSync(
     join(workspace, "autoloops.toml"),
-    [
+    `${[
       'backend.kind = "command"',
       'backend.command = "node"',
       `backend.args = [${JSON.stringify(MOCK_BACKEND)}]`,
       'backend.prompt_mode = "arg"',
-      'review.enabled = false',
+      "review.enabled = false",
       'core.state_dir = ".autoloop"',
       'core.journal_file = ".autoloop/journal.jsonl"',
       'core.memory_file = ".autoloop/memory.jsonl"',
-    ].join("\n") + "\n",
+    ].join("\n")}\n`,
     "utf-8",
   );
 
@@ -42,7 +47,7 @@ function makeWorkspaceWithGlobalBackend(name: string): { workspace: string; pres
   const presetConfig = readFileSync(presetConfigPath, "utf-8")
     .replace('backend.kind = "command"', 'backend.kind = "pi"')
     .replace('backend.command = "echo"', 'backend.command = "pi"')
-    .replace(/backend\.args = \[[^\n]+\]\n/, '');
+    .replace(/backend\.args = \[[^\n]+\]\n/, "");
   writeFileSync(presetConfigPath, presetConfig, "utf-8");
 
   return { workspace, presetDir };
@@ -78,7 +83,9 @@ describe("integration: run loop with mock backend", () => {
 
     expect(progressLine).toBeTruthy();
     expect(progressLine).toContain("ts=");
-    expect(progressLine).toMatch(/ts=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/);
+    expect(progressLine).toMatch(
+      /ts=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/,
+    );
     expect(progressLine).toContain("iter=1");
     expect(progressLine).toContain("recent=loop.start");
     expect(progressLine).toContain("outcome=complete:completion_promise");
@@ -100,9 +107,12 @@ describe("integration: run loop with mock backend", () => {
   it("does not complete via completion_promise when the iteration had invalid events", () => {
     const project = makeTempProject("invalid-event-with-promise");
     const fixture = join(FIXTURES_DIR, "invalid-event-with-promise.json");
-    const res = runCli(["run", project, "integration invalid event blocks promise"], {
-      MOCK_FIXTURE_PATH: fixture,
-    });
+    const res = runCli(
+      ["run", project, "integration invalid event blocks promise"],
+      {
+        MOCK_FIXTURE_PATH: fixture,
+      },
+    );
 
     expect(res.status).toBe(0);
     const journal = readText(join(project, ".autoloop/journal.jsonl"));
@@ -119,9 +129,12 @@ describe("integration: run loop with mock backend", () => {
   it("prefers an accepted routing event over completion_promise within the same iteration", () => {
     const project = makeTempProject("routed-event-over-promise");
     const fixture = join(FIXTURES_DIR, "routed-event-and-promise.json");
-    const res = runCli(["run", project, "integration routed event over promise"], {
-      MOCK_FIXTURE_PATH: fixture,
-    });
+    const res = runCli(
+      ["run", project, "integration routed event over promise"],
+      {
+        MOCK_FIXTURE_PATH: fixture,
+      },
+    );
 
     expect(res.status).toBe(0);
     const journal = readText(join(project, ".autoloop/journal.jsonl"));
@@ -131,7 +144,9 @@ describe("integration: run loop with mock backend", () => {
 
     const routedIndex = journal.indexOf('"topic": "tasks.ready"');
     const secondIterationIndex = journal.indexOf('"iteration": "2"');
-    const completionPromiseIndex = journal.indexOf('"topic": "loop.complete", "fields": {"reason": "completion_promise"}');
+    const completionPromiseIndex = journal.indexOf(
+      '"topic": "loop.complete", "fields": {"reason": "completion_promise"}',
+    );
 
     expect(routedIndex).toBeGreaterThanOrEqual(0);
     expect(secondIterationIndex).toBeGreaterThan(routedIndex);
@@ -143,9 +158,12 @@ describe("integration: run loop with mock backend", () => {
   it("prints a progress line when stopping at max iterations", () => {
     const project = makeTempProject("max-iterations-progress");
     const fixture = join(FIXTURES_DIR, "no-completion.json");
-    const res = runCli(["run", project, "integration max iterations progress"], {
-      MOCK_FIXTURE_PATH: fixture,
-    });
+    const res = runCli(
+      ["run", project, "integration max iterations progress"],
+      {
+        MOCK_FIXTURE_PATH: fixture,
+      },
+    );
 
     expect(res.status).toBe(0);
     expect(res.stdout).toContain("[progress]");
@@ -155,9 +173,12 @@ describe("integration: run loop with mock backend", () => {
   it("prints a progress line when the backend fails", () => {
     const project = makeTempProject("backend-failed-progress");
     const fixture = join(FIXTURES_DIR, "non-zero-exit.json");
-    const res = runCli(["run", project, "integration backend failure progress"], {
-      MOCK_FIXTURE_PATH: fixture,
-    });
+    const res = runCli(
+      ["run", project, "integration backend failure progress"],
+      {
+        MOCK_FIXTURE_PATH: fixture,
+      },
+    );
 
     expect(res.status).toBe(0);
     expect(res.stdout).toContain("[progress]");
@@ -174,9 +195,12 @@ describe("integration: run loop with mock backend", () => {
     writeFileSync(configPath, config, "utf-8");
 
     const fixture = join(FIXTURES_DIR, "timeout.json");
-    const res = runCli(["run", project, "integration backend timeout progress"], {
-      MOCK_FIXTURE_PATH: fixture,
-    });
+    const res = runCli(
+      ["run", project, "integration backend timeout progress"],
+      {
+        MOCK_FIXTURE_PATH: fixture,
+      },
+    );
 
     expect(res.status).toBe(0);
     expect(res.stdout).toContain("[progress]");
@@ -199,9 +223,13 @@ describe("integration: run loop with mock backend", () => {
     const { workspace, presetDir } = makeWorkspaceWithGlobalBackend("override");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
 
-    const res = runCli(["run", presetDir, "global backend override"], {
-      MOCK_FIXTURE_PATH: fixture,
-    }, workspace);
+    const res = runCli(
+      ["run", presetDir, "global backend override"],
+      {
+        MOCK_FIXTURE_PATH: fixture,
+      },
+      workspace,
+    );
 
     expect(res.status).toBe(0);
 
@@ -237,9 +265,21 @@ describe("integration: run loop with mock backend", () => {
     });
     expect(res.status).toBe(0);
 
-    const metrics = inspectCli(["inspect", "metrics", "--format", "md"], {}, project);
-    const scratchpad = inspectCli(["inspect", "scratchpad", "--format", "md"], {}, project);
-    const memory = inspectCli(["inspect", "memory", "--format", "md"], {}, project);
+    const metrics = inspectCli(
+      ["inspect", "metrics", "--format", "md"],
+      {},
+      project,
+    );
+    const scratchpad = inspectCli(
+      ["inspect", "scratchpad", "--format", "md"],
+      {},
+      project,
+    );
+    const memory = inspectCli(
+      ["inspect", "memory", "--format", "md"],
+      {},
+      project,
+    );
 
     expect(metrics).toContain("iteration");
     expect(scratchpad).toContain("Iteration 1");

@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import { metaDirForRun, writeMeta } from "./meta.js";
-import type { WorktreeMeta } from "./meta.js";
 import { shellQuote } from "../utils.js";
+import type { WorktreeMeta } from "./meta.js";
+import { metaDirForRun, writeMeta } from "./meta.js";
 
 export interface CreateWorktreeOpts {
   mainProjectDir: string;
@@ -36,17 +36,26 @@ export function createWorktree(opts: CreateWorktreeOpts): CreateWorktreeResult {
 
   // Fail fast if branch already exists
   if (branchExists(mainProjectDir, branch)) {
-    throw new Error(`branch "${branch}" already exists; cannot create worktree for run ${runId}`);
+    throw new Error(
+      `branch "${branch}" already exists; cannot create worktree for run ${runId}`,
+    );
   }
 
   try {
-    execSync(`git worktree add ${shellQuote(worktreePath)} -b ${shellQuote(branch)}`, {
-      cwd: mainProjectDir,
-      stdio: "pipe",
-    });
+    execSync(
+      `git worktree add ${shellQuote(worktreePath)} -b ${shellQuote(branch)}`,
+      {
+        cwd: mainProjectDir,
+        stdio: "pipe",
+      },
+    );
   } catch (err: unknown) {
     // Clean up partial state on failure
-    try { rmSync(worktreePath, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      rmSync(worktreePath, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`git worktree add failed: ${msg}`);
   }
@@ -90,4 +99,3 @@ function branchExists(projectDir: string, branch: string): boolean {
     return false;
   }
 }
-

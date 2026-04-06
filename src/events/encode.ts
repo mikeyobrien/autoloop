@@ -1,4 +1,4 @@
-import { jsonField, jsonFieldRaw, jsonBool } from "../json.js";
+import { jsonBool, jsonField, jsonFieldRaw } from "../json.js";
 import type { JournalEvent } from "./types.js";
 
 export function encodeEvent(event: JournalEvent): string {
@@ -9,7 +9,7 @@ export function encodeEvent(event: JournalEvent): string {
   if (event.shape === "payload") {
     base.push(jsonField("payload", event.payload));
     if (event.source) base.push(jsonField("source", event.source));
-    return "{" + base.join(", ") + "}\n";
+    return `{${base.join(", ")}}\n`;
   }
 
   return (

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Test inspect journal CLI dispatch and parseInspectArgs --run flag.
@@ -26,7 +26,7 @@ vi.mock("../../src/chains.js", () => ({
 vi.mock("../../src/config.js", () => ({
   loadProject: vi.fn(() => ({})),
   getProfileDefaults: vi.fn(() => []),
-  stateDirPath: vi.fn((d: string) => d + "/.autoloop"),
+  stateDirPath: vi.fn((d: string) => `${d}/.autoloop`),
 }));
 
 vi.mock("../../src/topology.js", () => ({
@@ -35,7 +35,10 @@ vi.mock("../../src/topology.js", () => ({
 }));
 
 vi.mock("../../src/profiles.js", () => ({
-  resolveProfileFragments: vi.fn(() => ({ fragments: new Map(), warnings: [] })),
+  resolveProfileFragments: vi.fn(() => ({
+    fragments: new Map(),
+    warnings: [],
+  })),
 }));
 
 vi.mock("../../src/usage.js", () => ({
@@ -50,7 +53,7 @@ describe("dispatchInspect journal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Set a fallback project dir
-    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+    process.env.AUTOLOOP_PROJECT_DIR = "/tmp/test-project";
   });
 
   it("dispatches 'inspect journal' to renderAllJournals", () => {
@@ -61,7 +64,10 @@ describe("dispatchInspect journal", () => {
 
   it("dispatches 'inspect journal --run <id>' to renderJournal with run ID", () => {
     dispatchInspect(["journal", "--run", "abc-123"]);
-    expect(harness.renderJournal).toHaveBeenCalledWith(expect.any(String), "abc-123");
+    expect(harness.renderJournal).toHaveBeenCalledWith(
+      expect.any(String),
+      "abc-123",
+    );
     expect(harness.renderAllJournals).not.toHaveBeenCalled();
   });
 
@@ -72,41 +78,48 @@ describe("dispatchInspect journal", () => {
 
   it("dispatches 'inspect journal --run <id>' with explicit project dir", () => {
     dispatchInspect(["journal", "--run", "run-xyz", "/my/project"]);
-    expect(harness.renderJournal).toHaveBeenCalledWith("/my/project", "run-xyz");
+    expect(harness.renderJournal).toHaveBeenCalledWith(
+      "/my/project",
+      "run-xyz",
+    );
   });
 });
 
 describe("dispatchInspect topology", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+    process.env.AUTOLOOP_PROJECT_DIR = "/tmp/test-project";
   });
 
   it("dispatches 'inspect topology' to renderTopologyInspect", () => {
     dispatchInspect(["topology"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "terminal",
+      expect.any(String),
+      "terminal",
     );
   });
 
   it("dispatches 'inspect topology --format graph'", () => {
     dispatchInspect(["topology", "--format", "graph"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "graph",
+      expect.any(String),
+      "graph",
     );
   });
 
   it("dispatches 'inspect topology --format json'", () => {
     dispatchInspect(["topology", "--format", "json"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "json",
+      expect.any(String),
+      "json",
     );
   });
 
   it("dispatches 'inspect topology --run <id>' (run ignored, topology is static)", () => {
     dispatchInspect(["topology", "--run", "run-abc"]);
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String), "terminal",
+      expect.any(String),
+      "terminal",
     );
   });
 });
@@ -114,7 +127,7 @@ describe("dispatchInspect topology", () => {
 describe("dispatchInspect catch-all error", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+    process.env.AUTOLOOP_PROJECT_DIR = "/tmp/test-project";
   });
 
   it("prints valid targets for unknown artifact", () => {

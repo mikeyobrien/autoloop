@@ -6,7 +6,8 @@ export function decodeEvent(line: string): JournalEvent | null {
     const parsed = JSON.parse(line) as Record<string, unknown>;
     const run = typeof parsed.run === "string" ? parsed.run : "";
     const topic = typeof parsed.topic === "string" ? parsed.topic : "";
-    const iteration = typeof parsed.iteration === "string" ? parsed.iteration : undefined;
+    const iteration =
+      typeof parsed.iteration === "string" ? parsed.iteration : undefined;
 
     if (typeof parsed.payload === "string") {
       const event: PayloadEvent = {

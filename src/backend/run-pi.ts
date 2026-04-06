@@ -1,5 +1,5 @@
-import { shellWords } from "../utils.js";
 import type { LoopContext } from "../harness/types.js";
+import { shellWords } from "../utils.js";
 
 export function buildPiAdapterInvocation(
   loop: LoopContext,

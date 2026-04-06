@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { RunRecord } from "../registry/types.js";
 import { resolvePresetDir } from "../chains/load.js";
+import type { RunRecord } from "../registry/types.js";
 
 export type IsolationMode = "shared" | "run-scoped" | "worktree";
 
@@ -63,8 +63,8 @@ export function resolveIsolationMode(
     const warning = [
       `Active code-modifying run detected: ${runList}`,
       "  Runs sharing the same checkout may produce code conflicts.",
-      "  Consider: autoloop run <preset> --worktree \"your prompt\"",
-      "  Or suppress: autoloop run <preset> --no-worktree \"your prompt\"",
+      '  Consider: autoloop run <preset> --worktree "your prompt"',
+      '  Or suppress: autoloop run <preset> --no-worktree "your prompt"',
     ].join("\n");
     return {
       mode: "run-scoped",
@@ -82,7 +82,10 @@ export type PresetCategory = "code" | "planning" | "unknown";
  * Reads `<!-- category: ... -->` from harness.md if present.
  * Falls back to name-based heuristic.
  */
-export function presetCategory(presetName: string, projectDir: string): PresetCategory {
+export function presetCategory(
+  presetName: string,
+  projectDir: string,
+): PresetCategory {
   const presetDir = resolvePresetDir(presetName, projectDir);
   const harnessPath = join(presetDir, "harness.md");
 
@@ -98,10 +101,25 @@ export function presetCategory(presetName: string, projectDir: string): PresetCa
 
   // Name-based heuristic fallback
   const name = presetName.toLowerCase();
-  const codePresets = ["autocode", "autofix", "autotest", "autosimplify", "autoperf", "autosec"];
+  const codePresets = [
+    "autocode",
+    "autofix",
+    "autotest",
+    "autosimplify",
+    "autoperf",
+    "autosec",
+  ];
   if (codePresets.some((p) => name.includes(p))) return "code";
 
-  const planningPresets = ["automerge", "autoideas", "autoresearch", "autodoc", "autoreview", "autoqa", "autospec"];
+  const planningPresets = [
+    "automerge",
+    "autoideas",
+    "autoresearch",
+    "autodoc",
+    "autoreview",
+    "autoqa",
+    "autospec",
+  ];
   if (planningPresets.some((p) => name.includes(p))) return "planning";
 
   return "unknown";
@@ -113,12 +131,24 @@ export function presetCategory(presetName: string, projectDir: string): PresetCa
  * Accepts an optional category override from preset metadata.
  * This is intentionally conservative — returns false when uncertain.
  */
-export function isCodeModifyingRun(record: RunRecord, categoryOverride?: PresetCategory): boolean {
+export function isCodeModifyingRun(
+  record: RunRecord,
+  categoryOverride?: PresetCategory,
+): boolean {
   if (categoryOverride === "code") return true;
   if (categoryOverride === "planning") return false;
 
   const preset = record.preset.toLowerCase();
   const objective = record.objective.toLowerCase();
-  const codeIndicators = ["autocode", "builder", "fix", "implement", "refactor", "code"];
-  return codeIndicators.some((ind) => preset.includes(ind) || objective.includes(ind));
+  const codeIndicators = [
+    "autocode",
+    "builder",
+    "fix",
+    "implement",
+    "refactor",
+    "code",
+  ];
+  return codeIndicators.some(
+    (ind) => preset.includes(ind) || objective.includes(ind),
+  );
 }

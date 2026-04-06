@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Verify that inline automerge is skipped when trigger is "chain".
@@ -64,7 +64,7 @@ vi.mock("../../src/harness/parallel.js", () => ({
   appendLoopStart: vi.fn(),
 }));
 
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../../src/harness/index.js";
@@ -72,18 +72,24 @@ import { mergeWorktree } from "../../src/worktree/merge.js";
 
 function makeProject(configToml = ""): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-ts-automerge-chain-"));
-  writeFileSync(join(dir, "autoloops.toml"), configToml || '[backend]\ncommand = "echo"\n');
+  writeFileSync(
+    join(dir, "autoloops.toml"),
+    configToml || '[backend]\ncommand = "echo"\n',
+  );
   writeFileSync(join(dir, "topology.toml"), '[[role]]\nname = "builder"\n');
   const stateDir = join(dir, ".autoloop");
   mkdirSync(stateDir, { recursive: true });
   const metaDir = join(stateDir, "worktrees", "test-wt");
   mkdirSync(metaDir, { recursive: true });
-  writeFileSync(join(metaDir, "meta.json"), JSON.stringify({
-    run_id: "test-run",
-    branch: "wt-test",
-    merge_strategy: "squash",
-    created_at: new Date().toISOString(),
-  }));
+  writeFileSync(
+    join(metaDir, "meta.json"),
+    JSON.stringify({
+      run_id: "test-run",
+      branch: "wt-test",
+      merge_strategy: "squash",
+      created_at: new Date().toISOString(),
+    }),
+  );
   return dir;
 }
 

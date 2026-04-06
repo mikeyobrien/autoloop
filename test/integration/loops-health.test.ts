@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { join } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
+  FIXTURES_DIR,
   makeTempProject,
   runCli,
-  FIXTURES_DIR,
 } from "../helpers/runtime.js";
 
 beforeAll(() => {
@@ -15,20 +15,32 @@ beforeAll(() => {
 describe("integration: loops health", () => {
   it("shows all clear when no runs exist", () => {
     const project = makeTempProject("health-empty");
-    const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
-    }, project);
-    expect(res.stdout.trim()).toBe("All clear. 0 active, 0 completed in last 24h.");
+    const res = runCli(
+      ["loops", "health"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
+    expect(res.stdout.trim()).toBe(
+      "All clear. 0 active, 0 completed in last 24h.",
+    );
   });
 
   it("shows all clear with completion count after successful run", () => {
     const project = makeTempProject("health-completed");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    runCli(["run", project, "health completed test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "health completed test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
-    const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
-    }, project);
+    const res = runCli(
+      ["loops", "health"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(res.stdout).toContain("All clear.");
     expect(res.stdout).toContain("completed in last 24h.");
   });
@@ -36,11 +48,17 @@ describe("integration: loops health", () => {
   it("shows completions with --verbose", () => {
     const project = makeTempProject("health-verbose");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    runCli(["run", project, "health verbose test"], { MOCK_FIXTURE_PATH: fixture });
+    runCli(["run", project, "health verbose test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
 
-    const res = runCli(["loops", "health", "--verbose"], {
-      MINILOOPS_PROJECT_DIR: project,
-    }, project);
+    const res = runCli(
+      ["loops", "health", "--verbose"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     // When healthy, --verbose doesn't change the one-liner
     expect(res.stdout).toContain("All clear.");
   });
@@ -69,11 +87,15 @@ describe("integration: loops health", () => {
       stop_reason: "backend_failed",
       latest_event: "loop.stop",
     });
-    writeFileSync(join(registryDir, "registry.jsonl"), record + "\n", "utf-8");
+    writeFileSync(join(registryDir, "registry.jsonl"), `${record}\n`, "utf-8");
 
-    const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
-    }, project);
+    const res = runCli(
+      ["loops", "health"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(res.stdout).toContain("FAILED:");
     expect(res.stdout).toContain("run-test-failed-001");
     expect(res.stdout).toContain("1 failed");
@@ -104,11 +126,15 @@ describe("integration: loops health", () => {
       stop_reason: "",
       latest_event: "iteration.finish",
     });
-    writeFileSync(join(registryDir, "registry.jsonl"), record + "\n", "utf-8");
+    writeFileSync(join(registryDir, "registry.jsonl"), `${record}\n`, "utf-8");
 
-    const res = runCli(["loops", "health"], {
-      MINILOOPS_PROJECT_DIR: project,
-    }, project);
+    const res = runCli(
+      ["loops", "health"],
+      {
+        AUTOLOOP_PROJECT_DIR: project,
+      },
+      project,
+    );
     expect(res.stdout).toContain("STUCK:");
     expect(res.stdout).toContain("run-test-stuck-001");
     expect(res.stdout).toContain("1 stuck");

@@ -1,7 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { encodeEvent } from "../../src/events/encode.js";
+import { describe, expect, it } from "vitest";
 import { decodeEvent } from "../../src/events/decode.js";
-import { isCoordinationEvent, isPayloadEvent, isRoutingEvent, isSystemEvent } from "../../src/events/guards.js";
+import { encodeEvent } from "../../src/events/encode.js";
+import {
+  isCoordinationEvent,
+  isPayloadEvent,
+  isRoutingEvent,
+  isSystemEvent,
+} from "../../src/events/guards.js";
 
 describe("event codec", () => {
   it("round-trips fields events with string values", () => {
@@ -58,14 +63,20 @@ describe("event codec", () => {
   });
 
   it("returns null for invalid json", () => {
-    expect(decodeEvent('not json')).toBeNull();
+    expect(decodeEvent("not json")).toBeNull();
   });
 });
 
 describe("event guards", () => {
-  const systemEvent = decodeEvent('{"run":"r1","topic":"loop.start","fields":{}}');
-  const payloadEvent = decodeEvent('{"run":"r1","topic":"task.complete","payload":"done","source":"agent"}');
-  const coordinationEvent = decodeEvent('{"run":"r1","topic":"issue.discovered","payload":"id=1;summary=test","source":"agent"}');
+  const systemEvent = decodeEvent(
+    '{"run":"r1","topic":"loop.start","fields":{}}',
+  );
+  const payloadEvent = decodeEvent(
+    '{"run":"r1","topic":"task.complete","payload":"done","source":"agent"}',
+  );
+  const coordinationEvent = decodeEvent(
+    '{"run":"r1","topic":"issue.discovered","payload":"id=1;summary=test","source":"agent"}',
+  );
 
   it("identifies payload events", () => {
     expect(isPayloadEvent(payloadEvent)).toBe(true);

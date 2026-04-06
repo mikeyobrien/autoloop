@@ -1,4 +1,4 @@
-import { lineSep, joinCsv } from "./utils.js";
+import { joinCsv, lineSep } from "./utils.js";
 
 export interface MaterializedMemory {
   preferences: string[];
@@ -84,10 +84,10 @@ function formatDroppedCounts(
 ): string {
   if (prefs === 0 && learnings === 0 && meta === 0) return "";
   const parts: string[] = [];
-  if (prefs > 0) parts.push(prefs + " preferences");
-  if (learnings > 0) parts.push(learnings + " learnings");
-  if (meta > 0) parts.push(meta + " meta");
-  return " (" + joinCsv(parts) + " truncated)";
+  if (prefs > 0) parts.push(`${prefs} preferences`);
+  if (learnings > 0) parts.push(`${learnings} learnings`);
+  if (meta > 0) parts.push(`${meta} meta`);
+  return ` (${joinCsv(parts)} truncated)`;
 }
 
 function truncationFooter(

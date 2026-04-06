@@ -1,8 +1,17 @@
-import { existsSync, readFileSync, appendFileSync, mkdirSync, readdirSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+} from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { extractField as jsonExtractField, extractTopic as jsonExtractTopic } from "../json.js";
 import { encodeEvent } from "../events/encode.js";
-import { lineSep, shellQuote } from "../utils.js";
+import {
+  extractField as jsonExtractField,
+  extractTopic as jsonExtractTopic,
+} from "../json.js";
+import { lineSep } from "../utils.js";
 
 export function appendEvent(
   path: string,
@@ -11,14 +20,17 @@ export function appendEvent(
   topic: string,
   fieldsJson: string,
 ): void {
-  appendText(path, encodeEvent({
-    shape: "fields",
-    run: runId,
-    iteration: iteration || undefined,
-    topic,
-    fields: parsedFields(fieldsJson),
-    rawFields: parsedFieldsRaw(fieldsJson),
-  }));
+  appendText(
+    path,
+    encodeEvent({
+      shape: "fields",
+      run: runId,
+      iteration: iteration || undefined,
+      topic,
+      fields: parsedFields(fieldsJson),
+      rawFields: parsedFieldsRaw(fieldsJson),
+    }),
+  );
 }
 
 export function appendAgentEvent(
@@ -49,14 +61,17 @@ function appendEmittedEvent(
   payload: string,
   source: string,
 ): void {
-  appendText(path, encodeEvent({
-    shape: "payload",
-    run: runId,
-    iteration: iteration || undefined,
-    topic,
-    payload,
-    source,
-  }));
+  appendText(
+    path,
+    encodeEvent({
+      shape: "payload",
+      run: runId,
+      iteration: iteration || undefined,
+      topic,
+      payload,
+      source,
+    }),
+  );
 }
 
 function parsedFields(fieldsJson: string): Record<string, string> {
@@ -71,7 +86,7 @@ function parsedFields(fieldsJson: string): Record<string, string> {
 function parsedFieldsRaw(fieldsJson: string): Record<string, unknown> {
   if (!fieldsJson.trim()) return {};
   try {
-    return JSON.parse("{" + fieldsJson + "}") as Record<string, unknown>;
+    return JSON.parse(`{${fieldsJson}}`) as Record<string, unknown>;
   } catch {
     return {};
   }
@@ -86,9 +101,7 @@ export function readLines(path: string): string[] {
 }
 
 export function readRunLines(path: string, runId: string): string[] {
-  return readLines(path).filter(
-    (line) => extractRun(line) === runId,
-  );
+  return readLines(path).filter((line) => extractRun(line) === runId);
 }
 
 export function extractTopic(line: string): string {
@@ -119,10 +132,7 @@ export function latestRunId(path: string): string {
   return current;
 }
 
-export function latestIterationForRun(
-  path: string,
-  runId: string,
-): string {
+export function latestIterationForRun(path: string, runId: string): string {
   const lines = readRunLines(path, runId);
   let current = "";
   for (const line of lines) {
@@ -164,7 +174,13 @@ export function readAllJournals(baseStateDir: string): string[] {
     const entries = readdirSync(wtDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const wtJournal = join(wtDir, entry.name, "tree", stateDirName, "journal.jsonl");
+      const wtJournal = join(
+        wtDir,
+        entry.name,
+        "tree",
+        stateDirName,
+        "journal.jsonl",
+      );
       if (existsSync(wtJournal)) allLines.push(...readLines(wtJournal));
     }
   }
@@ -182,12 +198,22 @@ export function readAllJournals(baseStateDir: string): string[] {
  * Checks run-scoped (runs/<runId>/journal.jsonl) and worktree paths first.
  * Returns null if no run-specific journal exists.
  */
-export function resolveRunJournalPath(baseStateDir: string, runId: string): string | null {
+export function resolveRunJournalPath(
+  baseStateDir: string,
+  runId: string,
+): string | null {
   const runJournal = join(baseStateDir, "runs", runId, "journal.jsonl");
   if (existsSync(runJournal)) return runJournal;
 
   const stateDirName = basename(baseStateDir);
-  const wtJournal = join(baseStateDir, "worktrees", runId, "tree", stateDirName, "journal.jsonl");
+  const wtJournal = join(
+    baseStateDir,
+    "worktrees",
+    runId,
+    "tree",
+    stateDirName,
+    "journal.jsonl",
+  );
   if (existsSync(wtJournal)) return wtJournal;
 
   return null;

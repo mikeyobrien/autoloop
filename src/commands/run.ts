@@ -1,10 +1,14 @@
-import * as harness from "../harness/index.js";
+import { basename, resolve } from "node:path";
 import * as chains from "../chains.js";
 import * as config from "../config.js";
-import { resolve, basename } from "node:path";
-import { joinCsv } from "../utils.js";
-import { printRunUsage, missingPresetError, unknownPresetError } from "../usage.js";
 import { claudeBackend } from "../harness/config-helpers.js";
+import * as harness from "../harness/index.js";
+import {
+  missingPresetError,
+  printRunUsage,
+  unknownPresetError,
+} from "../usage.js";
+import { joinCsv } from "../utils.js";
 
 interface RunOptions {
   projectDir: string;
@@ -25,7 +29,12 @@ interface RunOptions {
   keepWorktree?: boolean;
 }
 
-export function dispatchRun(args: string[], argv: string[], bundleRoot: string, selfCmd: string): boolean {
+export function dispatchRun(
+  args: string[],
+  _argv: string[],
+  bundleRoot: string,
+  selfCmd: string,
+): boolean {
   if (args[0] === "--help" || args[0] === "-h") {
     printRunUsage();
     return true;
@@ -41,23 +50,18 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
   // --automerge sugar: build inline chain [preset, automerge]
   if (options.automerge) {
     const presetName = basename(options.projectDir);
-    const chainCsv = presetName + ",automerge";
+    const chainCsv = `${presetName},automerge`;
     const chainProjectDir = defaultChainProjectDir(bundleRoot);
     runInlineChain(chainCsv, chainProjectDir, selfCmd, options);
     return true;
   }
 
-  harness.run(
-    options.projectDir,
-    normalizePrompt(options.prompt),
-    selfCmd,
-    {
-      ...options,
-      profiles: options.profiles.length > 0 ? options.profiles : undefined,
-      noDefaultProfiles: options.noDefaultProfiles || undefined,
-      ...chainableOptions(options),
-    },
-  );
+  harness.run(options.projectDir, normalizePrompt(options.prompt), selfCmd, {
+    ...options,
+    profiles: options.profiles.length > 0 ? options.profiles : undefined,
+    noDefaultProfiles: options.noDefaultProfiles || undefined,
+    ...chainableOptions(options),
+  });
   return true;
 }
 
@@ -79,64 +83,110 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
   while (i < args.length) {
     const token = args[i];
 
-    if (token === "run") { i++; continue; }
-    if (token === "--verbose" || token === "-v") { options.logLevel = "debug"; i++; continue; }
+    if (token === "run") {
+      i++;
+      continue;
+    }
+    if (token === "--verbose" || token === "-v") {
+      options.logLevel = "debug";
+      i++;
+      continue;
+    }
     if (token === "-b" || token === "--backend") {
       const backend = args[i + 1];
-      if (!backend) { console.log("missing backend after " + token); options.usageError = true; return options; }
+      if (!backend) {
+        console.log(`missing backend after ${token}`);
+        options.usageError = true;
+        return options;
+      }
       options.backendOverride = backendOverrideSpec(backend);
-      i += 2; continue;
+      i += 2;
+      continue;
     }
     if (token === "-p" || token === "--preset") {
       const preset = args[i + 1];
-      if (!preset) { console.log("missing preset after " + token); options.usageError = true; return options; }
+      if (!preset) {
+        console.log(`missing preset after ${token}`);
+        options.usageError = true;
+        return options;
+      }
       const resolved = config.resolveProjectDir(preset, bundleRoot);
-      if (!resolved) { console.log("preset `" + preset + "` not found"); options.usageError = true; return options; }
+      if (!resolved) {
+        console.log(`preset \`${preset}\` not found`);
+        options.usageError = true;
+        return options;
+      }
       options.projectDir = resolved;
       options.presetExplicit = true;
-      i += 2; continue;
+      i += 2;
+      continue;
     }
     if (token === "--chain") {
       const chainVal = args[i + 1];
-      if (!chainVal) { console.log("missing chain after --chain"); options.usageError = true; return options; }
+      if (!chainVal) {
+        console.log("missing chain after --chain");
+        options.usageError = true;
+        return options;
+      }
       options.chain = chainVal;
-      i += 2; continue;
+      i += 2;
+      continue;
     }
     if (token === "--profile") {
       const profile = args[i + 1];
-      if (!profile) { console.log("missing profile spec after --profile"); options.usageError = true; return options; }
+      if (!profile) {
+        console.log("missing profile spec after --profile");
+        options.usageError = true;
+        return options;
+      }
       options.profiles.push(profile);
-      i += 2; continue;
+      i += 2;
+      continue;
     }
     if (token === "--no-default-profiles") {
       options.noDefaultProfiles = true;
-      i++; continue;
+      i++;
+      continue;
     }
     if (token === "--worktree") {
       options.worktree = true;
-      i++; continue;
+      i++;
+      continue;
     }
     if (token === "--no-worktree") {
       options.noWorktree = true;
-      i++; continue;
+      i++;
+      continue;
     }
     if (token === "--merge-strategy") {
       const val = args[i + 1];
-      if (!val) { console.log("missing strategy after --merge-strategy"); options.usageError = true; return options; }
+      if (!val) {
+        console.log("missing strategy after --merge-strategy");
+        options.usageError = true;
+        return options;
+      }
       options.mergeStrategy = val;
-      i += 2; continue;
+      i += 2;
+      continue;
     }
     if (token === "--automerge") {
       options.automerge = true;
-      i++; continue;
+      i++;
+      continue;
     }
     if (token === "--keep-worktree") {
       options.keepWorktree = true;
-      i++; continue;
+      i++;
+      continue;
     }
     if (token === "-i" || token === "--iterations") {
-      console.log("unsupported flag `" + token + "`; set event_loop.max_iterations in the preset config");
-      options.usageError = true; return options;
+      console.log(
+        "unsupported flag `" +
+          token +
+          "`; set event_loop.max_iterations in the preset config",
+      );
+      options.usageError = true;
+      return options;
     }
 
     options.positionals.push(token);
@@ -201,13 +251,15 @@ function applyGlobalBackendOverride(options: RunOptions): RunOptions {
   if (!config.projectHasConfig(cwdProjectDir)) return options;
   if (resolve(cwdProjectDir) === resolve(options.projectDir)) return options;
 
-  const globalBackendOverride = config.backendOverrideFromProject(cwdProjectDir);
+  const globalBackendOverride =
+    config.backendOverrideFromProject(cwdProjectDir);
   if (Object.keys(globalBackendOverride).length === 0) return options;
 
   if (config.hasUserConfig()) {
     process.stderr.write(
       "warning: cwd-based backend override is deprecated; configure backend in " +
-      config.userConfigPath() + " instead\n",
+        config.userConfigPath() +
+        " instead\n",
     );
   }
 
@@ -231,7 +283,7 @@ function runInlineChain(
     console.log("");
     console.log(validation.reason ?? "");
     console.log("");
-    console.log("Known presets: " + joinCsv(chains.listKnownPresets()));
+    console.log(`Known presets: ${joinCsv(chains.listKnownPresets())}`);
     return;
   }
   chains.runChain(chainSpec, projectDir, selfCmd, {
@@ -250,7 +302,12 @@ function backendOverrideSpec(backend: string): Record<string, unknown> {
     return { kind: "pi", command: "pi", args: [], prompt_mode: "arg" };
   }
   if (claudeBackend(backend)) {
-    return { kind: "command", command: backend, args: ["-p", "--dangerously-skip-permissions"], prompt_mode: "arg" };
+    return {
+      kind: "command",
+      command: backend,
+      args: ["-p", "--dangerously-skip-permissions"],
+      prompt_mode: "arg",
+    };
   }
   return { kind: "command", command: backend, args: [], prompt_mode: "arg" };
 }

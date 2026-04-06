@@ -1,5 +1,5 @@
 import { decodeEvent } from "../events/decode.js";
-import { heading, bulletList } from "../markdown.js";
+import { bulletList, heading } from "../markdown.js";
 
 interface Issue {
   id: string;
@@ -50,7 +50,11 @@ export function coordinationFromLines(lines: string[]): string {
   return renderCoordinationState(state);
 }
 
-function collectCoordinationEvent(topic: string, payload: string, state: CoordinationState): void {
+function collectCoordinationEvent(
+  topic: string,
+  payload: string,
+  state: CoordinationState,
+): void {
   switch (topic) {
     case "issue.discovered":
       state.issues.push({
@@ -105,7 +109,7 @@ function collectCoordinationEvent(topic: string, payload: string, state: Coordin
 }
 
 function extractKvFromPayload(payload: string, key: string): string {
-  const marker = key + "=";
+  const marker = `${key}=`;
   const parts = payload.split(marker);
   if (parts.length <= 1) return "";
   const rest = parts[1];
@@ -136,28 +140,30 @@ function renderCoordinationState(state: CoordinationState): string {
 function renderIssues(issues: Issue[]): string {
   if (issues.length === 0) return "";
   const items = issues.map((i) => {
-    let text = "[" + i.disposition + "] " + i.id + ": " + i.summary;
-    if (i.resolution) text += " — " + i.resolution;
-    if (i.owner) text += " (owner: " + i.owner + ")";
+    let text = `[${i.disposition}] ${i.id}: ${i.summary}`;
+    if (i.resolution) text += ` — ${i.resolution}`;
+    if (i.owner) text += ` (owner: ${i.owner})`;
     return text;
   });
-  return heading(2, "Issues") + "\n" + bulletList(items) + "\n\n";
+  return `${heading(2, "Issues")}\n${bulletList(items)}\n\n`;
 }
 
 function renderSlices(slices: Slice[]): string {
   if (slices.length === 0) return "";
-  const items = slices.map((s) => "[" + s.status + "] " + s.id + ": " + s.description);
-  return heading(2, "Slices") + "\n" + bulletList(items) + "\n\n";
+  const items = slices.map((s) => `[${s.status}] ${s.id}: ${s.description}`);
+  return `${heading(2, "Slices")}\n${bulletList(items)}\n\n`;
 }
 
 function renderCommits(commits: Commit[]): string {
   if (commits.length === 0) return "";
-  const items = commits.map((c) => c.sliceId + " → " + c.commitHash);
-  return heading(2, "Commits") + "\n" + bulletList(items) + "\n\n";
+  const items = commits.map((c) => `${c.sliceId} → ${c.commitHash}`);
+  return `${heading(2, "Commits")}\n${bulletList(items)}\n\n`;
 }
 
 function renderArchives(archives: Archive[]): string {
   if (archives.length === 0) return "";
-  const items = archives.map((a) => a.sourceFile + " → " + a.destFile + " (" + a.reason + ")");
-  return heading(2, "Archives") + "\n" + bulletList(items) + "\n\n";
+  const items = archives.map(
+    (a) => `${a.sourceFile} → ${a.destFile} (${a.reason})`,
+  );
+  return `${heading(2, "Archives")}\n${bulletList(items)}\n\n`;
 }

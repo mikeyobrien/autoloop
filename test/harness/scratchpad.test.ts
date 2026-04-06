@@ -1,11 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { encodeEvent } from "../../src/events/encode.js";
 import {
   renderRunScratchpadFull,
   renderRunScratchpadPrompt,
 } from "../../src/harness/scratchpad.js";
 
-function iterFinishLine(iteration: string, exitCode: string, output: string): string {
+function iterFinishLine(
+  iteration: string,
+  exitCode: string,
+  output: string,
+): string {
   return encodeEvent({
     shape: "fields",
     run: "r1",
@@ -121,7 +125,7 @@ describe("renderRunScratchpadPrompt", () => {
       iterFinishLine("5", "0", "d"),
     ];
     const result = renderRunScratchpadPrompt(lines);
-    expect(result).toContain("x".repeat(120) + "...");
+    expect(result).toContain(`${"x".repeat(120)}...`);
   });
 
   it("shows (no output) for empty output in compact summary", () => {

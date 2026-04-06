@@ -178,7 +178,7 @@ The harness also checks for invalid events after each iteration completes (in ca
 
 Invalid events are caught at two points:
 
-- **At emit time** — the `autoloop emit` command validates against `MINILOOPS_ALLOWED_EVENTS` environment variable and rejects immediately.
+- **At emit time** — the `autoloop emit` command validates against `AUTOLOOP_ALLOWED_EVENTS` environment variable and rejects immediately.
 - **After iteration** — the harness scans the iteration's journal entries for the latest agent event and validates it against the topology. This catches events emitted through non-standard paths.
 
 ## Completion detection
@@ -219,7 +219,7 @@ Each section is built from the `exit_code` and `output` fields of the correspond
 
 ## Run scoping
 
-All journal operations filter to the current run ID. The run ID is set at `loop.start` and carried through as `MINILOOPS_RUN_ID` in the environment. Multiple runs can coexist in the same journal file — each run's events are isolated by their `run` field.
+All journal operations filter to the current run ID. The run ID is set at `loop.start` and carried through as `AUTOLOOP_RUN_ID` in the environment. Multiple runs can coexist in the same journal file — each run's events are isolated by their `run` field.
 
 The latest run is found by scanning backward for the most recent `loop.start` entry.
 

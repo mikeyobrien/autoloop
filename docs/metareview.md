@@ -88,10 +88,10 @@ During a review invocation, the harness sets the following environment variables
 
 | Variable | Value | Purpose |
 |----------|-------|---------|
-| `MINILOOPS_REVIEW_MODE` | `metareview` | Signals to the backend that this is a review pass, not a normal iteration. |
-| `MINILOOPS_ITERATION` | Current iteration number | The iteration that triggered the review. |
+| `AUTOLOOP_REVIEW_MODE` | `metareview` | Signals to the backend that this is a review pass, not a normal iteration. |
+| `AUTOLOOP_ITERATION` | Current iteration number | The iteration that triggered the review. |
 
-Normal iterations set `MINILOOPS_REVIEW_MODE` to an empty string. The `pi-adapter` uses this to route stream logs to `pi-review.<iteration>.jsonl` instead of the normal `pi-stream.<iteration>.jsonl`.
+Normal iterations set `AUTOLOOP_REVIEW_MODE` to an empty string. The `pi-adapter` uses this to route stream logs to `pi-review.<iteration>.jsonl` instead of the normal `pi-stream.<iteration>.jsonl`.
 
 ## Allowed events
 
