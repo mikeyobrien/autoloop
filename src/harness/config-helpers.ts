@@ -12,9 +12,15 @@ import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
 import { createRunScopedDir } from "../isolation/run-scope.js";
 import * as profiles from "../profiles.js";
 import { activeRuns } from "../registry/read.js";
-import * as tasks from "../tasks.js";
 import * as topo from "../topology.js";
-import { generateCompactId, splitCsv } from "../utils.js";
+import {
+  assertNoRawAutoloopPaths,
+  expandTemplatePlaceholders,
+  generateCompactId,
+  generateReadableId,
+  splitCsv,
+  uniqueGeneratedId,
+} from "../utils.js";
 import { createWorktree } from "../worktree/create.js";
 import {
   extractField,
@@ -153,12 +159,24 @@ export function claudeBackend(command: string): boolean {
 }
 
 export function nextRunId(path: string, cfg: config.Config): string {
-  if (config.get(cfg, "core.run_id_format", "compact") === "counter") {
-    const lines = readLines(path);
+  const lines = readLines(path);
+  const format = config.get(cfg, "core.run_id_format", "human");
+  if (format === "counter") {
     const count = lines.filter((l) => extractTopic(l) === "loop.start").length;
     return `run-${count + 1}`;
   }
-  return generateCompactId("run");
+  const existing = new Set(
+    lines.map((line) => extractField(line, "run")).filter(Boolean),
+  );
+  if (format === "compact") {
+    return (
+      uniqueGeneratedId(() => generateCompactId("run"), existing) ??
+      generateCompactId("run")
+    );
+  }
+  return (
+    uniqueGeneratedId(generateReadableId, existing) ?? generateCompactId("run")
+  );
 }
 
 export function iterationFieldForRun(
@@ -308,7 +326,7 @@ export function buildLoopContext(
       workDir: effectiveWorkDir,
       stateDir: effectiveStateDir,
       journalFile:
-        isolation.mode === "run-scoped" || isolation.mode === "worktree"
+        isolation.mode === "worktree"
           ? join(effectiveStateDir, "journal.jsonl")
           : journalFile,
       memoryFile,
@@ -387,9 +405,23 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     }
   }
 
+  const templateVars: Record<string, string> = {
+    STATE_DIR: loop.paths.stateDir,
+    TOOL_PATH: loop.paths.toolPath,
+  };
+
+  const updatedTopology: topo.Topology = {
+    ...finalTopology,
+    roles: finalTopology.roles.map((role) => {
+      const prompt = expandTemplatePlaceholders(role.prompt, templateVars);
+      assertNoRawAutoloopPaths(prompt, `role prompt: ${role.id}`);
+      return { ...role, prompt };
+    }),
+  };
+
   const updated: LoopContext = {
     objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride),
-    topology: finalTopology,
+    topology: updatedTopology,
     limits: {
       maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3),
     },
@@ -406,7 +438,14 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       requiredEvents: config.getList(cfg, "event_loop.required_events"),
     },
     backend,
-    review,
+    review: {
+      ...review,
+      prompt: (() => {
+        const p = expandTemplatePlaceholders(review.prompt, templateVars);
+        assertNoRawAutoloopPaths(p, "metareview prompt");
+        return p;
+      })(),
+    },
     parallel,
     memory: {
       budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
@@ -415,10 +454,15 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       budgetChars: config.getInt(cfg, "tasks.prompt_budget_chars", 4000),
     },
     harness: {
-      instructions: readOptionalProjectFile(
-        pd,
-        config.get(cfg, "harness.instructions_file", "harness.md"),
-      ),
+      instructions: (() => {
+        const raw = readOptionalProjectFile(
+          pd,
+          config.get(cfg, "harness.instructions_file", "harness.md"),
+        );
+        const expanded = expandTemplatePlaceholders(raw, templateVars);
+        assertNoRawAutoloopPaths(expanded, "harness instructions");
+        return expanded;
+      })(),
     },
     profiles: profileInfo,
     paths: loop.paths,

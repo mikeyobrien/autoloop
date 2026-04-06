@@ -1,5 +1,232 @@
 import { randomBytes } from "node:crypto";
 
+const READABLE_ADJECTIVES = [
+  "able",
+  "agile",
+  "alert",
+  "allied",
+  "ample",
+  "ardent",
+  "artful",
+  "atomic",
+  "aware",
+  "basic",
+  "binary",
+  "bold",
+  "brave",
+  "brief",
+  "brisk",
+  "bright",
+  "broad",
+  "calm",
+  "candid",
+  "causal",
+  "central",
+  "clean",
+  "clear",
+  "clever",
+  "close",
+  "cobalt",
+  "cool",
+  "cosmic",
+  "crisp",
+  "deft",
+  "direct",
+  "eager",
+  "early",
+  "exact",
+  "fair",
+  "fast",
+  "fierce",
+  "final",
+  "fine",
+  "firm",
+  "fluent",
+  "focal",
+  "fresh",
+  "full",
+  "future",
+  "gentle",
+  "glad",
+  "golden",
+  "grand",
+  "graphic",
+  "guided",
+  "honest",
+  "ideal",
+  "instant",
+  "keen",
+  "kind",
+  "lean",
+  "level",
+  "lucid",
+  "lucky",
+  "lunar",
+  "major",
+  "mellow",
+  "meta",
+  "mild",
+  "mobile",
+  "modern",
+  "native",
+  "neat",
+  "neural",
+  "nimble",
+  "noble",
+  "open",
+  "orbital",
+  "plain",
+  "poised",
+  "prime",
+  "prompt",
+  "proud",
+  "pure",
+  "quick",
+  "quiet",
+  "rapid",
+  "ready",
+  "real",
+  "robust",
+  "sane",
+  "sharp",
+  "silent",
+  "simple",
+  "sleek",
+  "sly",
+  "smart",
+  "smooth",
+  "solid",
+  "sonic",
+  "sparse",
+  "stable",
+  "steady",
+  "still",
+  "strong",
+  "subtle",
+  "super",
+  "swift",
+  "tidy",
+  "tuned",
+  "vivid",
+  "warm",
+  "whole",
+  "wise",
+  "zesty",
+] as const;
+
+const READABLE_NOUNS = [
+  "agent",
+  "anchor",
+  "array",
+  "atlas",
+  "batch",
+  "beacon",
+  "branch",
+  "bridge",
+  "broker",
+  "build",
+  "cache",
+  "chain",
+  "check",
+  "cipher",
+  "claim",
+  "client",
+  "cloud",
+  "cluster",
+  "code",
+  "comet",
+  "commit",
+  "console",
+  "context",
+  "cortex",
+  "critic",
+  "daemon",
+  "data",
+  "delta",
+  "drift",
+  "drive",
+  "editor",
+  "embed",
+  "engine",
+  "event",
+  "factor",
+  "field",
+  "filter",
+  "flame",
+  "flow",
+  "forge",
+  "frame",
+  "graph",
+  "grid",
+  "guard",
+  "guide",
+  "harbor",
+  "helper",
+  "index",
+  "kernel",
+  "ledger",
+  "lens",
+  "light",
+  "link",
+  "loop",
+  "matrix",
+  "memory",
+  "mesh",
+  "model",
+  "module",
+  "monitor",
+  "node",
+  "orbit",
+  "parser",
+  "patch",
+  "path",
+  "pilot",
+  "pipe",
+  "plan",
+  "probe",
+  "prompt",
+  "pulse",
+  "queue",
+  "radar",
+  "relay",
+  "review",
+  "rover",
+  "route",
+  "router",
+  "runner",
+  "schema",
+  "scout",
+  "script",
+  "sensor",
+  "server",
+  "shard",
+  "signal",
+  "socket",
+  "solver",
+  "source",
+  "spark",
+  "stack",
+  "state",
+  "stream",
+  "switch",
+  "sync",
+  "system",
+  "task",
+  "thread",
+  "token",
+  "tool",
+  "trace",
+  "track",
+  "trail",
+  "vector",
+  "vault",
+  "vision",
+  "watch",
+  "wave",
+  "worker",
+  "writer",
+] as const;
+
 export function listContains(list: string[], needle: string): boolean {
   return list.includes(needle);
 }
@@ -58,6 +285,36 @@ export function replaceAll(
   return text.split(pattern).join(replacement);
 }
 
+export function expandTemplatePlaceholders(
+  text: string,
+  vars: Record<string, string>,
+): string {
+  const unknown: string[] = [];
+  const result = text.replace(
+    /\{\{([A-Z_][A-Z0-9_]*)\}\}/g,
+    (match, key: string) => {
+      if (Object.hasOwn(vars, key)) return vars[key];
+      unknown.push(key);
+      return match;
+    },
+  );
+  if (unknown.length > 0) {
+    throw new Error(
+      `Unknown template placeholder(s): ${unknown.map((k) => `{{${k}}}`).join(", ")}`,
+    );
+  }
+  return result;
+}
+
+export function assertNoRawAutoloopPaths(text: string, label: string): void {
+  const pattern = /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/;
+  if (pattern.test(text)) {
+    throw new Error(
+      `Raw .autoloop path found in ${label}. Use {{STATE_DIR}} and {{TOOL_PATH}} placeholders instead.`,
+    );
+  }
+}
+
 export function shellWords(parts: string[]): string {
   return parts.map(shellQuote).join(" ");
 }
@@ -85,6 +342,34 @@ export function generateCompactId(prefix: string): string {
   const encoded = intToBase36(ts);
   const suffix = randomSuffix();
   return `${prefix}-${encoded}-${suffix}`;
+}
+
+export function generateReadableId(): string {
+  return `${pickRandom(READABLE_ADJECTIVES)}-${pickRandom(READABLE_NOUNS)}`;
+}
+
+export function readableIdCapacity(): number {
+  return READABLE_ADJECTIVES.length * READABLE_NOUNS.length;
+}
+
+export function uniqueGeneratedId(
+  generate: () => string,
+  existing: ReadonlySet<string>,
+  maxAttempts = 64,
+): string | undefined {
+  for (let i = 0; i < maxAttempts; i++) {
+    const candidate = generate();
+    if (!existing.has(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+function pickRandom<T>(items: readonly T[]): T {
+  return items[randomIndex(items.length)];
+}
+
+function randomIndex(length: number): number {
+  return randomBytes(2).readUInt16BE(0) % length;
 }
 
 function randomSuffix(): string {

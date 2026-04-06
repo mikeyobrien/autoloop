@@ -22,6 +22,7 @@ function makeRecord(id: string, preset = "autocode"): RunRecord {
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T01:00:00Z",
     iteration: 5,
+    max_iterations: 10,
     stop_reason: "completion",
     latest_event: "loop.complete",
     isolation_mode: "shared",

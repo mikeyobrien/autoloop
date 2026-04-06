@@ -19,6 +19,7 @@ function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
     created_at: "2026-04-06T12:00:00Z",
     updated_at: "2026-04-06T12:00:00Z",
     iteration: 1,
+    max_iterations: 10,
     stop_reason: "",
     latest_event: "iteration.finish",
     isolation_mode: "",

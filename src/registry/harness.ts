@@ -26,6 +26,7 @@ function baseRecord(loop: LoopContext): RunRecord {
     created_at: loop.launch.createdAt,
     updated_at: new Date().toISOString(),
     iteration: 0,
+    max_iterations: loop.limits.maxIterations,
     stop_reason: "",
     latest_event: "loop.start",
     isolation_mode: loop.runtime.isolationMode ?? "shared",

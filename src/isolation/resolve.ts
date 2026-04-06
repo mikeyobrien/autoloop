@@ -27,7 +27,7 @@ export interface IsolationResult {
  *  3. Config isolation.enabled → "worktree"
  *  4. Other active runs exist with code roles → "run-scoped" + warning
  *  5. Other active runs exist (non-code) → "run-scoped"
- *  6. Solo run → "shared"
+ *  6. Solo run → "run-scoped" (working files isolate per run by default)
  */
 export function resolveIsolationMode(
   request: IsolationRequest,
@@ -46,7 +46,7 @@ export function resolveIsolationMode(
   }
 
   if (otherActiveRuns.length === 0) {
-    return { mode: "shared" };
+    return { mode: "run-scoped" };
   }
 
   const hasCodeRuns = otherActiveRuns.some((r) => isCodeModifyingRun(r));

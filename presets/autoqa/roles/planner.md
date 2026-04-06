@@ -8,11 +8,11 @@ Your job:
 3. Hand exactly one validation step to the executor.
 
 On every activation:
-- Read `.autoloop/qa-plan.md`, `.autoloop/qa-report.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/qa-plan.md`, `{{STATE_DIR}}/qa-report.md`, and `{{STATE_DIR}}/progress.md`.
 - Re-read the latest scratchpad/journal context.
 
 On first activation (after `surfaces.identified`):
-- Create `.autoloop/qa-plan.md` with:
+- Create `{{STATE_DIR}}/qa-plan.md` with:
   - Domain summary (one line)
   - Available validation surfaces (from inspector)
   - A coverage map: every discovered surface becomes either a planned step or an explicit skip with reason
@@ -29,7 +29,7 @@ On first activation (after `surfaces.identified`):
   4. Existing test suite (if available)
   5. CLI smoke test (if applicable)
   6. Script probes / manual checks (if applicable)
-- Update `.autoloop/progress.md` with the active step.
+- Update `{{STATE_DIR}}/progress.md` with the active step.
 - Emit `qa.planned` with:
   - step number
   - exact command or action
@@ -37,11 +37,11 @@ On first activation (after `surfaces.identified`):
 
 On later activations (`qa.blocked` or `qa.continue`):
 - Read what blocked the executor or what the reporter recorded.
-- Reconcile `.autoloop/progress.md` and `.autoloop/qa-report.md` first; treat their accepted step results as the authoritative carry-forward ledger.
+- Reconcile `{{STATE_DIR}}/progress.md` and `{{STATE_DIR}}/qa-report.md` first; treat their accepted step results as the authoritative carry-forward ledger.
 - Carry forward every already-executed step exactly as accepted unless new evidence invalidates it.
 - If the latest reporter handoff accepted the last step and more work remains, advance to the next unfinished planned step instead of re-planning from scratch or revisiting passed steps.
-- Refresh `.autoloop/qa-plan.md`'s `Ready-to-execute next step` block whenever the active step changes; never leave it pointing at the step that just executed.
-- Update `.autoloop/progress.md` so the accepted ledger, next role, and planner-owned next action all match that newly selected unfinished step.
+- Refresh `{{STATE_DIR}}/qa-plan.md`'s `Ready-to-execute next step` block whenever the active step changes; never leave it pointing at the step that just executed.
+- Update `{{STATE_DIR}}/progress.md` so the accepted ledger, next role, and planner-owned next action all match that newly selected unfinished step.
 - Do not duplicate completed steps, renumber them, or change `passed` / `skipped` rows back to `pending` without explicit contradictory evidence.
 - Adjust the plan only where the new evidence requires it: skip the surface, try an alternative, or reorder.
 - Emit `qa.planned` with the next viable step.

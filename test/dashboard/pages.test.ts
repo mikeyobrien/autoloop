@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createApp, type DashboardContext } from "../../src/dashboard/app.js";
+import { htmlShell } from "../../src/dashboard/views/shell.js";
 
 function makeCtx(overrides: Partial<DashboardContext> = {}): DashboardContext {
   const projectDir = mkdtempSync(join(tmpdir(), "dashboard-pages-test-"));
@@ -45,6 +46,43 @@ describe("page routes", () => {
     const res = await app.request("/static/alpine.min.js");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("javascript");
+  });
+
+  it("keeps iteration.start highlighted in the events list", () => {
+    const html = htmlShell();
+    expect(html).toContain("eventClasses(ev)");
+    expect(html).toContain(
+      "if ((ev.topic || '') === 'iteration.start') classes.push('ev-highlight');",
+    );
+    expect(html).toContain(".event-item.ev-highlight summary { opacity: 1; }");
+  });
+});
+
+describe("iter X/N and workspace display", () => {
+  it("run list shows iter X/N using max_iterations", () => {
+    const html = htmlShell();
+    expect(html).toContain("run.iteration + '/' + (run.max_iterations || '?')");
+  });
+
+  it("detail pane shows iter X/N using max_iterations", () => {
+    const html = htmlShell();
+    expect(html).toContain(
+      "selectedRunDetail.iteration + '/' + (selectedRunDetail.max_iterations || '?')",
+    );
+  });
+
+  it("detail pane shows workspace label and path helpers", () => {
+    const html = htmlShell();
+    expect(html).toContain("workspaceLabel(selectedRunDetail)");
+    expect(html).toContain("workspacePath(selectedRunDetail)");
+    expect(html).toContain("<label>Workspace: </label>");
+  });
+
+  it("run list shows compact WT badge for isolated runs", () => {
+    const html = htmlShell();
+    expect(html).toContain("run.isolation_mode === 'worktree'");
+    expect(html).toContain("wt-badge");
+    expect(html).toContain("run.worktree_name || ''");
   });
 });
 
@@ -106,6 +144,191 @@ describe("origin-check middleware", () => {
   });
 });
 
+describe("iteration.start routing disclosure", () => {
+  let html: string;
+
+  it("shell contains eventDisplayEntries helper", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("eventDisplayEntries(ev)");
+    expect(html).toContain("eventDisplayEntries");
+  });
+
+  it("template iterates over eventDisplayEntries instead of Object.entries", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain('x-for="[k,v] in eventDisplayEntries(ev)"');
+  });
+
+  it("shell contains routing badge field helpers", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("isRoutingBadgeField");
+    expect(html).toContain("renderRoutingValue");
+  });
+
+  it("eventSummary uses routing-first format with recent_event and allowed_events", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("f.recent_event");
+    expect(html).toContain("f.suggested_roles");
+    expect(html).toContain("f.allowed_events");
+    expect(html).toContain("f.backpressure");
+    expect(html).toContain("emits");
+  });
+
+  it("shell contains routing field labels for first-class display", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("'suggested_roles'");
+    expect(html).toContain("'allowed_events'");
+    expect(html).toContain("'backpressure'");
+    expect(html).toContain("'recent_event'");
+  });
+
+  it("shell renders routing badges with CSS classes", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain(".routing-badge");
+    expect(html).toContain(".bp-warning");
+    expect(html).toContain(".bp-none");
+  });
+
+  it("isPromptField handles flattened prompt key from iteration.start", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("isPromptField(ev.topic, k)");
+    expect(html).toContain("parsePromptSections");
+  });
+});
+
+describe("worktree merged badge and detail", () => {
+  it("run list shows merged checkmark for worktree runs", () => {
+    const html = htmlShell();
+    expect(html).toContain("run.worktree_merged");
+    expect(html).toContain("merged-badge");
+    expect(html).toContain("&#x2713;");
+  });
+
+  it("detail pane shows merge metadata section when worktree_merged", () => {
+    const html = htmlShell();
+    expect(html).toContain("selectedRunDetail.worktree_merged");
+    expect(html).toContain("merge-detail");
+    expect(html).toContain("Merge status: ");
+    expect(html).toContain("selectedRunDetail.worktree_merged_at");
+    expect(html).toContain("selectedRunDetail.worktree_merge_strategy");
+    expect(html).toContain("Merge strategy: ");
+    expect(html).toContain("Merged at: ");
+  });
+
+  it("has CSS styles for merge indicators", () => {
+    const html = htmlShell();
+    expect(html).toContain(".merged-badge");
+    expect(html).toContain(".merge-detail");
+  });
+});
+
+describe("backend event verbose toggle", () => {
+  it("initializes showVerbose state and renders backend-event toggle", () => {
+    const html = htmlShell();
+    expect(html).toContain("showVerbose: false");
+    expect(html).toContain('x-model="showVerbose"');
+    expect(html).toContain("Show backend events");
+  });
+
+  it("filters visible events using backend-only helper", () => {
+    const html = htmlShell();
+    expect(html).toContain("visibleRunEvents()");
+    expect(html).toContain("showVerbose || !this.isBackendEvent(ev)");
+    expect(html).toContain("return t.startsWith('backend.')");
+    expect(html).not.toContain(
+      "isBackendEvent(ev) {\n      const t = String(ev?.topic || '');\n      return t.startsWith('iteration.')",
+    );
+  });
+
+  it("keeps iteration events visible while backend events get their own dimmed class", () => {
+    const html = htmlShell();
+    expect(html).toContain(
+      "if (t.startsWith('backend.')) return 'ev-backend';",
+    );
+    expect(html).toContain(
+      "if (t.startsWith('iteration.')) return 'ev-system';",
+    );
+    expect(html).toContain(".event-item.ev-backend summary { opacity: 0.6; }");
+  });
+
+  it("adds output preview to finish-event summaries", () => {
+    const html = htmlShell();
+    expect(html).toContain("if (f.output) hint.push(String(f.output)");
+    expect(html).toContain(".slice(0, 80)");
+  });
+});
+
+describe("review event rendering", () => {
+  it("adds distinct CSS class for review events", () => {
+    const html = htmlShell();
+    expect(html).toContain(".event-item.ev-review");
+    expect(html).toContain("border-left: 3px solid var(--watching)");
+  });
+
+  it("categorizes review events with ev-review class", () => {
+    const html = htmlShell();
+    expect(html).toContain("if (t.startsWith('review.')) return 'ev-review'");
+  });
+
+  it("renders review.start with humanized label and reason preview", () => {
+    const html = htmlShell();
+    expect(html).toContain("Review Started");
+    expect(html).toContain(
+      "if (f.reason) hint.push(String(f.reason).slice(0, 60))",
+    );
+  });
+
+  it("renders review.finish with humanized label and decision/output preview", () => {
+    const html = htmlShell();
+    expect(html).toContain("Review Finished");
+    expect(html).toContain(
+      "if (f.decision) hint.push('decision=' + f.decision)",
+    );
+    expect(html).toContain("if (f.output) hint.push(String(f.output)");
+  });
+});
+
+describe("section open/close state preservation", () => {
+  it("uses sectionOpen state instead of hardcoded :open binding", () => {
+    const html = htmlShell();
+    expect(html).toContain("sectionOpen[cat.key]");
+    expect(html).not.toContain(
+      "cat.key === 'active' || cat.key === 'watching' || cat.key === 'stuck'",
+    );
+  });
+
+  it("tracks user toggle via @toggle handler", () => {
+    const html = htmlShell();
+    expect(html).toContain("@toggle=");
+    expect(html).toContain("sectionUserToggled[cat.key] = true");
+    expect(html).toContain("sectionOpen[cat.key] = $el.open");
+  });
+
+  it("initializes sectionOpen and sectionUserToggled in dashboard state", () => {
+    const html = htmlShell();
+    expect(html).toContain("sectionOpen:");
+    expect(html).toContain("sectionUserToggled:");
+  });
+
+  it("fetchRuns skips auto-open for user-toggled sections", () => {
+    const html = htmlShell();
+    expect(html).toContain("!this.sectionUserToggled[cat.key]");
+  });
+});
+
 describe("POST /api/runs input validation", () => {
   it("returns 400 for empty prompt", async () => {
     const app = createApp(makeCtx());
@@ -148,7 +371,6 @@ describe("POST /api/runs input validation", () => {
 
   it("returns 202 for valid prompt without preset", async () => {
     // Mock spawn to avoid actually launching a process
-    const { spawn } = await import("node:child_process");
     vi.mock("node:child_process", async (importOriginal) => {
       const orig = await importOriginal<typeof import("node:child_process")>();
       return {
