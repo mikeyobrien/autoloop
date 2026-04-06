@@ -211,6 +211,34 @@ describe("iteration.start routing disclosure", () => {
   });
 });
 
+describe("section open/close state preservation", () => {
+  it("uses sectionOpen state instead of hardcoded :open binding", () => {
+    const html = htmlShell();
+    expect(html).toContain("sectionOpen[cat.key]");
+    expect(html).not.toContain(
+      "cat.key === 'active' || cat.key === 'watching' || cat.key === 'stuck'",
+    );
+  });
+
+  it("tracks user toggle via @toggle handler", () => {
+    const html = htmlShell();
+    expect(html).toContain("@toggle=");
+    expect(html).toContain("sectionUserToggled[cat.key] = true");
+    expect(html).toContain("sectionOpen[cat.key] = $el.open");
+  });
+
+  it("initializes sectionOpen and sectionUserToggled in dashboard state", () => {
+    const html = htmlShell();
+    expect(html).toContain("sectionOpen:");
+    expect(html).toContain("sectionUserToggled:");
+  });
+
+  it("fetchRuns skips auto-open for user-toggled sections", () => {
+    const html = htmlShell();
+    expect(html).toContain("!this.sectionUserToggled[cat.key]");
+  });
+});
+
 describe("POST /api/runs input validation", () => {
   it("returns 400 for empty prompt", async () => {
     const app = createApp(makeCtx());

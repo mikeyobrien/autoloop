@@ -121,7 +121,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 </div>
 
 <template x-for="cat in categories" :key="cat.key">
-  <details class="section" :open="cat.items.length > 0 && (cat.key === 'active' || cat.key === 'watching' || cat.key === 'stuck')">
+  <details class="section" :open="sectionOpen[cat.key]" @toggle="sectionUserToggled[cat.key] = true; sectionOpen[cat.key] = $el.open">
     <summary>
       <span x-text="cat.label"></span>
       <span class="badge" :data-status="cat.key" x-text="cat.items.length"></span>
@@ -297,6 +297,8 @@ function dashboard() {
     selectedPreset: "",
     pollInterval: null,
     lastUpdated: null,
+    sectionOpen: { active: false, watching: false, stuck: false, failed: false, completed: false },
+    sectionUserToggled: {},
 
     get categories() {
       return [
@@ -319,6 +321,12 @@ function dashboard() {
         const res = await fetch("/api/runs");
         this.runs = await res.json();
         this.lastUpdated = new Date().toLocaleTimeString();
+        const defaultOpen = ['active', 'watching', 'stuck'];
+        for (const cat of this.categories) {
+          if (!this.sectionUserToggled[cat.key]) {
+            this.sectionOpen[cat.key] = cat.items.length > 0 && defaultOpen.includes(cat.key);
+          }
+        }
         if (this.selectedRun) this.fetchEvents(this.selectedRun);
       } catch (e) { /* retry on next poll */ }
     },
