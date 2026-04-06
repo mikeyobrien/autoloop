@@ -59,6 +59,7 @@ function listWorktrees(stateDir: string): void {
     "RUN ID".padEnd(24),
     "STATUS".padEnd(18),
     "BRANCH".padEnd(30),
+    "BASE".padEnd(16),
     "STRATEGY".padEnd(10),
     "CREATED",
   ].join("  ");
@@ -70,6 +71,7 @@ function listWorktrees(stateDir: string): void {
       truncate(meta.run_id, 24).padEnd(24),
       statusLabel.padEnd(18),
       truncate(meta.branch, 30).padEnd(30),
+      truncate(meta.base_branch, 16).padEnd(16),
       meta.merge_strategy.padEnd(10),
       formatTime(meta.created_at),
     ].join("  ");
