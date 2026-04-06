@@ -197,7 +197,7 @@ export function buildLoopContext(
     otherActive,
   );
   if (isolation.warning) {
-    process.stderr.write("isolation: " + isolation.warning + "\n");
+    process.stderr.write("\n" + isolation.warning + "\n\n");
   }
 
   // For run-scoped isolation, route per-run state files to runs/<runId>/

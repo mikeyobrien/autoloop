@@ -68,9 +68,13 @@ describe("resolveIsolationMode", () => {
   });
 
   it("returns run-scoped with warning when code-modifying runs are active", () => {
-    const result = resolveIsolationMode({}, [makeRecord({ preset: "autocode" })]);
+    const result = resolveIsolationMode({}, [makeRecord({ preset: "autocode", run_id: "run-abc" })]);
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toContain("code-modifying");
+    expect(result.warning).toContain("run-abc");
+    expect(result.warning).toContain("autocode");
+    expect(result.warning).toContain("--worktree");
+    expect(result.warning).toContain("--no-worktree");
   });
 
   it("returns run-scoped without warning for non-code active runs", () => {
@@ -88,13 +92,16 @@ describe("resolveIsolationMode", () => {
     expect(result.warning).toBeUndefined();
   });
 
-  it("code preset + code-modifying active run → run-scoped, warning", () => {
+  it("code preset + code-modifying active run → run-scoped, warning with details", () => {
     const result = resolveIsolationMode(
       { currentCategory: "code" },
-      [makeRecord({ preset: "autocode" })],
+      [makeRecord({ preset: "autocode", run_id: "run-xyz" })],
     );
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toContain("code-modifying");
+    expect(result.warning).toContain("run-xyz");
+    expect(result.warning).toContain("autocode");
+    expect(result.warning).toContain("--worktree");
   });
 
   it("planning preset + non-code active run → run-scoped, no warning", () => {

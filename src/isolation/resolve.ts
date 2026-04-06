@@ -58,9 +58,17 @@ export function resolveIsolationMode(
 
   // Code or unknown presets warn when concurrent code-modifying runs exist
   if (hasCodeRuns) {
+    const codeRuns = otherActiveRuns.filter((r) => isCodeModifyingRun(r));
+    const runList = codeRuns.map((r) => `${r.run_id} (${r.preset})`).join(", ");
+    const warning = [
+      `Active code-modifying run detected: ${runList}`,
+      "  Runs sharing the same checkout may produce code conflicts.",
+      "  Consider: autoloop run <preset> --worktree \"your prompt\"",
+      "  Or suppress: autoloop run <preset> --no-worktree \"your prompt\"",
+    ].join("\n");
     return {
       mode: "run-scoped",
-      warning: "concurrent code-modifying run detected; using run-scoped isolation",
+      warning,
     };
   }
 
