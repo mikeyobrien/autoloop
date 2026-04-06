@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { loadAgentMap } from "../agent-map.js";
 import * as config from "../config.js";
 import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
 import { createRunScopedDir } from "../isolation/run-scope.js";
@@ -431,6 +432,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
         kiro_model: config.get(cfg, "backend.model", ""),
       } : {}),
     },
+    agentMap: loadAgentMap(pd),
   };
   return applyRuntimeModeOverrides(updated);
 }

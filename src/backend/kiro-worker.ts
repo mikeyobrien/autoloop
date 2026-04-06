@@ -46,6 +46,15 @@ async function handleCommand(cmd: any): Promise<unknown> {
       const result = await sendAcpPrompt(session, cmd.prompt, cmd.timeoutMs);
       return { ok: true, ...result };
     }
+    case "set_mode": {
+      if (!session) return { ok: false, error: "no session" };
+      try {
+        await session.connection.setSessionMode({ sessionId: session.sessionId, modeId: cmd.agentName });
+        return { ok: true };
+      } catch (err: unknown) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
     case "terminate": {
       if (session) await terminateAcpSession(session);
       session = null;
