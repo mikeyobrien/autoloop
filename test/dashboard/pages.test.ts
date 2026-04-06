@@ -13,6 +13,7 @@ function makeCtx(overrides: Partial<DashboardContext> = {}): DashboardContext {
   return {
     registryPath: join(stateDir, "registry.jsonl"),
     journalPath: join(stateDir, "journal.jsonl"),
+    stateDir,
     bundleRoot: projectDir,
     projectDir,
     selfCmd: "autoloop",

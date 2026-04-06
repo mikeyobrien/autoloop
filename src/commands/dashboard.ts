@@ -31,6 +31,7 @@ export function dispatchDashboard(args: string[], bundleRoot: string, selfCmd: s
   const ctx: DashboardContext = {
     registryPath: join(stateDir, "registry.jsonl"),
     journalPath: join(stateDir, "journal.jsonl"),
+    stateDir,
     bundleRoot,
     projectDir: resolved,
     selfCmd,

@@ -5,6 +5,7 @@ import { pageRoutes } from "./routes/pages.js";
 export interface DashboardContext {
   registryPath: string;
   journalPath: string;
+  stateDir: string;
   bundleRoot: string;
   projectDir: string;
   selfCmd: string;

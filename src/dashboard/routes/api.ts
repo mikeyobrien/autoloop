@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { spawn } from "node:child_process";
 import { categorizeRuns } from "../../loops/health.js";
 import { findRunByPrefix } from "../../registry/read.js";
-import { readRunLines } from "../../harness/journal.js";
+import { readRunLines, resolveRunJournalPath, readLines } from "../../harness/journal.js";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
 import type { DashboardContext } from "../app.js";
 
@@ -28,7 +28,8 @@ export function apiRoutes(ctx: DashboardContext): Hono {
 
   api.get("/runs/:id/events", (c) => {
     const id = c.req.param("id");
-    const lines = readRunLines(ctx.journalPath, id);
+    const runJournal = resolveRunJournalPath(ctx.stateDir, id);
+    const lines = runJournal ? readLines(runJournal) : readRunLines(ctx.journalPath, id);
     const events = lines.map((line) => {
       try { return JSON.parse(line); } catch { return { raw: line }; }
     });
