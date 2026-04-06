@@ -36,7 +36,7 @@ import {
 import { maybeRunMetareview } from "./metareview.js";
 import { runIteration } from "./iteration.js";
 import { stopMaxIterations } from "./stop.js";
-import { registryStart } from "../registry/harness.js";
+import { registryStart, registryStop } from "../registry/harness.js";
 import { updateStatus as updateWorktreeStatus, readMeta } from "../worktree/meta.js";
 import { mergeWorktree } from "../worktree/merge.js";
 import { cleanWorktrees } from "../worktree/clean.js";
@@ -56,8 +56,31 @@ export function run(
   installRuntimeTools(loop);
   appendLoopStart(loop);
   registryStart(loop);
+
+  // Track current iteration for signal handler
+  let currentIteration = 0;
+  let signalHandled = false;
+
+  const onSignal = (signal: NodeJS.Signals) => {
+    if (signalHandled) return;
+    signalHandled = true;
+    try {
+      registryStop(loop, currentIteration, "interrupted");
+    } catch { /* best-effort */ }
+    process.removeListener("SIGINT", onSignal);
+    process.removeListener("SIGTERM", onSignal);
+    process.kill(process.pid, signal);
+  };
+
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+
   log(loop, "info", `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`);
   const summary = iterate(loop, 1);
+
+  // Clean up signal handlers on normal exit
+  process.removeListener("SIGINT", onSignal);
+  process.removeListener("SIGTERM", onSignal);
 
   // Post-run worktree lifecycle: status update, automerge, cleanup
   if (loop.runtime.isolationMode === "worktree" && loop.paths.worktreeMetaDir) {

@@ -81,4 +81,31 @@ describe("categorizeRecords", () => {
     const result = categorizeRecords(records, NOW);
     expect(result.active).toHaveLength(1);
   });
+
+  it("reclassifies running record with dead PID as not active", () => {
+    // Use a PID that definitely doesn't exist
+    const records = [
+      makeRun({ pid: 2147483647, updated_at: new Date(NOW - 60 * 1000).toISOString() }),
+    ];
+    const result = categorizeRecords(records, NOW);
+    expect(result.active).toHaveLength(0);
+    expect(result.watching).toHaveLength(0);
+    expect(result.stuck).toHaveLength(0);
+  });
+
+  it("keeps running record with live PID as active", () => {
+    const records = [
+      makeRun({ pid: process.pid, updated_at: new Date(NOW - 60 * 1000).toISOString() }),
+    ];
+    const result = categorizeRecords(records, NOW);
+    expect(result.active).toHaveLength(1);
+  });
+
+  it("keeps running record without PID as active (backward compat)", () => {
+    const records = [
+      makeRun({ updated_at: new Date(NOW - 60 * 1000).toISOString() }),
+    ];
+    const result = categorizeRecords(records, NOW);
+    expect(result.active).toHaveLength(1);
+  });
 });

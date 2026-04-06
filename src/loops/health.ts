@@ -37,20 +37,27 @@ export function categorizeRecords(records: RunRecord[], nowMs: number = Date.now
 
   for (const r of records) {
     if (r.status === "running") {
-      const elapsed = elapsedMs(r, nowMs);
-      if (elapsed === null) {
-        active.push(r);
+      // If PID is recorded and the process is dead, treat as stopped
+      if (r.pid != null && !isProcessAlive(r.pid)) {
+        r.status = "stopped";
+        r.stop_reason = r.stop_reason || "interrupted";
+        // Fall through to non-running classification
+      } else {
+        const elapsed = elapsedMs(r, nowMs);
+        if (elapsed === null) {
+          active.push(r);
+          continue;
+        }
+        const policy = policyForPreset(r.preset);
+        if (elapsed > policy.stuckAfterMs) {
+          stuck.push(r);
+        } else if (elapsed > policy.warningAfterMs) {
+          watching.push(r);
+        } else {
+          active.push(r);
+        }
         continue;
       }
-      const policy = policyForPreset(r.preset);
-      if (elapsed > policy.stuckAfterMs) {
-        stuck.push(r);
-      } else if (elapsed > policy.warningAfterMs) {
-        watching.push(r);
-      } else {
-        active.push(r);
-      }
-      continue;
     }
 
     if (!isRecent(r, nowMs)) continue;
@@ -70,6 +77,15 @@ function elapsedMs(r: RunRecord, nowMs: number): number | null {
   const updatedMs = new Date(r.updated_at).getTime();
   if (Number.isNaN(updatedMs)) return null;
   return nowMs - updatedMs;
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isRecent(r: RunRecord, nowMs: number): boolean {

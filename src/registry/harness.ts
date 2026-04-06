@@ -31,6 +31,7 @@ function baseRecord(loop: LoopContext): RunRecord {
     isolation_mode: loop.runtime.isolationMode ?? "shared",
     worktree_name: loop.paths.worktreeBranch || "",
     worktree_path: loop.paths.worktreePath || "",
+    pid: process.pid,
   };
 }
 
