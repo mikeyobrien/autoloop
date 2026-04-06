@@ -181,8 +181,7 @@ export function renderAllJournals(projectDir: string): void {
   if (lines.length > 0) {
     console.log(lines.join("\n"));
   } else {
-    // Fall back to single journal file
-    console.log(readIfExists(resolveEmitJournalFile(projectDir)));
+    renderJournal(projectDir);
   }
 }
 
