@@ -1,6 +1,12 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
-import { ensureBuild, makeTempProject, runCli, readText, FIXTURES_DIR } from "../helpers/runtime.js";
+import { beforeAll, describe, expect, it } from "vitest";
+import {
+  ensureBuild,
+  FIXTURES_DIR,
+  makeTempProject,
+  readText,
+  runCli,
+} from "../helpers/runtime.js";
 
 beforeAll(() => {
   ensureBuild();

@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { renderFile, statsFile } from "../src/memory.js";
 
 const tmpDir = join(import.meta.dirname ?? ".", ".tmp-memory-test");
 const memFile = join(tmpDir, "memory.jsonl");
 
 function writeMem(lines: string[]) {
-  writeFileSync(memFile, lines.join("\n") + "\n", "utf-8");
+  writeFileSync(memFile, `${lines.join("\n")}\n`, "utf-8");
 }
 
 function memLine(id: string, type: string, extra: string): string {
@@ -40,7 +40,11 @@ describe("memory materialize via renderFile", () => {
 
   it("renders learnings with source", () => {
     writeMem([
-      memLine("mem-1", "learning", '"text": "vitest is fast", "source": "test run"'),
+      memLine(
+        "mem-1",
+        "learning",
+        '"text": "vitest is fast", "source": "test run"',
+      ),
     ]);
     const result = renderFile(memFile, 0);
     expect(result).toContain("Learnings:");
@@ -49,9 +53,7 @@ describe("memory materialize via renderFile", () => {
   });
 
   it("renders meta entries", () => {
-    writeMem([
-      memLine("meta-1", "meta", '"key": "version", "value": "1.0"'),
-    ]);
+    writeMem([memLine("meta-1", "meta", '"key": "version", "value": "1.0"')]);
     const result = renderFile(memFile, 0);
     expect(result).toContain("Meta:");
     expect(result).toContain("version: 1.0");
@@ -87,9 +89,7 @@ describe("memory materialize via renderFile", () => {
   });
 
   it("skips lines without id", () => {
-    writeMem([
-      '{"type": "learning", "text": "no id"}',
-    ]);
+    writeMem(['{"type": "learning", "text": "no id"}']);
     const result = renderFile(memFile, 0);
     expect(result).toBe("");
   });
@@ -112,7 +112,11 @@ describe("memory statsFile", () => {
 
   it("reports truncated when rendered exceeds budget", () => {
     writeMem([
-      memLine("mem-1", "learning", '"text": "a very long learning entry that takes up space", "source": "s"'),
+      memLine(
+        "mem-1",
+        "learning",
+        '"text": "a very long learning entry that takes up space", "source": "s"',
+      ),
     ]);
     const stats = statsFile(memFile, 10);
     expect(stats.truncated).toBe(true);

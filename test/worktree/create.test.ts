@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import { createWorktree } from "../../src/worktree/create.js";
 import { readMeta } from "../../src/worktree/meta.js";
 
@@ -11,7 +11,13 @@ function makeGitRepo(): string {
   execSync("git init && git commit --allow-empty -m init", {
     cwd: dir,
     stdio: "pipe",
-    env: { ...process.env, GIT_AUTHOR_NAME: "test", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "test", GIT_COMMITTER_EMAIL: "t@t" },
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "test",
+      GIT_AUTHOR_EMAIL: "t@t",
+      GIT_COMMITTER_NAME: "test",
+      GIT_COMMITTER_EMAIL: "t@t",
+    },
   });
   return dir;
 }
@@ -37,11 +43,11 @@ describe("createWorktree", () => {
     // Meta was written
     const meta = readMeta(result.metaDir);
     expect(meta).not.toBeNull();
-    expect(meta!.run_id).toBe("run-test1");
-    expect(meta!.branch).toBe("autoloop/run-test1");
-    expect(meta!.status).toBe("running");
-    expect(meta!.merge_strategy).toBe("squash");
-    expect(meta!.base_branch).toBeTruthy();
+    expect(meta?.run_id).toBe("run-test1");
+    expect(meta?.branch).toBe("autoloop/run-test1");
+    expect(meta?.status).toBe("running");
+    expect(meta?.merge_strategy).toBe("squash");
+    expect(meta?.base_branch).toBeTruthy();
   });
 
   it("uses custom branch prefix", () => {
@@ -91,6 +97,6 @@ describe("createWorktree", () => {
     });
 
     const meta = readMeta(result.metaDir);
-    expect(meta!.merge_strategy).toBe("rebase");
+    expect(meta?.merge_strategy).toBe("rebase");
   });
 });

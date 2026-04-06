@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { resolveOutcome } from "../../src/harness/iteration.js";
 
 const base = {
@@ -18,7 +18,10 @@ describe("resolveOutcome", () => {
       allTopics: ["step.done", "task.complete"],
       requiredEvents: ["step.done"],
     });
-    expect(result).toEqual({ action: "complete_event", outcome: "complete:completion_event" });
+    expect(result).toEqual({
+      action: "complete_event",
+      outcome: "complete:completion_event",
+    });
   });
 
   it("returns complete_event even without required events when list is empty", () => {
@@ -26,7 +29,10 @@ describe("resolveOutcome", () => {
       ...base,
       allTopics: ["task.complete"],
     });
-    expect(result).toEqual({ action: "complete_event", outcome: "complete:completion_event" });
+    expect(result).toEqual({
+      action: "complete_event",
+      outcome: "complete:completion_event",
+    });
   });
 
   it("does not complete via event when required events are missing", () => {
@@ -36,7 +42,10 @@ describe("resolveOutcome", () => {
       allTopics: ["step.done"],
       requiredEvents: ["verify.done"],
     });
-    expect(result).toEqual({ action: "continue_routed", outcome: "continue:routed_event" });
+    expect(result).toEqual({
+      action: "continue_routed",
+      outcome: "continue:routed_event",
+    });
   });
 
   it("returns continue_routed for a non-completion accepted event", () => {
@@ -45,7 +54,10 @@ describe("resolveOutcome", () => {
       emittedTopic: "plan.ready",
       allTopics: ["plan.ready"],
     });
-    expect(result).toEqual({ action: "continue_routed", outcome: "continue:routed_event" });
+    expect(result).toEqual({
+      action: "continue_routed",
+      outcome: "continue:routed_event",
+    });
   });
 
   it("returns complete_promise when output contains the promise string", () => {
@@ -54,7 +66,10 @@ describe("resolveOutcome", () => {
       output: "some output LOOP_COMPLETE more output",
       completionPromise: "LOOP_COMPLETE",
     });
-    expect(result).toEqual({ action: "complete_promise", outcome: "complete:completion_promise" });
+    expect(result).toEqual({
+      action: "complete_promise",
+      outcome: "complete:completion_promise",
+    });
   });
 
   it("does not complete via promise when there were invalid events", () => {
@@ -89,7 +104,10 @@ describe("resolveOutcome", () => {
       output: "LOOP_COMPLETE",
       completionPromise: "LOOP_COMPLETE",
     });
-    expect(result).toEqual({ action: "complete_event", outcome: "complete:completion_event" });
+    expect(result).toEqual({
+      action: "complete_event",
+      outcome: "complete:completion_event",
+    });
   });
 
   it("prefers routed event over promise completion", () => {
@@ -100,6 +118,9 @@ describe("resolveOutcome", () => {
       output: "LOOP_COMPLETE",
       completionPromise: "LOOP_COMPLETE",
     });
-    expect(result).toEqual({ action: "continue_routed", outcome: "continue:routed_event" });
+    expect(result).toEqual({
+      action: "continue_routed",
+      outcome: "continue:routed_event",
+    });
   });
 });

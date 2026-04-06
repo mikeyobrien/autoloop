@@ -3,3 +3,5 @@ dist/
 *.tsbuildinfo
 .autoloop/
 .tonic/
+.agents/
+test-results/

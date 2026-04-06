@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Test that inspect projection surfaces correctly resolve journals
@@ -22,9 +22,7 @@ vi.mock("../../src/config.js", () => ({
     if (key === "core.state_dir") return ".autoloop";
     return fallback;
   }),
-  stateDirPath: vi.fn((projectDir: string) =>
-    join(projectDir, ".autoloop"),
-  ),
+  stateDirPath: vi.fn((projectDir: string) => join(projectDir, ".autoloop")),
   resolveJournalFile: vi.fn((projectDir: string) =>
     join(projectDir, ".autoloop", "journal.jsonl"),
   ),
@@ -32,11 +30,11 @@ vi.mock("../../src/config.js", () => ({
 }));
 
 import {
-  renderScratchpadFormat,
-  renderPromptFormat,
-  renderOutput,
   renderCoordinationFormat,
   renderMetrics,
+  renderOutput,
+  renderPromptFormat,
+  renderScratchpadFormat,
 } from "../../src/harness/index.js";
 
 function journalLine(
@@ -45,7 +43,13 @@ function journalLine(
   iteration: string,
   fields: Record<string, string> = {},
 ): string {
-  return JSON.stringify({ run, topic, iteration, timestamp: new Date().toISOString(), fields });
+  return JSON.stringify({
+    run,
+    topic,
+    iteration,
+    timestamp: new Date().toISOString(),
+    fields,
+  });
 }
 
 const tmpDir = join(import.meta.dirname, "__tmp_inspect_run_test__");
@@ -67,10 +71,15 @@ describe("inspect projection surfaces with --run for run-scoped journals", () =>
       journalLine(runId, "loop.start", "0"),
       journalLine(runId, "iteration.start", "1", { prompt: "do the thing" }),
       journalLine(runId, "iteration.finish", "1", { output: "done" }),
-      journalLine(runId, "scratchpad.update", "1", { content: "scratch content" }),
-      journalLine(runId, "event", "1", { payload: "coordination data", source: "agent" }),
+      journalLine(runId, "scratchpad.update", "1", {
+        content: "scratch content",
+      }),
+      journalLine(runId, "event", "1", {
+        payload: "coordination data",
+        source: "agent",
+      }),
     ];
-    writeFileSync(join(runDir, "journal.jsonl"), lines.join("\n") + "\n");
+    writeFileSync(join(runDir, "journal.jsonl"), `${lines.join("\n")}\n`);
   }
 
   it("renderScratchpadFormat reads from run-scoped journal when runId provided", () => {
@@ -90,7 +99,7 @@ describe("inspect projection surfaces with --run for run-scoped journals", () =>
     renderPromptFormat(tmpDir, "1", "terminal", runId);
     expect(spy).toHaveBeenCalled();
     // Should have printed the prompt content, not a "missing" message
-    const output = spy.mock.calls.map(c => c.join(" ")).join("\n");
+    const output = spy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(output).not.toContain("missing prompt");
     spy.mockRestore();
   });
@@ -134,14 +143,21 @@ describe("inspect projection surfaces with --run for run-scoped journals", () =>
 
 describe("inspect projection surfaces with --run for worktree journals", () => {
   function setupWorktreeJournal(runId: string): void {
-    const wtDir = join(tmpDir, ".autoloop", "worktrees", runId, "tree", ".autoloop");
+    const wtDir = join(
+      tmpDir,
+      ".autoloop",
+      "worktrees",
+      runId,
+      "tree",
+      ".autoloop",
+    );
     mkdirSync(wtDir, { recursive: true });
     const lines = [
       journalLine(runId, "loop.start", "0"),
       journalLine(runId, "iteration.start", "1", { prompt: "worktree task" }),
       journalLine(runId, "iteration.finish", "1", { output: "worktree done" }),
     ];
-    writeFileSync(join(wtDir, "journal.jsonl"), lines.join("\n") + "\n");
+    writeFileSync(join(wtDir, "journal.jsonl"), `${lines.join("\n")}\n`);
   }
 
   it("renderOutput reads from worktree journal when runId provided", () => {
@@ -158,7 +174,7 @@ describe("inspect projection surfaces with --run for worktree journals", () => {
     setupWorktreeJournal(runId);
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     renderPromptFormat(tmpDir, "1", "terminal", runId);
-    const output = spy.mock.calls.map(c => c.join(" ")).join("\n");
+    const output = spy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(output).not.toContain("missing prompt");
     spy.mockRestore();
   });
@@ -172,10 +188,14 @@ describe("fallback to top-level journal when no isolated journal exists", () => 
     const runId = "top-level-run";
     const lines = [
       journalLine(runId, "loop.start", "0"),
-      journalLine(runId, "iteration.start", "1", { prompt: "top-level prompt" }),
-      journalLine(runId, "iteration.finish", "1", { output: "top-level output" }),
+      journalLine(runId, "iteration.start", "1", {
+        prompt: "top-level prompt",
+      }),
+      journalLine(runId, "iteration.finish", "1", {
+        output: "top-level output",
+      }),
     ];
-    writeFileSync(join(stateDir, "journal.jsonl"), lines.join("\n") + "\n");
+    writeFileSync(join(stateDir, "journal.jsonl"), `${lines.join("\n")}\n`);
 
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     renderOutput(tmpDir, "1", runId);

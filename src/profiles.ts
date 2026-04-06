@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type { Role } from "./topology.js";
 
 export interface ProfileSpec {
@@ -50,31 +50,41 @@ export function resolveProfileFragments(
     const profileDir = resolveProfileDir(parsed, workDir);
 
     if (!existsSync(profileDir)) {
-      throw new Error(`profile "${spec}" not found: ${profileDir} does not exist`);
+      throw new Error(
+        `profile "${spec}" not found: ${profileDir} does not exist`,
+      );
     }
 
     const presetDir = join(profileDir, presetName);
     if (!existsSync(presetDir)) {
-      warnings.push(`profile "${spec}" has no fragments for preset "${presetName}"`);
+      warnings.push(
+        `profile "${spec}" has no fragments for preset "${presetName}"`,
+      );
       continue;
     }
 
     let contributed = false;
-    const entries = readdirSync(presetDir).filter((f) => f.endsWith(".md")).sort();
+    const entries = readdirSync(presetDir)
+      .filter((f) => f.endsWith(".md"))
+      .sort();
     for (const entry of entries) {
       const roleId = entry.replace(/\.md$/, "");
       if (!roleIds.has(roleId)) {
-        warnings.push(`profile "${spec}" has fragment for unknown role "${roleId}" in preset "${presetName}"`);
+        warnings.push(
+          `profile "${spec}" has fragment for unknown role "${roleId}" in preset "${presetName}"`,
+        );
         continue;
       }
       const content = readFileSync(join(presetDir, entry), "utf-8");
       const existing = fragments.get(roleId) ?? "";
-      fragments.set(roleId, existing + "\n" + content);
+      fragments.set(roleId, `${existing}\n${content}`);
       contributed = true;
     }
 
     if (!contributed) {
-      warnings.push(`profile "${spec}" contributed no fragments for preset "${presetName}"`);
+      warnings.push(
+        `profile "${spec}" contributed no fragments for preset "${presetName}"`,
+      );
     }
   }
 

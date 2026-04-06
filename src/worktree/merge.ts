@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
-import { readMeta, updateStatus } from "./meta.js";
-import type { WorktreeMeta } from "./meta.js";
 import { shellQuote } from "../utils.js";
+import type { WorktreeMeta } from "./meta.js";
+import { readMeta, updateStatus } from "./meta.js";
 
 export interface MergeOpts {
   mainProjectDir: string;
@@ -32,11 +32,17 @@ export function mergeWorktree(opts: MergeOpts): MergeResult {
   try {
     if (strategy === "squash") {
       exec(mainProjectDir, `git merge --squash ${shellQuote(branch)}`);
-      exec(mainProjectDir, `git commit --no-edit -m ${shellQuote(`merge worktree ${meta.run_id} (squash)`)}`);
+      exec(
+        mainProjectDir,
+        `git commit --no-edit -m ${shellQuote(`merge worktree ${meta.run_id} (squash)`)}`,
+      );
     } else if (strategy === "rebase") {
       exec(mainProjectDir, `git rebase ${shellQuote(branch)}`);
     } else {
-      exec(mainProjectDir, `git merge --no-ff ${shellQuote(branch)} -m ${shellQuote(`merge worktree ${meta.run_id}`)}`);
+      exec(
+        mainProjectDir,
+        `git merge --no-ff ${shellQuote(branch)} -m ${shellQuote(`merge worktree ${meta.run_id}`)}`,
+      );
     }
   } catch (err: unknown) {
     // Attempt to detect conflicts and abort
@@ -48,7 +54,9 @@ export function mergeWorktree(opts: MergeOpts): MergeResult {
       } else {
         exec(mainProjectDir, "git merge --abort");
       }
-    } catch { /* abort best-effort */ }
+    } catch {
+      /* abort best-effort */
+    }
 
     if (conflicts.length > 0) {
       return {
@@ -92,4 +100,3 @@ function detectConflicts(cwd: string): string[] {
 function exec(cwd: string, cmd: string): string {
   return execSync(cmd, { cwd, encoding: "utf-8", stdio: "pipe" });
 }
-

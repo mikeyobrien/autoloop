@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { parseInlineChain, validatePresetVocabulary } from "../../src/chains.js";
+import { describe, expect, it } from "vitest";
+import {
+  parseInlineChain,
+  validatePresetVocabulary,
+} from "../../src/chains.js";
 
 describe("chains facade", () => {
   it("parses inline chain steps", () => {

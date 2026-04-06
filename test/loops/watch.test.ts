@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { healthAdvisory } from "../../src/loops/watch.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
@@ -33,13 +33,18 @@ const NOW = new Date("2026-04-06T12:00:00Z").getTime();
 describe("healthAdvisory", () => {
   it("returns null for a healthy running run", () => {
     // autocode warningAfterMs = 5min; run is 2min old
-    const r = makeRun({ updated_at: new Date(NOW - 2 * 60 * 1000).toISOString() });
+    const r = makeRun({
+      updated_at: new Date(NOW - 2 * 60 * 1000).toISOString(),
+    });
     expect(healthAdvisory(r, NOW)).toBeNull();
   });
 
   it("returns investigate-soon for a watching-band run", () => {
     // autosimplify warningAfterMs = 2min, stuckAfterMs = 6min; run is 3min old
-    const r = makeRun({ preset: "autosimplify", updated_at: new Date(NOW - 3 * 60 * 1000).toISOString() });
+    const r = makeRun({
+      preset: "autosimplify",
+      updated_at: new Date(NOW - 3 * 60 * 1000).toISOString(),
+    });
     const msg = healthAdvisory(r, NOW);
     expect(msg).toContain("autosimplify");
     expect(msg).toContain("investigate soon");
@@ -47,7 +52,10 @@ describe("healthAdvisory", () => {
 
   it("returns stuck advisory for a stuck run", () => {
     // autosimplify stuckAfterMs = 6min; run is 7min old
-    const r = makeRun({ preset: "autosimplify", updated_at: new Date(NOW - 7 * 60 * 1000).toISOString() });
+    const r = makeRun({
+      preset: "autosimplify",
+      updated_at: new Date(NOW - 7 * 60 * 1000).toISOString(),
+    });
     const msg = healthAdvisory(r, NOW);
     expect(msg).toContain("autosimplify");
     expect(msg).toContain("likely stuck");

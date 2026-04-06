@@ -8,9 +8,9 @@ export function buildCommandInvocation(
 ): string {
   const argv = shellWords([spec.command, ...spec.args]);
   if (spec.promptMode === "stdin") {
-    return "printf '%s' " + shellQuote(prompt) + " | " + argv;
+    return `printf '%s' ${shellQuote(prompt)} | ${argv}`;
   }
-  return argv + " " + shellQuote(prompt);
+  return `${argv} ${shellQuote(prompt)}`;
 }
 
 export function runShellCommand(

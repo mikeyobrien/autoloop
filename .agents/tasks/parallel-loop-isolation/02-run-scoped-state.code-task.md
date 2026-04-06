@@ -62,7 +62,7 @@ paths: {
 
 ### 3. Verify emit tool env var propagation
 
-The emit tool script in `src/harness/tools.ts` bakes `MINILOOPS_STATE_DIR` and `MINILOOPS_JOURNAL_FILE` from `loop.paths`. Since these now point to the run-scoped directory, no changes are needed — but verify with a manual test that the tool resolves correctly.
+The emit tool script in `src/harness/tools.ts` bakes `AUTOLOOP_STATE_DIR` and `AUTOLOOP_JOURNAL_FILE` from `loop.paths`. Since these now point to the run-scoped directory, no changes are needed — but verify with a manual test that the tool resolves correctly.
 
 ### Acceptance Criteria
 

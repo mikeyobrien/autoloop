@@ -1,11 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { encodeEvent } from "../../src/events/encode.js";
+import { describe, expect, it } from "vitest";
 import { renderChainLines } from "../../src/chains/render.js";
+import { encodeEvent } from "../../src/events/encode.js";
 
-function fieldsLine(
-  topic: string,
-  fields: Record<string, string>,
-): string {
+function fieldsLine(topic: string, fields: Record<string, string>): string {
   return encodeEvent({
     shape: "fields",
     run: "r1",
@@ -30,9 +27,7 @@ describe("renderChainLines", () => {
   });
 
   it("renders chain.start", () => {
-    const lines = [
-      fieldsLine("chain.start", { name: "deploy", steps: "3" }),
-    ];
+    const lines = [fieldsLine("chain.start", { name: "deploy", steps: "3" })];
     const result = renderChainLines(lines);
     expect(result).toContain("## Chain: deploy");
     expect(result).toContain("Steps: 3");
@@ -42,7 +37,11 @@ describe("renderChainLines", () => {
     const lines = [
       fieldsLine("chain.start", { name: "build", steps: "2" }),
       fieldsLine("chain.step.start", { step: "1", preset: "lint" }),
-      fieldsLine("chain.step.finish", { step: "1", preset: "lint", stop_reason: "completed" }),
+      fieldsLine("chain.step.finish", {
+        step: "1",
+        preset: "lint",
+        stop_reason: "completed",
+      }),
     ];
     const result = renderChainLines(lines);
     expect(result).toContain("Step 1 (lint) started");
@@ -52,7 +51,10 @@ describe("renderChainLines", () => {
   it("renders chain.complete", () => {
     const lines = [
       fieldsLine("chain.start", { name: "ci", steps: "2" }),
-      fieldsLine("chain.complete", { outcome: "success", steps_completed: "2" }),
+      fieldsLine("chain.complete", {
+        outcome: "success",
+        steps_completed: "2",
+      }),
     ];
     const result = renderChainLines(lines);
     expect(result).toContain("Outcome: success (2 steps completed)");
@@ -74,10 +76,21 @@ describe("renderChainLines", () => {
     const lines = [
       fieldsLine("chain.start", { name: "full", steps: "2" }),
       fieldsLine("chain.step.start", { step: "1", preset: "test" }),
-      fieldsLine("chain.step.finish", { step: "1", preset: "test", stop_reason: "done" }),
+      fieldsLine("chain.step.finish", {
+        step: "1",
+        preset: "test",
+        stop_reason: "done",
+      }),
       fieldsLine("chain.step.start", { step: "2", preset: "deploy" }),
-      fieldsLine("chain.step.finish", { step: "2", preset: "deploy", stop_reason: "done" }),
-      fieldsLine("chain.complete", { outcome: "success", steps_completed: "2" }),
+      fieldsLine("chain.step.finish", {
+        step: "2",
+        preset: "deploy",
+        stop_reason: "done",
+      }),
+      fieldsLine("chain.complete", {
+        outcome: "success",
+        steps_completed: "2",
+      }),
     ];
     const result = renderChainLines(lines);
     expect(result).toContain("# Chain State");

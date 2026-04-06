@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { encodeEvent } from "../../src/events/encode.js";
-import { deriveRunRecords, stopReasonToStatus } from "../../src/registry/derive.js";
+import {
+  deriveRunRecords,
+  stopReasonToStatus,
+} from "../../src/registry/derive.js";
 
-function loopStartLine(runId: string, fields: Record<string, string> = {}): string {
+function loopStartLine(
+  runId: string,
+  fields: Record<string, string> = {},
+): string {
   return encodeEvent({
     shape: "fields",
     run: runId,
@@ -34,7 +40,11 @@ function iterationFinishLine(runId: string, iteration: string): string {
   }).trim();
 }
 
-function loopCompleteLine(runId: string, iteration: string, reason: string): string {
+function loopCompleteLine(
+  runId: string,
+  iteration: string,
+  reason: string,
+): string {
   return encodeEvent({
     shape: "fields",
     run: runId,
@@ -44,7 +54,11 @@ function loopCompleteLine(runId: string, iteration: string, reason: string): str
   }).trim();
 }
 
-function loopStopLine(runId: string, iteration: string, reason: string): string {
+function loopStopLine(
+  runId: string,
+  iteration: string,
+  reason: string,
+): string {
   return encodeEvent({
     shape: "fields",
     run: runId,
@@ -75,9 +89,16 @@ describe("deriveRunRecords", () => {
   });
 
   it("derives backend_args from loop.start metadata", () => {
-    const lines = [loopStartLine("run-1", { backend_args: "-p,--dangerously-skip-permissions" })];
+    const lines = [
+      loopStartLine("run-1", {
+        backend_args: "-p,--dangerously-skip-permissions",
+      }),
+    ];
     const records = deriveRunRecords(lines);
-    expect(records[0].backend_args).toEqual(["-p", "--dangerously-skip-permissions"]);
+    expect(records[0].backend_args).toEqual([
+      "-p",
+      "--dangerously-skip-permissions",
+    ]);
   });
 
   it("defaults backend_args to empty array when absent", () => {
@@ -157,9 +178,7 @@ describe("deriveRunRecords", () => {
   });
 
   it("ignores events for unknown run ids", () => {
-    const lines = [
-      iterationFinishLine("run-unknown", "1"),
-    ];
+    const lines = [iterationFinishLine("run-unknown", "1")];
     const records = deriveRunRecords(lines);
     expect(records).toHaveLength(0);
   });
@@ -175,11 +194,7 @@ describe("deriveRunRecords", () => {
   });
 
   it("skips malformed lines", () => {
-    const lines = [
-      "not valid json",
-      loopStartLine("run-1"),
-      "{broken",
-    ];
+    const lines = ["not valid json", loopStartLine("run-1"), "{broken"];
     const records = deriveRunRecords(lines);
     expect(records).toHaveLength(1);
     expect(records[0].run_id).toBe("run-1");

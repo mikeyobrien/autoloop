@@ -1,7 +1,7 @@
-import { readRegistry } from "../registry/read.js";
+import { readMergedRegistry } from "../registry/discover.js";
 import type { RunRecord } from "../registry/types.js";
 import { policyForPreset } from "./policy.js";
-import { renderRunLine, renderListHeader } from "./render.js";
+import { renderListHeader, renderRunLine } from "./render.js";
 
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -18,17 +18,20 @@ export interface HealthResult {
  * Exception-focused: only surfaces issues by default.
  * Pass verbose=true to also list recent completions.
  */
-export function healthSummary(registryPath: string, verbose: boolean): string {
-  const result = categorizeRuns(registryPath);
+export function healthSummary(stateDir: string, verbose: boolean): string {
+  const result = categorizeRuns(stateDir);
   return renderHealth(result, verbose);
 }
 
-export function categorizeRuns(registryPath: string): HealthResult {
-  const all = readRegistry(registryPath);
+export function categorizeRuns(stateDir: string): HealthResult {
+  const all = readMergedRegistry(stateDir);
   return categorizeRecords(all);
 }
 
-export function categorizeRecords(records: RunRecord[], nowMs: number = Date.now()): HealthResult {
+export function categorizeRecords(
+  records: RunRecord[],
+  nowMs: number = Date.now(),
+): HealthResult {
   const active: RunRecord[] = [];
   const watching: RunRecord[] = [];
   const stuck: RunRecord[] = [];
@@ -37,20 +40,27 @@ export function categorizeRecords(records: RunRecord[], nowMs: number = Date.now
 
   for (const r of records) {
     if (r.status === "running") {
-      const elapsed = elapsedMs(r, nowMs);
-      if (elapsed === null) {
-        active.push(r);
+      // If PID is recorded and the process is dead, treat as stopped
+      if (r.pid != null && !isProcessAlive(r.pid)) {
+        r.status = "stopped";
+        r.stop_reason = r.stop_reason || "interrupted";
+        // Fall through to non-running classification
+      } else {
+        const elapsed = elapsedMs(r, nowMs);
+        if (elapsed === null) {
+          active.push(r);
+          continue;
+        }
+        const policy = policyForPreset(r.preset);
+        if (elapsed > policy.stuckAfterMs) {
+          stuck.push(r);
+        } else if (elapsed > policy.warningAfterMs) {
+          watching.push(r);
+        } else {
+          active.push(r);
+        }
         continue;
       }
-      const policy = policyForPreset(r.preset);
-      if (elapsed > policy.stuckAfterMs) {
-        stuck.push(r);
-      } else if (elapsed > policy.warningAfterMs) {
-        watching.push(r);
-      } else {
-        active.push(r);
-      }
-      continue;
     }
 
     if (!isRecent(r, nowMs)) continue;
@@ -72,31 +82,56 @@ function elapsedMs(r: RunRecord, nowMs: number): number | null {
   return nowMs - updatedMs;
 }
 
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isRecent(r: RunRecord, nowMs: number): boolean {
   if (!r.updated_at) return false;
   const updatedMs = new Date(r.updated_at).getTime();
   if (Number.isNaN(updatedMs)) return false;
-  return (nowMs - updatedMs) <= RECENT_WINDOW_MS;
+  return nowMs - updatedMs <= RECENT_WINDOW_MS;
 }
 
 function renderHealth(h: HealthResult, verbose: boolean): string {
-  const hasExceptions = h.stuck.length > 0 || h.recentFailed.length > 0 || h.watching.length > 0;
+  const hasExceptions =
+    h.stuck.length > 0 || h.recentFailed.length > 0 || h.watching.length > 0;
 
   if (!hasExceptions && h.active.length === 0) {
-    return "All clear. 0 active, " + h.recentCompleted.length + " completed in last 24h.";
+    return (
+      "All clear. 0 active, " +
+      h.recentCompleted.length +
+      " completed in last 24h."
+    );
   }
 
   if (!hasExceptions) {
-    return "All clear. " + h.active.length + " active, " + h.recentCompleted.length + " completed in last 24h.";
+    return (
+      "All clear. " +
+      h.active.length +
+      " active, " +
+      h.recentCompleted.length +
+      " completed in last 24h."
+    );
   }
 
   const lines: string[] = [];
 
   lines.push(
-    "Health: " + h.active.length + " active, " +
-    h.watching.length + " watching, " +
-    h.stuck.length + " stuck, " +
-    h.recentFailed.length + " failed (last 24h)",
+    "Health: " +
+      h.active.length +
+      " active, " +
+      h.watching.length +
+      " watching, " +
+      h.stuck.length +
+      " stuck, " +
+      h.recentFailed.length +
+      " failed (last 24h)",
   );
   lines.push("");
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Verify that runId flows from RunSummary → StepRecord → handoff artifact
@@ -27,7 +27,11 @@ let runCallCount = 0;
 vi.mock("../../src/harness/index.js", () => ({
   run: vi.fn(() => {
     runCallCount++;
-    return { stopReason: "completion_event", iterations: 1, runId: "run-" + runCallCount };
+    return {
+      stopReason: "completion_event",
+      iterations: 1,
+      runId: `run-${runCallCount}`,
+    };
   }),
 }));
 
@@ -72,9 +76,7 @@ describe("chain handoff runId propagation", () => {
   it("includes runId in StepRecord", () => {
     const spec: ChainSpec = {
       name: "test-chain",
-      steps: [
-        { name: "autocode", presetDir: "/presets/autocode" },
-      ],
+      steps: [{ name: "autocode", presetDir: "/presets/autocode" }],
     };
 
     const result = runChain(spec, ".", "autoloop", {});
@@ -106,9 +108,7 @@ describe("chain handoff runId propagation", () => {
   it("includes runId in result artifact", () => {
     const spec: ChainSpec = {
       name: "test-chain",
-      steps: [
-        { name: "autocode", presetDir: "/presets/autocode" },
-      ],
+      steps: [{ name: "autocode", presetDir: "/presets/autocode" }],
     };
 
     runChain(spec, ".", "autoloop", {});

@@ -1,24 +1,26 @@
-import * as topology from "../topology.js";
-import * as memory from "../memory.js";
 import type { MemoryStats } from "../memory.js";
-import { listText, joinCsv, lineSep } from "../utils.js";
+import * as memory from "../memory.js";
+import { materialize as materializeTasks } from "../tasks.js";
+import { renderTasksPrompt } from "../tasks-render.js";
+import * as topology from "../topology.js";
+import { joinCsv, listText } from "../utils.js";
 import {
-  extractTopic,
-  extractField,
-  extractIteration,
-  readRunLines,
-} from "./journal.js";
-import { renderRunScratchpadPrompt } from "./scratchpad.js";
-import {
-  routingTopic,
-  systemTopic,
   coordinationTopic,
   coreSystemTopic,
   parallelTopic,
   reservedParallelJoinedTopic,
-  parallelDispatchBase,
+  routingTopic,
+  systemTopic,
 } from "./emit.js";
 import type { LoopContext } from "./index.js";
+import {
+  extractField,
+  extractIteration,
+  extractTopic,
+  readLines,
+  readRunLines,
+} from "./journal.js";
+import { renderRunScratchpadPrompt } from "./scratchpad.js";
 
 export interface IterationContext {
   iteration: number;
@@ -36,17 +38,40 @@ interface DerivedRunContext {
   scratchpadText: string;
   memoryText: string;
   memoryStats: MemoryStats;
+  tasksText: string;
+  tasksStats: { open: number; done: number; total: number };
   routing: RoutingContext;
   backpressure: string;
   invalidCount: number;
   lastRejected: string;
 }
 
-function deriveRunContext(loop: LoopContext, runLines: string[]): DerivedRunContext {
+function deriveRunContext(
+  loop: LoopContext,
+  runLines: string[],
+): DerivedRunContext {
+  const taskLines = readLines(loop.paths.tasksFile);
+  const tasksMaterialized = materializeTasks(taskLines);
+  const tasksText = renderTasksPrompt(
+    tasksMaterialized,
+    loop.tasks.budgetChars,
+  );
   return {
     scratchpadText: renderRunScratchpadPrompt(runLines),
-    memoryText: memory.renderFile(loop.paths.memoryFile, loop.memory.budgetChars),
-    memoryStats: memory.statsFile(loop.paths.memoryFile, loop.memory.budgetChars),
+    memoryText: memory.renderFile(
+      loop.paths.memoryFile,
+      loop.memory.budgetChars,
+    ),
+    memoryStats: memory.statsFile(
+      loop.paths.memoryFile,
+      loop.memory.budgetChars,
+    ),
+    tasksText,
+    tasksStats: {
+      open: tasksMaterialized.open.length,
+      done: tasksMaterialized.done.length,
+      total: tasksMaterialized.open.length + tasksMaterialized.done.length,
+    },
     routing: iterationRoutingContext(loop.topology, runLines),
     backpressure: latestInvalidNote(runLines),
     invalidCount: invalidEventCount(runLines),
@@ -113,8 +138,7 @@ function joinedIterationRoutingContext(
   return {
     recentEvent: resumeRecentEvent,
     allowedRoles: restoredRoles.length > 0 ? restoredRoles : fallbackRoles,
-    allowedEvents:
-      restoredEvents.length > 0 ? restoredEvents : fallbackEvents,
+    allowedEvents: restoredEvents.length > 0 ? restoredEvents : fallbackEvents,
   };
 }
 
@@ -156,7 +180,10 @@ function csvFieldList(line: string, field: string): string[] {
   if (!line) return [];
   const value = extractField(line, field);
   if (!value) return [];
-  return value.split(",").map((s) => s.trim()).filter((s) => s !== "");
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
 }
 
 export function routingEventFromLines(lines: string[]): string {
@@ -230,17 +257,28 @@ export function renderIterationPromptText(
   iteration: number,
   derived: DerivedRunContext,
 ): string {
-  const { routing, backpressure, memoryStats, memoryText, scratchpadText, invalidCount, lastRejected } = derived;
+  const {
+    routing,
+    backpressure,
+    memoryStats,
+    memoryText,
+    tasksText,
+    tasksStats,
+    scratchpadText,
+    invalidCount,
+    lastRejected,
+  } = derived;
   const { allowedRoles, allowedEvents, recentEvent } = routing;
   return (
     "You are inside a bare-minimal autoloops harness.\n\n" +
     harnessInstructionsText(loop) +
-    contextPressureText(memoryStats, invalidCount, lastRejected) +
+    contextPressureText(memoryStats, tasksStats, invalidCount, lastRejected) +
     backpressureText(backpressure) +
     "Objective:\n" +
     loop.objective +
     "\n\n" +
-    (memoryText ? memoryText + "\n" : "") +
+    (memoryText ? `${memoryText}\n` : "") +
+    (tasksText ? `${tasksText}\n` : "") +
     topology.renderWithContext(
       loop.topology,
       recentEvent,
@@ -253,7 +291,7 @@ export function renderIterationPromptText(
     `Log level: ${loop.runtime.logLevel}\n` +
     `Completion event: ${loop.completion.event}\n` +
     `Completion promise fallback: ${loop.completion.promise}\n` +
-    `Required events: ${(loop.completion.requiredEvents.length === 0 ? "(none)" : joinCsv(loop.completion.requiredEvents))}\n` +
+    `Required events: ${loop.completion.requiredEvents.length === 0 ? "(none)" : joinCsv(loop.completion.requiredEvents)}\n` +
     `Loop-owned working files belong under: ${loop.paths.stateDir}\n` +
     `Do not leave loop-owned artifacts at the repo root. Use paths under ${loop.paths.stateDir} such as ${loop.paths.stateDir}/progress.md or ${loop.paths.stateDir}/logs/.\n` +
     `Suggested next roles now: ${listText(allowedRoles)}\n` +
@@ -275,7 +313,11 @@ export function renderIterationPromptText(
     loop.paths.toolPath +
     ' memory add learning "durable lesson"\n' +
     loop.paths.toolPath +
-    ' memory add preference Workflow "short preference note"\n\n' +
+    ' memory add preference Workflow "short preference note"\n' +
+    loop.paths.toolPath +
+    ' task add "description of work item"\n' +
+    loop.paths.toolPath +
+    " task complete task-1\n\n" +
     "Backpressure rule: if you emit an event outside the allowed next-event set, the loop will reject that handoff and ask you to re-route.\n" +
     "Prompt/output/scratchpad/memory are projections or stores you can inspect with `" +
     loop.paths.toolPath +
@@ -294,7 +336,17 @@ export function renderReviewPromptText(
   runLines: string[],
 ): string {
   const derived = deriveRunContext(loop, runLines);
-  const { scratchpadText, memoryText, memoryStats, routing, backpressure, invalidCount, lastRejected } = derived;
+  const {
+    scratchpadText,
+    memoryText,
+    tasksText,
+    memoryStats,
+    tasksStats,
+    routing,
+    backpressure,
+    invalidCount,
+    lastRejected,
+  } = derived;
   const latestIteration = String(maxReviewPromptIteration(runLines));
 
   return (
@@ -308,9 +360,10 @@ export function renderReviewPromptText(
     "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" +
     "Do not emit normal loop events during review.\n\n" +
     reviewInstructionsText(loop) +
-    contextPressureText(memoryStats, invalidCount, lastRejected) +
+    contextPressureText(memoryStats, tasksStats, invalidCount, lastRejected) +
     backpressureText(backpressure) +
-    (memoryText ? memoryText + "\n" : "") +
+    (memoryText ? `${memoryText}\n` : "") +
+    (tasksText ? `${tasksText}\n` : "") +
     `Review trigger iteration: ${iteration}\n` +
     "Latest routing event: " +
     routing.recentEvent +
@@ -344,16 +397,17 @@ export function renderReviewPromptText(
 
 function harnessInstructionsText(loop: LoopContext): string {
   if (!loop.harness.instructions) return "";
-  return "Live harness instructions:\n" + loop.harness.instructions + "\n\n";
+  return `Live harness instructions:\n${loop.harness.instructions}\n\n`;
 }
 
 function reviewInstructionsText(loop: LoopContext): string {
   if (!loop.review.prompt) return "";
-  return "Additional metareview instructions:\n" + loop.review.prompt + "\n\n";
+  return `Additional metareview instructions:\n${loop.review.prompt}\n\n`;
 }
 
 function contextPressureText(
   memoryStats: MemoryStats,
+  tasksStats: { open: number; done: number; total: number },
   invalidCount: number,
   lastRejected: string,
 ): string {
@@ -362,12 +416,24 @@ function contextPressureText(
     "- Memory: " +
     memoryPressureSummary(memoryStats) +
     "\n" +
+    "- Tasks: " +
+    tasksPressureSummary(tasksStats) +
+    "\n" +
     "- Invalid emits this run: " +
     invalidCount +
     invalidEmitHint(invalidCount, lastRejected) +
     "\n" +
     contextPressureRecommendation(memoryStats.truncated, invalidCount)
   );
+}
+
+function tasksPressureSummary(stats: {
+  open: number;
+  done: number;
+  total: number;
+}): string {
+  if (stats.total === 0) return "no tasks";
+  return `${stats.open} open, ${stats.done} done (${stats.total} total)`;
 }
 
 function memoryPressureSummary(stats: MemoryStats): string {
@@ -384,7 +450,7 @@ function memoryPressureSummary(stats: MemoryStats): string {
 function invalidEmitHint(invalidCount: number, lastRejected: string): string {
   if (invalidCount === 0) return "";
   if (!lastRejected) return " — routing is currently under backpressure";
-  return " — routing backpressure; last rejected: `" + lastRejected + "`";
+  return ` — routing backpressure; last rejected: \`${lastRejected}\``;
 }
 
 function contextPressureRecommendation(
@@ -398,21 +464,32 @@ function contextPressureRecommendation(
 }
 
 function backpressureText(text: string): string {
-  return text ? "Backpressure:\n" + text + "\n\n" : "";
+  return text ? `Backpressure:\n${text}\n\n` : "";
 }
 
-function parallelPromptText(loop: LoopContext, allowedEvents: string[]): string {
+function parallelPromptText(
+  loop: LoopContext,
+  allowedEvents: string[],
+): string {
   if (!loop.parallel.enabled || loop.runtime.branchMode) return "";
-  const dispatch = parallelDispatchPromptEvents(allowedEvents, loop.completion.event);
-  const dispatchLine = dispatch.length === 0
-    ? "- Dispatch fan-out is available as `<allowed-event>.parallel` for currently allowed normal handoff events.\n"
-    : "- Dispatch fan-out is available now via `<allowed-event>.parallel`: " + dispatch.map((e) => "`" + e + "`").join(", ") + ".\n";
-  return "Structured parallelism:\n" +
+  const dispatch = parallelDispatchPromptEvents(
+    allowedEvents,
+    loop.completion.event,
+  );
+  const dispatchLine =
+    dispatch.length === 0
+      ? "- Dispatch fan-out is available as `<allowed-event>.parallel` for currently allowed normal handoff events.\n"
+      : "- Dispatch fan-out is available now via `<allowed-event>.parallel`: " +
+        dispatch.map((e) => `\`${e}\``).join(", ") +
+        ".\n";
+  return (
+    "Structured parallelism:\n" +
     "- `explore.parallel` is available for exploratory self-loop fan-out before you choose the real next event.\n" +
     dispatchLine +
     `- Payloads must be a markdown bullet list or numbered list with 1..${loop.parallel.maxBranches} distinct branch objectives.\n` +
     "- Use fan-out only when branches are concrete, independently useful, and worth the barrier cost; keep one active wave at a time.\n" +
-    `- Branches run in isolated state under \`${loop.paths.stateDir}/waves/\`; only the harness may emit \`*.parallel.joined\` to resume the parent after the join barrier.\n\n`;
+    `- Branches run in isolated state under \`${loop.paths.stateDir}/waves/\`; only the harness may emit \`*.parallel.joined\` to resume the parent after the join barrier.\n\n`
+  );
 }
 
 function parallelDispatchPromptEvents(
@@ -427,7 +504,7 @@ function parallelDispatchPromptEvents(
         !coreSystemTopic(e) &&
         !parallelTopic(e),
     )
-    .map((e) => e + ".parallel");
+    .map((e) => `${e}.parallel`);
 }
 
 function maxReviewPromptIteration(runLines: string[]): number {
@@ -435,7 +512,7 @@ function maxReviewPromptIteration(runLines: string[]): number {
   for (const line of runLines) {
     if (extractTopic(line) === "iteration.start") {
       const val = parseInt(extractIteration(line), 10);
-      if (!isNaN(val) && val > current) current = val;
+      if (!Number.isNaN(val) && val > current) current = val;
     }
   }
   return current;

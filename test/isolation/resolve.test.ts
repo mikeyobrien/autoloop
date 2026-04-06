@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
 import { resolve } from "node:path";
-import { resolveIsolationMode, isCodeModifyingRun, presetCategory } from "../../src/isolation/resolve.js";
+import { describe, expect, it } from "vitest";
+import {
+  isCodeModifyingRun,
+  presetCategory,
+  resolveIsolationMode,
+} from "../../src/isolation/resolve.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
 const bundleRoot = resolve(import.meta.dirname, "../..");
@@ -53,12 +57,18 @@ describe("resolveIsolationMode", () => {
   });
 
   it("returns shared when config enabled but --no-worktree overrides", () => {
-    const result = resolveIsolationMode({ configEnabled: true, noWorktree: true }, []);
+    const result = resolveIsolationMode(
+      { configEnabled: true, noWorktree: true },
+      [],
+    );
     expect(result).toEqual({ mode: "shared" });
   });
 
   it("--worktree takes priority over --no-worktree", () => {
-    const result = resolveIsolationMode({ worktree: true, noWorktree: true }, []);
+    const result = resolveIsolationMode(
+      { worktree: true, noWorktree: true },
+      [],
+    );
     expect(result).toEqual({ mode: "worktree" });
   });
 
@@ -68,7 +78,9 @@ describe("resolveIsolationMode", () => {
   });
 
   it("returns run-scoped with warning when code-modifying runs are active", () => {
-    const result = resolveIsolationMode({}, [makeRecord({ preset: "autocode", run_id: "run-abc" })]);
+    const result = resolveIsolationMode({}, [
+      makeRecord({ preset: "autocode", run_id: "run-abc" }),
+    ]);
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toContain("code-modifying");
     expect(result.warning).toContain("run-abc");
@@ -78,25 +90,25 @@ describe("resolveIsolationMode", () => {
   });
 
   it("returns run-scoped without warning for non-code active runs", () => {
-    const result = resolveIsolationMode({}, [makeRecord({ preset: "diagnostics", objective: "check logs" })]);
+    const result = resolveIsolationMode({}, [
+      makeRecord({ preset: "diagnostics", objective: "check logs" }),
+    ]);
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toBeUndefined();
   });
 
   it("planning preset + code-modifying active run → run-scoped, no warning", () => {
-    const result = resolveIsolationMode(
-      { currentCategory: "planning" },
-      [makeRecord({ preset: "autocode" })],
-    );
+    const result = resolveIsolationMode({ currentCategory: "planning" }, [
+      makeRecord({ preset: "autocode" }),
+    ]);
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toBeUndefined();
   });
 
   it("code preset + code-modifying active run → run-scoped, warning with details", () => {
-    const result = resolveIsolationMode(
-      { currentCategory: "code" },
-      [makeRecord({ preset: "autocode", run_id: "run-xyz" })],
-    );
+    const result = resolveIsolationMode({ currentCategory: "code" }, [
+      makeRecord({ preset: "autocode", run_id: "run-xyz" }),
+    ]);
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toContain("code-modifying");
     expect(result.warning).toContain("run-xyz");
@@ -105,19 +117,17 @@ describe("resolveIsolationMode", () => {
   });
 
   it("planning preset + non-code active run → run-scoped, no warning", () => {
-    const result = resolveIsolationMode(
-      { currentCategory: "planning" },
-      [makeRecord({ preset: "diagnostics", objective: "check logs" })],
-    );
+    const result = resolveIsolationMode({ currentCategory: "planning" }, [
+      makeRecord({ preset: "diagnostics", objective: "check logs" }),
+    ]);
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toBeUndefined();
   });
 
   it("unknown preset + code-modifying active run → run-scoped, warning", () => {
-    const result = resolveIsolationMode(
-      { currentCategory: "unknown" },
-      [makeRecord({ preset: "autocode" })],
-    );
+    const result = resolveIsolationMode({ currentCategory: "unknown" }, [
+      makeRecord({ preset: "autocode" }),
+    ]);
     expect(result.mode).toBe("run-scoped");
     expect(result.warning).toContain("code-modifying");
   });
@@ -133,23 +143,38 @@ describe("isCodeModifyingRun", () => {
   });
 
   it("detects fix in objective", () => {
-    expect(isCodeModifyingRun(makeRecord({ objective: "fix the login bug" }))).toBe(true);
+    expect(
+      isCodeModifyingRun(makeRecord({ objective: "fix the login bug" })),
+    ).toBe(true);
   });
 
   it("detects implement in objective", () => {
-    expect(isCodeModifyingRun(makeRecord({ objective: "implement caching" }))).toBe(true);
+    expect(
+      isCodeModifyingRun(makeRecord({ objective: "implement caching" })),
+    ).toBe(true);
   });
 
   it("returns false for non-code runs", () => {
-    expect(isCodeModifyingRun(makeRecord({ preset: "diagnostics", objective: "check logs" }))).toBe(false);
+    expect(
+      isCodeModifyingRun(
+        makeRecord({ preset: "diagnostics", objective: "check logs" }),
+      ),
+    ).toBe(false);
   });
 
   it("respects category override code", () => {
-    expect(isCodeModifyingRun(makeRecord({ preset: "diagnostics", objective: "check logs" }), "code")).toBe(true);
+    expect(
+      isCodeModifyingRun(
+        makeRecord({ preset: "diagnostics", objective: "check logs" }),
+        "code",
+      ),
+    ).toBe(true);
   });
 
   it("respects category override planning", () => {
-    expect(isCodeModifyingRun(makeRecord({ preset: "autocode" }), "planning")).toBe(false);
+    expect(
+      isCodeModifyingRun(makeRecord({ preset: "autocode" }), "planning"),
+    ).toBe(false);
   });
 });
 

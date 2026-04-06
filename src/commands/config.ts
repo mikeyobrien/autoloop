@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 import * as config from "../config.js";
 
-
 export function dispatchConfig(args: string[]): boolean {
   const sub = args[0] ?? "";
 
@@ -18,7 +17,7 @@ export function dispatchConfig(args: string[]): boolean {
     return true;
   }
 
-  console.log("unknown config subcommand: " + sub);
+  console.log(`unknown config subcommand: ${sub}`);
   printConfigUsage();
   return true;
 }
@@ -46,17 +45,17 @@ function configShow(args: string[]): boolean {
   console.log("");
 
   for (const section of Object.keys(resolved)) {
-    console.log("[" + section + "]");
+    console.log(`[${section}]`);
     const value = resolved[section];
     if (typeof value === "object" && value !== null) {
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        const dotPath = section + "." + k;
+        const dotPath = `${section}.${k}`;
         const source = provenance[dotPath] ?? "default";
-        console.log("  " + k + " = " + JSON.stringify(String(v)) + "    # " + source);
+        console.log(`  ${k} = ${JSON.stringify(String(v))}    # ${source}`);
       }
     } else {
       const source = provenance[section] ?? "default";
-      console.log("  " + JSON.stringify(String(value)) + "    # " + source);
+      console.log(`  ${JSON.stringify(String(value))}    # ${source}`);
     }
     console.log("");
   }
@@ -75,10 +74,14 @@ function printConfigUsage(): void {
   console.log("Usage: autoloop config <subcommand>");
   console.log("");
   console.log("Subcommands:");
-  console.log("  show              Show resolved config with provenance labels");
+  console.log(
+    "  show              Show resolved config with provenance labels",
+  );
   console.log("  path              Print user config file path and existence");
   console.log("");
   console.log("Options (show):");
-  console.log("  --project <dir>   Resolve against a specific project directory");
+  console.log(
+    "  --project <dir>   Resolve against a specific project directory",
+  );
   console.log("  --json            Output as JSON with config and provenance");
 }

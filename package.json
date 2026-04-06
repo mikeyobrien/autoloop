@@ -38,11 +38,28 @@
   },
   "scripts": {
     "build": "tsc",
+    "lint": "biome check src/ test/",
+    "lint:fix": "biome check --write src/ test/",
+    "format": "biome format src/ test/",
+    "format:fix": "biome format --write src/ test/",
     "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
-    "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest"
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/vitest run --coverage",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest",
+    "check": "biome check src/ test/ && tsc --noEmit && npm run test:coverage",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,js,json}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
     "@types/node": "^25.5.2",
+    "@vitest/coverage-v8": "^3.2.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "playwright": "^1.59.1",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },

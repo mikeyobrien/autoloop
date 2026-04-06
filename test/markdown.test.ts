@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  bold,
-  italic,
-  code,
-  heading,
-  codeBlock,
   blockquote,
-  section,
+  bold,
   bulletList,
+  code,
+  codeBlock,
+  heading,
+  italic,
   numberedList,
+  section,
   table,
 } from "../src/markdown.js";
 
@@ -97,12 +97,18 @@ describe("numberedList", () => {
 
 describe("table", () => {
   it("renders headers and rows with padding", () => {
-    const result = table(["Name", "Age"], [["Alice", "30"], ["Bob", "25"]]);
+    const result = table(
+      ["Name", "Age"],
+      [
+        ["Alice", "30"],
+        ["Bob", "25"],
+      ],
+    );
     const lines = result.split("\n");
     expect(lines).toHaveLength(4);
     expect(lines[0]).toContain("Name");
     expect(lines[0]).toContain("Age");
-    expect(lines[1]).toMatch(/^[\|\s\-]+$/);
+    expect(lines[1]).toMatch(/^[|\s-]+$/);
     expect(lines[2]).toContain("Alice");
     expect(lines[3]).toContain("Bob");
   });

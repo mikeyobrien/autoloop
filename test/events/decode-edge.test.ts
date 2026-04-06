@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { decodeEvent } from "../../src/events/decode.js";
 import { encodeEvent } from "../../src/events/encode.js";
-import { isSystemEvent, isRoutingEvent } from "../../src/events/guards.js";
+import { isRoutingEvent, isSystemEvent } from "../../src/events/guards.js";
 
 describe("decodeEvent edge cases", () => {
   it("returns null for empty string", () => {
@@ -15,58 +15,60 @@ describe("decodeEvent edge cases", () => {
   it("defaults run and topic to empty string when missing", () => {
     const event = decodeEvent('{"fields":{}}');
     expect(event).not.toBeNull();
-    expect(event!.run).toBe("");
-    expect(event!.topic).toBe("");
+    expect(event?.run).toBe("");
+    expect(event?.topic).toBe("");
   });
 
   it("defaults run and topic when non-string", () => {
     const event = decodeEvent('{"run": 42, "topic": true, "fields":{}}');
-    expect(event!.run).toBe("");
-    expect(event!.topic).toBe("");
+    expect(event?.run).toBe("");
+    expect(event?.topic).toBe("");
   });
 
   it("omits iteration when not present", () => {
     const event = decodeEvent('{"run":"r1","topic":"t","fields":{}}');
-    expect(event!.iteration).toBeUndefined();
+    expect(event?.iteration).toBeUndefined();
   });
 
   it("converts null field values to empty string", () => {
     const event = decodeEvent('{"run":"r1","topic":"t","fields":{"key":null}}');
-    expect(event!.shape).toBe("fields");
-    if (event!.shape === "fields") {
-      expect(event!.fields.key).toBe("");
+    expect(event?.shape).toBe("fields");
+    if (event?.shape === "fields") {
+      expect(event?.fields.key).toBe("");
     }
   });
 
   it("converts numeric field values to string", () => {
     const event = decodeEvent('{"run":"r1","topic":"t","fields":{"count":42}}');
-    if (event!.shape === "fields") {
-      expect(event!.fields.count).toBe("42");
+    if (event?.shape === "fields") {
+      expect(event?.fields.count).toBe("42");
     }
   });
 
   it("treats array as non-object for fields fallback", () => {
     const event = decodeEvent('{"run":"r1","topic":"t","fields":[1,2]}');
-    expect(event!.shape).toBe("fields");
-    if (event!.shape === "fields") {
-      expect(Object.keys(event!.fields)).toHaveLength(0);
+    expect(event?.shape).toBe("fields");
+    if (event?.shape === "fields") {
+      expect(Object.keys(event?.fields)).toHaveLength(0);
     }
   });
 
   it("preserves rawFields with original types", () => {
-    const event = decodeEvent('{"run":"r1","topic":"t","fields":{"ok":true,"n":5}}');
-    if (event!.shape === "fields") {
-      expect(event!.rawFields?.ok).toBe(true);
-      expect(event!.rawFields?.n).toBe(5);
+    const event = decodeEvent(
+      '{"run":"r1","topic":"t","fields":{"ok":true,"n":5}}',
+    );
+    if (event?.shape === "fields") {
+      expect(event?.rawFields?.ok).toBe(true);
+      expect(event?.rawFields?.n).toBe(5);
     }
   });
 
   it("decodes payload event without source", () => {
     const event = decodeEvent('{"run":"r1","topic":"t","payload":"hello"}');
-    expect(event!.shape).toBe("payload");
-    if (event!.shape === "payload") {
-      expect(event!.payload).toBe("hello");
-      expect(event!.source).toBeUndefined();
+    expect(event?.shape).toBe("payload");
+    if (event?.shape === "payload") {
+      expect(event?.payload).toBe("hello");
+      expect(event?.source).toBeUndefined();
     }
   });
 });
@@ -143,7 +145,9 @@ describe("event guards edge cases", () => {
   });
 
   it("custom topic is a routing event", () => {
-    const event = decodeEvent('{"run":"r1","topic":"gaps.identified","payload":"done"}');
+    const event = decodeEvent(
+      '{"run":"r1","topic":"gaps.identified","payload":"done"}',
+    );
     expect(isRoutingEvent(event)).toBe(true);
     expect(isSystemEvent(event)).toBe(false);
   });

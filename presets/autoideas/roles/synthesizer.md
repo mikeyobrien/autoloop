@@ -37,7 +37,20 @@ Brief overview of findings so far.
 Table of all suggestions ranked by impact/effort ratio.
 ```
 
-After updating the report:
+After updating the report, do these steps IN ORDER:
+
+**Step 1 (MANDATORY — do this FIRST or the loop breaks):**
+Open `.autoloop/context.md` and REPLACE the `## Current State` section with updated values:
+```
+## Current State
+- **Phase**: Areas 1–N complete, cycling back to scanner to dispatch Area N+1.
+- **Completed**: [list every completed area with suggestion count]. Total: X validated suggestions in ideas-report.md.
+- **Next area**: Area N+1 ([name]) — see scan-areas.md for details.
+- **Remaining**: Areas N+1–7 pending analysis.
+```
+Fill in the actual numbers. This is not optional — the scanner reads this to decide what to do next.
+
+**Step 2:** Emit the appropriate event:
 - If there are remaining unanalyzed areas in `.autoloop/scan-areas.md`, emit `report.updated` to send the scanner back for the next area.
 - If all areas are covered and the report is complete, emit `task.complete`.
 - If you need the scanner to re-survey (e.g., the report reveals a gap), emit `synthesis.blocked`.

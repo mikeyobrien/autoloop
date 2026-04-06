@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { policyForPreset } from "../../src/loops/policy.js";
 
 describe("policyForPreset", () => {
@@ -6,7 +6,9 @@ describe("policyForPreset", () => {
     const autospec = policyForPreset("autospec");
     const autosimplify = policyForPreset("autosimplify");
     expect(autospec.stuckAfterMs).toBeGreaterThan(autosimplify.stuckAfterMs);
-    expect(autospec.warningAfterMs).toBeGreaterThan(autosimplify.warningAfterMs);
+    expect(autospec.warningAfterMs).toBeGreaterThan(
+      autosimplify.warningAfterMs,
+    );
   });
 
   it("falls back to default policy for unknown presets", () => {

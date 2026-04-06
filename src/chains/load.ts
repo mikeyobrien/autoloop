@@ -4,7 +4,7 @@ import TOML from "@iarna/toml";
 import * as config from "../config.js";
 import { parseStringList } from "../utils.js";
 import { defaultBudget, parseBudgetFromToml } from "./budget.js";
-import type { ChainStep, ChainSpec, ChainsConfig, Budget } from "./types.js";
+import type { Budget, ChainSpec, ChainStep, ChainsConfig } from "./types.js";
 
 export function load(projectDir: string): ChainsConfig {
   const path = join(projectDir, "chains.toml");
@@ -12,7 +12,10 @@ export function load(projectDir: string): ChainsConfig {
   return loadExisting(path, projectDir);
 }
 
-export function resolveChain(chains: ChainsConfig, name: string): ChainSpec | null {
+export function resolveChain(
+  chains: ChainsConfig,
+  name: string,
+): ChainSpec | null {
   return chains.chains.find((c) => c.name === name) ?? null;
 }
 
@@ -20,7 +23,10 @@ export function listChains(chains: ChainsConfig): ChainSpec[] {
   return chains.chains;
 }
 
-export function parseInlineChain(csvSteps: string, projectDir: string): ChainSpec {
+export function parseInlineChain(
+  csvSteps: string,
+  projectDir: string,
+): ChainSpec {
   const stepNames = parseStringList(csvSteps);
   return {
     name: "inline",
@@ -36,19 +42,29 @@ export function loadBudget(projectDir: string): Budget {
 }
 
 export function resolvePresetDir(name: string, projectDir: string): string {
-  const candidate = join(projectDir, "presets/" + name);
+  const candidate = join(projectDir, `presets/${name}`);
   if (existsSync(candidate)) return candidate;
-  const cwdCandidate = join(".", "presets/" + name);
+  const cwdCandidate = join(".", `presets/${name}`);
   if (existsSync(cwdCandidate)) return cwdCandidate;
   return name;
 }
 
 export function listKnownPresets(): string[] {
   return [
-    "autocode", "autosimplify", "autoideas", "autoresearch",
-    "autoqa", "autotest", "autofix", "autoreview",
-    "autodoc", "autosec", "autoperf", "autospec",
+    "autocode",
+    "autosimplify",
+    "autoideas",
+    "autoresearch",
+    "autoqa",
+    "autotest",
+    "autofix",
+    "autoreview",
+    "autodoc",
+    "autosec",
+    "autoperf",
+    "autospec",
     "automerge",
+    "autopr",
   ];
 }
 
@@ -83,8 +99,11 @@ export function validatePresetVocabulary(
 ): { ok: boolean; reason?: string } {
   const known = listKnownPresets();
   for (const name of steps) {
-    if (!known.includes(name) && !config.projectHasConfig(resolvePresetDir(name, projectDir))) {
-      return { ok: false, reason: "unknown preset: " + name };
+    if (
+      !known.includes(name) &&
+      !config.projectHasConfig(resolvePresetDir(name, projectDir))
+    ) {
+      return { ok: false, reason: `unknown preset: ${name}` };
     }
   }
   return { ok: true };
@@ -96,8 +115,14 @@ function loadExisting(path: string, projectDir: string): ChainsConfig {
   return parseChainsFromToml(parsed as Record<string, unknown>, projectDir);
 }
 
-function parseChainsFromToml(parsed: Record<string, unknown>, projectDir: string): ChainsConfig {
-  const rawChains = (parsed.chain ?? []) as Array<{ name?: string; steps?: string[] }>;
+function parseChainsFromToml(
+  parsed: Record<string, unknown>,
+  projectDir: string,
+): ChainsConfig {
+  const rawChains = (parsed.chain ?? []) as Array<{
+    name?: string;
+    steps?: string[];
+  }>;
   const chains = rawChains
     .filter((c) => typeof c.name === "string" && c.name !== "")
     .map((c) => ({

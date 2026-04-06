@@ -1,7 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { truncateText, type MaterializedMemory } from "../src/memory-render.js";
+import { describe, expect, it } from "vitest";
+import { type MaterializedMemory, truncateText } from "../src/memory-render.js";
 
-const emptyMemory: MaterializedMemory = { preferences: [], learnings: [], meta: [] };
+const emptyMemory: MaterializedMemory = {
+  preferences: [],
+  learnings: [],
+  meta: [],
+};
 
 describe("truncateText", () => {
   it("returns text unchanged when under budget", () => {

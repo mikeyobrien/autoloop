@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Verify that runInlineChain forwards worktree-related options
@@ -23,8 +23,8 @@ vi.mock("../../src/harness/index.js", () => ({
   run: vi.fn(),
 }));
 
-import { dispatchRun } from "../../src/commands/run.js";
 import * as chains from "../../src/chains.js";
+import { dispatchRun } from "../../src/commands/run.js";
 
 describe("runInlineChain option propagation", () => {
   beforeEach(() => {
@@ -34,7 +34,15 @@ describe("runInlineChain option propagation", () => {
   it("forwards worktree options through to chains.runChain", () => {
     // dispatch with --chain and worktree options
     dispatchRun(
-      ["--chain", "autocode,autoqa", "--worktree", "--merge-strategy", "rebase", "--keep-worktree", "."],
+      [
+        "--chain",
+        "autocode,autoqa",
+        "--worktree",
+        "--merge-strategy",
+        "rebase",
+        "--keep-worktree",
+        ".",
+      ],
       [],
       ".",
       "autoloop",
@@ -68,12 +76,7 @@ describe("runInlineChain option propagation", () => {
     // Simulate: autoloop run autocode --automerge --worktree
     // The bundleRoot is "." so defaultChainProjectDir should resolve to "."
     // NOT the resolved preset path
-    dispatchRun(
-      ["autocode", "--automerge", "--worktree"],
-      [],
-      ".",
-      "autoloop",
-    );
+    dispatchRun(["autocode", "--automerge", "--worktree"], [], ".", "autoloop");
 
     expect(chains.runChain).toHaveBeenCalledTimes(1);
     const callArgs = vi.mocked(chains.runChain).mock.calls[0];
@@ -84,7 +87,10 @@ describe("runInlineChain option propagation", () => {
 
     // The chain CSV should be "autocode,automerge"
     const chainSpec = callArgs[0];
-    expect(chainSpec.steps.map((s: { name: string }) => s.name)).toEqual(["autocode", "autoqa"]);
+    expect(chainSpec.steps.map((s: { name: string }) => s.name)).toEqual([
+      "autocode",
+      "autoqa",
+    ]);
   });
 
   it("forwards --no-worktree through to chains.runChain", () => {

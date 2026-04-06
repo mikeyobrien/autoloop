@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, existsSync, utimesSync } from "node:fs";
+import { existsSync, mkdtempSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRunScopedDir, runScopedPath, cleanRunScopedDirs } from "../../src/isolation/run-scope.js";
+import { describe, expect, it } from "vitest";
+import {
+  cleanRunScopedDirs,
+  createRunScopedDir,
+  runScopedPath,
+} from "../../src/isolation/run-scope.js";
 
 function makeTempStateDir(): string {
   return mkdtempSync(join(tmpdir(), "autoloop-ts-runscope-"));
@@ -59,7 +63,9 @@ describe("cleanRunScopedDirs", () => {
     createRunScopedDir(base, "run-a");
     createRunScopedDir(base, "run-b");
 
-    const removed = cleanRunScopedDirs(base, { activeRunIds: new Set(["run-a", "run-b"]) });
+    const removed = cleanRunScopedDirs(base, {
+      activeRunIds: new Set(["run-a", "run-b"]),
+    });
     expect(removed).toEqual([]);
   });
 
@@ -88,7 +94,10 @@ describe("cleanRunScopedDirs", () => {
     createRunScopedDir(base, "run-a");
     createRunScopedDir(base, "run-b");
 
-    const removed = cleanRunScopedDirs(base, { activeRunIds: new Set(), maxAgeDays: 0 });
+    const removed = cleanRunScopedDirs(base, {
+      activeRunIds: new Set(),
+      maxAgeDays: 0,
+    });
     expect(removed.sort()).toEqual(["run-a", "run-b"]);
   });
 });

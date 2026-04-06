@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
 import { encodeEvent } from "../../src/events/encode.js";
-import { rebuildRegistry } from "../../src/registry/rebuild.js";
 import { readRegistry } from "../../src/registry/read.js";
+import { rebuildRegistry } from "../../src/registry/rebuild.js";
 
 function loopStartLine(runId: string): string {
   return encodeEvent({

@@ -1,36 +1,50 @@
-import { Hono } from "hono";
 import { spawn } from "node:child_process";
-import { categorizeRuns } from "../../loops/health.js";
-import { findRunByPrefix } from "../../registry/read.js";
-import { readRunLines } from "../../harness/journal.js";
+import { Hono } from "hono";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
+import {
+  readLines,
+  readRunLines,
+  resolveRunJournalPath,
+} from "../../harness/journal.js";
+import { categorizeRuns } from "../../loops/health.js";
+import { mergedFindRunByPrefix } from "../../registry/discover.js";
 import type { DashboardContext } from "../app.js";
 
 export function apiRoutes(ctx: DashboardContext): Hono {
   const api = new Hono();
 
   api.get("/runs", (c) => {
-    const result = categorizeRuns(ctx.registryPath);
+    const result = categorizeRuns(ctx.stateDir);
     return c.json(result);
   });
 
   api.get("/runs/:id", (c) => {
     const id = c.req.param("id");
-    const result = findRunByPrefix(ctx.registryPath, id);
+    const result = mergedFindRunByPrefix(ctx.stateDir, id);
     if (result === undefined) {
       return c.json({ error: "not found" }, 404);
     }
     if (Array.isArray(result)) {
-      return c.json({ error: "ambiguous prefix", candidates: result.map((r) => r.run_id) }, 409);
+      return c.json(
+        { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
+        409,
+      );
     }
     return c.json(result);
   });
 
   api.get("/runs/:id/events", (c) => {
     const id = c.req.param("id");
-    const lines = readRunLines(ctx.journalPath, id);
+    const runJournal = resolveRunJournalPath(ctx.stateDir, id);
+    const lines = runJournal
+      ? readLines(runJournal)
+      : readRunLines(ctx.journalPath, id);
     const events = lines.map((line) => {
-      try { return JSON.parse(line); } catch { return { raw: line }; }
+      try {
+        return JSON.parse(line);
+      } catch {
+        return { raw: line };
+      }
     });
     return c.json({ events });
   });
@@ -44,8 +58,14 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     const body = await c.req.json<{ prompt?: string; preset?: string }>();
     const prompt = body.prompt;
     const preset = body.preset;
-    if (!prompt || typeof prompt !== "string") {
-      return c.json({ error: "prompt is required" }, 400);
+    if (!prompt || typeof prompt !== "string" || prompt.length > 10_000) {
+      return c.json({ error: "prompt required (max 10000 chars)" }, 400);
+    }
+    if (preset) {
+      const validPresets = listPresetsWithDescriptions(ctx.projectDir);
+      if (!validPresets.some((p) => p.name === preset)) {
+        return c.json({ error: "unknown preset" }, 400);
+      }
     }
 
     const args: string[] = ["run"];

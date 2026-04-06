@@ -18,7 +18,12 @@ export type CoreSystemTopic =
   | BackendTopic
   | ReviewTopic
   | "event.invalid";
-export type KnownTopic = CoreSystemTopic | CoordinationTopic | ChainTopic | WaveTopic | string;
+export type KnownTopic =
+  | CoreSystemTopic
+  | CoordinationTopic
+  | ChainTopic
+  | WaveTopic
+  | string;
 
 export interface EventBase {
   run: string;

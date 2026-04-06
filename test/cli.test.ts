@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const ENTRY = resolve(ROOT, "dist/main.js");
@@ -12,7 +12,7 @@ function cli(...args: string[]): string {
     cwd: ROOT,
     encoding: "utf-8",
     timeout: 10_000,
-    env: { ...process.env, MINILOOPS_PROJECT_DIR: undefined },
+    env: { ...process.env, AUTOLOOP_PROJECT_DIR: undefined },
   });
 }
 

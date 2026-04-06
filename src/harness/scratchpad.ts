@@ -1,5 +1,5 @@
 import { decodeEvent } from "../events/decode.js";
-import { heading, bulletList } from "../markdown.js";
+import { bulletList, heading } from "../markdown.js";
 import { lineSep } from "../utils.js";
 
 interface ScratchpadEntry {
@@ -33,11 +33,16 @@ function collectScratchpadEntries(lines: string[]): ScratchpadEntry[] {
   const entries: ScratchpadEntry[] = [];
   for (const line of lines) {
     const event = decodeEvent(line);
-    if (!event || event.shape !== "fields" || event.topic !== "iteration.finish") continue;
+    if (
+      !event ||
+      event.shape !== "fields" ||
+      event.topic !== "iteration.finish"
+    )
+      continue;
     entries.push({
       iteration: event.iteration ?? "",
-      exitCode: event.fields["exit_code"] ?? "",
-      output: event.fields["output"] ?? "",
+      exitCode: event.fields.exit_code ?? "",
+      output: event.fields.output ?? "",
     });
   }
   return entries;
@@ -49,7 +54,7 @@ function renderScratchpadEntries(entries: ScratchpadEntry[]): string {
 
 function scratchpadEntryText(entry: ScratchpadEntry): string {
   return (
-    heading(2, "Iteration " + entry.iteration) +
+    heading(2, `Iteration ${entry.iteration}`) +
     "\n\n" +
     "exit_code=" +
     entry.exitCode +
@@ -75,7 +80,7 @@ function scratchpadEntrySummary(entry: ScratchpadEntry): string {
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed !== "") {
-      return trimmed.length <= 120 ? trimmed : trimmed.slice(0, 120) + "...";
+      return trimmed.length <= 120 ? trimmed : `${trimmed.slice(0, 120)}...`;
     }
   }
   return "(no output)";

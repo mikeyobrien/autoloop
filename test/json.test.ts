@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  jsonString,
+  decodeJsonValue,
+  encodeJsonValue,
+  extractField,
+  extractTopic,
   jsonBool,
   jsonField,
   jsonFieldRaw,
-  encodeJsonValue,
-  decodeJsonValue,
-  extractField,
-  extractTopic,
+  jsonString,
 } from "../src/json.js";
 
 describe("jsonString", () => {
@@ -81,7 +81,8 @@ describe("encodeJsonValue / decodeJsonValue roundtrip", () => {
 });
 
 describe("extractField", () => {
-  const line = '{"run": "run-1", "iteration": "3", "topic": "review.ready", "fields": {"reason": "done"}}';
+  const line =
+    '{"run": "run-1", "iteration": "3", "topic": "review.ready", "fields": {"reason": "done"}}';
 
   it("extracts run", () => {
     expect(extractField(line, "run")).toBe("run-1");

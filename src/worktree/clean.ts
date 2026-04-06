@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { readMeta, updateStatus, isOrphanWorktree } from "./meta.js";
-import type { WorktreeStatus } from "./meta.js";
 import { shellQuote } from "../utils.js";
+import type { WorktreeStatus } from "./meta.js";
+import { isOrphanWorktree, readMeta, updateStatus } from "./meta.js";
 
 export interface CleanOpts {
   mainProjectDir: string;
@@ -18,7 +18,11 @@ export interface CleanResult {
   skipped: string[];
 }
 
-const TERMINAL_STATUSES: ReadonlySet<WorktreeStatus> = new Set(["merged", "failed", "removed"]);
+const TERMINAL_STATUSES: ReadonlySet<WorktreeStatus> = new Set([
+  "merged",
+  "failed",
+  "removed",
+]);
 
 export function cleanWorktrees(opts: CleanOpts): CleanResult {
   const { mainProjectDir, mainStateDir, force = false } = opts;
@@ -48,7 +52,13 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
     }
 
     // Without --all, only clean terminal-status or orphaned worktrees
-    if (!opts.all && !opts.runId && !TERMINAL_STATUSES.has(meta.status) && !force && !orphan) {
+    if (
+      !opts.all &&
+      !opts.runId &&
+      !TERMINAL_STATUSES.has(meta.status) &&
+      !force &&
+      !orphan
+    ) {
       skipped.push(runId);
       continue;
     }
@@ -57,13 +67,20 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
     if (existsSync(meta.worktree_path)) {
       try {
         const forceFlag = force ? " --force" : "";
-        execSync(`git worktree remove ${shellQuote(meta.worktree_path)}${forceFlag}`, {
-          cwd: mainProjectDir,
-          stdio: "pipe",
-        });
+        execSync(
+          `git worktree remove ${shellQuote(meta.worktree_path)}${forceFlag}`,
+          {
+            cwd: mainProjectDir,
+            stdio: "pipe",
+          },
+        );
       } catch {
         // Worktree may already be gone; try direct removal
-        try { rmSync(meta.worktree_path, { recursive: true, force: true }); } catch { /* ignore */ }
+        try {
+          rmSync(meta.worktree_path, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
       }
     }
 
@@ -74,11 +91,21 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
         cwd: mainProjectDir,
         stdio: "pipe",
       });
-    } catch { /* branch may already be gone */ }
+    } catch {
+      /* branch may already be gone */
+    }
 
     // Update meta status and clean up meta directory
-    try { updateStatus(metaDir, "removed"); } catch { /* best-effort */ }
-    try { rmSync(metaDir, { recursive: true, force: true }); } catch { /* best-effort */ }
+    try {
+      updateStatus(metaDir, "removed");
+    } catch {
+      /* best-effort */
+    }
+    try {
+      rmSync(metaDir, { recursive: true, force: true });
+    } catch {
+      /* best-effort */
+    }
 
     removed.push(runId);
   }
@@ -89,10 +116,9 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
 function listWorktreeRunIds(worktreesDir: string): string[] {
   try {
     return readdirSync(worktreesDir, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
   } catch {
     return [];
   }
 }
-

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
 import { resolve } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { dispatchList } from "../../src/commands/list.js";
 
 const bundleRoot = resolve(import.meta.dirname, "../..");

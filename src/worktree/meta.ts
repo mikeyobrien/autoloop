@@ -1,7 +1,18 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
-export type WorktreeStatus = "running" | "completed" | "failed" | "merged" | "removed";
+export type WorktreeStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "merged"
+  | "removed";
 
 export interface WorktreeMeta {
   run_id: string;
@@ -24,8 +35,8 @@ export function metaDirForRun(mainStateDir: string, runId: string): string {
 export function writeMeta(metaDir: string, meta: WorktreeMeta): void {
   mkdirSync(metaDir, { recursive: true });
   const target = join(metaDir, META_FILE);
-  const tmp = target + ".tmp";
-  writeFileSync(tmp, JSON.stringify(meta, null, 2) + "\n");
+  const tmp = `${target}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(meta, null, 2)}\n`);
   renameSync(tmp, target);
 }
 

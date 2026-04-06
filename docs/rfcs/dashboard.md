@@ -26,7 +26,7 @@ autoloop dashboard [--port <n>] [--host <addr>] [--project-dir <path>]
 |------|---------|-------------|
 | `--port` | `4800` | HTTP listen port |
 | `--host` | `127.0.0.1` | Bind address (localhost only by default) |
-| `--project-dir` | `MINILOOPS_PROJECT_DIR` or `.` | Project root for registry/journal resolution |
+| `--project-dir` | `AUTOLOOP_PROJECT_DIR` or `.` | Project root for registry/journal resolution |
 
 The command blocks (like `loops watch`) — Ctrl-C stops the server.
 

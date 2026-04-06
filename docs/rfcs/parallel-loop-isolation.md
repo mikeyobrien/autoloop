@@ -377,9 +377,9 @@ autoloop worktree clean <run-id>     # remove specific worktree
 The emit tool script (`src/harness/tools.ts`) bakes env vars at install time. Run-scoped paths flow automatically:
 
 ```sh
-export MINILOOPS_STATE_DIR=/path/to/.autoloop/runs/run-abc12345
-export MINILOOPS_JOURNAL_FILE=/path/to/.autoloop/runs/run-abc12345/journal.jsonl
-export MINILOOPS_RUN_ID=run-abc12345
+export AUTOLOOP_STATE_DIR=/path/to/.autoloop/runs/run-abc12345
+export AUTOLOOP_JOURNAL_FILE=/path/to/.autoloop/runs/run-abc12345/journal.jsonl
+export AUTOLOOP_RUN_ID=run-abc12345
 ```
 
 No changes needed to tool internals or pi-adapter — only to the paths that `buildLoopContext` computes.

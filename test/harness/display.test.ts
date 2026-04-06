@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   printBackendOutputTail,
   printIterationBanner,
   printIterationFooter,
   printReviewBanner,
 } from "../../src/harness/display.js";
-import type { LoopContext } from "../../src/harness/types.js";
 import type { IterationContext } from "../../src/harness/prompt.js";
+import type { LoopContext } from "../../src/harness/types.js";
 
 function setIsTTY(value: boolean): void {
   Object.defineProperty(process.stdout, "isTTY", {
@@ -26,9 +26,28 @@ function makeLoopContext(): LoopContext {
       handoffKeys: [],
     },
     limits: { maxIterations: 6 },
-    completion: { promise: "LOOP_COMPLETE", event: "task.complete", requiredEvents: [] },
-    backend: { kind: "command", command: "claude", args: [], promptMode: "stdin", timeoutMs: 1000 },
-    review: { enabled: false, every: 4, kind: "command", command: "claude", args: [], promptMode: "stdin", prompt: "", timeoutMs: 1000 },
+    completion: {
+      promise: "LOOP_COMPLETE",
+      event: "task.complete",
+      requiredEvents: [],
+    },
+    backend: {
+      kind: "command",
+      command: "claude",
+      args: [],
+      promptMode: "stdin",
+      timeoutMs: 1000,
+    },
+    review: {
+      enabled: false,
+      every: 4,
+      kind: "command",
+      command: "claude",
+      args: [],
+      promptMode: "stdin",
+      prompt: "",
+      timeoutMs: 1000,
+    },
     parallel: { enabled: false, maxBranches: 1, branchTimeoutMs: 1000 },
     memory: { budgetChars: 1000 },
     harness: { instructions: "" },
@@ -48,8 +67,21 @@ function makeLoopContext(): LoopContext {
       worktreePath: "",
       worktreeMetaDir: ".autoloop/meta",
     },
-    runtime: { runId: "run-test", selfCommand: "autoloop", promptOverride: null, backendOverride: {}, logLevel: "info", branchMode: false, isolationMode: "shared" },
-    launch: { preset: "autocode", trigger: "cli", createdAt: "2026-04-06T00:00:00Z", parentRunId: "" },
+    runtime: {
+      runId: "run-test",
+      selfCommand: "autoloop",
+      promptOverride: null,
+      backendOverride: {},
+      logLevel: "info",
+      branchMode: false,
+      isolationMode: "shared",
+    },
+    launch: {
+      preset: "autocode",
+      trigger: "cli",
+      createdAt: "2026-04-06T00:00:00Z",
+      parentRunId: "",
+    },
     store: {},
   };
 }
@@ -134,7 +166,10 @@ describe("display formatting", () => {
   it("omits decorative iteration rules when stdout is not a tty", () => {
     setIsTTY(false);
     printIterationBanner(makeLoopContext(), makeIterationContext());
-    expect(logged).toEqual(["iteration 2/6", "role: builder │ event: task.start │ next: design.ready"]);
+    expect(logged).toEqual([
+      "iteration 2/6",
+      "role: builder │ event: task.start │ next: design.ready",
+    ]);
   });
 
   it("omits decorative review banner when stdout is not a tty", () => {

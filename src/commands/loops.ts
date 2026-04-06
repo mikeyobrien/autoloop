@@ -1,15 +1,15 @@
 import { join } from "node:path";
-import { listRuns } from "../loops/list.js";
-import { showRun, showArtifacts } from "../loops/show.js";
-import { watchRun } from "../loops/watch.js";
 import { healthSummary } from "../loops/health.js";
+import { listRuns } from "../loops/list.js";
+import { showArtifacts, showRun } from "../loops/show.js";
+import { watchRun } from "../loops/watch.js";
 
 export function dispatchLoops(args: string[]): void {
   const projectDir = resolveProjectDir();
-  const registryPath = join(projectDir, ".autoloop", "registry.jsonl");
+  const stateDir = join(projectDir, ".autoloop");
 
   if (args.length === 0) {
-    console.log(listRuns(registryPath, false));
+    console.log(listRuns(stateDir, false));
     return;
   }
 
@@ -21,7 +21,7 @@ export function dispatchLoops(args: string[]): void {
   }
 
   if (first === "--all") {
-    console.log(listRuns(registryPath, true));
+    console.log(listRuns(stateDir, true));
     return;
   }
 
@@ -31,7 +31,7 @@ export function dispatchLoops(args: string[]): void {
       console.log("Usage: autoloop loops show <run-id>");
       return;
     }
-    console.log(showRun(registryPath, runId));
+    console.log(showRun(stateDir, runId));
     return;
   }
 
@@ -41,7 +41,7 @@ export function dispatchLoops(args: string[]): void {
       console.log("Usage: autoloop loops artifacts <run-id>");
       return;
     }
-    console.log(showArtifacts(registryPath, runId));
+    console.log(showArtifacts(stateDir, runId));
     return;
   }
 
@@ -51,7 +51,7 @@ export function dispatchLoops(args: string[]): void {
       console.log("Usage: autoloop loops watch <run-id>");
       return;
     }
-    watchRun(registryPath, runId).catch((err: unknown) => {
+    watchRun(stateDir, runId).catch((err: unknown) => {
       console.error("Watch error:", err);
       process.exitCode = 1;
     });
@@ -60,11 +60,11 @@ export function dispatchLoops(args: string[]): void {
 
   if (first === "health") {
     const verbose = args.includes("--verbose") || args.includes("-v");
-    console.log(healthSummary(registryPath, verbose));
+    console.log(healthSummary(stateDir, verbose));
     return;
   }
 
-  console.log("Unknown loops subcommand: " + first);
+  console.log(`Unknown loops subcommand: ${first}`);
   printLoopsUsage();
 }
 
@@ -79,5 +79,5 @@ function printLoopsUsage(): void {
 }
 
 function resolveProjectDir(): string {
-  return process.env["MINILOOPS_PROJECT_DIR"] || ".";
+  return process.env.AUTOLOOP_PROJECT_DIR || ".";
 }

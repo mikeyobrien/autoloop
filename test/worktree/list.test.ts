@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeMeta } from "../../src/worktree/meta.js";
-import type { WorktreeMeta } from "../../src/worktree/meta.js";
+import { describe, expect, it } from "vitest";
 import { listWorktreeMetas } from "../../src/worktree/list.js";
+import type { WorktreeMeta } from "../../src/worktree/meta.js";
+import { writeMeta } from "../../src/worktree/meta.js";
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "autoloop-ts-wt-list-"));
@@ -62,10 +62,13 @@ describe("listWorktreeMetas", () => {
   it("does not flag removed worktrees as orphan even if path is missing", () => {
     const stateDir = makeTempDir();
     const metaDir = join(stateDir, "worktrees", "run-abc");
-    writeMeta(metaDir, sampleMeta({
-      status: "removed",
-      worktree_path: "/nonexistent/path",
-    }));
+    writeMeta(
+      metaDir,
+      sampleMeta({
+        status: "removed",
+        worktree_path: "/nonexistent/path",
+      }),
+    );
 
     const entries = listWorktreeMetas(stateDir);
     expect(entries).toHaveLength(1);
@@ -76,22 +79,28 @@ describe("listWorktreeMetas", () => {
     const stateDir = makeTempDir();
 
     const metaDirA = join(stateDir, "worktrees", "run-a");
-    writeMeta(metaDirA, sampleMeta({
-      run_id: "run-a",
-      worktree_path: metaDirA, // exists
-    }));
+    writeMeta(
+      metaDirA,
+      sampleMeta({
+        run_id: "run-a",
+        worktree_path: metaDirA, // exists
+      }),
+    );
 
     const metaDirB = join(stateDir, "worktrees", "run-b");
-    writeMeta(metaDirB, sampleMeta({
-      run_id: "run-b",
-      worktree_path: "/gone", // orphan
-    }));
+    writeMeta(
+      metaDirB,
+      sampleMeta({
+        run_id: "run-b",
+        worktree_path: "/gone", // orphan
+      }),
+    );
 
     const entries = listWorktreeMetas(stateDir);
     expect(entries).toHaveLength(2);
 
-    const a = entries.find(e => e.run_id === "run-a")!;
-    const b = entries.find(e => e.run_id === "run-b")!;
+    const a = entries.find((e) => e.run_id === "run-a")!;
+    const b = entries.find((e) => e.run_id === "run-b")!;
     expect(a.orphan).toBe(false);
     expect(b.orphan).toBe(true);
   });

@@ -1,9 +1,13 @@
 import { join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
-import { createApp } from "../dashboard/app.js";
 import type { DashboardContext } from "../dashboard/app.js";
+import { createApp } from "../dashboard/app.js";
 
-export function dispatchDashboard(args: string[], bundleRoot: string, selfCmd: string): void {
+export function dispatchDashboard(
+  args: string[],
+  bundleRoot: string,
+  selfCmd: string,
+): void {
   let port = 4800;
   let host = "127.0.0.1";
   let projectDir = ".";
@@ -31,15 +35,19 @@ export function dispatchDashboard(args: string[], bundleRoot: string, selfCmd: s
   const ctx: DashboardContext = {
     registryPath: join(stateDir, "registry.jsonl"),
     journalPath: join(stateDir, "journal.jsonl"),
+    stateDir,
     bundleRoot,
     projectDir: resolved,
     selfCmd,
   };
 
-  const app = createApp(ctx);
+  const app = createApp({ ...ctx, host, port });
 
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
-    console.log("Dashboard listening on http://" + info.address + ":" + info.port);
+    if (process.stderr.isTTY) {
+      console.error(`autoloop dashboard → http://${info.address}:${info.port}`);
+    }
+    console.log(`Dashboard listening on http://${info.address}:${info.port}`);
   });
 
   const shutdown = () => {
@@ -53,7 +61,7 @@ export function dispatchDashboard(args: string[], bundleRoot: string, selfCmd: s
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
-      console.error("Port " + port + " is already in use.");
+      console.error(`Port ${port} is already in use.`);
       process.exit(1);
     }
     throw err;
