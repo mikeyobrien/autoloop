@@ -5,3 +5,5 @@ dist/
 .tonic/
 .agents/
 test-results/
+PROMPT.md
+kiro-loop.sh
