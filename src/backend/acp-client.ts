@@ -15,7 +15,10 @@ export interface AcpSession {
   connection: acp.ClientSideConnection;
   process: ChildProcess;
   textBuffer: string;
+  stderrBuffer: string;
   options: AcpClientOptions;
+  /** Resolves when the child process exits — used to race against hanging prompts */
+  closed: Promise<{ code: number | null; signal: string | null }>;
 }
 
 export interface AcpPromptResult {
@@ -30,15 +33,11 @@ export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
     env: process.env,
+    detached: true, // create process group so we can kill the tree with process.kill(-pid)
   });
 
   if (!child.stdout || !child.stdin) {
     throw new Error("Failed to create ACP process stdio streams");
-  }
-
-  // Buffer stderr for diagnostics
-  if (child.stderr) {
-    child.stderr.on("data", () => {});
   }
 
   const session: AcpSession = {
@@ -46,8 +45,22 @@ export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession
     connection: null as unknown as acp.ClientSideConnection,
     process: child,
     textBuffer: "",
+    stderrBuffer: "",
     options: opts,
+    closed: null as unknown as Promise<{ code: number | null; signal: string | null }>,
   };
+
+  // Buffer stderr for diagnostics
+  if (child.stderr) {
+    child.stderr.on("data", (chunk: Buffer) => {
+      session.stderrBuffer += chunk.toString();
+    });
+  }
+
+  // Track process exit so hanging prompts can bail out
+  session.closed = new Promise((resolve) => {
+    child.on("close", (code, signal) => resolve({ code, signal }));
+  });
 
   // Build transport: manual NDJSON parsing on stdout (more reliable), SDK serialization on stdin
   const stdin = child.stdin;
@@ -79,7 +92,16 @@ export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed) {
-        try { msgController.enqueue(JSON.parse(trimmed)); } catch { /* skip malformed */ }
+        try {
+          const msg = JSON.parse(trimmed);
+          // Filter kiro-cli private notifications — the ACP SDK doesn't know about
+          // _kiro.dev/* methods and responds with -32601 "Method not found".
+          // These are private kiro-cli extensions the ACP SDK does not handle.
+          if (msg.method && typeof msg.method === "string" && msg.method.startsWith("_kiro.dev/")) {
+            continue;
+          }
+          msgController.enqueue(msg);
+        } catch { /* skip malformed */ }
       }
     }
   });
@@ -144,6 +166,30 @@ export async function sendAcpPrompt(
 ): Promise<AcpPromptResult> {
   session.textBuffer = "";
 
+  // Retry with backoff if agent isn't idle yet
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await sendAcpPromptOnce(session, prompt, timeoutMs);
+    } catch (err: any) {
+      if (err.message?.includes("not idle") && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, attempt * 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  // unreachable, but satisfies TS
+  return { output: session.textBuffer, stopReason: "end_turn", timedOut: false, error: "retry exhausted" };
+}
+
+async function sendAcpPromptOnce(
+  session: AcpSession,
+  prompt: string,
+  timeoutMs: number,
+): Promise<AcpPromptResult> {
+  session.textBuffer = "";
+
   let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -155,6 +201,13 @@ export async function sendAcpPrompt(
     }, timeoutMs);
   });
 
+  // Detect process crash mid-prompt
+  const crashPromise = session.closed.then(({ code, signal }) => {
+    const stderr = session.stderrBuffer.trim();
+    const detail = stderr ? `\n${stderr}` : "";
+    throw new Error(`kiro-cli exited unexpectedly: code=${code} signal=${signal}${detail}`);
+  });
+
   try {
     const response = await Promise.race([
       session.connection.prompt({
@@ -162,6 +215,7 @@ export async function sendAcpPrompt(
         prompt: [{ type: "text", text: prompt }],
       }),
       timeoutPromise,
+      crashPromise,
     ]);
     clearTimeout(timer);
     return { output: session.textBuffer, stopReason: response.stopReason, timedOut: false };
@@ -178,12 +232,21 @@ export async function terminateAcpSession(session: AcpSession): Promise<void> {
   const child = session.process;
   if (!child.pid || child.killed) return;
 
+  // Cancel any in-flight turn before killing
+  try { session.connection.cancel({ sessionId: session.sessionId }); } catch { /* may not have a session */ }
+
+  // Kill the entire process tree — MCP servers run in their own process groups
+  // and won't die from just killing the parent.
+  const pid = child.pid;
+  try { process.kill(-pid, "SIGTERM"); } catch { /* process group may not exist */ }
   child.kill("SIGTERM");
+
   const exited = await Promise.race([
     new Promise<boolean>((resolve) => child.on("exit", () => resolve(true))),
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
   ]);
   if (!exited && !child.killed) {
+    try { process.kill(-pid, "SIGKILL"); } catch { /* already dead */ }
     child.kill("SIGKILL");
   }
 }

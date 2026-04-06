@@ -73,5 +73,9 @@ async function handleCommand(cmd: any): Promise<unknown> {
     writeResult(result);
     Atomics.store(control, 0, 2); // signal result ready
     Atomics.notify(control, 0);
+
+    // Wait for main thread to acknowledge (reset to 0) before looping,
+    // otherwise we'd immediately re-enter and read stale data.
+    Atomics.wait(control, 0, 2);
   }
 })();
