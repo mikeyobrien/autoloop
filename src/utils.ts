@@ -285,6 +285,13 @@ export function replaceAll(
   return text.split(pattern).join(replacement);
 }
 
+export function rewriteLoopStatePaths(text: string, stateDir: string): string {
+  return text.replace(
+    /(^|[^A-Za-z0-9_-])(?:\.\/)?\.autoloop(?=\/|\b)/g,
+    (_, prefix: string) => `${prefix}${stateDir}`,
+  );
+}
+
 export function shellWords(parts: string[]): string {
   return parts.map(shellQuote).join(" ");
 }

@@ -12,6 +12,7 @@ import {
   parseStringList,
   readableIdCapacity,
   replaceAll,
+  rewriteLoopStatePaths,
   shellQuote,
   shellWords,
   sliceOuter,
@@ -122,6 +123,36 @@ describe("replaceAll", () => {
 
   it("handles no occurrences", () => {
     expect(replaceAll("abc", "X", "Y")).toBe("abc");
+  });
+});
+
+describe("rewriteLoopStatePaths", () => {
+  it("rewrites .autoloop file paths to the effective state dir", () => {
+    expect(
+      rewriteLoopStatePaths(
+        "Use .autoloop/progress.md and .autoloop/logs/output.txt",
+        "/tmp/state/runs/swift-agent",
+      ),
+    ).toBe(
+      "Use /tmp/state/runs/swift-agent/progress.md and /tmp/state/runs/swift-agent/logs/output.txt",
+    );
+  });
+
+  it("rewrites ./.autoloop command examples without leaving a malformed prefix", () => {
+    expect(
+      rewriteLoopStatePaths(
+        'Run `./.autoloop/autoloops memory add learning "lesson"` and inspect ./.autoloop/progress.md.',
+        "/tmp/state/runs/swift-agent",
+      ),
+    ).toBe(
+      'Run `/tmp/state/runs/swift-agent/autoloops memory add learning "lesson"` and inspect /tmp/state/runs/swift-agent/progress.md.',
+    );
+  });
+
+  it("rewrites standalone .autoloop mentions", () => {
+    expect(
+      rewriteLoopStatePaths("Artifacts live under `.autoloop`.", "/tmp/state"),
+    ).toBe("Artifacts live under `/tmp/state`.");
   });
 });
 
