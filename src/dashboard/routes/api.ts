@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { spawn } from "node:child_process";
 import { categorizeRuns } from "../../loops/health.js";
-import { findRunByPrefix } from "../../registry/read.js";
+import { mergedFindRunByPrefix } from "../../registry/discover.js";
 import { readRunLines, resolveRunJournalPath, readLines } from "../../harness/journal.js";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
 import type { DashboardContext } from "../app.js";
@@ -10,13 +10,13 @@ export function apiRoutes(ctx: DashboardContext): Hono {
   const api = new Hono();
 
   api.get("/runs", (c) => {
-    const result = categorizeRuns(ctx.registryPath);
+    const result = categorizeRuns(ctx.stateDir);
     return c.json(result);
   });
 
   api.get("/runs/:id", (c) => {
     const id = c.req.param("id");
-    const result = findRunByPrefix(ctx.registryPath, id);
+    const result = mergedFindRunByPrefix(ctx.stateDir, id);
     if (result === undefined) {
       return c.json({ error: "not found" }, 404);
     }

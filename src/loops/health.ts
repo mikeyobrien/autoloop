@@ -1,4 +1,4 @@
-import { readRegistry } from "../registry/read.js";
+import { readMergedRegistry } from "../registry/discover.js";
 import type { RunRecord } from "../registry/types.js";
 import { policyForPreset } from "./policy.js";
 import { renderRunLine, renderListHeader } from "./render.js";
@@ -18,13 +18,13 @@ export interface HealthResult {
  * Exception-focused: only surfaces issues by default.
  * Pass verbose=true to also list recent completions.
  */
-export function healthSummary(registryPath: string, verbose: boolean): string {
-  const result = categorizeRuns(registryPath);
+export function healthSummary(stateDir: string, verbose: boolean): string {
+  const result = categorizeRuns(stateDir);
   return renderHealth(result, verbose);
 }
 
-export function categorizeRuns(registryPath: string): HealthResult {
-  const all = readRegistry(registryPath);
+export function categorizeRuns(stateDir: string): HealthResult {
+  const all = readMergedRegistry(stateDir);
   return categorizeRecords(all);
 }
 

@@ -112,7 +112,6 @@ describe("integration: loops command", () => {
       AUTOLOOP_PROJECT_DIR: project,
     }, project);
     expect(artRes.stdout).toContain("Journal:");
-    expect(artRes.stdout).toContain("Registry:");
     expect(artRes.stdout).toContain("State dir:");
     expect(artRes.stdout).toContain("Work dir:");
   });

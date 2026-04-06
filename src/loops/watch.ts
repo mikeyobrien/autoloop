@@ -1,4 +1,4 @@
-import { findRunByPrefix } from "../registry/read.js";
+import { mergedFindRunByPrefix } from "../registry/discover.js";
 import type { RunRecord } from "../registry/types.js";
 import { policyForPreset } from "./policy.js";
 import { renderRunDetail, renderRunLine, renderListHeader } from "./render.js";
@@ -50,11 +50,11 @@ function healthState(r: RunRecord, nowMs: number): HealthState {
  * For already-terminal runs, prints the detail view and returns immediately.
  */
 export async function watchRun(
-  registryPath: string,
+  stateDir: string,
   partial: string,
   intervalMs: number = DEFAULT_INTERVAL_MS,
 ): Promise<void> {
-  const initial = resolveRun(registryPath, partial);
+  const initial = resolveRun(stateDir, partial);
   if (typeof initial === "string") {
     console.log(initial);
     return;
@@ -82,7 +82,7 @@ export async function watchRun(
     process.on("SIGINT", onSigint);
 
     const timer = setInterval(() => {
-      const current = resolveRun(registryPath, initial.run_id);
+      const current = resolveRun(stateDir, initial.run_id);
       if (typeof current === "string") {
         // Run disappeared from registry — unusual but handle gracefully
         console.log("[watch] " + current);
@@ -119,8 +119,8 @@ export async function watchRun(
   });
 }
 
-function resolveRun(registryPath: string, partial: string): RunRecord | string {
-  const result = findRunByPrefix(registryPath, partial);
+function resolveRun(stateDir: string, partial: string): RunRecord | string {
+  const result = mergedFindRunByPrefix(stateDir, partial);
   if (result === undefined) {
     return "No run matching '" + partial + "'.";
   }

@@ -49,11 +49,10 @@ export function renderRunDetail(r: RunRecord): string {
 /**
  * Render artifact paths for a run.
  */
-export function renderArtifacts(r: RunRecord, registryPath: string): string {
+export function renderArtifacts(r: RunRecord, stateDir: string): string {
   const lines: string[] = [
     field("Journal", r.journal_file),
-    field("Registry", registryPath),
-    field("State dir", r.state_dir),
+    field("State dir", r.state_dir || stateDir),
     field("Work dir", r.work_dir),
   ];
   return lines.join("\n");
