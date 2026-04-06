@@ -44,8 +44,14 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     const body = await c.req.json<{ prompt?: string; preset?: string }>();
     const prompt = body.prompt;
     const preset = body.preset;
-    if (!prompt || typeof prompt !== "string") {
-      return c.json({ error: "prompt is required" }, 400);
+    if (!prompt || typeof prompt !== "string" || prompt.length > 10_000) {
+      return c.json({ error: "prompt required (max 10000 chars)" }, 400);
+    }
+    if (preset) {
+      const validPresets = listPresetsWithDescriptions(ctx.projectDir);
+      if (!validPresets.some((p) => p.name === preset)) {
+        return c.json({ error: "unknown preset" }, 400);
+      }
     }
 
     const args: string[] = ["run"];

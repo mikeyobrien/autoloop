@@ -36,9 +36,12 @@ export function dispatchDashboard(args: string[], bundleRoot: string, selfCmd: s
     selfCmd,
   };
 
-  const app = createApp(ctx);
+  const app = createApp({ ...ctx, host, port });
 
   const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
+    if (process.stderr.isTTY) {
+      console.error(`autoloop dashboard → http://${info.address}:${info.port}`);
+    }
     console.log("Dashboard listening on http://" + info.address + ":" + info.port);
   });
 
