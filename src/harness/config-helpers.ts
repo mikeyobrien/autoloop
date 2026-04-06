@@ -323,7 +323,7 @@ export function buildLoopContext(
       workDir: effectiveWorkDir,
       stateDir: effectiveStateDir,
       journalFile:
-        isolation.mode === "run-scoped" || isolation.mode === "worktree"
+        isolation.mode === "worktree"
           ? join(effectiveStateDir, "journal.jsonl")
           : journalFile,
       memoryFile,
