@@ -172,7 +172,9 @@ export function buildLoopContext(
   // Resolve isolation mode
   const registryFile = join(stateDir, "registry.jsonl");
   const otherActive = activeRuns(registryFile);
-  const configIsolationEnabled = config.get(cfg, "isolation.enabled", "false") === "true";
+  const configIsolationEnabled =
+    config.get(cfg, "worktree.enabled", "") === "true" ||
+    config.get(cfg, "isolation.enabled", "false") === "true";
   const isolation = resolveIsolationMode(
     { worktree: runOptions.worktree, noWorktree: runOptions.noWorktree, configEnabled: configIsolationEnabled },
     otherActive,
@@ -194,7 +196,7 @@ export function buildLoopContext(
 
   if (isolation.mode === "worktree") {
     const branchPrefix = config.get(cfg, "worktree.branch_prefix", "autoloop");
-    const mergeStrategy = config.get(cfg, "worktree.merge_strategy", "squash");
+    const mergeStrategy = runOptions.mergeStrategy || config.get(cfg, "worktree.merge_strategy", "squash");
     const wt = createWorktree({
       mainProjectDir: resolvedProjectDir,
       mainStateDir: stateDir,

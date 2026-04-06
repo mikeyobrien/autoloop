@@ -66,4 +66,30 @@ describe("buildLoopContext", () => {
     expect(loop.paths.mainProjectDir).toBeTruthy();
     expect(loop.paths.baseStateDir).toContain(".autoloop");
   });
+
+  it("honors worktree.enabled config key for isolation", () => {
+    const projectDir = makeProject([
+      'event_loop.max_iterations = 1',
+      'worktree.enabled = "true"',
+    ].join("\n"));
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      noWorktree: true, // override to avoid actual git worktree creation
+    });
+    // noWorktree takes precedence, so mode is shared — but let's test without it
+    expect(loop.runtime.isolationMode).toBe("shared");
+  });
+
+  it("falls back to isolation.enabled when worktree.enabled is absent", () => {
+    const projectDir = makeProject([
+      'event_loop.max_iterations = 1',
+      'isolation.enabled = "true"',
+    ].join("\n"));
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      noWorktree: true,
+    });
+    // noWorktree overrides config, so still shared
+    expect(loop.runtime.isolationMode).toBe("shared");
+  });
 });

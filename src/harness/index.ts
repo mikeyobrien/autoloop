@@ -36,7 +36,10 @@ import { maybeRunMetareview } from "./metareview.js";
 import { runIteration } from "./iteration.js";
 import { stopMaxIterations } from "./stop.js";
 import { registryStart } from "../registry/harness.js";
-import { updateStatus as updateWorktreeStatus } from "../worktree/meta.js";
+import { updateStatus as updateWorktreeStatus, readMeta } from "../worktree/meta.js";
+import { mergeWorktree } from "../worktree/merge.js";
+import { cleanWorktrees } from "../worktree/clean.js";
+import * as config from "../config.js";
 
 export type { LoopContext, RunOptions, RunSummary };
 
@@ -55,10 +58,56 @@ export function run(
   log(loop, "info", `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`);
   const summary = iterate(loop, 1);
 
-  // Post-run worktree status update
+  // Post-run worktree lifecycle: status update, automerge, cleanup
   if (loop.runtime.isolationMode === "worktree" && loop.paths.worktreeMetaDir) {
-    const wtStatus = summary.stopReason === "completed" ? "completed" : "failed";
+    const succeeded = summary.stopReason === "completed";
+    const wtStatus = succeeded ? "completed" : "failed";
     try { updateWorktreeStatus(loop.paths.worktreeMetaDir, wtStatus); } catch { /* meta update is best-effort */ }
+
+    const keepWorktree = runOptions.keepWorktree ?? false;
+    const automerge = runOptions.automerge ?? false;
+    const cfg = config.loadProject(loop.paths.mainProjectDir);
+    const cleanupPolicy = config.get(cfg, "worktree.cleanup", "on_success");
+
+    // Automerge if requested and run succeeded
+    if (automerge && succeeded && !keepWorktree) {
+      const meta = readMeta(loop.paths.worktreeMetaDir);
+      if (meta) {
+        const strategy = (meta.merge_strategy || "squash") as "squash" | "merge" | "rebase";
+        try {
+          mergeWorktree({
+            mainProjectDir: loop.paths.mainProjectDir,
+            metaDir: loop.paths.worktreeMetaDir,
+            strategy,
+          });
+          log(loop, "info", `worktree merged (${strategy}) for run ${loop.runtime.runId}`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          log(loop, "warn", `worktree merge failed: ${msg}`);
+        }
+      }
+    }
+
+    // Cleanup worktree based on policy (unless --keep-worktree)
+    if (!keepWorktree) {
+      const shouldClean =
+        cleanupPolicy === "always" ||
+        (cleanupPolicy === "on_success" && succeeded);
+      if (shouldClean) {
+        try {
+          cleanWorktrees({
+            mainProjectDir: loop.paths.mainProjectDir,
+            mainStateDir: loop.paths.baseStateDir,
+            runId: loop.runtime.runId,
+            force: cleanupPolicy === "always",
+          });
+          log(loop, "info", `worktree cleaned for run ${loop.runtime.runId}`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          log(loop, "warn", `worktree cleanup failed: ${msg}`);
+        }
+      }
+    }
   }
 
   printSummary(summary, loop);

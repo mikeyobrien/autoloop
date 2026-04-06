@@ -44,9 +44,14 @@ describe("resolveIsolationMode", () => {
     expect(result).toEqual({ mode: "shared" });
   });
 
-  it("returns worktree when config enabled", () => {
+  it("returns worktree when config enabled (worktree.enabled or isolation.enabled)", () => {
     const result = resolveIsolationMode({ configEnabled: true }, []);
     expect(result).toEqual({ mode: "worktree" });
+  });
+
+  it("returns shared when config enabled but --no-worktree overrides", () => {
+    const result = resolveIsolationMode({ configEnabled: true, noWorktree: true }, []);
+    expect(result).toEqual({ mode: "shared" });
   });
 
   it("--worktree takes priority over --no-worktree", () => {
