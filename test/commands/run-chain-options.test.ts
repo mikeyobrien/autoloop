@@ -64,6 +64,29 @@ describe("runInlineChain option propagation", () => {
     expect(runOptions.automerge).toBe(true);
   });
 
+  it("automerge sugar uses chain-compatible projectDir, not preset path", () => {
+    // Simulate: autoloop run autocode --automerge --worktree
+    // The bundleRoot is "." so defaultChainProjectDir should resolve to "."
+    // NOT the resolved preset path
+    dispatchRun(
+      ["autocode", "--automerge", "--worktree"],
+      [],
+      ".",
+      "autoloop",
+    );
+
+    expect(chains.runChain).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(chains.runChain).mock.calls[0];
+    // projectDir (2nd arg to runChain) must be the chain-compatible dir, not a nested preset path
+    const projectDir = callArgs[1];
+    // It should be "." (the bundleRoot / defaultChainProjectDir result), not something like "presets/autocode"
+    expect(projectDir).toBe(".");
+
+    // The chain CSV should be "autocode,automerge"
+    const chainSpec = callArgs[0];
+    expect(chainSpec.steps.map((s: { name: string }) => s.name)).toEqual(["autocode", "autoqa"]);
+  });
+
   it("forwards --no-worktree through to chains.runChain", () => {
     dispatchRun(
       ["--chain", "autocode,autoqa", "--no-worktree", "."],

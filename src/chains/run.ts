@@ -7,6 +7,7 @@ import * as harness from "../harness/index.js";
 import { appendText, readLines, extractTopic, extractField } from "../harness/journal.js";
 import { checkBudget, defaultBudget } from "./budget.js";
 import { parseInlineChain } from "./load.js";
+import { presetCategory } from "../isolation/resolve.js";
 import type { ChainSpec, DynamicChainSpec, StepRecord, ChainTracker } from "./types.js";
 
 export function runChain(
@@ -114,7 +115,14 @@ function runSteps(
       ", " + jsonField("work_dir", stepWorkDir),
   );
 
-  const stepOptions: harness.RunOptions = { ...runOptions, workDir: stepWorkDir, trigger: "chain" };
+  const category = presetCategory(stepName, projectDir);
+  const suppressWorktree = category === "planning" && runOptions.worktree;
+  const stepOptions: harness.RunOptions = {
+    ...runOptions,
+    workDir: stepWorkDir,
+    trigger: "chain",
+    ...(suppressWorktree ? { worktree: undefined, noWorktree: true } : {}),
+  };
   const prompt = stepNum === 1 ? (runOptions.prompt ?? null) : null;
   const result = harness.run(presetDir, prompt, selfCommand, stepOptions);
   const stopReason = result.stopReason;

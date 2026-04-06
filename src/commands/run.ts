@@ -42,7 +42,8 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
   if (options.automerge) {
     const presetName = basename(options.projectDir);
     const chainCsv = presetName + ",automerge";
-    runInlineChain(chainCsv, options.projectDir, selfCmd, options);
+    const chainProjectDir = defaultChainProjectDir(bundleRoot);
+    runInlineChain(chainCsv, chainProjectDir, selfCmd, options);
     return true;
   }
 
