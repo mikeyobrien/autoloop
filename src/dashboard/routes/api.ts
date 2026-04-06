@@ -32,12 +32,12 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     const events = lines.map((line) => {
       try { return JSON.parse(line); } catch { return { raw: line }; }
     });
-    return c.json(events);
+    return c.json({ events });
   });
 
   api.get("/presets", (c) => {
     const presets = listPresetsWithDescriptions(ctx.projectDir);
-    return c.json(presets);
+    return c.json({ presets });
   });
 
   api.post("/runs", async (c) => {
