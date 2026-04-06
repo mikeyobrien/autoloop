@@ -69,8 +69,9 @@ export function run(
     const cfg = config.loadProject(loop.paths.mainProjectDir);
     const cleanupPolicy = config.get(cfg, "worktree.cleanup", "on_success");
 
-    // Automerge if requested and run succeeded
-    if (automerge && succeeded && !keepWorktree) {
+    // Automerge if requested and run succeeded.
+    // Skip when trigger is "chain" — chain-mode defers merge to a dedicated automerge step.
+    if (automerge && succeeded && !keepWorktree && loop.launch.trigger !== "chain") {
       const meta = readMeta(loop.paths.worktreeMetaDir);
       if (meta) {
         const strategy = (meta.merge_strategy || "squash") as "squash" | "merge" | "rebase";
