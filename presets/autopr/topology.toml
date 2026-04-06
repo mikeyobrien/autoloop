@@ -1,0 +1,32 @@
+name = "autopr"
+completion = "task.complete"
+
+[[role]]
+id = "collector"
+emits = ["pr.context_ready", "pr.blocked"]
+prompt_file = "roles/collector.md"
+
+[[role]]
+id = "drafter"
+emits = ["pr.drafted", "draft.blocked"]
+prompt_file = "roles/drafter.md"
+
+[[role]]
+id = "validator"
+emits = ["pr.validated", "pr.revise"]
+prompt_file = "roles/validator.md"
+
+[[role]]
+id = "publisher"
+emits = ["task.complete", "publish.blocked"]
+prompt_file = "roles/publisher.md"
+
+[handoff]
+"loop.start" = ["collector"]
+"pr.blocked" = ["collector"]
+"pr.context_ready" = ["drafter"]
+"draft.blocked" = ["collector"]
+"pr.drafted" = ["validator"]
+"pr.revise" = ["drafter"]
+"pr.validated" = ["publisher"]
+"publish.blocked" = ["collector"]

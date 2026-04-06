@@ -20,6 +20,9 @@ export function emitToolScript(loop: LoopContext): string {
     "export AUTOLOOP_MEMORY_FILE=" +
     shellQuote(loop.paths.memoryFile) +
     "\n" +
+    "export AUTOLOOP_TASKS_FILE=" +
+    shellQuote(loop.paths.tasksFile) +
+    "\n" +
     "export AUTOLOOP_RUN_ID=" +
     shellQuote(loop.runtime.runId) +
     "\n" +

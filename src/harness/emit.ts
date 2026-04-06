@@ -2,6 +2,8 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import * as config from "../config.js";
 import { jsonField } from "../json.js";
+import type { TaskEntry } from "../tasks.js";
+import { materializeOpenFrom } from "../tasks.js";
 import * as topology from "../topology.js";
 import { joinCsv, listText, splitCsv } from "../utils.js";
 import {
@@ -73,6 +75,16 @@ export function emit(projectDir: string, topic: string, payload: string): void {
   if (coordinationTopic(topic)) {
     acceptEmit(journalFile, topic, payload, validation);
     return;
+  }
+
+  // Task completion gate: block completion if open tasks remain
+  if (topic === validation.completionEvent) {
+    const tasksFile = resolveTasksFile(projectDir);
+    const openTasks = materializeOpenFrom(tasksFile);
+    if (openTasks.length > 0) {
+      rejectTaskGate(journalFile, topic, openTasks, validation);
+      return;
+    }
   }
 
   if (
@@ -315,6 +327,36 @@ export function resolveEmitJournalFile(projectDir: string): string {
   const envEvents = process.env.AUTOLOOP_EVENTS_FILE;
   if (envEvents) return envEvents;
   return config.resolveJournalFile(projectDir);
+}
+
+function resolveTasksFile(projectDir: string): string {
+  const envPath = process.env.AUTOLOOP_TASKS_FILE;
+  if (envPath) return envPath;
+  const cfg = config.loadProject(projectDir);
+  return config.get(cfg, "core.tasks_file", ".autoloop/tasks.jsonl");
+}
+
+function rejectTaskGate(
+  journalFile: string,
+  topic: string,
+  openTasks: TaskEntry[],
+  validation: EmitValidation,
+): void {
+  appendEvent(
+    journalFile,
+    validation.runId,
+    validation.iteration,
+    "task.gate",
+    jsonField("blocked_topic", topic) +
+      ", " +
+      jsonField("open_tasks", openTasks.map((t) => t.id).join(",")),
+  );
+
+  const taskLines = openTasks.map((t) => `  - [${t.id}] ${t.text}`).join("\n");
+  process.stderr.write(
+    `Cannot complete: ${openTasks.length} open tasks remain:\n${taskLines}\nComplete or remove these tasks before emitting ${topic}.\n`,
+  );
+  process.exitCode = 1;
 }
 
 function truthySetting(value: string): boolean {

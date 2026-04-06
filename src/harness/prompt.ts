@@ -1,5 +1,7 @@
 import type { MemoryStats } from "../memory.js";
 import * as memory from "../memory.js";
+import { materialize as materializeTasks } from "../tasks.js";
+import { renderTasksPrompt } from "../tasks-render.js";
 import * as topology from "../topology.js";
 import { joinCsv, listText } from "../utils.js";
 import {
@@ -15,6 +17,7 @@ import {
   extractField,
   extractIteration,
   extractTopic,
+  readLines,
   readRunLines,
 } from "./journal.js";
 import { renderRunScratchpadPrompt } from "./scratchpad.js";
@@ -35,6 +38,8 @@ interface DerivedRunContext {
   scratchpadText: string;
   memoryText: string;
   memoryStats: MemoryStats;
+  tasksText: string;
+  tasksStats: { open: number; done: number; total: number };
   routing: RoutingContext;
   backpressure: string;
   invalidCount: number;
@@ -45,6 +50,12 @@ function deriveRunContext(
   loop: LoopContext,
   runLines: string[],
 ): DerivedRunContext {
+  const taskLines = readLines(loop.paths.tasksFile);
+  const tasksMaterialized = materializeTasks(taskLines);
+  const tasksText = renderTasksPrompt(
+    tasksMaterialized,
+    loop.tasks.budgetChars,
+  );
   return {
     scratchpadText: renderRunScratchpadPrompt(runLines),
     memoryText: memory.renderFile(
@@ -55,6 +66,12 @@ function deriveRunContext(
       loop.paths.memoryFile,
       loop.memory.budgetChars,
     ),
+    tasksText,
+    tasksStats: {
+      open: tasksMaterialized.open.length,
+      done: tasksMaterialized.done.length,
+      total: tasksMaterialized.open.length + tasksMaterialized.done.length,
+    },
     routing: iterationRoutingContext(loop.topology, runLines),
     backpressure: latestInvalidNote(runLines),
     invalidCount: invalidEventCount(runLines),
@@ -245,6 +262,8 @@ export function renderIterationPromptText(
     backpressure,
     memoryStats,
     memoryText,
+    tasksText,
+    tasksStats,
     scratchpadText,
     invalidCount,
     lastRejected,
@@ -253,12 +272,13 @@ export function renderIterationPromptText(
   return (
     "You are inside a bare-minimal autoloops harness.\n\n" +
     harnessInstructionsText(loop) +
-    contextPressureText(memoryStats, invalidCount, lastRejected) +
+    contextPressureText(memoryStats, tasksStats, invalidCount, lastRejected) +
     backpressureText(backpressure) +
     "Objective:\n" +
     loop.objective +
     "\n\n" +
     (memoryText ? `${memoryText}\n` : "") +
+    (tasksText ? `${tasksText}\n` : "") +
     topology.renderWithContext(
       loop.topology,
       recentEvent,
@@ -293,7 +313,11 @@ export function renderIterationPromptText(
     loop.paths.toolPath +
     ' memory add learning "durable lesson"\n' +
     loop.paths.toolPath +
-    ' memory add preference Workflow "short preference note"\n\n' +
+    ' memory add preference Workflow "short preference note"\n' +
+    loop.paths.toolPath +
+    ' task add "description of work item"\n' +
+    loop.paths.toolPath +
+    " task complete task-1\n\n" +
     "Backpressure rule: if you emit an event outside the allowed next-event set, the loop will reject that handoff and ask you to re-route.\n" +
     "Prompt/output/scratchpad/memory are projections or stores you can inspect with `" +
     loop.paths.toolPath +
@@ -315,7 +339,9 @@ export function renderReviewPromptText(
   const {
     scratchpadText,
     memoryText,
+    tasksText,
     memoryStats,
+    tasksStats,
     routing,
     backpressure,
     invalidCount,
@@ -334,9 +360,10 @@ export function renderReviewPromptText(
     "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" +
     "Do not emit normal loop events during review.\n\n" +
     reviewInstructionsText(loop) +
-    contextPressureText(memoryStats, invalidCount, lastRejected) +
+    contextPressureText(memoryStats, tasksStats, invalidCount, lastRejected) +
     backpressureText(backpressure) +
     (memoryText ? `${memoryText}\n` : "") +
+    (tasksText ? `${tasksText}\n` : "") +
     `Review trigger iteration: ${iteration}\n` +
     "Latest routing event: " +
     routing.recentEvent +
@@ -380,6 +407,7 @@ function reviewInstructionsText(loop: LoopContext): string {
 
 function contextPressureText(
   memoryStats: MemoryStats,
+  tasksStats: { open: number; done: number; total: number },
   invalidCount: number,
   lastRejected: string,
 ): string {
@@ -388,12 +416,24 @@ function contextPressureText(
     "- Memory: " +
     memoryPressureSummary(memoryStats) +
     "\n" +
+    "- Tasks: " +
+    tasksPressureSummary(tasksStats) +
+    "\n" +
     "- Invalid emits this run: " +
     invalidCount +
     invalidEmitHint(invalidCount, lastRejected) +
     "\n" +
     contextPressureRecommendation(memoryStats.truncated, invalidCount)
   );
+}
+
+function tasksPressureSummary(stats: {
+  open: number;
+  done: number;
+  total: number;
+}): string {
+  if (stats.total === 0) return "no tasks";
+  return `${stats.open} open, ${stats.done} done (${stats.total} total)`;
 }
 
 function memoryPressureSummary(stats: MemoryStats): string {

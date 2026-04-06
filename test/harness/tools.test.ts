@@ -9,6 +9,7 @@ function fakeLoop(overrides: Partial<LoopContext> = {}): LoopContext {
       stateDir: "/tmp/state",
       journalFile: "/tmp/journal.jsonl",
       memoryFile: "/tmp/memory.md",
+      tasksFile: "/tmp/tasks.jsonl",
       toolPath: "/usr/bin/autoloops",
       ...(overrides.paths ?? {}),
     },

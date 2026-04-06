@@ -10,6 +10,7 @@ import { dispatchMemory } from "./commands/memory.js";
 import { dispatchPiAdapter } from "./commands/pi-adapter.js";
 import { dispatchRun } from "./commands/run.js";
 import { dispatchRuns } from "./commands/runs.js";
+import { dispatchTask } from "./commands/task.js";
 import { dispatchWorktree } from "./commands/worktree.js";
 import * as harness from "./harness/index.js";
 import { printEmitUsage, printUsage } from "./usage.js";
@@ -62,6 +63,9 @@ function dispatch(args: string[], argv: string[]): void {
     case "memory":
       dispatchMemory(args.slice(1));
       return;
+    case "task":
+      dispatchTask(args.slice(1));
+      return;
     case "worktree":
       dispatchWorktree(args.slice(1));
       return;
@@ -108,6 +112,7 @@ function isCliCommand(value: string): boolean {
     "emit",
     "inspect",
     "memory",
+    "task",
     "list",
     "loops",
     "runs",

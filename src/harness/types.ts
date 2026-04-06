@@ -39,6 +39,7 @@ export interface LoopContext {
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
   memory: { budgetChars: number };
+  tasks: { budgetChars: number };
   harness: { instructions: string };
   profiles: ProfileInfo;
   paths: {
@@ -47,6 +48,7 @@ export interface LoopContext {
     stateDir: string;
     journalFile: string;
     memoryFile: string;
+    tasksFile: string;
     registryFile: string;
     toolPath: string;
     piAdapterPath: string;

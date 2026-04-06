@@ -11,6 +11,7 @@ export function printUsage(): void {
     "  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]",
   );
   console.log("  autoloop memory <list|add|remove> [args]");
+  console.log("  autoloop task <add|complete|update|remove|list> [args]");
   console.log("  autoloop list");
   console.log("  autoloop loops [--all]");
   console.log("  autoloop loops show <run-id>");
@@ -132,6 +133,9 @@ export function printInspectUsage(): void {
     "  memory         —             md, terminal, json      terminal",
   );
   console.log(
+    "  tasks          —             md, terminal            terminal",
+  );
+  console.log(
     "  coordination   —             md, terminal            terminal",
   );
   console.log(
@@ -164,6 +168,15 @@ export function printMemoryUsage(): void {
   console.log("  autoloop memory add preference <category> <text...>");
   console.log("  autoloop memory add meta <key> <value...>");
   console.log("  autoloop memory remove <id> [reason...]");
+}
+
+export function printTaskUsage(): void {
+  console.log("Usage:");
+  console.log("  autoloop task add <text...>");
+  console.log("  autoloop task complete <id>");
+  console.log("  autoloop task update <id> <text...>");
+  console.log("  autoloop task remove <id> [reason...]");
+  console.log("  autoloop task list [project-dir]");
 }
 
 export function printMemoryAddUsage(): void {

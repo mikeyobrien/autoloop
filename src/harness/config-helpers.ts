@@ -11,6 +11,7 @@ import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
 import { createRunScopedDir } from "../isolation/run-scope.js";
 import * as profiles from "../profiles.js";
 import { activeRuns } from "../registry/read.js";
+import * as tasks from "../tasks.js";
 import * as topo from "../topology.js";
 import { generateCompactId, splitCsv } from "../utils.js";
 import { createWorktree } from "../worktree/create.js";
@@ -224,6 +225,7 @@ export function buildLoopContext(
     resolvedProjectDir,
     resolvedWorkDir,
   );
+  // tasksFile is resolved later, after isolation mode determines effectiveStateDir
   const runId = nextRunId(journalFile, cfg);
   const backendOverride = runOptions.backendOverride || {};
   const logLevel =
@@ -290,6 +292,13 @@ export function buildLoopContext(
   const configDefaults = noDefaults ? [] : config.getProfileDefaults(cfg);
   const activeProfiles = [...configDefaults, ...cliProfiles];
 
+  // Tasks are always per-run: use effectiveStateDir (already per-run for
+  // run-scoped/worktree), or route to runs/<runId>/ for shared mode.
+  const tasksFile =
+    isolation.mode === "run-scoped" || isolation.mode === "worktree"
+      ? join(effectiveStateDir, "tasks.jsonl")
+      : join(stateDir, "runs", runId, "tasks.jsonl");
+
   // Only paths, runtime, launch, profiles, and store survive — reloadLoop fills the rest from config.
   const seed = {
     paths: {
@@ -301,6 +310,7 @@ export function buildLoopContext(
           ? join(effectiveStateDir, "journal.jsonl")
           : journalFile,
       memoryFile,
+      tasksFile,
       registryFile,
       toolPath: join(effectiveStateDir, "autoloops"),
       piAdapterPath: join(effectiveStateDir, "pi-adapter"),
@@ -398,6 +408,9 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     parallel,
     memory: {
       budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
+    },
+    tasks: {
+      budgetChars: config.getInt(cfg, "tasks.prompt_budget_chars", 4000),
     },
     harness: {
       instructions: readOptionalProjectFile(

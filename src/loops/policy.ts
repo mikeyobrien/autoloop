@@ -36,6 +36,11 @@ const POLICIES: Record<string, SupervisionPolicy> = {
     warningAfterMs: 4 * 60 * 1000,
     stuckAfterMs: 10 * 60 * 1000,
   },
+  autopr: {
+    label: "autopr",
+    warningAfterMs: 3 * 60 * 1000,
+    stuckAfterMs: 8 * 60 * 1000,
+  },
 };
 
 export function policyForPreset(preset: string): SupervisionPolicy {

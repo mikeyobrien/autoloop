@@ -64,6 +64,7 @@ export function listKnownPresets(): string[] {
     "autoperf",
     "autospec",
     "automerge",
+    "autopr",
   ];
 }
 

@@ -4,6 +4,7 @@ import * as config from "../config.js";
 import * as harness from "../harness/index.js";
 import * as memory from "../memory.js";
 import * as profiles from "../profiles.js";
+import * as tasks from "../tasks.js";
 import * as topo from "../topology.js";
 import { printInspectUsage } from "../usage.js";
 
@@ -13,6 +14,7 @@ const INSPECT_TARGETS = [
   "output",
   "journal",
   "memory",
+  "tasks",
   "coordination",
   "chain",
   "metrics",
@@ -46,6 +48,9 @@ export function dispatchInspect(args: string[]): boolean {
     case "memory":
       if (format === "json") console.log(memory.rawProject(projectDir));
       else console.log(memory.listProject(projectDir));
+      return true;
+    case "tasks":
+      console.log(tasks.listTasks(projectDir));
       return true;
     case "journal":
       if (spec.run) {
