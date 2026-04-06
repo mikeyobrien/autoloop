@@ -27,7 +27,13 @@ export function apiRoutes(ctx: DashboardContext): Hono {
 
   api.get("/runs", (c) => {
     const result = categorizeRuns(ctx.stateDir);
-    for (const bucket of [result.active, result.watching, result.stuck, result.recentFailed, result.recentCompleted]) {
+    for (const bucket of [
+      result.active,
+      result.watching,
+      result.stuck,
+      result.recentFailed,
+      result.recentCompleted,
+    ]) {
       enrichRecords(ctx.stateDir, bucket);
     }
     return c.json(result);
