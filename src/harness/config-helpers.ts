@@ -92,6 +92,7 @@ export function installRuntimeTools(loop: LoopContext): void {
 
 export function resolveProcessKind(kind: string, command: string): string {
   if (kind === "pi") return "pi";
+  if (kind === "kiro") return "kiro";
   if (kind === "command") return "command";
   return piBinary(command) ? "pi" : "command";
 }
@@ -422,7 +423,14 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     paths: loop.paths,
     runtime: loop.runtime,
     launch: loop.launch,
-    store: loop.store,
+    store: {
+      ...loop.store,
+      ...(backend.kind === "kiro" ? {
+        kiro_trust_all_tools: config.get(cfg, "backend.trust_all_tools", "true") !== "false",
+        kiro_agent: config.get(cfg, "backend.agent", ""),
+        kiro_model: config.get(cfg, "backend.model", ""),
+      } : {}),
+    },
   };
   return applyRuntimeModeOverrides(updated);
 }

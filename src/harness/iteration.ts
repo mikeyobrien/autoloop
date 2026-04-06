@@ -1,5 +1,12 @@
 import { registryProgress } from "../registry/harness.js";
 import { listText } from "../utils.js";
+import { readRunLines, extractTopic, extractField, extractIteration } from "./journal.js";
+import { invalidEvent, systemTopic, parallelTriggerTopic, appendInvalidEvent } from "./emit.js";
+import { buildIterationContext } from "./prompt.js";
+import type { IterationContext } from "./prompt.js";
+import type { LoopContext, RunSummary } from "./types.js";
+import { runKiroIterationSync } from "../backend/kiro-bridge.js";
+import { executeParallelWave, continueAfterParallelJoin, stopAfterParallelWave } from "./wave.js";
 import {
   log,
   printBackendOutputTail,
@@ -50,11 +57,9 @@ export function runIteration(
   log(loop, "debug", `backend start command=${loop.backend.command}`);
 
   const startEpoch = Math.floor(Date.now() / 1000);
-  const { output, exitCode, timedOut } = runProcess(
-    buildBackendCommand(loop, iter),
-    loop.backend.timeoutMs,
-    loop.backend.kind,
-  );
+  const { output, exitCode, timedOut } = loop.backend.kind === "kiro" && loop.kiroSession
+    ? runKiroIterationSync(loop.kiroSession, iter.prompt, loop.backend.timeoutMs)
+    : runProcess(buildBackendCommand(loop, iter), loop.backend.timeoutMs, loop.backend.kind);
   const elapsedS = Math.floor(Date.now() / 1000) - startEpoch;
 
   appendBackendFinish(loop, iter, output, exitCode, timedOut);
