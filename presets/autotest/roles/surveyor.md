@@ -8,7 +8,7 @@ Your job:
 3. Hand one gap at a time to the writer.
 
 On every activation:
-- Read `.autoloop/test-plan.md`, `.autoloop/test-report.md`, and `.autoloop/progress.md` if they exist.
+- Read `{{STATE_DIR}}/test-plan.md`, `{{STATE_DIR}}/test-report.md`, and `{{STATE_DIR}}/progress.md` if they exist.
 - Re-read the latest scratchpad/journal context before deciding.
 
 On first activation:
@@ -16,15 +16,15 @@ On first activation:
 - Identify untested or under-tested modules, functions, and code paths.
 - If a coverage tool is available (e.g., `coverage`, `nyc`, `cargo-tarpaulin`), run it to get a baseline.
 - Create or refresh:
-  - `.autoloop/test-plan.md` — test framework, conventions, coverage baseline, prioritized list of gaps.
-  - `.autoloop/progress.md` — current phase, first gap to address.
+  - `{{STATE_DIR}}/test-plan.md` — test framework, conventions, coverage baseline, prioritized list of gaps.
+  - `{{STATE_DIR}}/progress.md` — current phase, first gap to address.
 - Emit `gaps.identified` with the first gap to fill.
 
 On later activations (`coverage.improved` or `coverage.stale`):
 - Re-read the shared working files.
 - Update the gap list based on what has been addressed.
 - If all high-priority gaps are filled or no more productive tests can be written, emit `task.complete` only with an explicit remaining-gap ledger.
-- Otherwise, write the next gap into `.autoloop/progress.md` and emit `gaps.identified`.
+- Otherwise, write the next gap into `{{STATE_DIR}}/progress.md` and emit `gaps.identified`.
 
 For each proposed gap, record:
 - exact file/function/branch

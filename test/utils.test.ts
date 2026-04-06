@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  expandTemplatePlaceholders,
   generateCompactId,
   generateReadableId,
   isQuoted,
@@ -153,6 +154,49 @@ describe("rewriteLoopStatePaths", () => {
     expect(
       rewriteLoopStatePaths("Artifacts live under `.autoloop`.", "/tmp/state"),
     ).toBe("Artifacts live under `/tmp/state`.");
+  });
+});
+
+describe("expandTemplatePlaceholders", () => {
+  const vars = {
+    STATE_DIR: "/tmp/state/runs/swift-agent/.autoloop",
+    TOOL_PATH: "/tmp/state/runs/swift-agent/.autoloop/autoloops",
+  };
+
+  it("expands {{STATE_DIR}} and {{TOOL_PATH}}", () => {
+    expect(
+      expandTemplatePlaceholders(
+        "Use {{STATE_DIR}}/progress.md and run {{TOOL_PATH}} emit task.complete",
+        vars,
+      ),
+    ).toBe(
+      "Use /tmp/state/runs/swift-agent/.autoloop/progress.md and run /tmp/state/runs/swift-agent/.autoloop/autoloops emit task.complete",
+    );
+  });
+
+  it("leaves unknown placeholders intact", () => {
+    expect(expandTemplatePlaceholders("Hello {{UNKNOWN}} world", vars)).toBe(
+      "Hello {{UNKNOWN}} world",
+    );
+  });
+
+  it("returns text unchanged when no placeholders present", () => {
+    const text = "No placeholders here.";
+    expect(expandTemplatePlaceholders(text, vars)).toBe(text);
+  });
+
+  it("handles multiple occurrences of the same placeholder", () => {
+    expect(
+      expandTemplatePlaceholders("{{STATE_DIR}}/a and {{STATE_DIR}}/b", vars),
+    ).toBe(
+      "/tmp/state/runs/swift-agent/.autoloop/a and /tmp/state/runs/swift-agent/.autoloop/b",
+    );
+  });
+
+  it("handles empty vars map gracefully", () => {
+    expect(expandTemplatePlaceholders("{{STATE_DIR}}/foo", {})).toBe(
+      "{{STATE_DIR}}/foo",
+    );
   });
 });
 

@@ -9,13 +9,13 @@ Your job:
 4. Hand the discovered surfaces to the planner.
 
 On every activation:
-- Read `.autoloop/qa-plan.md`, `.autoloop/qa-report.md`, and `.autoloop/progress.md` if they exist.
+- Read `{{STATE_DIR}}/qa-plan.md`, `{{STATE_DIR}}/qa-report.md`, and `{{STATE_DIR}}/progress.md` if they exist.
 - Re-read the latest scratchpad/journal context before deciding what to do.
 
 On first activation:
 - Walk the repo structure: check for build files, test directories, linter configs, type checker configs, CI definitions, Makefiles, package manifests, scripts, and existing test suites.
 - Create or refresh:
-  - `.autoloop/progress.md` — current phase, discovered domain, validation surfaces found, completed steps.
+  - `{{STATE_DIR}}/progress.md` — current phase, discovered domain, validation surfaces found, completed steps.
 - Emit `surfaces.identified` with:
   - inferred domain
   - list of available validation surfaces with brief notes on each

@@ -114,19 +114,32 @@ Example:
 This is a custom analysis-and-implementation loop.
 
 Global rules:
-- Shared working files are the source of truth: `.autoloop/tasks.md`, `.autoloop/progress.md`.
+- Shared working files are the source of truth: `{{STATE_DIR}}/tasks.md`, `{{STATE_DIR}}/progress.md`.
 - One task at a time. Do not start the next task before the current one is verified.
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read shared working files before acting.
-- Use `./.autoloop/autoloops memory add learning ...` for durable learnings.
+- Use `{{TOOL_PATH}} memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside analyst → implementer → verifier.
 
 State files:
-- `.autoloop/tasks.md` — task list with priorities and status.
-- `.autoloop/progress.md` — current task, verification results, what the next role should do.
+- `{{STATE_DIR}}/tasks.md` — task list with priorities and status.
+- `{{STATE_DIR}}/progress.md` — current task, verification results, what the next role should do.
 ```
 
 The `harness.instructions_file` key in `autoloops.toml` points to this file. It defaults to `harness.md`.
+
+### Template placeholders
+
+Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` in harness instructions, role prompts, and metareview prompts instead of hardcoding `.autoloop/` paths. The harness expands these placeholders at load time before the prompt reaches the model.
+
+| Placeholder | Expands to | Example |
+|---|---|---|
+| `{{STATE_DIR}}` | The loop's state directory (e.g. `.autoloop`) | `{{STATE_DIR}}/progress.md` |
+| `{{TOOL_PATH}}` | The full event tool path (e.g. `./.autoloop/autoloops`) | `{{TOOL_PATH}} emit review.ready "done"` |
+
+**Why placeholders?** The concrete state directory can vary — worktrees, chains, and nested loops all change the path. Placeholders let the harness inject the correct path at runtime so presets stay portable.
+
+**Backward compatibility:** Raw `.autoloop/` references in prompt text still work — the harness rewrites them via `rewriteLoopStatePaths`. But placeholders are preferred for new and updated presets because they are explicit and avoid edge cases where a raw path matches unintended text.
 
 ## Step 4: Configure the loop
 
@@ -257,3 +270,4 @@ Before running a new preset:
 - [ ] Role prompt files exist at the paths declared in `prompt_file`.
 - [ ] `harness.md` exists (or `harness.instructions_file` points to the correct file).
 - [ ] Shared working file names are consistent between `harness.md` and role prompts.
+- [ ] Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` placeholders instead of hardcoded `.autoloop/` paths in harness and role prompts.

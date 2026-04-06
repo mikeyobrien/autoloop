@@ -8,7 +8,7 @@ Your job:
 3. Confirm the intended artifact paths and note any stronger local conventions.
 
 On every activation:
-- Read `.autoloop/spec-brief.md`, `.autoloop/spec-research.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/spec-brief.md`, `{{STATE_DIR}}/spec-research.md`, and `{{STATE_DIR}}/progress.md`.
 - Re-read the latest scratchpad/journal context before deciding.
 
 Process:
@@ -17,13 +17,13 @@ Process:
    - existing `.code-task.md` files or task conventions
    - adjacent code, docs, tests, configs, or examples relevant to the idea
    - related prior RFCs or implementation notes
-2. Write or refresh `.autoloop/spec-research.md` with:
+2. Write or refresh `{{STATE_DIR}}/spec-research.md` with:
    - confirmed artifact path convention
    - existing task/doc structure to match
    - related files and why they matter
    - alternatives or prior art discovered in the repo
    - unanswered questions that still affect the design
-3. Update `.autoloop/progress.md` with the strongest references and remaining evidence gaps.
+3. Update `{{STATE_DIR}}/progress.md` with the strongest references and remaining evidence gaps.
 4. Emit `research.ready` with the confirmed paths, key references, and unresolved questions.
 
 Rules:
