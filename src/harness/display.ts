@@ -33,11 +33,23 @@ function stopReasonHint(reason: string): string[] {
   }
 }
 
+function decorativeOutputEnabled(): boolean {
+  return Boolean(process.stdout.isTTY);
+}
+
 export function printIterationBanner(loop: LoopContext, iter: IterationContext): void {
+  const roleLine = `role: ${listText(iter.allowedRoles)} │ event: ${iter.recentEvent} │ next: ${listText(iter.allowedEvents)}`;
+  if (!decorativeOutputEnabled()) {
+    console.log(`iteration ${iter.iteration}/${loop.limits.maxIterations}`);
+    console.log(roleLine);
+    if (iter.lastRejected) {
+      console.log(`previous emit rejected: \`${iter.lastRejected}\` — rerouting`);
+    }
+    return;
+  }
   const label = `━━━ iteration ${iter.iteration}/${loop.limits.maxIterations} `;
   const width = terminalWidth();
   const rule = label.padEnd(width, "━");
-  const roleLine = `role: ${listText(iter.allowedRoles)} │ event: ${iter.recentEvent} │ next: ${listText(iter.allowedEvents)}`;
   console.log("");
   console.log(rule);
   console.log(roleLine);
@@ -48,6 +60,7 @@ export function printIterationBanner(loop: LoopContext, iter: IterationContext):
 }
 
 export function printIterationFooter(iter: IterationContext, elapsedS: number): void {
+  if (!decorativeOutputEnabled()) return;
   const elapsed = elapsedS >= 60
     ? `${Math.floor(elapsedS / 60)}m ${elapsedS % 60}s`
     : `${elapsedS}s`;
@@ -84,6 +97,10 @@ function progressRoleLabel(roles: string[]): string {
 }
 
 export function printReviewBanner(iteration: number): void {
+  if (!decorativeOutputEnabled()) {
+    console.log(`review before iteration ${iteration}`);
+    return;
+  }
   const label = `━━━ review before iteration ${iteration} `;
   console.log("");
   console.log(label.padEnd(terminalWidth(), "━"));
@@ -94,6 +111,11 @@ export function printBackendOutputTail(output: string, maxLines: number = 200): 
   const tail = lines.slice(-maxLines);
   if (!tail.join("").trim()) return;
   const shown = Math.min(lines.length, maxLines);
+  if (!decorativeOutputEnabled()) {
+    console.log(`── backend stdout (last ${shown} of ${lines.length} lines) ──`);
+    console.log(tail.join(lineSep()));
+    return;
+  }
   console.log(`── backend stdout (last ${shown} of ${lines.length} lines) ──`);
   console.log(tail.join(lineSep()));
   console.log("──────────────────────────────────────");
