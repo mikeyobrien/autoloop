@@ -57,7 +57,9 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .event-item.ev-error { border-left: 3px solid var(--failed); padding-left: 0.4rem; background: rgba(220,38,38,0.05); }
 .event-item.ev-coordination { border-left: 3px solid var(--active); padding-left: 0.4rem; }
 .event-item.ev-completion { border-left: 3px solid var(--completed); padding-left: 0.4rem; }
+.event-item.ev-highlight { border-left-color: var(--active); }
 .event-item.ev-system summary { opacity: 0.6; }
+.event-item.ev-highlight summary { opacity: 1; }
 .event-item.ev-system:hover summary { opacity: 1; }
 .event-field { margin: 0.15rem 0; font-size: 0.7rem; }
 .event-field strong { color: var(--muted); margin-right: 0.3rem; }
@@ -94,6 +96,11 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .prompt-raw-toggle button { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 0.2rem 0.6rem; font-size: 0.7rem; color: var(--muted); cursor: pointer; }
 .prompt-raw-toggle button:hover { background: var(--card-bg); color: var(--fg); }
 .prompt-raw-toggle pre { white-space: pre-wrap; font-size: 0.65rem; margin-top: 0.3rem; max-height: 400px; overflow-y: auto; background: var(--badge-bg); padding: 0.5rem; border-radius: 4px; }
+
+/* Routing badges and backpressure */
+.routing-badge { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 6px; background: var(--badge-bg); margin: 0.1rem 0.15rem; font-family: monospace; }
+.bp-none { color: var(--muted); font-style: italic; font-size: 0.7rem; }
+.bp-warning { display: inline-block; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 6px; background: color-mix(in srgb, var(--watching) 15%, transparent); border: 1px solid color-mix(in srgb, var(--watching) 40%, transparent); color: var(--watching); font-family: monospace; }
 </style>
 </head>
 <body x-data="dashboard()" x-init="startPolling()">
@@ -159,10 +166,10 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
   <div class="events-list">
     <h3>Events</h3>
     <template x-for="(ev, idx) in selectedRunEvents" :key="idx">
-      <details :class="'event-item ' + eventCategory(ev)">
+      <details :class="eventClasses(ev)">
         <summary x-text="eventSummary(ev)"></summary>
         <div style="padding:0.3rem">
-          <template x-for="[k,v] in Object.entries(ev)" :key="k">
+          <template x-for="[k,v] in eventDisplayEntries(ev)" :key="k">
             <div class="event-field">
               <strong x-text="k + ':'"></strong>
               <template x-if="isPromptField(ev.topic, k)">
@@ -232,12 +239,15 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
                   </template>
                 </div>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && isRoutingBadgeField(k)">
+                <span x-html="renderRoutingValue(k, v)"></span>
+              </template>
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
                   <div class="md-content" x-html="renderMarkdown(typeof v === 'object' ? JSON.stringify(v,null,2) : String(v))"></div>
                 </template>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
                   <details>
                     <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
@@ -245,12 +255,12 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
                   </details>
                 </template>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && !isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && !isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
                   <pre x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
                 </template>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && !isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && !isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
                   <details>
                     <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
@@ -444,6 +454,45 @@ function dashboard() {
       return text;
     },
 
+    eventDisplayEntries(ev) {
+      if (ev.topic === 'iteration.start' && ev.fields && typeof ev.fields === 'object') {
+        const entries = [];
+        for (const [k, v] of Object.entries(ev)) {
+          if (k === 'fields') continue;
+          entries.push([k, v]);
+        }
+        const fieldKeys = ['recent_event', 'suggested_roles', 'allowed_events', 'backpressure', 'prompt'];
+        for (const fk of fieldKeys) {
+          if (ev.fields[fk] !== undefined) {
+            entries.push([fk, ev.fields[fk]]);
+          }
+        }
+        return entries;
+      }
+      return Object.entries(ev);
+    },
+
+    isRoutingBadgeField(key) {
+      return ['suggested_roles', 'allowed_events', 'backpressure', 'recent_event'].includes(String(key));
+    },
+
+    renderRoutingValue(key, value) {
+      const k = String(key);
+      const v = String(value || '');
+      if (k === 'backpressure') {
+        if (!v || v === 'none' || v === '') {
+          return '<span class="bp-none">none</span>';
+        }
+        return '<span class="bp-warning">' + this._escHtml(v) + '</span>';
+      }
+      if (k === 'suggested_roles' || k === 'allowed_events') {
+        const items = v.split(',').map(s => s.trim()).filter(Boolean);
+        if (items.length === 0) return '<span class="bp-none">-</span>';
+        return items.map(i => '<span class="routing-badge">' + this._escHtml(i) + '</span>').join(' ');
+      }
+      return '<span class="routing-badge">' + this._escHtml(v) + '</span>';
+    },
+
     isPromptField(topic, key) {
       return String(topic) === 'iteration.start' && String(key) === 'prompt';
     },
@@ -538,6 +587,12 @@ function dashboard() {
       return 'ev-coordination';
     },
 
+    eventClasses(ev) {
+      const classes = ['event-item', this.eventCategory(ev)];
+      if ((ev.topic || '') === 'iteration.start') classes.push('ev-highlight');
+      return classes.join(' ');
+    },
+
     eventSummary(ev) {
       const parts = [];
       if (ev.iteration) parts.push('[iter ' + ev.iteration + ']');
@@ -546,8 +601,16 @@ function dashboard() {
       const f = ev.fields || {};
       const t = ev.topic || '';
       if (t === 'iteration.start') {
-        if (f.suggested_roles) parts.push('\\u2192 ' + f.suggested_roles);
-        if (f.prompt) {
+        const hints = [];
+        if (f.recent_event) hints.push(f.recent_event);
+        if (f.suggested_roles) hints.push('\\u2192 ' + f.suggested_roles);
+        if (f.allowed_events) hints.push('\\u00b7 emits ' + f.allowed_events);
+        if (f.backpressure && String(f.backpressure) !== 'none' && String(f.backpressure).trim() !== '') {
+          hints.push('[BP: ' + f.backpressure + ']');
+        }
+        if (hints.length) {
+          parts.push('\\u2014 ' + hints.join(' '));
+        } else if (f.prompt) {
           const objMatch = String(f.prompt).match(/Objective:\\s*\\n?([^\\n]+)/);
           if (objMatch) {
             const preview = objMatch[1].trim().slice(0, 100);
