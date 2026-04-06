@@ -285,7 +285,7 @@ Watch a run live by polling the registry.
 autoloop loops watch <run-id>
 ```
 
-Polls the registry every 2 seconds and prints a compact progress line whenever the run's state changes (iteration, event, or status). When the run reaches a terminal status (completed, failed, timed_out, stopped), prints a full detail view and exits.
+Polls the registry every 2 seconds and prints a compact progress line whenever the run's state changes (iteration, event, or status). When a run transitions into the watching or stuck health band for its preset, an advisory line is printed (e.g. `[watch] autosimplify: no progress for 3m — investigate soon`). When the run reaches a terminal status (completed, failed, timed_out, stopped), prints a full detail view and exits.
 
 If the run is already in a terminal state when watch starts, prints the detail view immediately and exits. Supports partial run-ID matching.
 
@@ -299,13 +299,14 @@ Print an exception-focused health summary of all runs.
 autoloop loops health [--verbose]
 ```
 
-Reads the registry and categorizes runs:
+Reads the registry and categorizes runs using preset-aware thresholds (see [Operator Health](operator-health.md) for the full policy table):
 - **Active**: currently running and recently updated
-- **Stuck**: running but no registry update in the last 10 minutes
+- **Watching**: running but quiet longer than the preset's warning threshold — investigate soon
+- **Stuck**: running but quiet longer than the preset's stuck threshold — likely needs intervention
 - **Failed**: failed or timed out within the last 24 hours
 - **Completed**: completed within the last 24 hours (suppressed by default)
 
-When no exceptions exist, prints a one-line "All clear" summary. When exceptions exist, prints them grouped by category with a table header. Pass `--verbose` to also list recent completions.
+When no exceptions exist, prints a one-line "All clear" summary. When exceptions exist (stuck, watching, or failed), prints them grouped by category with a table header. Pass `--verbose` to also list recent completions.
 
 Designed for cron jobs and chat delivery: call this one command and forward the output.
 
