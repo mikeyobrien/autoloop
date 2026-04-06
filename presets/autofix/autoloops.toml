@@ -1,7 +1,10 @@
 event_loop.max_iterations = 100
 event_loop.completion_event = "task.complete"
 event_loop.completion_promise = "LOOP_COMPLETE"
-event_loop.required_events = ["fix.verified"]
+# Note: required_events intentionally omitted. The topology already enforces
+# the correct flow (diagnoser→fixer→verifier→closer→task.complete). Adding
+# required_events = ["fix.verified"] would block termination when there are
+# no bugs to fix, causing a degenerate spin.
 
 backend.kind = "command"
 backend.command = "claude"

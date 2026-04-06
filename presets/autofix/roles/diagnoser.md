@@ -15,6 +15,7 @@ On every activation:
 
 On first activation:
 - Parse the input: bug report, error message, failing test, or user description.
+- If there is no bug report, no failing test, and the build is clean: emit `task.complete` with a brief summary. Do not continue diagnosing.
 - Reproduce the bug: run the failing test or trigger the reported behavior.
 - Trace the root cause: read the relevant source, follow the execution path.
 - Create or refresh:

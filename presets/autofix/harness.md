@@ -17,6 +17,7 @@ Global rules:
 - Scope searches to repo paths or other paths you have confirmed exist. Do not spray `rg` or `find` across optional home-directory locations.
 - Use `./.autoloop/autoloops memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside diagnoser → fixer → verifier → closer.
+- If the diagnoser finds no bugs on first activation (build passes, all tests pass, no bug report or failing test), emit `task.complete` immediately. Do not re-confirm on subsequent iterations — one clean pass is sufficient.
 
 State files:
 - `.autoloop/bug-report.md` — the original bug report, reproduction steps, and root cause analysis.
