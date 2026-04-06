@@ -113,7 +113,7 @@ export function run(
   }
 
   printSummary(summary, loop);
-  return summary;
+  return { ...summary, runId: loop.runtime.runId };
 }
 
 export { emitCmd as emit };

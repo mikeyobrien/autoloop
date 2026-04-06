@@ -33,6 +33,7 @@ export interface StepRecord {
   step: number;
   name: string;
   stopReason: string;
+  runId?: string;
 }
 
 export interface ChainTracker {

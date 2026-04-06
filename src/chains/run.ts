@@ -137,7 +137,7 @@ function runSteps(
       ", " + jsonField("stop_reason", stopReason),
   );
 
-  const record: StepRecord = { step: stepNum, name: stepName, stopReason };
+  const record: StepRecord = { step: stepNum, name: stepName, stopReason, runId: result.runId };
   const updatedCompleted = [...completed, record];
 
   if (chainStepSuccess(stopReason)) {
@@ -158,7 +158,14 @@ function writeHandoffArtifact(stepWorkDir: string, stepNum: number, completed: S
   } else {
     content += "## Prior Steps\n";
     for (const rec of completed) {
-      content += "- Step " + rec.step + " (" + rec.name + "): " + rec.stopReason + "\n";
+      const runTag = rec.runId ? " [run_id=" + rec.runId + "]" : "";
+      content += "- Step " + rec.step + " (" + rec.name + "): " + rec.stopReason + runTag + "\n";
+    }
+    // Expose the most recent run ID as parent_run_id for downstream steps (e.g. automerge)
+    const lastWithRunId = [...completed].reverse().find((r) => r.runId);
+    if (lastWithRunId) {
+      content += "\n## Parent Run\n";
+      content += "parent_run_id: " + lastWithRunId.runId + "\n";
     }
   }
   writeFileSync(join(stepWorkDir, "handoff.md"), content);
@@ -168,7 +175,8 @@ function writeResultArtifact(stepWorkDir: string, stepNum: number, stepName: str
   const content =
     "# Chain Result — Step " + stepNum + " (" + stepName + ")\n\n" +
     "Stop reason: " + result.stopReason + "\n" +
-    "Iterations: " + result.iterations + "\n";
+    "Iterations: " + result.iterations + "\n" +
+    (result.runId ? "Run ID: " + result.runId + "\n" : "");
   writeFileSync(join(stepWorkDir, "result.md"), content);
 }
 

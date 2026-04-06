@@ -53,4 +53,5 @@ export interface RunOptions {
 export interface RunSummary {
   iterations: number;
   stopReason: string;
+  runId?: string;
 }
