@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, existsSync, writeFileSync } from "node:fs";
+import { describe, it, expect } from "vitest";
+import { mkdtempSync, existsSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRunScopedDir, runScopedPath, cleanRunScopedDirs } from "../../src/isolation/run-scope.js";
@@ -39,8 +39,8 @@ describe("cleanRunScopedDirs", () => {
     createRunScopedDir(base, "run-done");
     createRunScopedDir(base, "run-old");
 
-    const active = new Set(["run-active"]);
-    const removed = cleanRunScopedDirs(base, active);
+    const activeRunIds = new Set(["run-active"]);
+    const removed = cleanRunScopedDirs(base, { activeRunIds });
 
     expect(removed.sort()).toEqual(["run-done", "run-old"]);
     expect(existsSync(join(base, "runs", "run-active"))).toBe(true);
@@ -50,7 +50,7 @@ describe("cleanRunScopedDirs", () => {
 
   it("returns empty array when no runs dir exists", () => {
     const base = makeTempStateDir();
-    const removed = cleanRunScopedDirs(base, new Set());
+    const removed = cleanRunScopedDirs(base, { activeRunIds: new Set() });
     expect(removed).toEqual([]);
   });
 
@@ -59,7 +59,36 @@ describe("cleanRunScopedDirs", () => {
     createRunScopedDir(base, "run-a");
     createRunScopedDir(base, "run-b");
 
-    const removed = cleanRunScopedDirs(base, new Set(["run-a", "run-b"]));
+    const removed = cleanRunScopedDirs(base, { activeRunIds: new Set(["run-a", "run-b"]) });
     expect(removed).toEqual([]);
+  });
+
+  it("respects maxAgeDays — keeps recent directories", () => {
+    const base = makeTempStateDir();
+    createRunScopedDir(base, "run-recent");
+    createRunScopedDir(base, "run-stale");
+
+    // Make run-stale look 10 days old
+    const stalePath = join(base, "runs", "run-stale");
+    const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000);
+    utimesSync(stalePath, tenDaysAgo, tenDaysAgo);
+
+    const removed = cleanRunScopedDirs(base, {
+      activeRunIds: new Set(),
+      maxAgeDays: 7,
+    });
+
+    expect(removed).toEqual(["run-stale"]);
+    expect(existsSync(join(base, "runs", "run-recent"))).toBe(true);
+    expect(existsSync(stalePath)).toBe(false);
+  });
+
+  it("maxAgeDays 0 removes all non-active regardless of age", () => {
+    const base = makeTempStateDir();
+    createRunScopedDir(base, "run-a");
+    createRunScopedDir(base, "run-b");
+
+    const removed = cleanRunScopedDirs(base, { activeRunIds: new Set(), maxAgeDays: 0 });
+    expect(removed.sort()).toEqual(["run-a", "run-b"]);
   });
 });
