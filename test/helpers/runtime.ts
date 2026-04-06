@@ -49,12 +49,20 @@ function inferCwd(args: string[]): string {
   return ROOT;
 }
 
+function cleanEnv(env: Record<string, string>): Record<string, string | undefined> {
+  const base: Record<string, string | undefined> = { ...process.env };
+  for (const key of Object.keys(base)) {
+    if (key.startsWith("MINILOOPS_")) delete base[key];
+  }
+  return { ...base, ...env };
+}
+
 export function runCli(args: string[], env: Record<string, string>, cwd?: string): { stdout: string; stderr: string; status: number | null } {
   const res = spawnSync("node", [DIST_ENTRY, ...args], {
     cwd: cwd || inferCwd(args),
     encoding: "utf-8",
     timeout: 60_000,
-    env: { ...process.env, ...env },
+    env: cleanEnv(env),
   });
   return {
     stdout: res.stdout || "",
@@ -68,6 +76,6 @@ export function inspectCli(args: string[], env: Record<string, string> = {}, cwd
     cwd: cwd || inferCwd(args),
     encoding: "utf-8",
     timeout: 30_000,
-    env: { ...process.env, ...env },
+    env: cleanEnv(env),
   });
 }
