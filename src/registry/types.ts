@@ -28,4 +28,7 @@ export interface RunRecord {
   worktree_name: string;
   worktree_path: string;
   pid?: number;
+  worktree_merged?: boolean;
+  worktree_merged_at?: string | null;
+  worktree_merge_strategy?: string;
 }

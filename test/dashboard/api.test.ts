@@ -162,6 +162,204 @@ describe("dashboard /api/runs max_iterations", () => {
   });
 });
 
+describe("dashboard /api/runs worktree merge enrichment", () => {
+  it("enriches worktree runs with merge metadata from meta.json", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const runId = "run-wt-merged-001";
+    const updatedAt = new Date().toISOString();
+    const record = JSON.stringify({
+      run_id: runId,
+      status: "completed",
+      preset: "autocode",
+      objective: "test merge enrichment",
+      trigger: "cli",
+      project_dir: projectDir,
+      work_dir: projectDir,
+      state_dir: stateDir,
+      journal_file: journalPath,
+      parent_run_id: "",
+      backend: "mock",
+      backend_args: [],
+      created_at: updatedAt,
+      updated_at: updatedAt,
+      iteration: 5,
+      max_iterations: 10,
+      stop_reason: "completed",
+      latest_event: "task.complete",
+      isolation_mode: "worktree",
+      worktree_name: "autoloop/test-branch",
+      worktree_path: join(projectDir, "worktrees", "test"),
+    });
+    writeFileSync(registryPath, `${record}\n`, "utf-8");
+
+    // Write worktree meta.json with merged status
+    const metaDir = join(stateDir, "worktrees", runId);
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(
+      join(metaDir, "meta.json"),
+      JSON.stringify({
+        run_id: runId,
+        branch: "autoloop/test-branch",
+        worktree_path: join(projectDir, "worktrees", "test"),
+        base_branch: "main",
+        status: "merged",
+        merge_strategy: "squash",
+        created_at: updatedAt,
+        merged_at: "2026-04-06T12:00:00.000Z",
+        removed_at: null,
+      }),
+      "utf-8",
+    );
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    // Test /api/runs enrichment
+    const listRes = await app.request("/api/runs");
+    expect(listRes.status).toBe(200);
+    const listBody = await listRes.json();
+    const allRuns = [
+      ...(listBody.active || []),
+      ...(listBody.watching || []),
+      ...(listBody.stuck || []),
+      ...(listBody.recentFailed || []),
+      ...(listBody.recentCompleted || []),
+    ];
+    const listRun = allRuns.find((r: any) => r.run_id === runId);
+    expect(listRun).toBeDefined();
+    expect(listRun.worktree_merged).toBe(true);
+    expect(listRun.worktree_merged_at).toBe("2026-04-06T12:00:00.000Z");
+    expect(listRun.worktree_merge_strategy).toBe("squash");
+
+    // Test /api/runs/:id enrichment
+    const detailRes = await app.request(`/api/runs/${runId}`);
+    expect(detailRes.status).toBe(200);
+    const detailBody = await detailRes.json();
+    expect(detailBody.worktree_merged).toBe(true);
+    expect(detailBody.worktree_merged_at).toBe("2026-04-06T12:00:00.000Z");
+    expect(detailBody.worktree_merge_strategy).toBe("squash");
+  });
+
+  it("does not add merge fields for non-worktree runs", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const runId = "run-shared-nometa";
+    const updatedAt = new Date().toISOString();
+    const record = JSON.stringify({
+      run_id: runId,
+      status: "completed",
+      preset: "autocode",
+      objective: "no merge",
+      trigger: "cli",
+      project_dir: projectDir,
+      work_dir: projectDir,
+      state_dir: stateDir,
+      journal_file: journalPath,
+      parent_run_id: "",
+      backend: "mock",
+      backend_args: [],
+      created_at: updatedAt,
+      updated_at: updatedAt,
+      iteration: 3,
+      max_iterations: 10,
+      stop_reason: "completed",
+      latest_event: "task.complete",
+    });
+    writeFileSync(registryPath, `${record}\n`, "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const detailRes = await app.request(`/api/runs/${runId}`);
+    expect(detailRes.status).toBe(200);
+    const body = await detailRes.json();
+    expect(body.worktree_merged).toBeUndefined();
+  });
+
+  it("does not add merge fields for worktree runs without merged status", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const runId = "run-wt-notmerged";
+    const updatedAt = new Date().toISOString();
+    const record = JSON.stringify({
+      run_id: runId,
+      status: "completed",
+      preset: "autocode",
+      objective: "not merged",
+      trigger: "cli",
+      project_dir: projectDir,
+      work_dir: projectDir,
+      state_dir: stateDir,
+      journal_file: journalPath,
+      parent_run_id: "",
+      backend: "mock",
+      backend_args: [],
+      created_at: updatedAt,
+      updated_at: updatedAt,
+      iteration: 3,
+      max_iterations: 10,
+      stop_reason: "completed",
+      latest_event: "task.complete",
+      isolation_mode: "worktree",
+      worktree_name: "autoloop/unmerged",
+      worktree_path: join(projectDir, "worktrees", "unmerged"),
+    });
+    writeFileSync(registryPath, `${record}\n`, "utf-8");
+
+    // Write meta with "completed" status (not "merged")
+    const metaDir = join(stateDir, "worktrees", runId);
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(
+      join(metaDir, "meta.json"),
+      JSON.stringify({
+        run_id: runId,
+        branch: "autoloop/unmerged",
+        worktree_path: join(projectDir, "worktrees", "unmerged"),
+        base_branch: "main",
+        status: "completed",
+        merge_strategy: "",
+        created_at: updatedAt,
+        merged_at: null,
+        removed_at: null,
+      }),
+      "utf-8",
+    );
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const detailRes = await app.request(`/api/runs/${runId}`);
+    expect(detailRes.status).toBe(200);
+    const body = await detailRes.json();
+    expect(body.worktree_merged).toBeUndefined();
+  });
+});
+
 describe("dashboard /api/runs/:id/events", () => {
   function makeEvent(runId: string, topic: string, seq: number) {
     return JSON.stringify({

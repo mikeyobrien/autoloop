@@ -101,6 +101,11 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .routing-badge { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 6px; background: var(--badge-bg); margin: 0.1rem 0.15rem; font-family: monospace; }
 .bp-none { color: var(--muted); font-style: italic; font-size: 0.7rem; }
 .bp-warning { display: inline-block; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 6px; background: color-mix(in srgb, var(--watching) 15%, transparent); border: 1px solid color-mix(in srgb, var(--watching) 40%, transparent); color: var(--watching); font-family: monospace; }
+
+/* Merged indicator */
+.merged-badge { color: var(--completed); font-weight: 600; }
+.merge-detail { margin-top: 0.5rem; padding: 0.5rem; background: color-mix(in srgb, var(--completed) 8%, transparent); border: 1px solid color-mix(in srgb, var(--completed) 25%, transparent); border-radius: 4px; }
+.merge-detail .field label { color: var(--completed); }
 </style>
 </head>
 <body x-data="dashboard()" x-init="startPolling()">
@@ -139,6 +144,9 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
               <span>
                 <span style="color:var(--muted)"> &middot; </span>
                 <span :title="run.worktree_path || run.work_dir || ''" x-text="run.worktree_name"></span>
+                <template x-if="run.worktree_merged">
+                  <span class="merged-badge" title="merged"> &#x2713;</span>
+                </template>
               </span>
             </template>
           </span>
@@ -168,6 +176,13 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       <div class="field"><label>Duration: </label><span x-text="runDuration()"></span></div>
       <div class="field"><label>Latest event: </label><span x-text="'[iter ' + selectedRunDetail.iteration + '] ' + selectedRunDetail.latest_event"></span></div>
       <div class="field"><label>Events: </label><span x-text="selectedRunEvents.length"></span></div>
+      <template x-if="selectedRunDetail.worktree_merged">
+        <div class="merge-detail">
+          <div class="field"><label>Merge status: </label><span>merged</span></div>
+          <div class="field" x-show="selectedRunDetail.worktree_merged_at"><label>Merged at: </label><span x-text="selectedRunDetail.worktree_merged_at"></span></div>
+          <div class="field" x-show="selectedRunDetail.worktree_merge_strategy"><label>Merge strategy: </label><span x-text="selectedRunDetail.worktree_merge_strategy"></span></div>
+        </div>
+      </template>
     </div>
   </template>
   <div class="events-list">
