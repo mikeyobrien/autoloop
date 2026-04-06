@@ -84,6 +84,14 @@ export function runKiroIterationSync(
   };
 }
 
+export function setKiroSessionMode(handle: KiroSessionHandle, agentName: string): void {
+  const result = sendCommand(handle, { type: "set_mode", agentName });
+  if (!result.ok) {
+    // Non-fatal: log but don't crash the loop
+    process.stderr.write(`[autoloop] warning: failed to set kiro agent mode "${agentName}": ${result.error}\n`);
+  }
+}
+
 export function terminateKiroSession(handle: KiroSessionHandle): void {
   sendCommand(handle, { type: "terminate" });
   // Signal shutdown

@@ -1,12 +1,9 @@
+import {
+  runKiroIterationSync,
+  setKiroSessionMode,
+} from "../backend/kiro-bridge.js";
 import { registryProgress } from "../registry/harness.js";
 import { listText } from "../utils.js";
-import { readRunLines, extractTopic, extractField, extractIteration } from "./journal.js";
-import { invalidEvent, systemTopic, parallelTriggerTopic, appendInvalidEvent } from "./emit.js";
-import { buildIterationContext } from "./prompt.js";
-import type { IterationContext } from "./prompt.js";
-import type { LoopContext, RunSummary } from "./types.js";
-import { runKiroIterationSync } from "../backend/kiro-bridge.js";
-import { executeParallelWave, continueAfterParallelJoin, stopAfterParallelWave } from "./wave.js";
 import {
   log,
   printBackendOutputTail,
@@ -57,9 +54,29 @@ export function runIteration(
   log(loop, "debug", `backend start command=${loop.backend.command}`);
 
   const startEpoch = Math.floor(Date.now() / 1000);
-  const { output, exitCode, timedOut } = loop.backend.kind === "kiro" && loop.kiroSession
-    ? runKiroIterationSync(loop.kiroSession, iter.prompt, loop.backend.timeoutMs)
-    : runProcess(buildBackendCommand(loop, iter), loop.backend.timeoutMs, loop.backend.kind);
+
+  // Switch Kiro session agent mode per-role if agents.toml provides a mapping
+  if (iter.roleAgent && loop.backend.kind === "kiro" && loop.kiroSession) {
+    log(
+      loop,
+      "debug",
+      `switching kiro agent to "${iter.roleAgent}" for role "${iter.allowedRoles[0]}"`,
+    );
+    setKiroSessionMode(loop.kiroSession, iter.roleAgent);
+  }
+
+  const { output, exitCode, timedOut } =
+    loop.backend.kind === "kiro" && loop.kiroSession
+      ? runKiroIterationSync(
+          loop.kiroSession,
+          iter.prompt,
+          loop.backend.timeoutMs,
+        )
+      : runProcess(
+          buildBackendCommand(loop, iter),
+          loop.backend.timeoutMs,
+          loop.backend.kind,
+        );
   const elapsedS = Math.floor(Date.now() / 1000) - startEpoch;
 
   appendBackendFinish(loop, iter, output, exitCode, timedOut);

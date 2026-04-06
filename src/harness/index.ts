@@ -1,5 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { AcpClientOptions } from "../backend/acp-client.js";
+import {
+  initKiroSession,
+  terminateKiroSession,
+} from "../backend/kiro-bridge.js";
 import * as config from "../config.js";
 import { registryStart, registryStop } from "../registry/harness.js";
 import { cleanWorktrees } from "../worktree/clean.js";
@@ -48,13 +53,6 @@ import {
 } from "./parallel.js";
 import { renderRunScratchpadFull } from "./scratchpad.js";
 import { stopMaxIterations } from "./stop.js";
-import { registryStart } from "../registry/harness.js";
-import { updateStatus as updateWorktreeStatus, readMeta } from "../worktree/meta.js";
-import { mergeWorktree } from "../worktree/merge.js";
-import { cleanWorktrees } from "../worktree/clean.js";
-import { initKiroSession, terminateKiroSession } from "../backend/kiro-bridge.js";
-import type { AcpClientOptions } from "../backend/acp-client.js";
-import * as config from "../config.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export type { LoopContext, RunOptions, RunSummary };

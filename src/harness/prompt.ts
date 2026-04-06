@@ -12,6 +12,7 @@ import {
   routingTopic,
   systemTopic,
 } from "./emit.js";
+import { resolveRoleAgent } from "../agent-map.js";
 import type { LoopContext } from "./index.js";
 import {
   extractField,
@@ -32,6 +33,7 @@ export interface IterationContext {
   scratchpadText: string;
   memoryText: string;
   prompt: string;
+  roleAgent: string;
 }
 
 interface DerivedRunContext {
@@ -85,6 +87,8 @@ export function buildIterationContext(
 ): IterationContext {
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
   const derived = deriveRunContext(loop, runLines);
+  const activeRole = derived.routing.allowedRoles.length === 1 ? derived.routing.allowedRoles[0] : "";
+  const roleAgent = resolveRoleAgent(loop.agentMap, loop.launch.preset, activeRole) || "";
 
   return {
     iteration,
@@ -96,6 +100,7 @@ export function buildIterationContext(
     scratchpadText: derived.scratchpadText,
     memoryText: derived.memoryText,
     prompt: renderIterationPromptText(loop, iteration, derived),
+    roleAgent,
   };
 }
 
