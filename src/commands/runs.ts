@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { cleanRunScopedDirs } from "../isolation/run-scope.js";
 import { activeRuns } from "../registry/read.js";
+import { parseFlag } from "../utils.js";
 
 const DEFAULT_MAX_AGE_DAYS = 7;
 
@@ -59,8 +60,3 @@ function printRunsUsage(): void {
   console.log("  --max-age <days>   Only remove directories older than N days (default: 7)");
 }
 
-function parseFlag(args: string[], flag: string): string | undefined {
-  const idx = args.indexOf(flag);
-  if (idx === -1 || idx + 1 >= args.length) return undefined;
-  return args[idx + 1];
-}

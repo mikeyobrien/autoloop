@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { readMeta, updateStatus } from "./meta.js";
+import { readMeta, updateStatus, isOrphanWorktree } from "./meta.js";
 import type { WorktreeStatus } from "./meta.js";
 import { shellQuote } from "../utils.js";
 
@@ -39,7 +39,7 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
       continue;
     }
 
-    const orphan = meta.status !== "removed" && !existsSync(meta.worktree_path);
+    const orphan = isOrphanWorktree(meta);
 
     // Skip running worktrees unless --force or orphaned (path already gone)
     if (meta.status === "running" && !force && !orphan) {

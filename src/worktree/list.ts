@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { readMeta } from "./meta.js";
+import { readMeta, isOrphanWorktree } from "./meta.js";
 import type { WorktreeMeta } from "./meta.js";
 
 export interface WorktreeListEntry extends WorktreeMeta {
@@ -22,8 +22,7 @@ export function listWorktreeMetas(mainStateDir: string): WorktreeListEntry[] {
     const meta = readMeta(join(worktreesDir, dirent.name));
     if (!meta) continue;
 
-    const orphan =
-      meta.status !== "removed" && !existsSync(meta.worktree_path);
+    const orphan = isOrphanWorktree(meta);
 
     entries.push({ ...meta, orphan });
   }

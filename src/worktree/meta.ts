@@ -35,6 +35,10 @@ export function readMeta(metaDir: string): WorktreeMeta | null {
   return JSON.parse(readFileSync(target, "utf-8")) as WorktreeMeta;
 }
 
+export function isOrphanWorktree(meta: WorktreeMeta): boolean {
+  return meta.status !== "removed" && !existsSync(meta.worktree_path);
+}
+
 export function updateStatus(metaDir: string, status: WorktreeStatus): void {
   const meta = readMeta(metaDir);
   if (!meta) throw new Error(`no worktree meta found in ${metaDir}`);

@@ -1,10 +1,10 @@
-import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { readMeta } from "../worktree/meta.js";
+import { readMeta, isOrphanWorktree } from "../worktree/meta.js";
 import { mergeWorktree } from "../worktree/merge.js";
 import { cleanWorktrees } from "../worktree/clean.js";
 import { listWorktreeMetas } from "../worktree/list.js";
 import { formatTime } from "../loops/render.js";
+import { parseFlag } from "../utils.js";
 import type { MergeOpts } from "../worktree/merge.js";
 
 export function dispatchWorktree(args: string[]): void {
@@ -82,7 +82,7 @@ function showWorktree(stateDir: string, runId: string): void {
   const meta = readMeta(metaDir);
   if (!meta) { console.log(`No worktree found for run ${runId}`); return; }
 
-  const orphan = meta.status !== "removed" && !existsSync(meta.worktree_path);
+  const orphan = isOrphanWorktree(meta);
   const statusLabel = orphan ? meta.status + " (orphan)" : meta.status;
 
   const lines = [
@@ -167,8 +167,3 @@ function truncate(s: string, max: number): string {
   return s.slice(0, max - 2) + "..";
 }
 
-function parseFlag(args: string[], flag: string): string | undefined {
-  const idx = args.indexOf(flag);
-  if (idx === -1 || idx + 1 >= args.length) return undefined;
-  return args[idx + 1];
-}
