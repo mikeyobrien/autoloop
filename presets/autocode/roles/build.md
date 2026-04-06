@@ -31,3 +31,4 @@ Rules:
 - No fake verification.
 - Do not emit `review.ready` for an uncommitted completed slice.
 - If confidence is shaky, choose the narrower, more reversible change and document why.
+- You MUST emit `review.ready` (or `build.blocked`) — never `review.passed`, `task.complete`, or any other event. The critic reviews your work; you do not self-approve.

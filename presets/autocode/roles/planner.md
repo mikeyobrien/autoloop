@@ -14,7 +14,7 @@ On every activation:
 - Re-read the latest scratchpad/journal context before deciding the next slice.
 
 On first activation:
-- Create or refresh:
+- Overwrite (not append) these files to clear any stale state from prior runs:
   - `.autoloop/context.md` — request summary, source type, constraints, repo patterns, acceptance criteria
   - `.autoloop/plan.md` — numbered high-level steps, not a blob checklist
   - `.autoloop/progress.md` — current step, active slice, verification notes, completed steps
