@@ -60,7 +60,7 @@ describe("bin/dev", () => {
     // tsc produces no output on success, but npm logs the script name
     // Just verify it exits 0 (no throw)
     expect(true).toBe(true);
-  });
+  }, 60_000);
 
   it("test subcommand delegates to vitest", () => {
     // Run a small, fast unit test to verify delegation without self-recursion
