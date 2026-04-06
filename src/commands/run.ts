@@ -38,8 +38,8 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
     return true;
   }
 
-  // --automerge sugar: when no --chain, build inline chain [preset, automerge]
-  if (options.automerge && !options.chain) {
+  // --automerge sugar: build inline chain [preset, automerge]
+  if (options.automerge) {
     const presetName = basename(options.projectDir);
     const chainCsv = presetName + ",automerge";
     runInlineChain(chainCsv, options.projectDir, selfCmd, options);
