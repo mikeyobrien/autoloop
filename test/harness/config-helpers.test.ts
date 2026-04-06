@@ -266,13 +266,47 @@ describe("buildLoopContext run-scoped isolation", () => {
     expect(existsSync(loop.paths.stateDir)).toBe(true);
   });
 
-  it("rewrites harness, metareview, and role prompts to the effective run-scoped state dir", () => {
+  it("errors when harness instructions contain raw .autoloop paths", () => {
     const projectDir = makeProjectWithActiveRun(
       [
         "event_loop.max_iterations = 1",
         'harness.instructions_file = "harness.md"',
+      ].join("\n"),
+      {
+        files: {
+          "harness.md": "Shared files: .autoloop/progress.md",
+        },
+      },
+    );
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow("Raw .autoloop path found in harness instructions");
+  });
+
+  it("errors when metareview prompt contains raw .autoloop paths", () => {
+    const projectDir = makeProjectWithActiveRun(
+      [
+        "event_loop.max_iterations = 1",
         'review.prompt_file = "metareview.md"',
       ].join("\n"),
+      {
+        files: {
+          "metareview.md": "Inspect .autoloop/logs/ for output.",
+        },
+      },
+    );
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow("Raw .autoloop path found in metareview prompt");
+  });
+
+  it("errors when role prompt contains raw .autoloop paths", () => {
+    const projectDir = makeProjectWithActiveRun(
+      ["event_loop.max_iterations = 1"].join("\n"),
       {
         topologyToml: [
           "[[role]]",
@@ -281,39 +315,15 @@ describe("buildLoopContext run-scoped isolation", () => {
           'emits = ["review.ready"]',
         ].join("\n"),
         files: {
-          "harness.md":
-            'Shared files: .autoloop/progress.md\nRemember `./.autoloop/autoloops memory add learning "lesson"`.',
-          "metareview.md":
-            'Inspect .autoloop/logs/ and rerun `./.autoloop/autoloops emit review.passed "ok"` if needed.',
-          "roles/build.md":
-            'Builder uses .autoloop/context.md and `./.autoloop/autoloops emit review.ready "done"`.',
+          "roles/build.md": "Builder uses .autoloop/context.md for context.",
         },
       },
     );
-    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
-      workDir: projectDir,
-    });
-
-    expect(loop.runtime.isolationMode).toBe("run-scoped");
-
-    expect(loop.harness.instructions).toContain(loop.paths.stateDir);
-    expect(loop.harness.instructions).toContain(loop.paths.toolPath);
-    expect(loop.harness.instructions).not.toMatch(
-      /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/,
-    );
-
-    expect(loop.review.prompt).toContain(loop.paths.stateDir);
-    expect(loop.review.prompt).toContain(loop.paths.toolPath);
-    expect(loop.review.prompt).not.toMatch(
-      /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/,
-    );
-
-    expect(loop.topology.roles).toHaveLength(1);
-    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.stateDir);
-    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.toolPath);
-    expect(loop.topology.roles[0]?.prompt).not.toMatch(
-      /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/,
-    );
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow("Raw .autoloop path found in role prompt: builder");
   });
 
   it("expands {{STATE_DIR}} and {{TOOL_PATH}} placeholders in harness, metareview, and role prompts", () => {

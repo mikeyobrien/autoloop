@@ -13,10 +13,10 @@ import * as profiles from "../profiles.js";
 import { activeRuns } from "../registry/read.js";
 import * as topo from "../topology.js";
 import {
+  assertNoRawAutoloopPaths,
   expandTemplatePlaceholders,
   generateCompactId,
   generateReadableId,
-  rewriteLoopStatePaths,
   splitCsv,
   uniqueGeneratedId,
 } from "../utils.js";
@@ -410,13 +410,11 @@ export function reloadLoop(loop: LoopContext): LoopContext {
 
   const updatedTopology: topo.Topology = {
     ...finalTopology,
-    roles: finalTopology.roles.map((role) => ({
-      ...role,
-      prompt: expandTemplatePlaceholders(
-        rewriteLoopStatePaths(role.prompt, loop.paths.stateDir),
-        templateVars,
-      ),
-    })),
+    roles: finalTopology.roles.map((role) => {
+      const prompt = expandTemplatePlaceholders(role.prompt, templateVars);
+      assertNoRawAutoloopPaths(prompt, `role prompt: ${role.id}`);
+      return { ...role, prompt };
+    }),
   };
 
   const updated: LoopContext = {
@@ -440,10 +438,11 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     backend,
     review: {
       ...review,
-      prompt: expandTemplatePlaceholders(
-        rewriteLoopStatePaths(review.prompt, loop.paths.stateDir),
-        templateVars,
-      ),
+      prompt: (() => {
+        const p = expandTemplatePlaceholders(review.prompt, templateVars);
+        assertNoRawAutoloopPaths(p, "metareview prompt");
+        return p;
+      })(),
     },
     parallel,
     memory: {
@@ -453,16 +452,15 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       budgetChars: config.getInt(cfg, "tasks.prompt_budget_chars", 4000),
     },
     harness: {
-      instructions: expandTemplatePlaceholders(
-        rewriteLoopStatePaths(
-          readOptionalProjectFile(
-            pd,
-            config.get(cfg, "harness.instructions_file", "harness.md"),
-          ),
-          loop.paths.stateDir,
-        ),
-        templateVars,
-      ),
+      instructions: (() => {
+        const raw = readOptionalProjectFile(
+          pd,
+          config.get(cfg, "harness.instructions_file", "harness.md"),
+        );
+        const expanded = expandTemplatePlaceholders(raw, templateVars);
+        assertNoRawAutoloopPaths(expanded, "harness instructions");
+        return expanded;
+      })(),
     },
     profiles: profileInfo,
     paths: loop.paths,

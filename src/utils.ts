@@ -285,20 +285,34 @@ export function replaceAll(
   return text.split(pattern).join(replacement);
 }
 
-export function rewriteLoopStatePaths(text: string, stateDir: string): string {
-  return text.replace(
-    /(^|[^A-Za-z0-9_-])(?:\.\/)?\.autoloop(?=\/|\b)/g,
-    (_, prefix: string) => `${prefix}${stateDir}`,
-  );
-}
-
 export function expandTemplatePlaceholders(
   text: string,
   vars: Record<string, string>,
 ): string {
-  return text.replace(/\{\{([A-Z_][A-Z0-9_]*)\}\}/g, (match, key: string) =>
-    Object.hasOwn(vars, key) ? vars[key] : match,
+  const unknown: string[] = [];
+  const result = text.replace(
+    /\{\{([A-Z_][A-Z0-9_]*)\}\}/g,
+    (match, key: string) => {
+      if (Object.hasOwn(vars, key)) return vars[key];
+      unknown.push(key);
+      return match;
+    },
   );
+  if (unknown.length > 0) {
+    throw new Error(
+      `Unknown template placeholder(s): ${unknown.map((k) => `{{${k}}}`).join(", ")}`,
+    );
+  }
+  return result;
+}
+
+export function assertNoRawAutoloopPaths(text: string, label: string): void {
+  const pattern = /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/;
+  if (pattern.test(text)) {
+    throw new Error(
+      `Raw .autoloop path found in ${label}. Use {{STATE_DIR}} and {{TOOL_PATH}} placeholders instead.`,
+    );
+  }
 }
 
 export function shellWords(parts: string[]): string {
