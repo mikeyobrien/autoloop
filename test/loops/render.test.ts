@@ -41,14 +41,14 @@ describe("renderListHeader", () => {
     expect(header.indexOf("STARTED")).toBeLessThan(header.indexOf("UPDATED"));
   });
 
-  it("includes ISOLATION column", () => {
+  it("includes compact WT column", () => {
     const header = renderListHeader();
-    expect(header).toContain("ISOLATION");
-    // ISOLATION should appear after PRESET and before ITER
-    expect(header.indexOf("ISOLATION")).toBeGreaterThan(
-      header.indexOf("PRESET"),
-    );
-    expect(header.indexOf("ISOLATION")).toBeLessThan(header.indexOf("ITER"));
+    expect(header).toContain("WT");
+    expect(header).not.toContain("ISOLATION");
+    // WT should appear after PRESET and before ITER
+    const wtIdx = header.indexOf("WT");
+    expect(wtIdx).toBeGreaterThan(header.indexOf("PRESET"));
+    expect(wtIdx).toBeLessThan(header.indexOf("ITER"));
   });
 });
 
@@ -65,14 +65,21 @@ describe("renderRunLine", () => {
     expect(line).toContain("-");
   });
 
-  it("shows isolation_mode in run line", () => {
+  it("shows WT indicator for worktree isolation", () => {
     const line = renderRunLine(makeRun({ isolation_mode: "worktree" }));
-    expect(line).toContain("worktree");
+    expect(line).toContain("WT");
+    expect(line).not.toContain("worktree");
   });
 
-  it("defaults to shared when isolation_mode is empty", () => {
+  it("shows dash indicator for shared isolation", () => {
     const line = renderRunLine(makeRun({ isolation_mode: "" }));
-    expect(line).toContain("shared");
+    expect(line).toContain("──");
+    expect(line).not.toContain("shared");
+  });
+
+  it("shows dash indicator for explicit shared mode", () => {
+    const line = renderRunLine(makeRun({ isolation_mode: "shared" }));
+    expect(line).toContain("──");
   });
 });
 

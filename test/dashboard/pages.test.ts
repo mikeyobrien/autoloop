@@ -78,13 +78,11 @@ describe("iter X/N and workspace display", () => {
     expect(html).toContain("<label>Workspace: </label>");
   });
 
-  it("run list shows worktree name for isolated runs", () => {
+  it("run list shows compact WT badge for isolated runs", () => {
     const html = htmlShell();
-    expect(html).toContain(
-      "run.isolation_mode === 'worktree' && run.worktree_name",
-    );
-    expect(html).toContain("run.worktree_name");
-    expect(html).toContain("run.worktree_path || run.work_dir || ''");
+    expect(html).toContain("run.isolation_mode === 'worktree'");
+    expect(html).toContain("wt-badge");
+    expect(html).toContain("run.worktree_name || ''");
   });
 });
 

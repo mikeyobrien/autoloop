@@ -40,6 +40,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .badge[data-status="stuck"] { background: var(--stuck); color: #fff; }
 .badge[data-status="failed"] { background: var(--failed); color: #fff; }
 .badge[data-status="completed"] { background: var(--completed); color: #fff; }
+.wt-badge { background: var(--badge-bg); color: var(--muted); font-weight: 600; letter-spacing: 0.03em; }
 
 .run-list { list-style: none; padding: 0; }
 .run-item { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 0.8rem; font-family: monospace; }
@@ -140,10 +141,9 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
             <span x-text="run.preset"></span>
             <span style="color:var(--muted)"> &middot; iter </span>
             <span x-text="run.iteration + '/' + (run.max_iterations || '?')"></span>
-            <template x-if="run.isolation_mode === 'worktree' && run.worktree_name">
+            <template x-if="run.isolation_mode === 'worktree'">
               <span>
-                <span style="color:var(--muted)"> &middot; </span>
-                <span :title="run.worktree_path || run.work_dir || ''" x-text="run.worktree_name"></span>
+                <span class="badge wt-badge" :title="run.worktree_name || ''">WT</span>
                 <template x-if="run.worktree_merged">
                   <span class="merged-badge" title="merged"> &#x2713;</span>
                 </template>
