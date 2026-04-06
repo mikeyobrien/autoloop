@@ -178,21 +178,28 @@ export function readAllJournals(baseStateDir: string): string[] {
 }
 
 /**
- * Read journal lines for a specific run.
- * Checks run-scoped path (runs/<runId>/journal.jsonl) first,
- * then worktree path (worktrees/<runId>/tree/<stateDirName>/journal.jsonl).
+ * Resolve the journal file path for a specific run within a state directory.
+ * Checks run-scoped (runs/<runId>/journal.jsonl) and worktree paths first.
+ * Returns null if no run-specific journal exists.
  */
-export function readRunJournal(baseStateDir: string, runId: string): string[] {
-  // Run-scoped journal
+export function resolveRunJournalPath(baseStateDir: string, runId: string): string | null {
   const runJournal = join(baseStateDir, "runs", runId, "journal.jsonl");
-  if (existsSync(runJournal)) return readLines(runJournal);
+  if (existsSync(runJournal)) return runJournal;
 
-  // Worktree journal
   const stateDirName = basename(baseStateDir);
   const wtJournal = join(baseStateDir, "worktrees", runId, "tree", stateDirName, "journal.jsonl");
-  if (existsSync(wtJournal)) return readLines(wtJournal);
+  if (existsSync(wtJournal)) return wtJournal;
 
-  return [];
+  return null;
+}
+
+/**
+ * Read journal lines for a specific run.
+ * Checks run-scoped and worktree paths via resolveRunJournalPath.
+ */
+export function readRunJournal(baseStateDir: string, runId: string): string[] {
+  const path = resolveRunJournalPath(baseStateDir, runId);
+  return path ? readLines(path) : [];
 }
 
 function extractTimestamp(line: string): string {
