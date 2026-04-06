@@ -64,6 +64,18 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .event-field pre { display: inline; white-space: pre-wrap; }
 .event-field details summary { cursor: pointer; color: var(--muted); font-style: italic; }
 
+.md-content { font-family: system-ui, -apple-system, sans-serif; font-size: 0.75rem; line-height: 1.5; white-space: normal; }
+.md-content h1, .md-content h2, .md-content h3, .md-content h4, .md-content h5, .md-content h6 { margin: 0.5em 0 0.25em; font-weight: 600; }
+.md-content h1 { font-size: 1.1em; } .md-content h2 { font-size: 1em; } .md-content h3 { font-size: 0.95em; }
+.md-content p { margin: 0.3em 0; }
+.md-content code { background: var(--badge-bg); padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+.md-content pre { background: var(--badge-bg); padding: 0.5em; border-radius: 4px; overflow-x: auto; margin: 0.4em 0; }
+.md-content pre code { background: none; padding: 0; }
+.md-content ul, .md-content ol { margin: 0.3em 0; padding-left: 1.5em; }
+.md-content li { margin: 0.15em 0; }
+.md-content strong { font-weight: 600; }
+.md-content em { font-style: italic; }
+
 .empty { color: var(--muted); font-size: 0.8rem; padding: 0.5rem 0; }
 </style>
 </head>
@@ -136,14 +148,31 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
           <template x-for="[k,v] in Object.entries(ev)" :key="k">
             <div class="event-field">
               <strong x-text="k + ':'"></strong>
-              <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
-                <pre x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
+              <template x-if="isMarkdownField(ev.topic, k)">
+                <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
+                  <div class="md-content" x-html="renderMarkdown(typeof v === 'object' ? JSON.stringify(v,null,2) : String(v))"></div>
+                </template>
               </template>
-              <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
-                <details>
-                  <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
-                  <pre style="white-space:pre-wrap;font-size:0.7rem;margin-top:0.2rem" x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
-                </details>
+              <template x-if="isMarkdownField(ev.topic, k)">
+                <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
+                  <details>
+                    <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
+                    <div class="md-content" style="font-size:0.7rem;margin-top:0.2rem" x-html="renderMarkdown(typeof v === 'object' ? JSON.stringify(v,null,2) : String(v))"></div>
+                  </details>
+                </template>
+              </template>
+              <template x-if="!isMarkdownField(ev.topic, k)">
+                <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
+                  <pre x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
+                </template>
+              </template>
+              <template x-if="!isMarkdownField(ev.topic, k)">
+                <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
+                  <details>
+                    <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
+                    <pre style="white-space:pre-wrap;font-size:0.7rem;margin-top:0.2rem" x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
+                  </details>
+                </template>
               </template>
             </div>
           </template>
@@ -252,6 +281,85 @@ function dashboard() {
       return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
     },
 
+    isMarkdownField(topic, key) {
+      if (!topic || !key) return false;
+      const t = String(topic);
+      const k = String(key);
+      if ((t === 'backend.finish' || t === 'iteration.finish') && k === 'output') return true;
+      if (t === 'iteration.start' && k === 'prompt') return true;
+      return false;
+    },
+
+    renderMarkdown(text) {
+      if (!text) return '';
+      let html = String(text);
+      // Escape HTML
+      html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      // Fenced code blocks
+      html = html.replace(/^\\\`\\\`\\\`(\\w*)\\n([\\s\\S]*?)^\\\`\\\`\\\`/gm, function(_, lang, code) {
+        return '<pre><code>' + code.trim() + '</code></pre>';
+      });
+      // Split into lines for block-level processing
+      const lines = html.split('\\n');
+      const out = [];
+      let inList = false;
+      let listType = '';
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Headings
+        const hMatch = line.match(/^(#{1,6})\\s+(.+)$/);
+        if (hMatch) {
+          if (inList) { out.push('</' + listType + '>'); inList = false; }
+          const lvl = hMatch[1].length;
+          out.push('<h' + lvl + '>' + this._inlineMd(hMatch[2]) + '</h' + lvl + '>');
+          continue;
+        }
+        // Unordered list
+        const ulMatch = line.match(/^[\\-\\*]\\s+(.+)$/);
+        if (ulMatch) {
+          if (!inList || listType !== 'ul') {
+            if (inList) out.push('</' + listType + '>');
+            out.push('<ul>'); inList = true; listType = 'ul';
+          }
+          out.push('<li>' + this._inlineMd(ulMatch[1]) + '</li>');
+          continue;
+        }
+        // Ordered list
+        const olMatch = line.match(/^\\d+\\.\\s+(.+)$/);
+        if (olMatch) {
+          if (!inList || listType !== 'ol') {
+            if (inList) out.push('</' + listType + '>');
+            out.push('<ol>'); inList = true; listType = 'ol';
+          }
+          out.push('<li>' + this._inlineMd(olMatch[1]) + '</li>');
+          continue;
+        }
+        // Close list if we hit non-list line
+        if (inList) { out.push('</' + listType + '>'); inList = false; }
+        // Empty line = paragraph break
+        if (line.trim() === '') {
+          out.push('');
+          continue;
+        }
+        // Normal paragraph line
+        out.push('<p>' + this._inlineMd(line) + '</p>');
+      }
+      if (inList) out.push('</' + listType + '>');
+      return out.join('\\n');
+    },
+
+    _inlineMd(text) {
+      // Inline code
+      text = text.replace(/\\\`([^\\\`]+)\\\`/g, '<code>$1</code>');
+      // Bold
+      text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+      text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+      // Italic
+      text = text.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
+      text = text.replace(/_(.+?)_/g, '<em>$1</em>');
+      return text;
+    },
+
     eventCategory(ev) {
       const t = ev.topic || '';
       if (['event.invalid','wave.timeout','wave.failed','loop.stop'].includes(t)) return 'ev-error';
@@ -267,8 +375,15 @@ function dashboard() {
       parts.push(ev.topic || JSON.stringify(ev).slice(0, 80));
       const f = ev.fields || {};
       const t = ev.topic || '';
-      if (t === 'iteration.start' && f.suggested_roles) {
-        parts.push('\\u2192 ' + f.suggested_roles);
+      if (t === 'iteration.start') {
+        if (f.suggested_roles) parts.push('\\u2192 ' + f.suggested_roles);
+        if (f.prompt) {
+          const objMatch = String(f.prompt).match(/Objective:\\s*\\n?([^\\n]+)/);
+          if (objMatch) {
+            const preview = objMatch[1].trim().slice(0, 100);
+            parts.push('\\u2014 ' + preview + (objMatch[1].trim().length > 100 ? '...' : ''));
+          }
+        }
       } else if (t === 'iteration.finish' || t === 'backend.finish') {
         const hint = [];
         if (f.exit_code !== undefined) hint.push('exit=' + f.exit_code);
