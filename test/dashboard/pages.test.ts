@@ -58,7 +58,7 @@ describe("page routes", () => {
   });
 });
 
-describe("iter X/N display", () => {
+describe("iter X/N and workspace display", () => {
   it("run list shows iter X/N using max_iterations", () => {
     const html = htmlShell();
     expect(html).toContain("run.iteration + '/' + (run.max_iterations || '?')");
@@ -69,6 +69,22 @@ describe("iter X/N display", () => {
     expect(html).toContain(
       "selectedRunDetail.iteration + '/' + (selectedRunDetail.max_iterations || '?')",
     );
+  });
+
+  it("detail pane shows workspace label and path helpers", () => {
+    const html = htmlShell();
+    expect(html).toContain("workspaceLabel(selectedRunDetail)");
+    expect(html).toContain("workspacePath(selectedRunDetail)");
+    expect(html).toContain("<label>Workspace: </label>");
+  });
+
+  it("run list shows worktree name for isolated runs", () => {
+    const html = htmlShell();
+    expect(html).toContain(
+      "run.isolation_mode === 'worktree' && run.worktree_name",
+    );
+    expect(html).toContain("run.worktree_name");
+    expect(html).toContain("run.worktree_path || run.work_dir || ''");
   });
 });
 

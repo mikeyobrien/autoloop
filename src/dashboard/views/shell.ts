@@ -135,6 +135,12 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
             <span x-text="run.preset"></span>
             <span style="color:var(--muted)"> &middot; iter </span>
             <span x-text="run.iteration + '/' + (run.max_iterations || '?')"></span>
+            <template x-if="run.isolation_mode === 'worktree' && run.worktree_name">
+              <span>
+                <span style="color:var(--muted)"> &middot; </span>
+                <span :title="run.worktree_path || run.work_dir || ''" x-text="run.worktree_name"></span>
+              </span>
+            </template>
           </span>
           <span class="meta">
             <span x-text="run.latest_event || '-'"></span>
@@ -156,6 +162,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       <div class="field"><label>Preset: </label><span x-text="selectedRunDetail.preset"></span></div>
       <div class="field"><label>Objective: </label><span x-text="selectedRunDetail.objective"></span></div>
       <div class="field"><label>Iteration: </label><span x-text="selectedRunDetail.iteration + '/' + (selectedRunDetail.max_iterations || '?')"></span></div>
+      <div class="field"><label>Workspace: </label><span :title="workspacePath(selectedRunDetail)" x-text="workspaceLabel(selectedRunDetail)"></span></div>
       <div class="field"><label>Created: </label><span :title="selectedRunDetail.created_at" x-text="timeAgo(selectedRunDetail.created_at) + ' ago'"></span></div>
       <div class="field"><label>Updated: </label><span :title="selectedRunDetail.updated_at" x-text="timeAgo(selectedRunDetail.updated_at) + ' ago'"></span></div>
       <div class="field"><label>Duration: </label><span x-text="runDuration()"></span></div>
@@ -373,6 +380,22 @@ function dashboard() {
       if (s < 60) return s + "s";
       if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
       return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+    },
+
+    workspaceLabel(run) {
+      if (!run) return "-";
+      if (run.isolation_mode === "worktree") {
+        return run.worktree_name || "worktree";
+      }
+      return "shared checkout";
+    },
+
+    workspacePath(run) {
+      if (!run) return "";
+      if (run.isolation_mode === "worktree") {
+        return run.worktree_path || run.work_dir || "";
+      }
+      return run.work_dir || run.project_dir || "";
     },
 
     isMarkdownField(topic, key) {
