@@ -16,6 +16,9 @@ export function printUsage(): void {
   console.log("  autoloop loops watch <run-id>");
   console.log("  autoloop loops health [--verbose]");
   console.log("  autoloop chain <list|run> [args]");
+  console.log("  autoloop worktree <list|show|merge|clean> [args]");
+  console.log("  autoloop config <show|set|unset|path> [args]");
+  console.log("  autoloop dashboard [--port <port>]");
   console.log("");
   console.log("The preset argument is required for `run`. It must be a bundled preset");
   console.log("name (e.g. autocode, autoqa) or a path to a directory containing");
@@ -52,6 +55,13 @@ export function printRunUsage(): void {
   console.log("  --chain          Run an inline chain (comma-separated presets)");
   console.log("  --profile <spec> Activate a profile (repo:<name> or user:<name>), repeatable");
   console.log("  --no-default-profiles  Suppress config-defined default profiles");
+  console.log("");
+  console.log("Isolation:");
+  console.log("  --worktree             Run in an isolated git worktree");
+  console.log("  --no-worktree          Force shared checkout (disable worktree)");
+  console.log("  --merge-strategy <s>   Merge strategy: squash (default), merge, rebase");
+  console.log("  --automerge            Auto-merge worktree on completion");
+  console.log("  --keep-worktree        Keep worktree after run completes");
   console.log("");
   console.log("Examples:");
   console.log("  autoloop run autocode");

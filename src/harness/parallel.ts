@@ -177,7 +177,10 @@ export function appendLoopStart(loop: LoopContext): void {
       ", " + jsonField("work_dir", loop.paths.workDir) +
       ", " + jsonField("backend", normalizeBackendLabel(loop.backend.command)) +
       ", " + jsonField("backend_args", joinCsv(loop.backend.args)) +
-      ", " + jsonField("parent_run_id", loop.launch.parentRunId),
+      ", " + jsonField("parent_run_id", loop.launch.parentRunId) +
+      ", " + jsonField("isolation_mode", loop.runtime.isolationMode ?? "shared") +
+      ", " + jsonField("worktree_name", loop.paths.worktreeBranch || "") +
+      ", " + jsonField("worktree_path", loop.paths.worktreePath || ""),
   );
 }
 
