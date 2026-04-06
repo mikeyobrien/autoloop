@@ -108,6 +108,60 @@ describe("dashboard /api/runs", () => {
   });
 });
 
+describe("dashboard /api/runs max_iterations", () => {
+  it("returns max_iterations in run records", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+
+    const updatedAt = new Date().toISOString();
+    const record = JSON.stringify({
+      run_id: "run-maxiter-001",
+      status: "running",
+      preset: "autocode",
+      objective: "test max_iterations",
+      trigger: "cli",
+      project_dir: projectDir,
+      work_dir: projectDir,
+      state_dir: join(projectDir, ".autoloop"),
+      journal_file: join(projectDir, ".autoloop", "journal.jsonl"),
+      parent_run_id: "",
+      backend: "mock",
+      backend_args: [],
+      created_at: updatedAt,
+      updated_at: updatedAt,
+      iteration: 3,
+      max_iterations: 10,
+      stop_reason: "",
+      latest_event: "iteration.finish",
+    });
+    writeFileSync(registryPath, `${record}\n`, "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath: join(projectDir, ".autoloop", "journal.jsonl"),
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request("/api/runs");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // Find our run in one of the buckets
+    const allRuns = [
+      ...(body.active || []),
+      ...(body.watching || []),
+      ...(body.stuck || []),
+      ...(body.completed || []),
+      ...(body.failed || []),
+    ];
+    const run = allRuns.find((r: any) => r.run_id === "run-maxiter-001");
+    expect(run).toBeDefined();
+    expect(run.max_iterations).toBe(10);
+    expect(run.iteration).toBe(3);
+  });
+});
+
 describe("dashboard /api/runs/:id/events", () => {
   function makeEvent(runId: string, topic: string, seq: number) {
     return JSON.stringify({
