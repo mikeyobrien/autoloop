@@ -4,6 +4,7 @@ import * as chains from "../chains.js";
 import * as config from "../config.js";
 import * as topo from "../topology.js";
 import * as profiles from "../profiles.js";
+import { basename } from "node:path";
 import { printInspectUsage } from "../usage.js";
 
 const INSPECT_TARGETS = [
@@ -106,7 +107,7 @@ function parseInspectArgs(args: string[]): InspectSpec {
   }
 
   const needsSelector = artifact === "prompt" || artifact === "output";
-  const selector = needsSelector ? (positionals[0] ?? "") : (artifact === "metrics" ? (positionals[0] ?? "") : "");
+  const selector = needsSelector || artifact === "metrics" ? (positionals[0] ?? "") : "";
   const projectDir = needsSelector
     ? (positionals[1] ?? resolveRuntimeProjectDir())
     : (artifact === "metrics" && positionals.length > 1
@@ -142,7 +143,7 @@ function renderProfilesInspect(projectDir: string): void {
     return;
   }
 
-  const presetName = require("node:path").basename(projectDir);
+  const presetName = basename(projectDir);
   try {
     const resolved = profiles.resolveProfileFragments(defaults, presetName, topoData.roles, workDir);
     console.log("Active profiles: " + defaults.join(", "));

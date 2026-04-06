@@ -182,9 +182,7 @@ export function buildLoopContext(
   const memoryFile = config.resolveMemoryFileIn(resolvedProjectDir, resolvedWorkDir);
   const runId = nextRunId(journalFile, cfg);
   const backendOverride = runOptions.backendOverride || {};
-  const cliLogLevel = runOptions.logLevel ?? null;
-  const configLogLevel = config.get(cfg, "core.log_level", "info");
-  const logLevel = cliLogLevel || configLogLevel;
+  const logLevel = runOptions.logLevel || config.get(cfg, "core.log_level", "info");
 
   // Resolve isolation mode
   const registryFile = join(stateDir, "registry.jsonl");

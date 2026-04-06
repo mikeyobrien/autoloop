@@ -63,7 +63,7 @@ function parsedFields(fieldsJson: string): Record<string, string> {
   const parsed = parsedFieldsRaw(fieldsJson);
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(parsed)) {
-    result[key] = value === null || value === undefined ? "" : String(value);
+    result[key] = String(value ?? "");
   }
   return result;
 }
