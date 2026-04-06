@@ -1,12 +1,13 @@
 import { readRegistry } from "../registry/read.js";
 import type { RunRecord } from "../registry/types.js";
+import { policyForPreset } from "./policy.js";
 import { renderRunLine, renderListHeader } from "./render.js";
 
-const STUCK_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface HealthResult {
   active: RunRecord[];
+  watching: RunRecord[];
   stuck: RunRecord[];
   recentFailed: RunRecord[];
   recentCompleted: RunRecord[];
@@ -23,25 +24,36 @@ export function healthSummary(registryPath: string, verbose: boolean): string {
 }
 
 export function categorizeRuns(registryPath: string): HealthResult {
-  const now = Date.now();
   const all = readRegistry(registryPath);
+  return categorizeRecords(all);
+}
 
+export function categorizeRecords(records: RunRecord[], nowMs: number = Date.now()): HealthResult {
   const active: RunRecord[] = [];
+  const watching: RunRecord[] = [];
   const stuck: RunRecord[] = [];
   const recentFailed: RunRecord[] = [];
   const recentCompleted: RunRecord[] = [];
 
-  for (const r of all) {
+  for (const r of records) {
     if (r.status === "running") {
-      if (isStuck(r, now)) {
+      const elapsed = elapsedMs(r, nowMs);
+      if (elapsed === null) {
+        active.push(r);
+        continue;
+      }
+      const policy = policyForPreset(r.preset);
+      if (elapsed > policy.stuckAfterMs) {
         stuck.push(r);
+      } else if (elapsed > policy.warningAfterMs) {
+        watching.push(r);
       } else {
         active.push(r);
       }
       continue;
     }
 
-    if (!isRecent(r, now)) continue;
+    if (!isRecent(r, nowMs)) continue;
 
     if (r.status === "failed" || r.status === "timed_out") {
       recentFailed.push(r);
@@ -50,14 +62,14 @@ export function categorizeRuns(registryPath: string): HealthResult {
     }
   }
 
-  return { active, stuck, recentFailed, recentCompleted };
+  return { active, watching, stuck, recentFailed, recentCompleted };
 }
 
-function isStuck(r: RunRecord, nowMs: number): boolean {
-  if (!r.updated_at) return false;
+function elapsedMs(r: RunRecord, nowMs: number): number | null {
+  if (!r.updated_at) return null;
   const updatedMs = new Date(r.updated_at).getTime();
-  if (Number.isNaN(updatedMs)) return false;
-  return (nowMs - updatedMs) > STUCK_THRESHOLD_MS;
+  if (Number.isNaN(updatedMs)) return null;
+  return nowMs - updatedMs;
 }
 
 function isRecent(r: RunRecord, nowMs: number): boolean {
@@ -68,7 +80,7 @@ function isRecent(r: RunRecord, nowMs: number): boolean {
 }
 
 function renderHealth(h: HealthResult, verbose: boolean): string {
-  const hasExceptions = h.stuck.length > 0 || h.recentFailed.length > 0;
+  const hasExceptions = h.stuck.length > 0 || h.recentFailed.length > 0 || h.watching.length > 0;
 
   if (!hasExceptions && h.active.length === 0) {
     return "All clear. 0 active, " + h.recentCompleted.length + " completed in last 24h.";
@@ -82,6 +94,7 @@ function renderHealth(h: HealthResult, verbose: boolean): string {
 
   lines.push(
     "Health: " + h.active.length + " active, " +
+    h.watching.length + " watching, " +
     h.stuck.length + " stuck, " +
     h.recentFailed.length + " failed (last 24h)",
   );
@@ -91,6 +104,13 @@ function renderHealth(h: HealthResult, verbose: boolean): string {
     lines.push("STUCK:");
     lines.push(renderListHeader());
     for (const r of h.stuck) lines.push(renderRunLine(r));
+    lines.push("");
+  }
+
+  if (h.watching.length > 0) {
+    lines.push("WATCHING:");
+    lines.push(renderListHeader());
+    for (const r of h.watching) lines.push(renderRunLine(r));
     lines.push("");
   }
 
