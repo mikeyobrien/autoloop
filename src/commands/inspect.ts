@@ -27,7 +27,7 @@ export function dispatchInspect(args: string[]): boolean {
 
   switch (artifact) {
     case "scratchpad":
-      harness.renderScratchpadFormat(projectDir, format);
+      harness.renderScratchpadFormat(projectDir, format, spec.run);
       return true;
     case "memory":
       if (format === "json") console.log(memory.rawProject(projectDir));
@@ -41,11 +41,11 @@ export function dispatchInspect(args: string[]): boolean {
       }
       return true;
     case "coordination":
-      harness.renderCoordinationFormat(projectDir, format);
+      harness.renderCoordinationFormat(projectDir, format, spec.run);
       return true;
     case "metrics":
       if (selector) harness.renderMetricsForRun(projectDir, selector, format);
-      else harness.renderMetrics(projectDir, format);
+      else harness.renderMetrics(projectDir, format, spec.run);
       return true;
     case "chain":
       console.log(chains.renderChainState(projectDir));
@@ -55,11 +55,11 @@ export function dispatchInspect(args: string[]): boolean {
       return true;
     case "prompt":
       if (!selector) { console.log("inspect prompt requires an iteration selector"); return true; }
-      harness.renderPromptFormat(projectDir, selector, format);
+      harness.renderPromptFormat(projectDir, selector, format, spec.run);
       return true;
     case "output":
       if (!selector) { console.log("inspect output requires an iteration selector"); return true; }
-      harness.renderOutput(projectDir, selector);
+      harness.renderOutput(projectDir, selector, spec.run);
       return true;
     default:
       console.log("unsupported inspect target `" + artifact + "`");

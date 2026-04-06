@@ -11,6 +11,7 @@ import {
   extractField,
   extractIteration,
   latestRunId,
+  readRunJournal,
 } from "./journal.js";
 import { emitToolScript, piAdapterScript } from "./tools.js";
 import { resolveIsolationMode, presetCategory } from "../isolation/resolve.js";
@@ -149,6 +150,30 @@ export function absolutePath(path: string): string {
 
 export function emptyFallback(text: string): string {
   return text || "(empty)";
+}
+
+/**
+ * Resolve the journal file path for a specific run.
+ * Checks run-scoped (runs/<runId>/journal.jsonl) and worktree paths first,
+ * falling back to the top-level journal.
+ */
+export function resolveJournalFileForRun(
+  projectDir: string,
+  runId: string,
+): { journalFile: string; runId: string } {
+  const stateDir = config.stateDirPath(projectDir);
+  const stateName = basename(stateDir);
+
+  // Run-scoped journal
+  const runJournal = join(stateDir, "runs", runId, "journal.jsonl");
+  if (existsSync(runJournal)) return { journalFile: runJournal, runId };
+
+  // Worktree journal
+  const wtJournal = join(stateDir, "worktrees", runId, "tree", stateName, "journal.jsonl");
+  if (existsSync(wtJournal)) return { journalFile: wtJournal, runId };
+
+  // Fall back to top-level journal
+  return { journalFile: config.resolveJournalFile(projectDir), runId };
 }
 
 export function buildLoopContext(

@@ -27,6 +27,7 @@ import {
   iterationFieldForRun,
   ensureRenderRunId,
   emptyFallback,
+  resolveJournalFileForRun,
   buildLoopContext,
   reloadLoop,
   applyRuntimeModeOverrides,
@@ -120,9 +121,9 @@ export { emitCmd as emit };
 export function renderScratchpadFormat(
   projectDir: string,
   format: string,
+  runIdOverride?: string,
 ): void {
-  const journalFile = resolveEmitJournalFile(projectDir);
-  const runId = ensureRenderRunId(journalFile);
+  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
   printProjectedMarkdown(
     emptyFallback(renderRunScratchpadFull(readRunLines(journalFile, runId))),
     format,
@@ -133,9 +134,9 @@ export function renderPromptFormat(
   projectDir: string,
   iteration: string,
   format: string,
+  runIdOverride?: string,
 ): void {
-  const journalFile = resolveEmitJournalFile(projectDir);
-  const runId = ensureRenderRunId(journalFile);
+  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
   const prompt = iterationFieldForRun(
     journalFile,
     runId,
@@ -153,9 +154,9 @@ export function renderPromptFormat(
 export function renderOutput(
   projectDir: string,
   iteration: string,
+  runIdOverride?: string,
 ): void {
-  const journalFile = resolveEmitJournalFile(projectDir);
-  const runId = ensureRenderRunId(journalFile);
+  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
   const output = iterationFieldForRun(
     journalFile,
     runId,
@@ -189,9 +190,9 @@ export function renderAllJournals(projectDir: string): void {
 export function renderCoordinationFormat(
   projectDir: string,
   format: string,
+  runIdOverride?: string,
 ): void {
-  const journalFile = resolveEmitJournalFile(projectDir);
-  const runId = ensureRenderRunId(journalFile);
+  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
   const lines = readRunLines(journalFile, runId);
   printProjectedMarkdown(emptyFallback(coordinationFromLines(lines)), format);
 }
@@ -199,9 +200,9 @@ export function renderCoordinationFormat(
 export function renderMetrics(
   projectDir: string,
   format: string,
+  runIdOverride?: string,
 ): void {
-  const journalFile = resolveEmitJournalFile(projectDir);
-  const runId = ensureRenderRunId(journalFile);
+  const { journalFile, runId } = resolveJournalAndRun(projectDir, runIdOverride);
   const lines = readRunLines(journalFile, runId);
   const rows = collectMetricsRows(lines);
   printProjectedText(formatMetrics(rows, format), format);
@@ -212,7 +213,7 @@ export function renderMetricsForRun(
   runId: string,
   format: string,
 ): void {
-  const journalFile = resolveEmitJournalFile(projectDir);
+  const { journalFile } = resolveJournalAndRun(projectDir, runId);
   const lines = readRunLines(journalFile, runId);
   const rows = collectMetricsRows(lines);
   printProjectedText(formatMetrics(rows, format), format);
@@ -274,6 +275,17 @@ export function runParallelBranchCli(
 }
 
 // --- Private implementation ---
+
+function resolveJournalAndRun(
+  projectDir: string,
+  runIdOverride?: string,
+): { journalFile: string; runId: string } {
+  if (runIdOverride) {
+    return resolveJournalFileForRun(projectDir, runIdOverride);
+  }
+  const journalFile = resolveEmitJournalFile(projectDir);
+  return { journalFile, runId: ensureRenderRunId(journalFile) };
+}
 
 function iterate(loop: LoopContext, iteration: number): RunSummary {
   const liveLoop = reloadLoop(loop);
