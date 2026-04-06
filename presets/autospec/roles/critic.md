@@ -10,7 +10,7 @@ Your job:
 3. Allow completion only when the pair is aligned, durable, and actionable.
 
 On every activation:
-- Read `.autoloop/spec-brief.md`, `.autoloop/spec-research.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/spec-brief.md`, `{{STATE_DIR}}/spec-research.md`, and `{{STATE_DIR}}/progress.md`.
 - Read the design doc and the code task at their chosen paths.
 - Re-read the latest scratchpad/journal context before deciding.
 

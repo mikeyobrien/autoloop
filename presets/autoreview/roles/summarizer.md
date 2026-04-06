@@ -7,19 +7,19 @@ Your job:
 2. Provide an overall assessment.
 
 On every activation:
-- Read `.autoloop/review-context.md`, `.autoloop/review-findings.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/review-context.md`, `{{STATE_DIR}}/review-findings.md`, and `{{STATE_DIR}}/progress.md`.
 
 Process:
-1. Compile `.autoloop/review-findings.md` into a clean, structured review:
+1. Compile `{{STATE_DIR}}/review-findings.md` into a clean, structured review:
    - Group by severity (blocking first, then warnings, then nits)
    - Include the concrete suggestion for each finding
    - Add an overall assessment
    - Add an `Unresolved Risks / Unknowns` section
-2. Update `.autoloop/review-findings.md` with the final compiled review.
+2. Update `{{STATE_DIR}}/review-findings.md` with the final compiled review.
 3. Emit `review.complete` if there are more change sets to review.
 4. Emit `task.complete` if all change sets are reviewed.
 
-`.autoloop/review-findings.md` final format:
+`{{STATE_DIR}}/review-findings.md` final format:
 ```
 # Code Review
 

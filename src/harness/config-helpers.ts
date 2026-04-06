@@ -13,6 +13,7 @@ import * as profiles from "../profiles.js";
 import { activeRuns } from "../registry/read.js";
 import * as topo from "../topology.js";
 import {
+  expandTemplatePlaceholders,
   generateCompactId,
   generateReadableId,
   rewriteLoopStatePaths,
@@ -402,11 +403,19 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     }
   }
 
+  const templateVars: Record<string, string> = {
+    STATE_DIR: loop.paths.stateDir,
+    TOOL_PATH: loop.paths.toolPath,
+  };
+
   const updatedTopology: topo.Topology = {
     ...finalTopology,
     roles: finalTopology.roles.map((role) => ({
       ...role,
-      prompt: rewriteLoopStatePaths(role.prompt, loop.paths.stateDir),
+      prompt: expandTemplatePlaceholders(
+        rewriteLoopStatePaths(role.prompt, loop.paths.stateDir),
+        templateVars,
+      ),
     })),
   };
 
@@ -431,7 +440,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     backend,
     review: {
       ...review,
-      prompt: rewriteLoopStatePaths(review.prompt, loop.paths.stateDir),
+      prompt: expandTemplatePlaceholders(
+        rewriteLoopStatePaths(review.prompt, loop.paths.stateDir),
+        templateVars,
+      ),
     },
     parallel,
     memory: {
@@ -441,12 +453,15 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       budgetChars: config.getInt(cfg, "tasks.prompt_budget_chars", 4000),
     },
     harness: {
-      instructions: rewriteLoopStatePaths(
-        readOptionalProjectFile(
-          pd,
-          config.get(cfg, "harness.instructions_file", "harness.md"),
+      instructions: expandTemplatePlaceholders(
+        rewriteLoopStatePaths(
+          readOptionalProjectFile(
+            pd,
+            config.get(cfg, "harness.instructions_file", "harness.md"),
+          ),
+          loop.paths.stateDir,
         ),
-        loop.paths.stateDir,
+        templateVars,
       ),
     },
     profiles: profileInfo,

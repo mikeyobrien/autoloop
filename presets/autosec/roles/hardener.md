@@ -8,7 +8,7 @@ Your job:
 3. Verify the vulnerable path is actually closed.
 
 On every activation:
-- Read `.autoloop/sec-findings.md`, `.autoloop/sec-report.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/sec-findings.md`, `{{STATE_DIR}}/sec-report.md`, and `{{STATE_DIR}}/progress.md`.
 - Understand the confirmed finding: what is vulnerable, why, and the recommended fix.
 
 Process:
@@ -23,7 +23,7 @@ Process:
 3. Verify the fix:
    - Run existing tests to check for regressions.
    - Verify the exploit scenario no longer works, or provide equivalent targeted proof that the vulnerable path is closed.
-4. Update `.autoloop/progress.md` with the fix details and verification evidence.
+4. Update `{{STATE_DIR}}/progress.md` with the fix details and verification evidence.
 5. If fix applied and verified → emit `fix.applied`.
 6. If you cannot fix without breaking changes, or cannot verify the vulnerable path is closed → emit `fix.blocked` with explanation.
 

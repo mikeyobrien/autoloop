@@ -316,6 +316,53 @@ describe("buildLoopContext run-scoped isolation", () => {
     );
   });
 
+  it("expands {{STATE_DIR}} and {{TOOL_PATH}} placeholders in harness, metareview, and role prompts", () => {
+    const projectDir = makeProjectWithActiveRun(
+      [
+        "event_loop.max_iterations = 1",
+        'harness.instructions_file = "harness.md"',
+        'review.prompt_file = "metareview.md"',
+      ].join("\n"),
+      {
+        topologyToml: [
+          "[[role]]",
+          'id = "builder"',
+          'prompt_file = "roles/build.md"',
+          'emits = ["review.ready"]',
+        ].join("\n"),
+        files: {
+          "harness.md":
+            "Shared files: {{STATE_DIR}}/progress.md\nTool: {{TOOL_PATH}}",
+          "metareview.md":
+            "Inspect {{STATE_DIR}}/logs/ and rerun `{{TOOL_PATH}} emit review.passed` if needed.",
+          "roles/build.md":
+            "Builder uses {{STATE_DIR}}/context.md and `{{TOOL_PATH}} emit review.ready`.",
+        },
+      },
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    // Harness instructions should have expanded placeholders
+    expect(loop.harness.instructions).toContain(loop.paths.stateDir);
+    expect(loop.harness.instructions).toContain(loop.paths.toolPath);
+    expect(loop.harness.instructions).not.toContain("{{STATE_DIR}}");
+    expect(loop.harness.instructions).not.toContain("{{TOOL_PATH}}");
+
+    // Review/metareview prompt
+    expect(loop.review.prompt).toContain(loop.paths.stateDir);
+    expect(loop.review.prompt).toContain(loop.paths.toolPath);
+    expect(loop.review.prompt).not.toContain("{{STATE_DIR}}");
+    expect(loop.review.prompt).not.toContain("{{TOOL_PATH}}");
+
+    // Role prompts
+    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.stateDir);
+    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.toolPath);
+    expect(loop.topology.roles[0]?.prompt).not.toContain("{{STATE_DIR}}");
+    expect(loop.topology.roles[0]?.prompt).not.toContain("{{TOOL_PATH}}");
+  });
+
   it("preserves mainProjectDir as the original projectDir", () => {
     const projectDir = makeProjectWithActiveRun();
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {

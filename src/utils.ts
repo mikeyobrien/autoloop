@@ -292,6 +292,15 @@ export function rewriteLoopStatePaths(text: string, stateDir: string): string {
   );
 }
 
+export function expandTemplatePlaceholders(
+  text: string,
+  vars: Record<string, string>,
+): string {
+  return text.replace(/\{\{([A-Z_][A-Z0-9_]*)\}\}/g, (match, key: string) =>
+    Object.hasOwn(vars, key) ? vars[key] : match,
+  );
+}
+
 export function shellWords(parts: string[]): string {
   return parts.map(shellQuote).join(" ");
 }

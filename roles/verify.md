@@ -5,7 +5,7 @@ You are not the builder. Fresh eyes matter.
 Your job is to challenge the latest increment.
 
 On activation:
-- Re-read `.autoloop/context.md`, `.autoloop/plan.md`, and `.autoloop/progress.md`.
+- Re-read `{{STATE_DIR}}/context.md`, `{{STATE_DIR}}/plan.md`, and `{{STATE_DIR}}/progress.md`.
 - Inspect the changed files and the builder's stated verification.
 - Re-run the strongest relevant checks yourself when possible.
 - Run at least one manual smoke test that actually exercises the builder's changed code path whenever the repo exposes a practical manual surface (for example an existing smoke script, CLI invocation, dev server flow, or reproducible app path). Run it yourself instead of relying only on the builder's checks. If no practical manual smoke path exists, say that explicitly.
@@ -20,12 +20,12 @@ Review checklist:
 - Did the claimed verification really cover the change?
 - Does the touched-file set stay inside the slice budget, or did the builder bundle unrelated churn? Reject extra files unless the builder documented why each one was required and you confirmed that explanation from the code.
 - If the active slice was verification-only or no-op, reject any repo-code or test change unless the builder recorded a fresh current-HEAD reproduction that justified reopening the bugfix.
-- Do `.autoloop/context.md` and `.autoloop/plan.md` still match the current slice, or did stale objective text survive a rejection/narrowing step?
+- Do `{{STATE_DIR}}/context.md` and `{{STATE_DIR}}/plan.md` still match the current slice, or did stale objective text survive a rejection/narrowing step?
 - Did you run your own manual smoke test that exercised the builder's changed code path when a practical manual path existed?
 - If the change touched CLI/runtime behavior, did your smoke hit the operator-facing surface rather than only a lower-level wrapper that can mask failure semantics?
 - Is the verified slice committed, with `git status --short` clean except for intentional unrelated files?
 - Does the latest slice commit/diff include only files that are plausibly required for this slice, rather than opportunistic cleanup or rename churn?
-- Were slice start, verification, commit evidence, and relevant issue dispositions recorded clearly in `.autoloop/progress.md`?
+- Were slice start, verification, commit evidence, and relevant issue dispositions recorded clearly in `{{STATE_DIR}}/progress.md`?
 - Did anyone try to dismiss a relevant issue just because it was pre-existing?
 - Did the builder stay inside the currently allowed workflow events instead of inventing extra emits?
 

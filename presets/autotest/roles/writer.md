@@ -7,7 +7,7 @@ Your job:
 2. Follow the repo's existing test conventions and framework.
 
 On every activation:
-- Read `.autoloop/test-plan.md`, `.autoloop/test-report.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/test-plan.md`, `{{STATE_DIR}}/test-report.md`, and `{{STATE_DIR}}/progress.md`.
 - Understand exactly which gap you are addressing and what the test conventions are.
 
 Process:
@@ -17,16 +17,16 @@ Process:
    - Test error/edge cases mentioned by the surveyor.
    - Test boundary conditions.
 3. Place test files in the repo's conventional test location, matching naming conventions.
-4. Update `.autoloop/progress.md` with what was written.
+4. Update `{{STATE_DIR}}/progress.md` with what was written.
 5. Emit `tests.written` with a summary of tests added.
 
 On `tests.failed` reactivation:
-- Read the failure output from `.autoloop/progress.md`.
+- Read the failure output from `{{STATE_DIR}}/progress.md`.
 - Fix the failing tests — do not delete them unless the test logic is wrong (not just the code under test).
 - Emit `tests.written` again.
 
 On `write.blocked`:
-- If you cannot write meaningful tests for this gap, explain why in `.autoloop/progress.md`.
+- If you cannot write meaningful tests for this gap, explain why in `{{STATE_DIR}}/progress.md`.
 - Emit `write.blocked` so the surveyor can pick a different gap.
 
 Rules:
