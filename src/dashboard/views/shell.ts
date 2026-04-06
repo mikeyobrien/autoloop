@@ -53,6 +53,16 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .events-list { margin-top: 0.75rem; max-height: 400px; overflow-y: auto; }
 .event-item { font-size: 0.75rem; font-family: monospace; padding: 0.2rem 0; border-bottom: 1px solid var(--border); word-break: break-all; }
 .event-item summary { cursor: pointer; }
+.event-item.ev-system { border-left: 3px solid var(--muted); padding-left: 0.4rem; }
+.event-item.ev-error { border-left: 3px solid var(--failed); padding-left: 0.4rem; background: rgba(220,38,38,0.05); }
+.event-item.ev-coordination { border-left: 3px solid var(--active); padding-left: 0.4rem; }
+.event-item.ev-completion { border-left: 3px solid var(--completed); padding-left: 0.4rem; }
+.event-item.ev-system summary { opacity: 0.6; }
+.event-item.ev-system:hover summary { opacity: 1; }
+.event-field { margin: 0.15rem 0; font-size: 0.7rem; }
+.event-field strong { color: var(--muted); margin-right: 0.3rem; }
+.event-field pre { display: inline; white-space: pre-wrap; }
+.event-field details summary { cursor: pointer; color: var(--muted); font-style: italic; }
 
 .empty { color: var(--muted); font-size: 0.8rem; padding: 0.5rem 0; }
 </style>
@@ -110,17 +120,34 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       <div class="field"><label>Preset: </label><span x-text="selectedRunDetail.preset"></span></div>
       <div class="field"><label>Objective: </label><span x-text="selectedRunDetail.objective"></span></div>
       <div class="field"><label>Iteration: </label><span x-text="selectedRunDetail.iteration"></span></div>
-      <div class="field"><label>Created: </label><span x-text="selectedRunDetail.created_at"></span></div>
-      <div class="field"><label>Updated: </label><span x-text="selectedRunDetail.updated_at"></span></div>
-      <div class="field"><label>Latest event: </label><span x-text="selectedRunDetail.latest_event"></span></div>
+      <div class="field"><label>Created: </label><span :title="selectedRunDetail.created_at" x-text="timeAgo(selectedRunDetail.created_at) + ' ago'"></span></div>
+      <div class="field"><label>Updated: </label><span :title="selectedRunDetail.updated_at" x-text="timeAgo(selectedRunDetail.updated_at) + ' ago'"></span></div>
+      <div class="field"><label>Duration: </label><span x-text="runDuration()"></span></div>
+      <div class="field"><label>Latest event: </label><span x-text="'[iter ' + selectedRunDetail.iteration + '] ' + selectedRunDetail.latest_event"></span></div>
+      <div class="field"><label>Events: </label><span x-text="selectedRunEvents.length"></span></div>
     </div>
   </template>
   <div class="events-list">
     <h3>Events</h3>
     <template x-for="(ev, idx) in selectedRunEvents" :key="idx">
-      <details class="event-item">
-        <summary x-text="ev.topic ? (ev.ts ? ev.ts + ' ' : '') + ev.topic : JSON.stringify(ev).slice(0, 80)"></summary>
-        <pre style="white-space:pre-wrap;font-size:0.7rem;padding:0.3rem" x-text="JSON.stringify(ev, null, 2)"></pre>
+      <details :class="'event-item ' + eventCategory(ev)">
+        <summary x-text="eventSummary(ev)"></summary>
+        <div style="padding:0.3rem">
+          <template x-for="[k,v] in Object.entries(ev)" :key="k">
+            <div class="event-field">
+              <strong x-text="k + ':'"></strong>
+              <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
+                <pre x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
+              </template>
+              <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
+                <details>
+                  <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
+                  <pre style="white-space:pre-wrap;font-size:0.7rem;margin-top:0.2rem" x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
+                </details>
+              </template>
+            </div>
+          </template>
+        </div>
       </details>
     </template>
     <p class="empty" x-show="selectedRunEvents.length === 0">No events</p>
@@ -212,6 +239,46 @@ function dashboard() {
       if (s < 60) return s + "s";
       if (s < 3600) return Math.floor(s / 60) + "m";
       return Math.floor(s / 3600) + "h";
+    },
+
+    runDuration() {
+      const d = this.selectedRunDetail;
+      if (!d || !d.created_at || !d.updated_at) return "-";
+      const ms = new Date(d.updated_at) - new Date(d.created_at);
+      if (ms < 0) return "-";
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + "s";
+      if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
+      return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+    },
+
+    eventCategory(ev) {
+      const t = ev.topic || '';
+      if (['event.invalid','wave.timeout','wave.failed','loop.stop'].includes(t)) return 'ev-error';
+      if (t === 'task.complete' || t === 'loop.complete') return 'ev-completion';
+      if (t.startsWith('iteration.') || t.startsWith('backend.')) return 'ev-system';
+      return 'ev-coordination';
+    },
+
+    eventSummary(ev) {
+      const parts = [];
+      if (ev.iteration) parts.push('[iter ' + ev.iteration + ']');
+      if (ev.ts) parts.push(this.timeAgo(ev.ts));
+      parts.push(ev.topic || JSON.stringify(ev).slice(0, 80));
+      const f = ev.fields || {};
+      const t = ev.topic || '';
+      if (t === 'iteration.start' && f.suggested_roles) {
+        parts.push('\\u2192 ' + f.suggested_roles);
+      } else if (t === 'iteration.finish' || t === 'backend.finish') {
+        const hint = [];
+        if (f.exit_code !== undefined) hint.push('exit=' + f.exit_code);
+        if (f.timed_out === 'true' || f.timed_out === true) hint.push('TIMEOUT');
+        if (f.elapsed_s !== undefined) hint.push(f.elapsed_s + 's');
+        if (hint.length) parts.push('\\u2014 ' + hint.join(' '));
+      } else if (ev.payload) {
+        parts.push('\\u2014 ' + String(ev.payload).slice(0, 60));
+      }
+      return parts.join(' ');
     },
   };
 }
