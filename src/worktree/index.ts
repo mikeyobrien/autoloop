@@ -6,3 +6,5 @@ export type { MergeOpts, MergeResult } from "./merge.js";
 export { mergeWorktree } from "./merge.js";
 export type { CleanOpts, CleanResult } from "./clean.js";
 export { cleanWorktrees } from "./clean.js";
+export type { WorktreeListEntry } from "./list.js";
+export { listWorktreeMetas } from "./list.js";

@@ -39,14 +39,16 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
       continue;
     }
 
-    // Skip running worktrees unless --force
-    if (meta.status === "running" && !force) {
+    const orphan = meta.status !== "removed" && !existsSync(meta.worktree_path);
+
+    // Skip running worktrees unless --force or orphaned (path already gone)
+    if (meta.status === "running" && !force && !orphan) {
       skipped.push(runId);
       continue;
     }
 
-    // Without --all, only clean terminal-status worktrees
-    if (!opts.all && !opts.runId && !TERMINAL_STATUSES.has(meta.status) && !force) {
+    // Without --all, only clean terminal-status or orphaned worktrees
+    if (!opts.all && !opts.runId && !TERMINAL_STATUSES.has(meta.status) && !force && !orphan) {
       skipped.push(runId);
       continue;
     }

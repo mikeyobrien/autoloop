@@ -1,10 +1,10 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { existsSync, readdirSync } from "node:fs";
 import { readMeta } from "../worktree/meta.js";
 import { mergeWorktree } from "../worktree/merge.js";
 import { cleanWorktrees } from "../worktree/clean.js";
+import { listWorktreeMetas } from "../worktree/list.js";
 import { formatTime } from "../loops/render.js";
-import type { WorktreeMeta } from "../worktree/meta.js";
 import type { MergeOpts } from "../worktree/merge.js";
 
 export function dispatchWorktree(args: string[]): void {
@@ -51,29 +51,24 @@ export function dispatchWorktree(args: string[]): void {
 }
 
 function listWorktrees(stateDir: string): void {
-  const worktreesDir = join(stateDir, "worktrees");
-  if (!existsSync(worktreesDir)) { console.log("No worktrees found."); return; }
-
-  const entries = readdirSync(worktreesDir, { withFileTypes: true })
-    .filter(d => d.isDirectory());
+  const entries = listWorktreeMetas(stateDir);
 
   if (entries.length === 0) { console.log("No worktrees found."); return; }
 
   const header = [
     "RUN ID".padEnd(24),
-    "STATUS".padEnd(12),
+    "STATUS".padEnd(18),
     "BRANCH".padEnd(30),
     "STRATEGY".padEnd(10),
     "CREATED",
   ].join("  ");
   console.log(header);
 
-  for (const entry of entries) {
-    const meta = readMeta(join(worktreesDir, entry.name));
-    if (!meta) continue;
+  for (const meta of entries) {
+    const statusLabel = meta.orphan ? meta.status + " (orphan)" : meta.status;
     const line = [
       truncate(meta.run_id, 24).padEnd(24),
-      meta.status.padEnd(12),
+      statusLabel.padEnd(18),
       truncate(meta.branch, 30).padEnd(30),
       meta.merge_strategy.padEnd(10),
       formatTime(meta.created_at),
@@ -87,15 +82,19 @@ function showWorktree(stateDir: string, runId: string): void {
   const meta = readMeta(metaDir);
   if (!meta) { console.log(`No worktree found for run ${runId}`); return; }
 
+  const orphan = meta.status !== "removed" && !existsSync(meta.worktree_path);
+  const statusLabel = orphan ? meta.status + " (orphan)" : meta.status;
+
   const lines = [
     field("Run ID", meta.run_id),
-    field("Status", meta.status),
+    field("Status", statusLabel),
     field("Branch", meta.branch),
     field("Base", meta.base_branch),
     field("Strategy", meta.merge_strategy),
     field("Path", meta.worktree_path),
     field("Created", meta.created_at),
   ];
+  if (orphan) lines.push(field("Orphan", "worktree path no longer exists"));
   if (meta.merged_at) lines.push(field("Merged", meta.merged_at));
   if (meta.removed_at) lines.push(field("Removed", meta.removed_at));
   console.log(lines.join("\n"));
