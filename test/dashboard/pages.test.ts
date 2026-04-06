@@ -271,6 +271,36 @@ describe("backend event verbose toggle", () => {
   });
 });
 
+describe("review event rendering", () => {
+  it("adds distinct CSS class for review events", () => {
+    const html = htmlShell();
+    expect(html).toContain(".event-item.ev-review");
+    expect(html).toContain("border-left: 3px solid var(--watching)");
+  });
+
+  it("categorizes review events with ev-review class", () => {
+    const html = htmlShell();
+    expect(html).toContain("if (t.startsWith('review.')) return 'ev-review'");
+  });
+
+  it("renders review.start with humanized label and reason preview", () => {
+    const html = htmlShell();
+    expect(html).toContain("Review Started");
+    expect(html).toContain(
+      "if (f.reason) hint.push(String(f.reason).slice(0, 60))",
+    );
+  });
+
+  it("renders review.finish with humanized label and decision/output preview", () => {
+    const html = htmlShell();
+    expect(html).toContain("Review Finished");
+    expect(html).toContain(
+      "if (f.decision) hint.push('decision=' + f.decision)",
+    );
+    expect(html).toContain("if (f.output) hint.push(String(f.output)");
+  });
+});
+
 describe("section open/close state preservation", () => {
   it("uses sectionOpen state instead of hardcoded :open binding", () => {
     const html = htmlShell();

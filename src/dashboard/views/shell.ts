@@ -56,6 +56,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .event-item summary { cursor: pointer; }
 .event-item.ev-system { border-left: 3px solid var(--muted); padding-left: 0.4rem; }
 .event-item.ev-backend { border-left: 3px solid var(--muted); padding-left: 0.4rem; }
+.event-item.ev-review { border-left: 3px solid var(--watching); padding-left: 0.4rem; background: rgba(217,119,6,0.03); }
 .event-item.ev-error { border-left: 3px solid var(--failed); padding-left: 0.4rem; background: rgba(220,38,38,0.05); }
 .event-item.ev-coordination { border-left: 3px solid var(--active); padding-left: 0.4rem; }
 .event-item.ev-completion { border-left: 3px solid var(--completed); padding-left: 0.4rem; }
@@ -643,6 +644,7 @@ function dashboard() {
       const t = ev.topic || '';
       if (['event.invalid','wave.timeout','wave.failed','loop.stop'].includes(t)) return 'ev-error';
       if (t === 'task.complete' || t === 'loop.complete') return 'ev-completion';
+      if (t.startsWith('review.')) return 'ev-review';
       if (t.startsWith('backend.')) return 'ev-backend';
       if (t.startsWith('iteration.')) return 'ev-system';
       return 'ev-coordination';
@@ -678,6 +680,19 @@ function dashboard() {
             parts.push('\\u2014 ' + preview + (objMatch[1].trim().length > 100 ? '...' : ''));
           }
         }
+      } else if (t === 'review.start') {
+        const f = ev.fields || {};
+        parts.push('Review Started');
+        const hint = [];
+        if (f.reason) hint.push(String(f.reason).slice(0, 60));
+        if (hint.length) parts.push('\\u2014 ' + hint.join(' '));
+      } else if (t === 'review.finish') {
+        const f = ev.fields || {};
+        parts.push('Review Finished');
+        const hint = [];
+        if (f.decision) hint.push('decision=' + f.decision);
+        if (f.output) hint.push(String(f.output).replace(/\\s+/g, ' ').trim().slice(0, 80));
+        if (hint.length) parts.push('\\u2014 ' + hint.join(' '));
       } else if (t === 'iteration.finish' || t === 'backend.finish') {
         const hint = [];
         if (f.exit_code !== undefined) hint.push('exit=' + f.exit_code);
