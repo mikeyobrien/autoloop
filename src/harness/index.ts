@@ -47,7 +47,6 @@ export function run(
   runOptions: RunOptions,
 ): RunSummary {
   let loop = buildLoopContext(projectDir, promptOverride, selfCommand, runOptions);
-  loop = reloadLoop(loop);
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
@@ -169,7 +168,6 @@ export function runParallelBranchCli(
     logLevel: logLevelVal,
     trigger: "branch",
   });
-  branchLoop = reloadLoop(branchLoop);
   branchLoop = initStore(branchLoop);
   branchLoop.runtime.branchMode = true;
   branchLoop = applyRuntimeModeOverrides(branchLoop);

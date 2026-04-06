@@ -4,6 +4,7 @@ import * as config from "../config.js";
 import { resolve } from "node:path";
 import { joinCsv } from "../utils.js";
 import { printRunUsage, missingPresetError, unknownPresetError } from "../usage.js";
+import { claudeBackend } from "../harness/config-helpers.js";
 
 interface RunOptions {
   projectDir: string;
@@ -217,10 +218,6 @@ function backendOverrideSpec(backend: string): Record<string, unknown> {
     return { kind: "command", command: backend, args: ["-p", "--dangerously-skip-permissions"], prompt_mode: "arg" };
   }
   return { kind: "command", command: backend, args: [], prompt_mode: "arg" };
-}
-
-function claudeBackend(backend: string): boolean {
-  return backend === "claude" || backend.endsWith("/claude");
 }
 
 function looksLikeProjectDir(path: string): boolean {

@@ -108,7 +108,7 @@ export function processListOverride(override: Record<string, unknown>, key: stri
   return Array.isArray(val) ? val as string[] : fallback;
 }
 
-function claudeBackend(command: string): boolean {
+export function claudeBackend(command: string): boolean {
   return command === "claude" || command.endsWith("/claude");
 }
 
