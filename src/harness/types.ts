@@ -45,6 +45,9 @@ export interface RunOptions {
   worktree?: boolean;
   noWorktree?: boolean;
   isolationMode?: string;
+  mergeStrategy?: string;
+  automerge?: boolean;
+  keepWorktree?: boolean;
 }
 
 export interface RunSummary {

@@ -10,6 +10,7 @@ export function renderRunLine(r: RunRecord): string {
     shortId.padEnd(24),
     r.status.padEnd(10),
     r.preset.padEnd(14),
+    (r.isolation_mode || "shared").padEnd(12),
     ("iter:" + r.iteration).padEnd(8),
     r.latest_event.padEnd(18),
     formatTime(r.created_at).padEnd(18),
@@ -34,6 +35,9 @@ export function renderRunDetail(r: RunRecord): string {
     field("Latest", r.latest_event),
   ];
   if (r.stop_reason) lines.push(field("Stop", r.stop_reason));
+  lines.push(field("Isolation", r.isolation_mode || "shared"));
+  if (r.worktree_name) lines.push(field("Worktree", r.worktree_name));
+  if (r.worktree_path) lines.push(field("WT Path", r.worktree_path));
   lines.push(field("Created", r.created_at));
   lines.push(field("Updated", r.updated_at));
   lines.push(field("Work dir", r.work_dir));
@@ -63,6 +67,7 @@ export function renderListHeader(): string {
     "RUN ID".padEnd(24),
     "STATUS".padEnd(10),
     "PRESET".padEnd(14),
+    "ISOLATION".padEnd(12),
     "ITER".padEnd(8),
     "LATEST EVENT".padEnd(18),
     "STARTED".padEnd(18),

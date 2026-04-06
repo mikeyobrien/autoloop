@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   renderListHeader,
   renderRunLine,
+  renderRunDetail,
   formatTime,
 } from "../../src/loops/render.js";
 import type { RunRecord } from "../../src/registry/types.js";
@@ -24,6 +25,9 @@ function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
     state_dir: "/tmp/state",
     journal_file: "/tmp/journal.jsonl",
     parent_run_id: "",
+    isolation_mode: "shared",
+    worktree_name: "",
+    worktree_path: "",
     ...overrides,
   } as RunRecord;
 }
@@ -33,24 +37,65 @@ describe("renderListHeader", () => {
     const header = renderListHeader();
     expect(header).toContain("STARTED");
     expect(header).toContain("UPDATED");
-    // STARTED should appear before UPDATED
     expect(header.indexOf("STARTED")).toBeLessThan(header.indexOf("UPDATED"));
+  });
+
+  it("includes ISOLATION column", () => {
+    const header = renderListHeader();
+    expect(header).toContain("ISOLATION");
+    // ISOLATION should appear after PRESET and before ITER
+    expect(header.indexOf("ISOLATION")).toBeGreaterThan(header.indexOf("PRESET"));
+    expect(header.indexOf("ISOLATION")).toBeLessThan(header.indexOf("ITER"));
   });
 });
 
 describe("renderRunLine", () => {
   it("includes formatted created_at timestamp", () => {
     const line = renderRunLine(makeRun());
-    // Should contain the formatted created_at
     expect(line).toContain("2026-04-05 ");
-    // Should contain both started and updated times
     const parts = line.split(/\s{2,}/);
-    expect(parts.length).toBeGreaterThanOrEqual(7);
+    expect(parts.length).toBeGreaterThanOrEqual(8);
   });
 
   it("shows dash for missing created_at", () => {
     const line = renderRunLine(makeRun({ created_at: "" }));
     expect(line).toContain("-");
+  });
+
+  it("shows isolation_mode in run line", () => {
+    const line = renderRunLine(makeRun({ isolation_mode: "worktree" }));
+    expect(line).toContain("worktree");
+  });
+
+  it("defaults to shared when isolation_mode is empty", () => {
+    const line = renderRunLine(makeRun({ isolation_mode: "" }));
+    expect(line).toContain("shared");
+  });
+});
+
+describe("renderRunDetail", () => {
+  it("includes isolation field", () => {
+    const detail = renderRunDetail(makeRun({ isolation_mode: "worktree" }));
+    expect(detail).toContain("Isolation:");
+    expect(detail).toContain("worktree");
+  });
+
+  it("includes worktree name when present", () => {
+    const detail = renderRunDetail(makeRun({
+      isolation_mode: "worktree",
+      worktree_name: "autoloop/run-abc",
+      worktree_path: "/tmp/wt",
+    }));
+    expect(detail).toContain("Worktree:");
+    expect(detail).toContain("autoloop/run-abc");
+    expect(detail).toContain("WT Path:");
+    expect(detail).toContain("/tmp/wt");
+  });
+
+  it("omits worktree fields when empty", () => {
+    const detail = renderRunDetail(makeRun({ isolation_mode: "shared" }));
+    expect(detail).not.toContain("Worktree:");
+    expect(detail).not.toContain("WT Path:");
   });
 });
 

@@ -20,6 +20,9 @@ interface RunOptions {
   noDefaultProfiles: boolean;
   worktree?: boolean;
   noWorktree?: boolean;
+  mergeStrategy?: string;
+  automerge?: boolean;
+  keepWorktree?: boolean;
 }
 
 export function dispatchRun(args: string[], argv: string[], bundleRoot: string, selfCmd: string): boolean {
@@ -45,6 +48,9 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
       noDefaultProfiles: options.noDefaultProfiles || undefined,
       worktree: options.worktree || undefined,
       noWorktree: options.noWorktree || undefined,
+      mergeStrategy: options.mergeStrategy,
+      automerge: options.automerge || undefined,
+      keepWorktree: options.keepWorktree || undefined,
     },
   );
   return true;
@@ -107,6 +113,20 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     }
     if (token === "--no-worktree") {
       options.noWorktree = true;
+      i++; continue;
+    }
+    if (token === "--merge-strategy") {
+      const val = args[i + 1];
+      if (!val) { console.log("missing strategy after --merge-strategy"); options.usageError = true; return options; }
+      options.mergeStrategy = val;
+      i += 2; continue;
+    }
+    if (token === "--automerge") {
+      options.automerge = true;
+      i++; continue;
+    }
+    if (token === "--keep-worktree") {
+      options.keepWorktree = true;
       i++; continue;
     }
     if (token === "-i" || token === "--iterations") {
