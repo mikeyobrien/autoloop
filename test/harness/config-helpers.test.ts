@@ -8,11 +8,25 @@ import {
 } from "../../src/harness/config-helpers.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
-function makeProject(configToml: string): string {
+function makeProject(
+  configToml: string,
+  options?: {
+    topologyToml?: string;
+    files?: Record<string, string>;
+  },
+): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-ts-config-helpers-"));
   writeFileSync(join(dir, "autoloops.toml"), configToml);
-  writeFileSync(join(dir, "topology.toml"), '[[role]]\nname = "builder"\n');
+  writeFileSync(
+    join(dir, "topology.toml"),
+    options?.topologyToml ?? '[[role]]\nname = "builder"\n',
+  );
   mkdirSync(join(dir, ".autoloop"), { recursive: true });
+  for (const [relativePath, content] of Object.entries(options?.files ?? {})) {
+    const fullPath = join(dir, relativePath);
+    mkdirSync(join(fullPath, ".."), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
   return dir;
 }
 
@@ -95,14 +109,16 @@ describe("buildLoopContext", () => {
     expect(loop.review.args).toEqual(["-p", "--dangerously-skip-permissions"]);
   });
 
-  it("sets isolation mode to shared by default for solo run", () => {
+  it("sets isolation mode to run-scoped by default for solo run", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
     });
 
-    expect(loop.runtime.isolationMode).toBe("shared");
-    expect(loop.paths.baseStateDir).toBe(loop.paths.stateDir);
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(loop.runtime.runId);
+    expect(loop.paths.baseStateDir).not.toContain("/runs/");
     expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
   });
 
@@ -142,11 +158,39 @@ describe("buildLoopContext", () => {
     // noWorktree overrides config, so still shared
     expect(loop.runtime.isolationMode).toBe("shared");
   });
+
+  it("defaults run ids to human-readable word pairs", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.runId).toMatch(/^[a-z]+-[a-z]+$/);
+  });
+
+  it("keeps legacy compact run ids when configured", () => {
+    const projectDir = makeProject(
+      ["event_loop.max_iterations = 1", 'core.run_id_format = "compact"'].join(
+        "\n",
+      ),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.runId).toMatch(/^run-[0-9a-z]+-[0-9a-f]{4}$/);
+  });
 });
 
 describe("buildLoopContext run-scoped isolation", () => {
-  function makeProjectWithActiveRun(configToml?: string): string {
-    const dir = makeProject(configToml ?? "event_loop.max_iterations = 1\n");
+  function makeProjectWithActiveRun(
+    configToml?: string,
+    options?: Parameters<typeof makeProject>[1],
+  ): string {
+    const dir = makeProject(
+      configToml ?? "event_loop.max_iterations = 1\n",
+      options,
+    );
     seedRegistry(join(dir, ".autoloop"), [
       {
         run_id: "run-existing",
@@ -179,15 +223,15 @@ describe("buildLoopContext run-scoped isolation", () => {
     expect(loop.paths.stateDir).not.toBe(loop.paths.baseStateDir);
   });
 
-  it("routes journalFile to run-scoped dir", () => {
+  it("keeps journalFile global even in run-scoped mode", () => {
     const projectDir = makeProjectWithActiveRun();
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
     });
 
-    expect(loop.paths.journalFile).toContain("/runs/");
-    expect(loop.paths.journalFile).toContain(loop.runtime.runId);
+    expect(loop.paths.journalFile).not.toContain("/runs/");
     expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
+    expect(loop.paths.journalFile).toContain(".autoloop");
   });
 
   it("keeps registryFile at baseStateDir (not run-scoped)", () => {
@@ -222,6 +266,113 @@ describe("buildLoopContext run-scoped isolation", () => {
     expect(existsSync(loop.paths.stateDir)).toBe(true);
   });
 
+  it("errors when harness instructions contain raw .autoloop paths", () => {
+    const projectDir = makeProjectWithActiveRun(
+      [
+        "event_loop.max_iterations = 1",
+        'harness.instructions_file = "harness.md"',
+      ].join("\n"),
+      {
+        files: {
+          "harness.md": "Shared files: .autoloop/progress.md",
+        },
+      },
+    );
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow("Raw .autoloop path found in harness instructions");
+  });
+
+  it("errors when metareview prompt contains raw .autoloop paths", () => {
+    const projectDir = makeProjectWithActiveRun(
+      [
+        "event_loop.max_iterations = 1",
+        'review.prompt_file = "metareview.md"',
+      ].join("\n"),
+      {
+        files: {
+          "metareview.md": "Inspect .autoloop/logs/ for output.",
+        },
+      },
+    );
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow("Raw .autoloop path found in metareview prompt");
+  });
+
+  it("errors when role prompt contains raw .autoloop paths", () => {
+    const projectDir = makeProjectWithActiveRun(
+      ["event_loop.max_iterations = 1"].join("\n"),
+      {
+        topologyToml: [
+          "[[role]]",
+          'id = "builder"',
+          'prompt_file = "roles/build.md"',
+          'emits = ["review.ready"]',
+        ].join("\n"),
+        files: {
+          "roles/build.md": "Builder uses .autoloop/context.md for context.",
+        },
+      },
+    );
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow("Raw .autoloop path found in role prompt: builder");
+  });
+
+  it("expands {{STATE_DIR}} and {{TOOL_PATH}} placeholders in harness, metareview, and role prompts", () => {
+    const projectDir = makeProjectWithActiveRun(
+      [
+        "event_loop.max_iterations = 1",
+        'harness.instructions_file = "harness.md"',
+        'review.prompt_file = "metareview.md"',
+      ].join("\n"),
+      {
+        topologyToml: [
+          "[[role]]",
+          'id = "builder"',
+          'prompt_file = "roles/build.md"',
+          'emits = ["review.ready"]',
+        ].join("\n"),
+        files: {
+          "harness.md":
+            "Shared files: {{STATE_DIR}}/progress.md\nTool: {{TOOL_PATH}}",
+          "metareview.md":
+            "Inspect {{STATE_DIR}}/logs/ and rerun `{{TOOL_PATH}} emit review.passed` if needed.",
+          "roles/build.md":
+            "Builder uses {{STATE_DIR}}/context.md and `{{TOOL_PATH}} emit review.ready`.",
+        },
+      },
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    // Harness instructions should have expanded placeholders
+    expect(loop.harness.instructions).toContain(loop.paths.stateDir);
+    expect(loop.harness.instructions).toContain(loop.paths.toolPath);
+    expect(loop.harness.instructions).not.toContain("{{STATE_DIR}}");
+    expect(loop.harness.instructions).not.toContain("{{TOOL_PATH}}");
+
+    // Review/metareview prompt
+    expect(loop.review.prompt).toContain(loop.paths.stateDir);
+    expect(loop.review.prompt).toContain(loop.paths.toolPath);
+    expect(loop.review.prompt).not.toContain("{{STATE_DIR}}");
+    expect(loop.review.prompt).not.toContain("{{TOOL_PATH}}");
+
+    // Role prompts
+    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.stateDir);
+    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.toolPath);
+    expect(loop.topology.roles[0]?.prompt).not.toContain("{{STATE_DIR}}");
+    expect(loop.topology.roles[0]?.prompt).not.toContain("{{TOOL_PATH}}");
+  });
+
   it("preserves mainProjectDir as the original projectDir", () => {
     const projectDir = makeProjectWithActiveRun();
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
@@ -229,5 +380,85 @@ describe("buildLoopContext run-scoped isolation", () => {
     });
 
     expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
+  });
+});
+
+describe("solo-run default run-scoping", () => {
+  it("solo run (no active runs) gets run-scoped isolation by default", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+  });
+
+  it("solo run stateDir is under runs/<id>/", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(loop.runtime.runId);
+    expect(loop.paths.baseStateDir).not.toContain("/runs/");
+  });
+
+  it("solo run journalFile stays at global .autoloop/journal.jsonl", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).toMatch(/\.autoloop\/journal\.jsonl$/);
+  });
+
+  it("solo run registryFile stays global", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.paths.registryFile).not.toContain("/runs/");
+    expect(loop.paths.registryFile).toMatch(/registry\.jsonl$/);
+  });
+
+  it("--no-worktree still returns shared mode even for solo run", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      noWorktree: true,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("shared");
+    expect(loop.paths.baseStateDir).toBe(loop.paths.stateDir);
+  });
+});
+
+describe("global journal behavior", () => {
+  it("journal path is global for solo run-scoped mode", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
+  });
+
+  it("journal path is global for concurrent run-scoped mode", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    seedRegistry(join(projectDir, ".autoloop"), [
+      { run_id: "run-other", status: "running", preset: "autocode" },
+    ]);
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
   });
 });

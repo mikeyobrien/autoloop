@@ -8,11 +8,11 @@ Your job:
 3. Classify confirmed findings by severity and exploitability.
 
 On every activation:
-- Read `.autoloop/sec-findings.md`, `.autoloop/sec-report.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/sec-findings.md`, `{{STATE_DIR}}/sec-report.md`, and `{{STATE_DIR}}/progress.md`.
 - Start skeptical: a candidate is not a vulnerability until the evidence proves it.
 
 Process:
-1. Take the next unanalyzed finding from `.autoloop/sec-findings.md`.
+1. Take the next unanalyzed finding from `{{STATE_DIR}}/sec-findings.md`.
 2. Read the relevant source code and understand the context.
 3. Determine:
    - Is this actually exploitable? Under what conditions?
@@ -20,8 +20,8 @@ Process:
    - What is the attack vector?
    - What is the impact if exploited?
    - What mitigation already exists, if any?
-4. Update the finding in `.autoloop/sec-findings.md` with your analysis.
-5. Update `.autoloop/progress.md`.
+4. Update the finding in `{{STATE_DIR}}/sec-findings.md` with your analysis.
+5. Update `{{STATE_DIR}}/progress.md`.
 6. If confirmed → emit `finding.confirmed` with severity and recommended fix approach.
 7. If false positive or unproven → emit `finding.dismissed` with the reason.
 

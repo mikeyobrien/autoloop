@@ -3,7 +3,7 @@ This is a autoloops-native autoresearch loop inspired by Ralph's autoresearch pr
 The loop runs autonomous experiments: strategize, implement, measure, evaluate.
 
 Global rules:
-- Shared working files are the source of truth: `.autoloop/autoresearch.md`, `.autoloop/experiments.jsonl`, and `.autoloop/progress.md`.
+- Shared working files are the source of truth: `{{STATE_DIR}}/autoresearch.md`, `{{STATE_DIR}}/experiments.jsonl`, and `{{STATE_DIR}}/progress.md`.
 - One experiment at a time. Do not start a new experiment before the current one is evaluated.
 - Use the event tool instead of prose-only handoffs.
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
@@ -12,13 +12,13 @@ Global rules:
 - The evaluator makes keep/discard decisions. Other roles do not commit or revert.
 - False keeps are worse than false discards.
 - Qualitative wins only count when the rubric was written down before the experiment.
-- Use `./.autoloop/autoloops memory add learning ...` for durable learnings.
+- Use `{{TOOL_PATH}} memory add learning ...` for durable learnings.
 - Do not invent extra phases. Stay inside strategist -> implementer -> benchmarker -> evaluator.
 
 State files:
-- `.autoloop/autoresearch.md` — running session document: goal, constraints, experiment history summary, current hypothesis.
-- `.autoloop/experiments.jsonl` — append-only log. Each line: `{"id":N, "hypothesis":"...", "change":"...", "metric_before":..., "metric_after":..., "verdict":"keep|discard", "reason":"..."}`.
-- `.autoloop/progress.md` — current experiment status, what the next role should do.
+- `{{STATE_DIR}}/autoresearch.md` — running session document: goal, constraints, experiment history summary, current hypothesis.
+- `{{STATE_DIR}}/experiments.jsonl` — append-only log. Each line: `{"id":N, "hypothesis":"...", "change":"...", "metric_before":..., "metric_after":..., "verdict":"keep|discard", "reason":"..."}`.
+- `{{STATE_DIR}}/progress.md` — current experiment status, what the next role should do.
 
 LLM-as-judge:
 - The evaluator can invoke `../../scripts/llm-judge.sh` to get a semantic pass/fail verdict.

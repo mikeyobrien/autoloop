@@ -9,12 +9,12 @@ Your job:
 3. Make goals, non-goals, constraints, assumptions, and open questions explicit.
 
 On every activation:
-- Read `.autoloop/spec-brief.md`, `.autoloop/spec-research.md`, and `.autoloop/progress.md` if they exist.
+- Read `{{STATE_DIR}}/spec-brief.md`, `{{STATE_DIR}}/spec-research.md`, and `{{STATE_DIR}}/progress.md` if they exist.
 - If the objective text points at a local file or directory, read it.
 - Re-read the latest scratchpad/journal context before deciding.
 
 On first activation or after `brief.revise`:
-- Create or refresh `.autoloop/spec-brief.md` with:
+- Create or refresh `{{STATE_DIR}}/spec-brief.md` with:
   - Objective
   - Source Material
   - Proposed Title
@@ -29,7 +29,7 @@ On first activation or after `brief.revise`:
   - Design: `docs/rfcs/<slug>.md`
   - Task: `.agents/tasks/<project-name>/<slug>.code-task.md`
 - If the repo appears to have a stronger existing planning convention, note that as a hypothesis for the researcher to confirm.
-- Update `.autoloop/progress.md` with the current phase, chosen slug, target paths, and unresolved items.
+- Update `{{STATE_DIR}}/progress.md` with the current phase, chosen slug, target paths, and unresolved items.
 - Emit `brief.ready` with the title, slug, output paths, and the top risks.
 
 Rules:

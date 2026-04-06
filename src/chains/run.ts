@@ -10,7 +10,12 @@ import {
 } from "../harness/journal.js";
 import { presetCategory } from "../isolation/resolve.js";
 import { jsonField } from "../json.js";
-import { generateCompactId, joinCsv } from "../utils.js";
+import {
+  generateCompactId,
+  generateReadableId,
+  joinCsv,
+  uniqueGeneratedId,
+} from "../utils.js";
 import { checkBudget, defaultBudget } from "./budget.js";
 import { parseInlineChain } from "./load.js";
 import type {
@@ -297,13 +302,26 @@ function writeResultArtifact(
 }
 
 function nextChainRunId(projectDir: string, cfg: config.Config): string {
-  if (config.get(cfg, "core.run_id_format", "compact") === "counter") {
-    const journalFile = config.resolveJournalFile(projectDir);
-    const lines = readLines(journalFile);
+  const journalFile = config.resolveJournalFile(projectDir);
+  const lines = readLines(journalFile);
+  const format = config.get(cfg, "core.run_id_format", "human");
+  if (format === "counter") {
     const count = lines.filter((l) => extractTopic(l) === "chain.start").length;
     return `chain-${count + 1}`;
   }
-  return generateCompactId("chain");
+  const existing = new Set(
+    lines.map((line) => extractField(line, "chain_run")).filter(Boolean),
+  );
+  if (format === "compact") {
+    return (
+      uniqueGeneratedId(() => generateCompactId("chain"), existing) ??
+      generateCompactId("chain")
+    );
+  }
+  return (
+    uniqueGeneratedId(generateReadableId, existing) ??
+    generateCompactId("chain")
+  );
 }
 
 function appendChainEvent(

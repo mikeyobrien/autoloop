@@ -26,6 +26,7 @@ function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     iteration: 0,
+    max_iterations: 10,
     stop_reason: "",
     latest_event: "loop.start",
     isolation_mode: "shared",
@@ -36,9 +37,9 @@ function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
 }
 
 describe("resolveIsolationMode", () => {
-  it("returns shared when solo run with no flags", () => {
+  it("returns run-scoped when solo run with no flags", () => {
     const result = resolveIsolationMode({}, []);
-    expect(result).toEqual({ mode: "shared" });
+    expect(result).toEqual({ mode: "run-scoped" });
   });
 
   it("returns worktree when --worktree flag is set", () => {

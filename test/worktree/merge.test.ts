@@ -39,6 +39,47 @@ function addFileAndCommit(
   });
 }
 
+function withMissingGitIdentity<T>(fn: () => T): T {
+  const tempHome = mkdtempSync(join(tmpdir(), "autoloop-ts-git-home-"));
+  const overrides: Record<string, string | undefined> = {
+    HOME: tempHome,
+    XDG_CONFIG_HOME: tempHome,
+    GIT_CONFIG_GLOBAL: join(tempHome, "gitconfig"),
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: undefined,
+    GIT_AUTHOR_EMAIL: undefined,
+    GIT_COMMITTER_NAME: undefined,
+    GIT_COMMITTER_EMAIL: undefined,
+    EMAIL: undefined,
+    AUTOLOOP_GIT_NAME: "Autoloop Test",
+    AUTOLOOP_GIT_EMAIL: "autoloop@test.local",
+  };
+  const original = new Map<string, string | undefined>();
+
+  for (const [key, value] of Object.entries(overrides)) {
+    original.set(key, process.env[key]);
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+
+  try {
+    return fn();
+  } finally {
+    for (const [key, value] of original.entries()) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+function readHeadIdentity(dir: string): string {
+  return execSync("git log -1 --format='%an <%ae>|%cn <%ce>'", {
+    cwd: dir,
+    encoding: "utf-8",
+    stdio: "pipe",
+  }).trim();
+}
+
 describe("mergeWorktree", () => {
   it("squash-merges a completed worktree", () => {
     const repo = makeGitRepo();
@@ -56,12 +97,19 @@ describe("mergeWorktree", () => {
     // Mark worktree as completed
     updateStatus(wt.metaDir, "completed");
 
-    const result = mergeWorktree({
-      mainProjectDir: repo,
-      metaDir: wt.metaDir,
+    const headIdentity = withMissingGitIdentity(() => {
+      const result = mergeWorktree({
+        mainProjectDir: repo,
+        metaDir: wt.metaDir,
+      });
+
+      expect(result.success).toBe(true);
+      return readHeadIdentity(repo);
     });
 
-    expect(result.success).toBe(true);
+    expect(headIdentity).toBe(
+      "Autoloop Test <autoloop@test.local>|Autoloop Test <autoloop@test.local>",
+    );
 
     // Meta should be "merged"
     const meta = readMeta(wt.metaDir);
@@ -83,13 +131,20 @@ describe("mergeWorktree", () => {
     addFileAndCommit(wt.worktreePath, "feature2.txt", "world", "add feature2");
     updateStatus(wt.metaDir, "completed");
 
-    const result = mergeWorktree({
-      mainProjectDir: repo,
-      metaDir: wt.metaDir,
-      strategy: "merge",
+    const headIdentity = withMissingGitIdentity(() => {
+      const result = mergeWorktree({
+        mainProjectDir: repo,
+        metaDir: wt.metaDir,
+        strategy: "merge",
+      });
+
+      expect(result.success).toBe(true);
+      return readHeadIdentity(repo);
     });
 
-    expect(result.success).toBe(true);
+    expect(headIdentity).toBe(
+      "Autoloop Test <autoloop@test.local>|Autoloop Test <autoloop@test.local>",
+    );
     expect(readMeta(wt.metaDir)?.status).toBe("merged");
   });
 

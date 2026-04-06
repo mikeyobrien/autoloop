@@ -40,6 +40,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .badge[data-status="stuck"] { background: var(--stuck); color: #fff; }
 .badge[data-status="failed"] { background: var(--failed); color: #fff; }
 .badge[data-status="completed"] { background: var(--completed); color: #fff; }
+.wt-badge { background: var(--badge-bg); color: var(--muted); font-weight: 600; letter-spacing: 0.03em; }
 
 .run-list { list-style: none; padding: 0; }
 .run-item { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 0.8rem; font-family: monospace; }
@@ -54,11 +55,15 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .event-item { font-size: 0.75rem; font-family: monospace; padding: 0.2rem 0; border-bottom: 1px solid var(--border); word-break: break-all; }
 .event-item summary { cursor: pointer; }
 .event-item.ev-system { border-left: 3px solid var(--muted); padding-left: 0.4rem; }
+.event-item.ev-backend { border-left: 3px solid var(--muted); padding-left: 0.4rem; }
+.event-item.ev-review { border-left: 3px solid var(--watching); padding-left: 0.4rem; background: rgba(217,119,6,0.03); }
 .event-item.ev-error { border-left: 3px solid var(--failed); padding-left: 0.4rem; background: rgba(220,38,38,0.05); }
 .event-item.ev-coordination { border-left: 3px solid var(--active); padding-left: 0.4rem; }
 .event-item.ev-completion { border-left: 3px solid var(--completed); padding-left: 0.4rem; }
-.event-item.ev-system summary { opacity: 0.6; }
-.event-item.ev-system:hover summary { opacity: 1; }
+.event-item.ev-highlight { border-left-color: var(--active); }
+.event-item.ev-backend summary { opacity: 0.6; }
+.event-item.ev-highlight summary { opacity: 1; }
+.event-item.ev-backend:hover summary { opacity: 1; }
 .event-field { margin: 0.15rem 0; font-size: 0.7rem; }
 .event-field strong { color: var(--muted); margin-right: 0.3rem; }
 .event-field pre { display: inline; white-space: pre-wrap; }
@@ -94,6 +99,16 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .prompt-raw-toggle button { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 0.2rem 0.6rem; font-size: 0.7rem; color: var(--muted); cursor: pointer; }
 .prompt-raw-toggle button:hover { background: var(--card-bg); color: var(--fg); }
 .prompt-raw-toggle pre { white-space: pre-wrap; font-size: 0.65rem; margin-top: 0.3rem; max-height: 400px; overflow-y: auto; background: var(--badge-bg); padding: 0.5rem; border-radius: 4px; }
+
+/* Routing badges and backpressure */
+.routing-badge { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 6px; background: var(--badge-bg); margin: 0.1rem 0.15rem; font-family: monospace; }
+.bp-none { color: var(--muted); font-style: italic; font-size: 0.7rem; }
+.bp-warning { display: inline-block; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 6px; background: color-mix(in srgb, var(--watching) 15%, transparent); border: 1px solid color-mix(in srgb, var(--watching) 40%, transparent); color: var(--watching); font-family: monospace; }
+
+/* Merged indicator */
+.merged-badge { color: var(--completed); font-weight: 600; }
+.merge-detail { margin-top: 0.5rem; padding: 0.5rem; background: color-mix(in srgb, var(--completed) 8%, transparent); border: 1px solid color-mix(in srgb, var(--completed) 25%, transparent); border-radius: 4px; }
+.merge-detail .field label { color: var(--completed); }
 </style>
 </head>
 <body x-data="dashboard()" x-init="startPolling()">
@@ -114,7 +129,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 </div>
 
 <template x-for="cat in categories" :key="cat.key">
-  <details class="section" :open="cat.items.length > 0 && (cat.key === 'active' || cat.key === 'watching' || cat.key === 'stuck')">
+  <details class="section" :open="sectionOpen[cat.key]" @toggle="sectionUserToggled[cat.key] = true; sectionOpen[cat.key] = $el.open">
     <summary>
       <span x-text="cat.label"></span>
       <span class="badge" :data-status="cat.key" x-text="cat.items.length"></span>
@@ -127,7 +142,15 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
             <span style="color:var(--muted)"> &middot; </span>
             <span x-text="run.preset"></span>
             <span style="color:var(--muted)"> &middot; iter </span>
-            <span x-text="run.iteration"></span>
+            <span x-text="run.iteration + '/' + (run.max_iterations || '?')"></span>
+            <template x-if="run.isolation_mode === 'worktree'">
+              <span>
+                <span class="badge wt-badge" :title="run.worktree_name || ''">WT</span>
+                <template x-if="run.worktree_merged">
+                  <span class="merged-badge" title="merged"> &#x2713;</span>
+                </template>
+              </span>
+            </template>
           </span>
           <span class="meta">
             <span x-text="run.latest_event || '-'"></span>
@@ -148,21 +171,32 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       <div class="field"><label>Status: </label><span x-text="selectedRunDetail.status"></span></div>
       <div class="field"><label>Preset: </label><span x-text="selectedRunDetail.preset"></span></div>
       <div class="field"><label>Objective: </label><span x-text="selectedRunDetail.objective"></span></div>
-      <div class="field"><label>Iteration: </label><span x-text="selectedRunDetail.iteration"></span></div>
+      <div class="field"><label>Iteration: </label><span x-text="selectedRunDetail.iteration + '/' + (selectedRunDetail.max_iterations || '?')"></span></div>
+      <div class="field"><label>Workspace: </label><span :title="workspacePath(selectedRunDetail)" x-text="workspaceLabel(selectedRunDetail)"></span></div>
       <div class="field"><label>Created: </label><span :title="selectedRunDetail.created_at" x-text="timeAgo(selectedRunDetail.created_at) + ' ago'"></span></div>
       <div class="field"><label>Updated: </label><span :title="selectedRunDetail.updated_at" x-text="timeAgo(selectedRunDetail.updated_at) + ' ago'"></span></div>
       <div class="field"><label>Duration: </label><span x-text="runDuration()"></span></div>
       <div class="field"><label>Latest event: </label><span x-text="'[iter ' + selectedRunDetail.iteration + '] ' + selectedRunDetail.latest_event"></span></div>
       <div class="field"><label>Events: </label><span x-text="selectedRunEvents.length"></span></div>
+      <template x-if="selectedRunDetail.worktree_merged">
+        <div class="merge-detail">
+          <div class="field"><label>Merge status: </label><span>merged</span></div>
+          <div class="field" x-show="selectedRunDetail.worktree_merged_at"><label>Merged at: </label><span x-text="selectedRunDetail.worktree_merged_at"></span></div>
+          <div class="field" x-show="selectedRunDetail.worktree_merge_strategy"><label>Merge strategy: </label><span x-text="selectedRunDetail.worktree_merge_strategy"></span></div>
+        </div>
+      </template>
     </div>
   </template>
   <div class="events-list">
-    <h3>Events</h3>
-    <template x-for="(ev, idx) in selectedRunEvents" :key="idx">
-      <details :class="'event-item ' + eventCategory(ev)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Events</h3>
+      <label style="font-size:0.75rem;cursor:pointer"><input type="checkbox" x-model="showVerbose" style="margin-right:0.3rem">Show backend events</label>
+    </div>
+    <template x-for="(ev, idx) in visibleRunEvents()" :key="idx">
+      <details :class="eventClasses(ev)">
         <summary x-text="eventSummary(ev)"></summary>
         <div style="padding:0.3rem">
-          <template x-for="[k,v] in Object.entries(ev)" :key="k">
+          <template x-for="[k,v] in eventDisplayEntries(ev)" :key="k">
             <div class="event-field">
               <strong x-text="k + ':'"></strong>
               <template x-if="isPromptField(ev.topic, k)">
@@ -232,12 +266,15 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
                   </template>
                 </div>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && isRoutingBadgeField(k)">
+                <span x-html="renderRoutingValue(k, v)"></span>
+              </template>
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
                   <div class="md-content" x-html="renderMarkdown(typeof v === 'object' ? JSON.stringify(v,null,2) : String(v))"></div>
                 </template>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
                   <details>
                     <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
@@ -245,12 +282,12 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
                   </details>
                 </template>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && !isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && !isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
                   <pre x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
                 </template>
               </template>
-              <template x-if="!isPromptField(ev.topic, k) && !isMarkdownField(ev.topic, k)">
+              <template x-if="!isPromptField(ev.topic, k) && !isRoutingBadgeField(k) && !isMarkdownField(ev.topic, k)">
                 <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
                   <details>
                     <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
@@ -263,7 +300,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
         </div>
       </details>
     </template>
-    <p class="empty" x-show="selectedRunEvents.length === 0">No events</p>
+    <p class="empty" x-show="visibleRunEvents().length === 0">No events</p>
   </div>
 </div>
 
@@ -280,6 +317,9 @@ function dashboard() {
     selectedPreset: "",
     pollInterval: null,
     lastUpdated: null,
+    sectionOpen: { active: false, watching: false, stuck: false, failed: false, completed: false },
+    sectionUserToggled: {},
+    showVerbose: false,
 
     get categories() {
       return [
@@ -302,6 +342,12 @@ function dashboard() {
         const res = await fetch("/api/runs");
         this.runs = await res.json();
         this.lastUpdated = new Date().toLocaleTimeString();
+        const defaultOpen = ['active', 'watching', 'stuck'];
+        for (const cat of this.categories) {
+          if (!this.sectionUserToggled[cat.key]) {
+            this.sectionOpen[cat.key] = cat.items.length > 0 && defaultOpen.includes(cat.key);
+          }
+        }
         if (this.selectedRun) this.fetchEvents(this.selectedRun);
       } catch (e) { /* retry on next poll */ }
     },
@@ -363,6 +409,22 @@ function dashboard() {
       if (s < 60) return s + "s";
       if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
       return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+    },
+
+    workspaceLabel(run) {
+      if (!run) return "-";
+      if (run.isolation_mode === "worktree") {
+        return run.worktree_name || "worktree";
+      }
+      return "shared checkout";
+    },
+
+    workspacePath(run) {
+      if (!run) return "";
+      if (run.isolation_mode === "worktree") {
+        return run.worktree_path || run.work_dir || "";
+      }
+      return run.work_dir || run.project_dir || "";
     },
 
     isMarkdownField(topic, key) {
@@ -442,6 +504,45 @@ function dashboard() {
       text = text.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
       text = text.replace(/_(.+?)_/g, '<em>$1</em>');
       return text;
+    },
+
+    eventDisplayEntries(ev) {
+      if (ev.topic === 'iteration.start' && ev.fields && typeof ev.fields === 'object') {
+        const entries = [];
+        for (const [k, v] of Object.entries(ev)) {
+          if (k === 'fields') continue;
+          entries.push([k, v]);
+        }
+        const fieldKeys = ['recent_event', 'suggested_roles', 'allowed_events', 'backpressure', 'prompt'];
+        for (const fk of fieldKeys) {
+          if (ev.fields[fk] !== undefined) {
+            entries.push([fk, ev.fields[fk]]);
+          }
+        }
+        return entries;
+      }
+      return Object.entries(ev);
+    },
+
+    isRoutingBadgeField(key) {
+      return ['suggested_roles', 'allowed_events', 'backpressure', 'recent_event'].includes(String(key));
+    },
+
+    renderRoutingValue(key, value) {
+      const k = String(key);
+      const v = String(value || '');
+      if (k === 'backpressure') {
+        if (!v || v === 'none' || v === '') {
+          return '<span class="bp-none">none</span>';
+        }
+        return '<span class="bp-warning">' + this._escHtml(v) + '</span>';
+      }
+      if (k === 'suggested_roles' || k === 'allowed_events') {
+        const items = v.split(',').map(s => s.trim()).filter(Boolean);
+        if (items.length === 0) return '<span class="bp-none">-</span>';
+        return items.map(i => '<span class="routing-badge">' + this._escHtml(i) + '</span>').join(' ');
+      }
+      return '<span class="routing-badge">' + this._escHtml(v) + '</span>';
     },
 
     isPromptField(topic, key) {
@@ -530,12 +631,29 @@ function dashboard() {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
 
+    visibleRunEvents() {
+      return this.selectedRunEvents.filter(ev => this.showVerbose || !this.isBackendEvent(ev));
+    },
+
+    isBackendEvent(ev) {
+      const t = String(ev?.topic || '');
+      return t.startsWith('backend.');
+    },
+
     eventCategory(ev) {
       const t = ev.topic || '';
       if (['event.invalid','wave.timeout','wave.failed','loop.stop'].includes(t)) return 'ev-error';
       if (t === 'task.complete' || t === 'loop.complete') return 'ev-completion';
-      if (t.startsWith('iteration.') || t.startsWith('backend.')) return 'ev-system';
+      if (t.startsWith('review.')) return 'ev-review';
+      if (t.startsWith('backend.')) return 'ev-backend';
+      if (t.startsWith('iteration.')) return 'ev-system';
       return 'ev-coordination';
+    },
+
+    eventClasses(ev) {
+      const classes = ['event-item', this.eventCategory(ev)];
+      if ((ev.topic || '') === 'iteration.start') classes.push('ev-highlight');
+      return classes.join(' ');
     },
 
     eventSummary(ev) {
@@ -546,19 +664,41 @@ function dashboard() {
       const f = ev.fields || {};
       const t = ev.topic || '';
       if (t === 'iteration.start') {
-        if (f.suggested_roles) parts.push('\\u2192 ' + f.suggested_roles);
-        if (f.prompt) {
+        const hints = [];
+        if (f.recent_event) hints.push(f.recent_event);
+        if (f.suggested_roles) hints.push('\\u2192 ' + f.suggested_roles);
+        if (f.allowed_events) hints.push('\\u00b7 emits ' + f.allowed_events);
+        if (f.backpressure && String(f.backpressure) !== 'none' && String(f.backpressure).trim() !== '') {
+          hints.push('[BP: ' + f.backpressure + ']');
+        }
+        if (hints.length) {
+          parts.push('\\u2014 ' + hints.join(' '));
+        } else if (f.prompt) {
           const objMatch = String(f.prompt).match(/Objective:\\s*\\n?([^\\n]+)/);
           if (objMatch) {
             const preview = objMatch[1].trim().slice(0, 100);
             parts.push('\\u2014 ' + preview + (objMatch[1].trim().length > 100 ? '...' : ''));
           }
         }
+      } else if (t === 'review.start') {
+        const f = ev.fields || {};
+        parts.push('Review Started');
+        const hint = [];
+        if (f.reason) hint.push(String(f.reason).slice(0, 60));
+        if (hint.length) parts.push('\\u2014 ' + hint.join(' '));
+      } else if (t === 'review.finish') {
+        const f = ev.fields || {};
+        parts.push('Review Finished');
+        const hint = [];
+        if (f.decision) hint.push('decision=' + f.decision);
+        if (f.output) hint.push(String(f.output).replace(/\\s+/g, ' ').trim().slice(0, 80));
+        if (hint.length) parts.push('\\u2014 ' + hint.join(' '));
       } else if (t === 'iteration.finish' || t === 'backend.finish') {
         const hint = [];
         if (f.exit_code !== undefined) hint.push('exit=' + f.exit_code);
         if (f.timed_out === 'true' || f.timed_out === true) hint.push('TIMEOUT');
         if (f.elapsed_s !== undefined) hint.push(f.elapsed_s + 's');
+        if (f.output) hint.push(String(f.output).replace(/\\s+/g, ' ').trim().slice(0, 80));
         if (hint.length) parts.push('\\u2014 ' + hint.join(' '));
       } else if (ev.payload) {
         parts.push('\\u2014 ' + String(ev.payload).slice(0, 60));

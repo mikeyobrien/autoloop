@@ -21,10 +21,14 @@ export interface RunRecord {
   created_at: string;
   updated_at: string;
   iteration: number;
+  max_iterations: number;
   stop_reason: string;
   latest_event: string;
   isolation_mode: string;
   worktree_name: string;
   worktree_path: string;
   pid?: number;
+  worktree_merged?: boolean;
+  worktree_merged_at?: string | null;
+  worktree_merge_strategy?: string;
 }

@@ -8,7 +8,7 @@ Your job:
 3. Leave a concrete verification checklist for the checker instead of making the checker reconstruct your claims from scratch.
 
 On every activation:
-- Read `.autoloop/doc-plan.md`, `.autoloop/doc-report.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/doc-plan.md`, `{{STATE_DIR}}/doc-report.md`, and `{{STATE_DIR}}/progress.md`.
 - Understand exactly which gap you are addressing.
 
 Process:
@@ -17,8 +17,8 @@ Process:
 3. Write or update the documentation:
    - For new docs: create the file in the conventional location.
    - For stale docs: update only the parts that are incorrect or missing.
-4. Update `.autoloop/progress.md` with what was written.
-5. Add a `Verification checklist` section to `.autoloop/progress.md` for this gap. For every concrete claim you introduced or changed, list:
+4. Update `{{STATE_DIR}}/progress.md` with what was written.
+5. Add a `Verification checklist` section to `{{STATE_DIR}}/progress.md` for this gap. For every concrete claim you introduced or changed, list:
    - the exact claim, command, path, API name, config key, default, or example
    - where it appears in the docs
    - the code/config/test evidence the checker should verify against
@@ -33,5 +33,5 @@ Rules:
 - Do not change code. Only write documentation.
 - The verification checklist must be claim-level, not file-level. `Updated README for CLI` is too vague; list the actual claims that need checking.
 - Include copy-pasteable commands and examples in the checklist exactly as written in the docs.
-- If you removed a stale claim, note the removal in `.autoloop/progress.md` so the checker knows the stale statement was intentionally deleted.
+- If you removed a stale claim, note the removal in `{{STATE_DIR}}/progress.md` so the checker knows the stale statement was intentionally deleted.
 - If you cannot document the gap meaningfully (e.g., the code is too unclear), emit `write.blocked` with an explanation.

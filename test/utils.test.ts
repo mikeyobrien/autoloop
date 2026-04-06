@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertNoRawAutoloopPaths,
+  expandTemplatePlaceholders,
   generateCompactId,
+  generateReadableId,
   isQuoted,
   joinCsv,
   joinLines,
@@ -9,6 +12,7 @@ import {
   listText,
   nonemptyOr,
   parseStringList,
+  readableIdCapacity,
   replaceAll,
   shellQuote,
   shellWords,
@@ -123,6 +127,84 @@ describe("replaceAll", () => {
   });
 });
 
+describe("expandTemplatePlaceholders", () => {
+  const vars = {
+    STATE_DIR: "/tmp/state/runs/swift-agent/.autoloop",
+    TOOL_PATH: "/tmp/state/runs/swift-agent/.autoloop/autoloops",
+  };
+
+  it("expands {{STATE_DIR}} and {{TOOL_PATH}}", () => {
+    expect(
+      expandTemplatePlaceholders(
+        "Use {{STATE_DIR}}/progress.md and run {{TOOL_PATH}} emit task.complete",
+        vars,
+      ),
+    ).toBe(
+      "Use /tmp/state/runs/swift-agent/.autoloop/progress.md and run /tmp/state/runs/swift-agent/.autoloop/autoloops emit task.complete",
+    );
+  });
+
+  it("throws on unknown placeholders", () => {
+    expect(() =>
+      expandTemplatePlaceholders("Hello {{UNKNOWN}} world", vars),
+    ).toThrow("Unknown template placeholder(s): {{UNKNOWN}}");
+  });
+
+  it("returns text unchanged when no placeholders present", () => {
+    const text = "No placeholders here.";
+    expect(expandTemplatePlaceholders(text, vars)).toBe(text);
+  });
+
+  it("handles multiple occurrences of the same placeholder", () => {
+    expect(
+      expandTemplatePlaceholders("{{STATE_DIR}}/a and {{STATE_DIR}}/b", vars),
+    ).toBe(
+      "/tmp/state/runs/swift-agent/.autoloop/a and /tmp/state/runs/swift-agent/.autoloop/b",
+    );
+  });
+
+  it("throws when vars map is empty and placeholders exist", () => {
+    expect(() => expandTemplatePlaceholders("{{STATE_DIR}}/foo", {})).toThrow(
+      "Unknown template placeholder(s): {{STATE_DIR}}",
+    );
+  });
+});
+
+describe("assertNoRawAutoloopPaths", () => {
+  it("throws when text contains raw .autoloop/ paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths(
+        "Use .autoloop/progress.md for tracking",
+        "harness instructions",
+      ),
+    ).toThrow("Raw .autoloop path found in harness instructions");
+  });
+
+  it("throws when text contains ./.autoloop/ paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths(
+        "Run `./.autoloop/autoloops emit task.complete`",
+        "role prompt: builder",
+      ),
+    ).toThrow("Raw .autoloop path found in role prompt: builder");
+  });
+
+  it("does not throw when text uses expanded paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths(
+        "Use /tmp/state/.autoloop/progress.md",
+        "harness instructions",
+      ),
+    ).not.toThrow();
+  });
+
+  it("does not throw when text has no autoloop paths", () => {
+    expect(() =>
+      assertNoRawAutoloopPaths("Just some normal text", "test"),
+    ).not.toThrow();
+  });
+});
+
 describe("shellWords", () => {
   it("quotes each word", () => {
     expect(shellWords(["echo", "hello world"])).toBe("'echo' 'hello world'");
@@ -170,5 +252,21 @@ describe("generateCompactId", () => {
       Array.from({ length: 20 }, () => generateCompactId("x")),
     );
     expect(ids.size).toBe(20);
+  });
+});
+
+describe("generateReadableId", () => {
+  it("returns a simple adjective-noun pair", () => {
+    const id = generateReadableId();
+    expect(id).toMatch(/^[a-z]+-[a-z]+$/);
+  });
+
+  it("keeps ids short", () => {
+    const id = generateReadableId();
+    expect(id.length).toBeLessThanOrEqual(15);
+  });
+
+  it("offers a large readable id space", () => {
+    expect(readableIdCapacity()).toBeGreaterThanOrEqual(10000);
   });
 });

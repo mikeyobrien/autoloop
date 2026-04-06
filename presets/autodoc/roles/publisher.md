@@ -8,10 +8,10 @@ Your job:
 3. Decide whether more gaps need attention.
 
 On every activation:
-- Read `.autoloop/doc-plan.md`, `.autoloop/doc-report.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/doc-plan.md`, `{{STATE_DIR}}/doc-report.md`, and `{{STATE_DIR}}/progress.md`.
 
 Process:
-1. Update `.autoloop/doc-report.md` with the completed documentation work:
+1. Update `{{STATE_DIR}}/doc-report.md` with the completed documentation work:
    - Gap addressed
    - Files written or updated
    - Accuracy check result
@@ -20,7 +20,7 @@ Process:
    - If more gaps remain → emit `doc.published` so the auditor picks the next one.
    - If all gaps are addressed → emit `task.complete` with a summary.
 
-`.autoloop/doc-report.md` format:
+`{{STATE_DIR}}/doc-report.md` format:
 ```
 # Documentation Report
 

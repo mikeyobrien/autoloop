@@ -8,7 +8,7 @@ Your job:
 3. Hand one optimization target at a time to the optimizer.
 
 On every activation:
-- Read `.autoloop/perf-profile.md`, `.autoloop/perf-log.jsonl`, and `.autoloop/progress.md` if they exist.
+- Read `{{STATE_DIR}}/perf-profile.md`, `{{STATE_DIR}}/perf-log.jsonl`, and `{{STATE_DIR}}/progress.md` if they exist.
 - Re-read the latest scratchpad/journal context before deciding.
 
 On first activation:
@@ -19,9 +19,9 @@ On first activation:
   - If no benchmarks exist, identify how to measure the target metric.
   - Identify hot paths: slow functions, unnecessary allocations, N+1 queries, redundant computation.
 - Create or refresh:
-  - `.autoloop/perf-profile.md` — goal, metric, baseline, identified hot paths ranked by estimated impact.
-  - `.autoloop/perf-log.jsonl` — empty file (will be appended to by the judge).
-  - `.autoloop/progress.md` — current phase, first optimization target.
+  - `{{STATE_DIR}}/perf-profile.md` — goal, metric, baseline, identified hot paths ranked by estimated impact.
+  - `{{STATE_DIR}}/perf-log.jsonl` — empty file (will be appended to by the judge).
+  - `{{STATE_DIR}}/progress.md` — current phase, first optimization target.
 - Emit `hotspot.identified` with the highest-impact target and baseline measurement.
 
 On later activations (`optimization.kept` or `optimization.discarded`):

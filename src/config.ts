@@ -267,7 +267,7 @@ export function defaults(): Config {
       journal_file: ".autoloop/journal.jsonl",
       events_file: ".autoloop/journal.jsonl",
       memory_file: ".autoloop/memory.jsonl",
-      run_id_format: "compact",
+      run_id_format: "human",
       log_level: "info",
     },
   };

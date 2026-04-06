@@ -8,24 +8,24 @@ Your job:
 3. Decide whether more bugs need attention.
 
 On every activation:
-- Read `.autoloop/bug-report.md`, `.autoloop/fix-log.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/bug-report.md`, `{{STATE_DIR}}/fix-log.md`, and `{{STATE_DIR}}/progress.md`.
 - Start skeptical: prefer `bug.reopened` over premature `task.complete`.
 
 Process:
 1. Review the fix: is it minimal? Does it address the root cause (not just the symptom)?
-2. Update `.autoloop/fix-log.md` with:
+2. Update `{{STATE_DIR}}/fix-log.md` with:
    - Bug description
    - Root cause
    - Fix applied (files changed, what changed)
    - Verification result
-3. Make sure `.autoloop/progress.md` exists and names the next action using the exact on-disk bug-report path.
+3. Make sure `{{STATE_DIR}}/progress.md` exists and names the next action using the exact on-disk bug-report path.
 4. Check if there are more bugs from the original report.
 5. Decide:
    - If the fix is good and no more bugs remain → emit `task.complete` with a summary.
    - If the fix is good but more bugs remain → emit `bug.closed` so the diagnoser picks up the next one.
    - If the fix is questionable, incomplete, workaround-shaped, API-breaking without justification, or weakly verified → emit `bug.reopened` with concerns for the diagnoser to reconsider.
 
-`.autoloop/fix-log.md` format:
+`{{STATE_DIR}}/fix-log.md` format:
 ```
 # Fix Log
 

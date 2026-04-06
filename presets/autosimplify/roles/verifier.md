@@ -8,7 +8,7 @@ Your job:
 3. Accept only when the result is clearly simpler or a justified no-op.
 
 On every activation:
-- Read `.autoloop/simplify-context.md`, `.autoloop/simplify-plan.md`, and `.autoloop/progress.md`.
+- Read `{{STATE_DIR}}/simplify-context.md`, `{{STATE_DIR}}/simplify-plan.md`, and `{{STATE_DIR}}/progress.md`.
 - Read the actual diff and the touched code directly. Treat other roles' summaries as claims to check.
 
 Process:
@@ -20,13 +20,13 @@ Process:
    - Review the recorded validation commands and outputs.
    - If the evidence is weak, rerun a narrow check yourself when practical.
 3. Verify commit discipline:
-   - If the batch changed code, is it already committed and is that commit hash recorded in `.autoloop/progress.md`?
+   - If the batch changed code, is it already committed and is that commit hash recorded in `{{STATE_DIR}}/progress.md`?
    - Is the tree clean apart from intentional unrelated files?
 4. Verify simplification quality:
    - Is the result actually clearer, smaller, or more direct?
    - Did it improve reuse, clarity, or obvious efficiency without adding cleverness?
    - If the batch was a no-op, is the no-op conclusion well supported?
-5. Update `.autoloop/progress.md` with your verdict and reasons.
+5. Update `{{STATE_DIR}}/progress.md` with your verdict and reasons.
 6. Emit `simplification.verified` only when the batch passes all four checks.
 7. Emit `simplification.rejected` with exact reasons when it fails any check.
 

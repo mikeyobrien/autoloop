@@ -62,6 +62,7 @@ function makeLoopContext(
       branchMode: false,
       isolationMode: overrides.isolationMode ?? "shared",
     },
+    limits: { maxIterations: 10 },
   } as unknown as LoopContext;
 }
 
