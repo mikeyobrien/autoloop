@@ -16,6 +16,7 @@ export function normalizeBackendLabel(command: string): string {
   const base = basename(command);
   if (base === "claude") return "claude";
   if (base === "pi") return "pi";
+  if (base === "kiro-cli") return "kiro";
   return base || command;
 }
 
@@ -48,6 +49,7 @@ export function normalizeProviderKind(spec: {
   args: string[];
 }): string {
   if (spec.kind === "pi") return "pi";
+  if (spec.kind === "kiro") return "kiro";
   if (mockBackend(spec.command, spec.args)) return "mock";
   return spec.kind || "command";
 }
