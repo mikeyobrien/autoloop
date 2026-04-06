@@ -54,11 +54,7 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
       ...options,
       profiles: options.profiles.length > 0 ? options.profiles : undefined,
       noDefaultProfiles: options.noDefaultProfiles || undefined,
-      worktree: options.worktree || undefined,
-      noWorktree: options.noWorktree || undefined,
-      mergeStrategy: options.mergeStrategy,
-      automerge: options.automerge || undefined,
-      keepWorktree: options.keepWorktree || undefined,
+      ...chainableOptions(options),
     },
   );
   return true;
@@ -240,11 +236,7 @@ function runInlineChain(
   }
   chains.runChain(chainSpec, projectDir, selfCmd, {
     prompt: normalizePrompt(options.prompt),
-    worktree: options.worktree || undefined,
-    noWorktree: options.noWorktree || undefined,
-    mergeStrategy: options.mergeStrategy,
-    automerge: options.automerge || undefined,
-    keepWorktree: options.keepWorktree || undefined,
+    ...chainableOptions(options),
   });
 }
 
@@ -275,4 +267,14 @@ function looksLikeProjectDir(path: string): boolean {
 function defaultChainProjectDir(bundleRoot: string): string {
   if (looksLikeProjectDir(".")) return ".";
   return bundleRoot;
+}
+
+function chainableOptions(opts: RunOptions): Record<string, unknown> {
+  return {
+    worktree: opts.worktree || undefined,
+    noWorktree: opts.noWorktree || undefined,
+    mergeStrategy: opts.mergeStrategy,
+    automerge: opts.automerge || undefined,
+    keepWorktree: opts.keepWorktree || undefined,
+  };
 }
