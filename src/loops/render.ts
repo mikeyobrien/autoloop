@@ -80,8 +80,7 @@ function field(label: string, value: string): string {
 }
 
 function shortRunId(id: string): string {
-  // run-abc12345-xyz0 → keep full id but it's already short enough
-  // If run IDs are long, truncate to 16 chars
+  // Human-readable ids fit comfortably; only truncate unusually long custom ids.
   if (id.length <= 24) return id;
   return `${id.slice(0, 22)}..`;
 }

@@ -11,9 +11,13 @@ import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
 import { createRunScopedDir } from "../isolation/run-scope.js";
 import * as profiles from "../profiles.js";
 import { activeRuns } from "../registry/read.js";
-import * as tasks from "../tasks.js";
 import * as topo from "../topology.js";
-import { generateCompactId, splitCsv } from "../utils.js";
+import {
+  generateCompactId,
+  generateReadableId,
+  splitCsv,
+  uniqueGeneratedId,
+} from "../utils.js";
 import { createWorktree } from "../worktree/create.js";
 import {
   extractField,
@@ -151,12 +155,24 @@ export function claudeBackend(command: string): boolean {
 }
 
 export function nextRunId(path: string, cfg: config.Config): string {
-  if (config.get(cfg, "core.run_id_format", "compact") === "counter") {
-    const lines = readLines(path);
+  const lines = readLines(path);
+  const format = config.get(cfg, "core.run_id_format", "human");
+  if (format === "counter") {
     const count = lines.filter((l) => extractTopic(l) === "loop.start").length;
     return `run-${count + 1}`;
   }
-  return generateCompactId("run");
+  const existing = new Set(
+    lines.map((line) => extractField(line, "run")).filter(Boolean),
+  );
+  if (format === "compact") {
+    return (
+      uniqueGeneratedId(() => generateCompactId("run"), existing) ??
+      generateCompactId("run")
+    );
+  }
+  return (
+    uniqueGeneratedId(generateReadableId, existing) ?? generateCompactId("run")
+  );
 }
 
 export function iterationFieldForRun(
