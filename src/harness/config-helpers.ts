@@ -15,6 +15,7 @@ import * as topo from "../topology.js";
 import {
   generateCompactId,
   generateReadableId,
+  rewriteLoopStatePaths,
   splitCsv,
   uniqueGeneratedId,
 } from "../utils.js";
@@ -401,9 +402,17 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     }
   }
 
+  const updatedTopology: topo.Topology = {
+    ...finalTopology,
+    roles: finalTopology.roles.map((role) => ({
+      ...role,
+      prompt: rewriteLoopStatePaths(role.prompt, loop.paths.stateDir),
+    })),
+  };
+
   const updated: LoopContext = {
     objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride),
-    topology: finalTopology,
+    topology: updatedTopology,
     limits: {
       maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3),
     },
@@ -420,7 +429,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       requiredEvents: config.getList(cfg, "event_loop.required_events"),
     },
     backend,
-    review,
+    review: {
+      ...review,
+      prompt: rewriteLoopStatePaths(review.prompt, loop.paths.stateDir),
+    },
     parallel,
     memory: {
       budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
@@ -429,9 +441,12 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       budgetChars: config.getInt(cfg, "tasks.prompt_budget_chars", 4000),
     },
     harness: {
-      instructions: readOptionalProjectFile(
-        pd,
-        config.get(cfg, "harness.instructions_file", "harness.md"),
+      instructions: rewriteLoopStatePaths(
+        readOptionalProjectFile(
+          pd,
+          config.get(cfg, "harness.instructions_file", "harness.md"),
+        ),
+        loop.paths.stateDir,
       ),
     },
     profiles: profileInfo,

@@ -8,11 +8,25 @@ import {
 } from "../../src/harness/config-helpers.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
-function makeProject(configToml: string): string {
+function makeProject(
+  configToml: string,
+  options?: {
+    topologyToml?: string;
+    files?: Record<string, string>;
+  },
+): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-ts-config-helpers-"));
   writeFileSync(join(dir, "autoloops.toml"), configToml);
-  writeFileSync(join(dir, "topology.toml"), '[[role]]\nname = "builder"\n');
+  writeFileSync(
+    join(dir, "topology.toml"),
+    options?.topologyToml ?? '[[role]]\nname = "builder"\n',
+  );
   mkdirSync(join(dir, ".autoloop"), { recursive: true });
+  for (const [relativePath, content] of Object.entries(options?.files ?? {})) {
+    const fullPath = join(dir, relativePath);
+    mkdirSync(join(fullPath, ".."), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
   return dir;
 }
 
@@ -167,8 +181,14 @@ describe("buildLoopContext", () => {
 });
 
 describe("buildLoopContext run-scoped isolation", () => {
-  function makeProjectWithActiveRun(configToml?: string): string {
-    const dir = makeProject(configToml ?? "event_loop.max_iterations = 1\n");
+  function makeProjectWithActiveRun(
+    configToml?: string,
+    options?: Parameters<typeof makeProject>[1],
+  ): string {
+    const dir = makeProject(
+      configToml ?? "event_loop.max_iterations = 1\n",
+      options,
+    );
     seedRegistry(join(dir, ".autoloop"), [
       {
         run_id: "run-existing",
@@ -242,6 +262,56 @@ describe("buildLoopContext run-scoped isolation", () => {
     });
 
     expect(existsSync(loop.paths.stateDir)).toBe(true);
+  });
+
+  it("rewrites harness, metareview, and role prompts to the effective run-scoped state dir", () => {
+    const projectDir = makeProjectWithActiveRun(
+      [
+        "event_loop.max_iterations = 1",
+        'harness.instructions_file = "harness.md"',
+        'review.prompt_file = "metareview.md"',
+      ].join("\n"),
+      {
+        topologyToml: [
+          "[[role]]",
+          'id = "builder"',
+          'prompt_file = "roles/build.md"',
+          'emits = ["review.ready"]',
+        ].join("\n"),
+        files: {
+          "harness.md":
+            'Shared files: .autoloop/progress.md\nRemember `./.autoloop/autoloops memory add learning "lesson"`.',
+          "metareview.md":
+            'Inspect .autoloop/logs/ and rerun `./.autoloop/autoloops emit review.passed "ok"` if needed.',
+          "roles/build.md":
+            'Builder uses .autoloop/context.md and `./.autoloop/autoloops emit review.ready "done"`.',
+        },
+      },
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+
+    expect(loop.harness.instructions).toContain(loop.paths.stateDir);
+    expect(loop.harness.instructions).toContain(loop.paths.toolPath);
+    expect(loop.harness.instructions).not.toMatch(
+      /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/,
+    );
+
+    expect(loop.review.prompt).toContain(loop.paths.stateDir);
+    expect(loop.review.prompt).toContain(loop.paths.toolPath);
+    expect(loop.review.prompt).not.toMatch(
+      /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/,
+    );
+
+    expect(loop.topology.roles).toHaveLength(1);
+    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.stateDir);
+    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.toolPath);
+    expect(loop.topology.roles[0]?.prompt).not.toMatch(
+      /(^|[\s`"'(])(?:\.\/)?\.autoloop(?=\/|\b)/,
+    );
   });
 
   it("preserves mainProjectDir as the original projectDir", () => {
