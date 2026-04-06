@@ -19,6 +19,16 @@ AutoPR is not a PR-hallucination preset.
 - `publish-and-arm` should enable auto-merge and stop; it should not poll CI.
 - `publish-and-merge-if-green` should merge only when green *now* or otherwise arm auto-merge if supported.
 
+## Remote-first base comparison
+
+AutoPR always compares the PR branch against `origin/<base>` (the remote tracking ref), not the local `<base>` ref. This prevents a dangerous class of bugs where local main is ahead of or diverged from origin/main:
+
+- **Merge-base, commit list, and file diff** are all computed against `origin/<base>`. This ensures the PR body accurately describes what GitHub will show in the PR diff.
+- **Inherited unpublished commit guard**: If the head branch includes commits that exist on local `<base>` but not on `origin/<base>`, these would silently appear in the GitHub PR. AutoPR detects this and blocks publication (`pr.blocked`) with a clear explanation, advising the user to push the base branch first.
+- **Local/remote divergence disclosure**: When local `<base>` differs from `origin/<base>` (even without inherited commits leaking into the head branch), the collector records the divergence status in `pr-context.md` so the drafter and validator are aware.
+
+The validator independently recomputes the diff against `origin/<base>` and rejects drafts whose scope doesn't match the remote-based diff.
+
 ## How it works
 
 1. **Collector** reads the launch prompt, optional `.autoloop/pr-request.md`, git state, and GitHub state and writes `.autoloop/pr-context.md`.

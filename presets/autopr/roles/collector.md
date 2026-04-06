@@ -16,6 +16,9 @@ On first activation:
 - Parse the launch objective.
 - If `{{STATE_DIR}}/pr-request.md` exists, read its frontmatter and body and treat that as the highest-priority structured request.
 - Inspect git state directly: current branch, detached-head status, dirty files, commits ahead/behind, merge-base, changed files, likely base branch.
+- **Remote-first base resolution**: Always resolve the base branch to its remote tracking ref (`origin/<base>`, or the remote specified in the request). Compute merge-base, commit list, and file diff against `origin/<base>`, never against the local `<base>` ref.
+- **Local/remote divergence check**: Compare local `<base>` against `origin/<base>`. If they differ, record the divergence in `{{STATE_DIR}}/pr-context.md` (local ahead by N commits, behind by M, or diverged).
+- **Inherited unpublished commit guard**: If the head branch includes commits that are on local `<base>` but NOT on `origin/<base>`, these are inherited unpublished commits that would silently appear in the GitHub PR diff. Emit `pr.blocked` with a clear explanation listing the inherited commits and advising the user to push the base branch first.
 - Inspect platform state directly when possible: `gh auth status`, existing PR for head branch, check status, mergeability, repo default branch.
 - Create or refresh:
   - `{{STATE_DIR}}/pr-context.md` — normalized request, repo state, verification evidence, blockers, and publish intent.
@@ -30,7 +33,9 @@ On later activations (`pr.blocked`, `draft.blocked`, `publish.blocked`):
 
 Required output in `{{STATE_DIR}}/pr-context.md`:
 - Request summary
-- Base branch
+- Base branch (local ref AND remote tracking ref)
+- Remote merge-base commit hash
+- Local/remote base divergence status (in-sync, local-ahead, diverged)
 - Head branch
 - Mode (`publish`, `publish-and-arm`, `publish-and-merge-if-green`)
 - Draft flag
@@ -42,7 +47,7 @@ Required output in `{{STATE_DIR}}/pr-context.md`:
 
 Rules:
 - Prefer derived facts over prompt wishes.
-- If base is unspecified, infer repo default branch or fall back to `main`, and say which one you chose.
+- If base is unspecified, infer repo default branch or fall back to `main`, and say which one you chose. Always verify `origin/<base>` exists; if not, block.
 - If the branch is detached, ambiguous, unpublished, or there is no meaningful diff, block.
 - If `gh` is unavailable or unauthenticated, block with exact command evidence.
 - Do not claim checks passed unless you found actual evidence.
