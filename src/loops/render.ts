@@ -6,11 +6,12 @@ import type { RunRecord } from "../registry/types.js";
  */
 export function renderRunLine(r: RunRecord): string {
   const shortId = shortRunId(r.run_id);
+  const wt = r.isolation_mode === "worktree" ? "WT" : "──";
   const parts = [
     shortId.padEnd(24),
     r.status.padEnd(10),
     r.preset.padEnd(14),
-    (r.isolation_mode || "shared").padEnd(12),
+    wt.padEnd(4),
     `iter:${r.iteration}`.padEnd(8),
     r.latest_event.padEnd(18),
     formatTime(r.created_at).padEnd(18),
@@ -66,7 +67,7 @@ export function renderListHeader(): string {
     "RUN ID".padEnd(24),
     "STATUS".padEnd(10),
     "PRESET".padEnd(14),
-    "ISOLATION".padEnd(12),
+    "WT".padEnd(4),
     "ITER".padEnd(8),
     "LATEST EVENT".padEnd(18),
     "STARTED".padEnd(18),
