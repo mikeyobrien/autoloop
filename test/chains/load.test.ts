@@ -4,6 +4,7 @@ import {
   listKnownPresets,
   getPresetDescription,
   listPresetsWithDescriptions,
+  validatePresetVocabulary,
 } from "../../src/chains/load.js";
 
 const bundleRoot = resolve(import.meta.dirname, "../..");
@@ -36,5 +37,21 @@ describe("listPresetsWithDescriptions", () => {
     for (const p of presets) {
       expect(p.description.startsWith("#")).toBe(false);
     }
+  });
+});
+
+describe("automerge preset", () => {
+  it("is included in listKnownPresets", () => {
+    expect(listKnownPresets()).toContain("automerge");
+  });
+
+  it("has a description", () => {
+    const desc = getPresetDescription("automerge", bundleRoot);
+    expect(desc.length).toBeGreaterThan(0);
+  });
+
+  it("passes vocabulary validation", () => {
+    const result = validatePresetVocabulary(["autocode", "automerge"], bundleRoot);
+    expect(result.ok).toBe(true);
   });
 });

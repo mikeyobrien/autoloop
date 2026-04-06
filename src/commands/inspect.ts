@@ -11,6 +11,7 @@ interface InspectSpec {
   selector: string;
   projectDir: string;
   format: string;
+  run?: string;
 }
 
 export function dispatchInspect(args: string[]): boolean {
@@ -33,7 +34,11 @@ export function dispatchInspect(args: string[]): boolean {
       else console.log(memory.listProject(projectDir));
       return true;
     case "journal":
-      harness.renderJournal(projectDir);
+      if (spec.run) {
+        harness.renderJournal(projectDir, spec.run);
+      } else {
+        harness.renderAllJournals(projectDir);
+      }
       return true;
     case "coordination":
       harness.renderCoordinationFormat(projectDir, format);
@@ -65,12 +70,16 @@ export function dispatchInspect(args: string[]): boolean {
 function parseInspectArgs(args: string[]): InspectSpec {
   const artifact = args[0] ?? "";
   let format = "";
+  let run: string | undefined;
   const positionals: string[] = [];
 
   let i = 1;
   while (i < args.length) {
     if (args[i] === "--format") {
       format = args[i + 1] ?? "";
+      i += 2;
+    } else if (args[i] === "--run") {
+      run = args[i + 1] ?? "";
       i += 2;
     } else {
       positionals.push(args[i]);
@@ -90,7 +99,7 @@ function parseInspectArgs(args: string[]): InspectSpec {
         ? positionals[1]
         : (positionals[0] ?? resolveRuntimeProjectDir()));
 
-  return { artifact, selector, projectDir, format };
+  return { artifact, selector, projectDir, format, run };
 }
 
 function inspectDefaultFormat(artifact: string): string {

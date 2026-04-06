@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, readFileSync, appendFileSync, mkdirSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { extractField as jsonExtractField, extractTopic as jsonExtractTopic } from "../json.js";
 import { encodeEvent } from "../events/encode.js";
 import { lineSep, shellQuote } from "../utils.js";
@@ -132,6 +132,49 @@ export function latestIterationForRun(
     }
   }
   return current;
+}
+
+/**
+ * Merge journals from the top-level file and all per-run journals under runs/.
+ * Returns all lines sorted by timestamp.
+ */
+export function readAllJournals(baseStateDir: string): string[] {
+  const allLines: string[] = [];
+
+  // Top-level journal
+  const topLevel = join(baseStateDir, "journal.jsonl");
+  if (existsSync(topLevel)) allLines.push(...readLines(topLevel));
+
+  // Per-run journals under runs/*/journal.jsonl
+  const runsDir = join(baseStateDir, "runs");
+  if (existsSync(runsDir)) {
+    const entries = readdirSync(runsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const runJournal = join(runsDir, entry.name, "journal.jsonl");
+      if (existsSync(runJournal)) allLines.push(...readLines(runJournal));
+    }
+  }
+
+  // Sort by timestamp field if present
+  return allLines.sort((a, b) => {
+    const tsA = extractTimestamp(a);
+    const tsB = extractTimestamp(b);
+    return tsA.localeCompare(tsB);
+  });
+}
+
+/**
+ * Read journal lines for a specific run under runs/<runId>/journal.jsonl.
+ */
+export function readRunJournal(baseStateDir: string, runId: string): string[] {
+  const runJournal = join(baseStateDir, "runs", runId, "journal.jsonl");
+  if (existsSync(runJournal)) return readLines(runJournal);
+  return [];
+}
+
+function extractTimestamp(line: string): string {
+  return extractField(line, "timestamp") || extractField(line, "ts") || "";
 }
 
 export function appendText(path: string, content: string): void {

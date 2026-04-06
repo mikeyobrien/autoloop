@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { resolveIsolationMode, isCodeModifyingRun } from "../../src/isolation/resolve.js";
+import { resolve } from "node:path";
+import { resolveIsolationMode, isCodeModifyingRun, presetCategory } from "../../src/isolation/resolve.js";
 import type { RunRecord } from "../../src/registry/types.js";
+
+const bundleRoot = resolve(import.meta.dirname, "../..");
 
 function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
   return {
@@ -96,5 +99,34 @@ describe("isCodeModifyingRun", () => {
 
   it("returns false for non-code runs", () => {
     expect(isCodeModifyingRun(makeRecord({ preset: "diagnostics", objective: "check logs" }))).toBe(false);
+  });
+
+  it("respects category override code", () => {
+    expect(isCodeModifyingRun(makeRecord({ preset: "diagnostics", objective: "check logs" }), "code")).toBe(true);
+  });
+
+  it("respects category override planning", () => {
+    expect(isCodeModifyingRun(makeRecord({ preset: "autocode" }), "planning")).toBe(false);
+  });
+});
+
+describe("presetCategory", () => {
+  it("reads category from automerge harness.md metadata", () => {
+    expect(presetCategory("automerge", bundleRoot)).toBe("planning");
+  });
+
+  it("falls back to name heuristic for code presets", () => {
+    expect(presetCategory("autocode", bundleRoot)).toBe("code");
+    expect(presetCategory("autofix", bundleRoot)).toBe("code");
+    expect(presetCategory("autotest", bundleRoot)).toBe("code");
+  });
+
+  it("falls back to name heuristic for planning presets", () => {
+    expect(presetCategory("autoresearch", bundleRoot)).toBe("planning");
+    expect(presetCategory("autodoc", bundleRoot)).toBe("planning");
+  });
+
+  it("returns unknown for unrecognized presets", () => {
+    expect(presetCategory("nonexistent-xyz", bundleRoot)).toBe("unknown");
   });
 });

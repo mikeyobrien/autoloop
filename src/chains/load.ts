@@ -48,6 +48,7 @@ export function listKnownPresets(): string[] {
     "autocode", "autosimplify", "autoideas", "autoresearch",
     "autoqa", "autotest", "autofix", "autoreview",
     "autodoc", "autosec", "autoperf", "autospec",
+    "automerge",
   ];
 }
 

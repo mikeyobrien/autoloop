@@ -1,0 +1,10 @@
+name = "automerge"
+completion = "task.complete"
+
+[[role]]
+id = "merge"
+emits = ["task.complete"]
+prompt_file = "roles/merge.md"
+
+[handoff]
+"loop.start" = ["merge"]

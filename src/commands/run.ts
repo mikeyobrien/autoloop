@@ -1,7 +1,7 @@
 import * as harness from "../harness/index.js";
 import * as chains from "../chains.js";
 import * as config from "../config.js";
-import { resolve } from "node:path";
+import { resolve, basename } from "node:path";
 import { joinCsv } from "../utils.js";
 import { printRunUsage, missingPresetError, unknownPresetError } from "../usage.js";
 import { claudeBackend } from "../harness/config-helpers.js";
@@ -35,6 +35,14 @@ export function dispatchRun(args: string[], argv: string[], bundleRoot: string, 
 
   if (options.chain) {
     runInlineChain(options.chain, options.projectDir, selfCmd, options);
+    return true;
+  }
+
+  // --automerge sugar: when no --chain, build inline chain [preset, automerge]
+  if (options.automerge && !options.chain) {
+    const presetName = basename(options.projectDir);
+    const chainCsv = presetName + ",automerge";
+    runInlineChain(chainCsv, options.projectDir, selfCmd, options);
     return true;
   }
 

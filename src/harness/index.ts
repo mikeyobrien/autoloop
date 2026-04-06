@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readRunLines, readIfExists } from "./journal.js";
+import { readRunLines, readIfExists, readAllJournals, readRunJournal } from "./journal.js";
 import { emit as emitCmd, resolveEmitJournalFile } from "./emit.js";
 import { renderRunScratchpadFull } from "./scratchpad.js";
 import { coordinationFromLines } from "./coordination.js";
@@ -165,8 +165,25 @@ export function renderOutput(
   console.log(output || `missing output projection for iteration ${iteration}`);
 }
 
-export function renderJournal(projectDir: string): void {
+export function renderJournal(projectDir: string, runId?: string): void {
+  if (runId) {
+    const stateDir = config.stateDirPath(projectDir);
+    const lines = readRunJournal(stateDir, runId);
+    console.log(lines.join("\n"));
+    return;
+  }
   console.log(readIfExists(resolveEmitJournalFile(projectDir)));
+}
+
+export function renderAllJournals(projectDir: string): void {
+  const stateDir = config.stateDirPath(projectDir);
+  const lines = readAllJournals(stateDir);
+  if (lines.length > 0) {
+    console.log(lines.join("\n"));
+  } else {
+    // Fall back to single journal file
+    console.log(readIfExists(resolveEmitJournalFile(projectDir)));
+  }
 }
 
 export function renderCoordinationFormat(

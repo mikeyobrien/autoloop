@@ -1,0 +1,12 @@
+event_loop.max_iterations = 1
+event_loop.completion_event = "task.complete"
+event_loop.completion_promise = "LOOP_COMPLETE"
+
+backend.kind = "command"
+backend.command = "claude"
+backend.timeout_ms = 300000
+
+harness.instructions_file = "harness.md"
+
+core.state_dir = ".miniloop"
+core.journal_file = ".miniloop/journal.jsonl"

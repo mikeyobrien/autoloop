@@ -1,4 +1,7 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { RunRecord } from "../registry/types.js";
+import { resolvePresetDir } from "../chains/load.js";
 
 export type IsolationMode = "shared" | "run-scoped" | "worktree";
 
@@ -56,12 +59,48 @@ export function resolveIsolationMode(
   return { mode: "run-scoped" };
 }
 
+export type PresetCategory = "code" | "planning" | "unknown";
+
+/**
+ * Determine preset category from harness.md metadata or name heuristic.
+ * Reads `<!-- category: ... -->` from harness.md if present.
+ * Falls back to name-based heuristic.
+ */
+export function presetCategory(presetName: string, projectDir: string): PresetCategory {
+  const presetDir = resolvePresetDir(presetName, projectDir);
+  const harnessPath = join(presetDir, "harness.md");
+
+  if (existsSync(harnessPath)) {
+    const content = readFileSync(harnessPath, "utf-8");
+    const match = content.match(/<!--\s*category:\s*([\w-]+)\s*-->/);
+    if (match) {
+      const cat = match[1].toLowerCase();
+      if (cat === "code") return "code";
+      if (cat === "planning") return "planning";
+    }
+  }
+
+  // Name-based heuristic fallback
+  const name = presetName.toLowerCase();
+  const codePresets = ["autocode", "autofix", "autotest", "autosimplify", "autoperf", "autosec"];
+  if (codePresets.some((p) => name.includes(p))) return "code";
+
+  const planningPresets = ["automerge", "autoideas", "autoresearch", "autodoc", "autoreview", "autoqa", "autospec"];
+  if (planningPresets.some((p) => name.includes(p))) return "planning";
+
+  return "unknown";
+}
+
 /**
  * Heuristic: a run is "code-modifying" if its preset or objective
  * suggests it writes code (builder, autocode, fix, etc.).
+ * Accepts an optional category override from preset metadata.
  * This is intentionally conservative — returns false when uncertain.
  */
-export function isCodeModifyingRun(record: RunRecord): boolean {
+export function isCodeModifyingRun(record: RunRecord, categoryOverride?: PresetCategory): boolean {
+  if (categoryOverride === "code") return true;
+  if (categoryOverride === "planning") return false;
+
   const preset = record.preset.toLowerCase();
   const objective = record.objective.toLowerCase();
   const codeIndicators = ["autocode", "builder", "fix", "implement", "refactor", "code"];
