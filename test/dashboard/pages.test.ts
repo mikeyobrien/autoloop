@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createApp, type DashboardContext } from "../../src/dashboard/app.js";
+import { htmlShell } from "../../src/dashboard/views/shell.js";
 
 function makeCtx(overrides: Partial<DashboardContext> = {}): DashboardContext {
   const projectDir = mkdtempSync(join(tmpdir(), "dashboard-pages-test-"));
@@ -45,6 +46,15 @@ describe("page routes", () => {
     const res = await app.request("/static/alpine.min.js");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("javascript");
+  });
+
+  it("keeps iteration.start highlighted in the events list", () => {
+    const html = htmlShell();
+    expect(html).toContain("eventClasses(ev)");
+    expect(html).toContain(
+      "if ((ev.topic || '') === 'iteration.start') classes.push('ev-highlight');",
+    );
+    expect(html).toContain(".event-item.ev-highlight summary { opacity: 1; }");
   });
 });
 
@@ -106,6 +116,71 @@ describe("origin-check middleware", () => {
   });
 });
 
+describe("iteration.start routing disclosure", () => {
+  let html: string;
+
+  it("shell contains eventDisplayEntries helper", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("eventDisplayEntries(ev)");
+    expect(html).toContain("eventDisplayEntries");
+  });
+
+  it("template iterates over eventDisplayEntries instead of Object.entries", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain('x-for="[k,v] in eventDisplayEntries(ev)"');
+  });
+
+  it("shell contains routing badge field helpers", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("isRoutingBadgeField");
+    expect(html).toContain("renderRoutingValue");
+  });
+
+  it("eventSummary uses routing-first format with recent_event and allowed_events", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("f.recent_event");
+    expect(html).toContain("f.suggested_roles");
+    expect(html).toContain("f.allowed_events");
+    expect(html).toContain("f.backpressure");
+    expect(html).toContain("emits");
+  });
+
+  it("shell contains routing field labels for first-class display", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("'suggested_roles'");
+    expect(html).toContain("'allowed_events'");
+    expect(html).toContain("'backpressure'");
+    expect(html).toContain("'recent_event'");
+  });
+
+  it("shell renders routing badges with CSS classes", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain(".routing-badge");
+    expect(html).toContain(".bp-warning");
+    expect(html).toContain(".bp-none");
+  });
+
+  it("isPromptField handles flattened prompt key from iteration.start", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    html = await res.text();
+    expect(html).toContain("isPromptField(ev.topic, k)");
+    expect(html).toContain("parsePromptSections");
+  });
+});
+
 describe("POST /api/runs input validation", () => {
   it("returns 400 for empty prompt", async () => {
     const app = createApp(makeCtx());
@@ -148,7 +223,6 @@ describe("POST /api/runs input validation", () => {
 
   it("returns 202 for valid prompt without preset", async () => {
     // Mock spawn to avoid actually launching a process
-    const { spawn } = await import("node:child_process");
     vi.mock("node:child_process", async (importOriginal) => {
       const orig = await importOriginal<typeof import("node:child_process")>();
       return {
