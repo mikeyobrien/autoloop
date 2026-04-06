@@ -301,6 +301,9 @@ function backendOverrideSpec(backend: string): Record<string, unknown> {
   if (backend === "pi") {
     return { kind: "pi", command: "pi", args: [], prompt_mode: "arg" };
   }
+  if (backend === "kiro" || backend === "kiro-cli") {
+    return { kind: "kiro", command: "kiro-cli", args: ["acp"], prompt_mode: "acp" };
+  }
   if (claudeBackend(backend)) {
     return {
       kind: "command",

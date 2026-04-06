@@ -1,5 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { AcpClientOptions } from "../backend/acp-client.js";
+import {
+  initKiroSession,
+  terminateKiroSession,
+} from "../backend/kiro-bridge.js";
 import * as config from "../config.js";
 import { registryStart, registryStop } from "../registry/harness.js";
 import { cleanWorktrees } from "../worktree/clean.js";
@@ -95,7 +100,28 @@ export function run(
     "info",
     `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`,
   );
-  const summary = iterate(loop, 1);
+
+  // Initialize kiro ACP session if backend is kiro
+  if (loop.backend.kind === "kiro") {
+    const acpOpts: AcpClientOptions = {
+      command: loop.backend.command,
+      args: loop.backend.args,
+      cwd: loop.paths.workDir,
+      trustAllTools: loop.store.kiro_trust_all_tools !== false,
+      agentName: (loop.store.kiro_agent as string) || undefined,
+      modelId: (loop.store.kiro_model as string) || undefined,
+    };
+    loop.kiroSession = initKiroSession(acpOpts);
+  }
+
+  let summary: RunSummary;
+  try {
+    summary = iterate(loop, 1);
+  } finally {
+    if (loop.kiroSession) {
+      terminateKiroSession(loop.kiroSession);
+    }
+  }
 
   // Clean up signal handlers on normal exit
   process.removeListener("SIGINT", onSignal);
@@ -355,6 +381,7 @@ function resolveJournalAndRun(
 
 function iterate(loop: LoopContext, iteration: number): RunSummary {
   const liveLoop = reloadLoop(loop);
+  liveLoop.kiroSession = loop.kiroSession;
   installRuntimeTools(liveLoop);
   const reviewed = maybeRunMetareview(liveLoop, iteration);
 
