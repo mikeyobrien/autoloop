@@ -38,6 +38,7 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
         created_at: f.created_at ?? "",
         updated_at: f.created_at ?? "",
         iteration: 0,
+        max_iterations: Number(f.max_iterations) || 0,
         stop_reason: "",
         latest_event: topic,
         isolation_mode: f.isolation_mode ?? "shared",

@@ -21,6 +21,7 @@ export interface RunRecord {
   created_at: string;
   updated_at: string;
   iteration: number;
+  max_iterations: number;
   stop_reason: string;
   latest_event: string;
   isolation_mode: string;

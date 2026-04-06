@@ -58,6 +58,20 @@ describe("page routes", () => {
   });
 });
 
+describe("iter X/N display", () => {
+  it("run list shows iter X/N using max_iterations", () => {
+    const html = htmlShell();
+    expect(html).toContain("run.iteration + '/' + (run.max_iterations || '?')");
+  });
+
+  it("detail pane shows iter X/N using max_iterations", () => {
+    const html = htmlShell();
+    expect(html).toContain(
+      "selectedRunDetail.iteration + '/' + (selectedRunDetail.max_iterations || '?')",
+    );
+  });
+});
+
 describe("API response wrapping", () => {
   it("GET /api/runs/:id/events returns { events }", async () => {
     const ctx = makeCtx();

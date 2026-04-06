@@ -17,6 +17,7 @@ function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
     backend: "mock",
     backend_args: [],
     iteration: 3,
+    max_iterations: 10,
     latest_event: "build.done",
     stop_reason: "",
     created_at: "2026-04-05T14:30:00.000Z",

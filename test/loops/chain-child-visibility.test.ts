@@ -27,6 +27,7 @@ function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     created_at: new Date(now.getTime() - 60_000).toISOString(),
     updated_at: now.toISOString(),
     iteration: 3,
+    max_iterations: 10,
     stop_reason: "",
     latest_event: "iteration.finish",
     isolation_mode: "shared",

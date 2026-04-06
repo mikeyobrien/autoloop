@@ -134,7 +134,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
             <span style="color:var(--muted)"> &middot; </span>
             <span x-text="run.preset"></span>
             <span style="color:var(--muted)"> &middot; iter </span>
-            <span x-text="run.iteration"></span>
+            <span x-text="run.iteration + '/' + (run.max_iterations || '?')"></span>
           </span>
           <span class="meta">
             <span x-text="run.latest_event || '-'"></span>
@@ -155,7 +155,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       <div class="field"><label>Status: </label><span x-text="selectedRunDetail.status"></span></div>
       <div class="field"><label>Preset: </label><span x-text="selectedRunDetail.preset"></span></div>
       <div class="field"><label>Objective: </label><span x-text="selectedRunDetail.objective"></span></div>
-      <div class="field"><label>Iteration: </label><span x-text="selectedRunDetail.iteration"></span></div>
+      <div class="field"><label>Iteration: </label><span x-text="selectedRunDetail.iteration + '/' + (selectedRunDetail.max_iterations || '?')"></span></div>
       <div class="field"><label>Created: </label><span :title="selectedRunDetail.created_at" x-text="timeAgo(selectedRunDetail.created_at) + ' ago'"></span></div>
       <div class="field"><label>Updated: </label><span :title="selectedRunDetail.updated_at" x-text="timeAgo(selectedRunDetail.updated_at) + ' ago'"></span></div>
       <div class="field"><label>Duration: </label><span x-text="runDuration()"></span></div>
