@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Developer convenience dispatcher for common autoloop dev tasks.
+# Run `bin/dev --help` or `bin/dev` with no args for usage.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+usage() {
+  cat <<EOF
+Usage: bin/dev <command> [args...]
+
+Commands:
+  build          Compile TypeScript (npm run build)
+  test [args]    Run test suite (npm test -- [args])
+  test:watch     Run tests in watch mode (npm run test:watch)
+  hooks          Install git hooks (bin/install-hooks)
+  run [args]     Run autoloop (node bin/autoloop [args])
+
+Options:
+  -h, --help     Show this help message
+EOF
+}
+
+if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+cmd="$1"
+shift
+
+case "$cmd" in
+  build)
+    exec npm run --prefix "$REPO_ROOT" build "$@"
+    ;;
+  test)
+    exec npm test --prefix "$REPO_ROOT" -- "$@"
+    ;;
+  test:watch)
+    exec npm run --prefix "$REPO_ROOT" test:watch -- "$@"
+    ;;
+  hooks)
+    exec "$REPO_ROOT/bin/install-hooks" "$@"
+    ;;
+  run)
+    exec node "$REPO_ROOT/bin/autoloop" "$@"
+    ;;
+  *)
+    echo "error: unknown command '$cmd'" >&2
+    echo "" >&2
+    usage >&2
+    exit 1
+    ;;
+esac

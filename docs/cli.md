@@ -391,6 +391,24 @@ Bundled fixtures in `test/fixtures/backend/`:
 
 These npm scripts and tools support day-to-day development on the autoloop codebase.
 
+### `bin/dev` dispatcher
+
+A single entry point for common dev tasks. Run `bin/dev` or `bin/dev --help` to see all subcommands.
+
+```bash
+bin/dev <command> [args...]
+```
+
+| Command | Delegates to | Description |
+|---------|-------------|-------------|
+| `build` | `npm run build` | Compile TypeScript via `tsc` |
+| `test [args]` | `npm test -- [args]` | Run test suite with Vitest |
+| `test:watch` | `npm run test:watch` | Vitest in watch mode |
+| `hooks` | `bin/install-hooks` | Install git hooks |
+| `run [args]` | `node bin/autoloop [args]` | Run autoloop |
+
+Unknown subcommands print an error and the help text, then exit non-zero.
+
 ### npm scripts
 
 | Script | Command | Description |
