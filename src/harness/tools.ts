@@ -6,6 +6,7 @@ export function emitToolScript(loop: LoopContext): string {
     "#!/bin/sh\n" +
     "set -eu\n" +
     "export MINILOOPS_PROJECT_DIR=" + shellQuote(loop.paths.projectDir) + "\n" +
+    "export MINILOOPS_STATE_DIR=" + shellQuote(loop.paths.stateDir) + "\n" +
     "export MINILOOPS_JOURNAL_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
     "export MINILOOPS_EVENTS_FILE=" + shellQuote(loop.paths.journalFile) + "\n" +
     "export MINILOOPS_MEMORY_FILE=" + shellQuote(loop.paths.memoryFile) + "\n" +

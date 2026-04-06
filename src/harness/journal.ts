@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, appendFileSync, mkdirSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { extractField as jsonExtractField, extractTopic as jsonExtractTopic } from "../json.js";
 import { encodeEvent } from "../events/encode.js";
 import { lineSep, shellQuote } from "../utils.js";
@@ -135,7 +135,8 @@ export function latestIterationForRun(
 }
 
 /**
- * Merge journals from the top-level file and all per-run journals under runs/.
+ * Merge journals from the top-level file, per-run journals under runs/,
+ * and worktree journals under worktrees/<id>/tree/<stateDirName>/.
  * Returns all lines sorted by timestamp.
  */
 export function readAllJournals(baseStateDir: string): string[] {
@@ -156,6 +157,18 @@ export function readAllJournals(baseStateDir: string): string[] {
     }
   }
 
+  // Worktree journals under worktrees/<id>/tree/<stateDirName>/journal.jsonl
+  const stateDirName = basename(baseStateDir);
+  const wtDir = join(baseStateDir, "worktrees");
+  if (existsSync(wtDir)) {
+    const entries = readdirSync(wtDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const wtJournal = join(wtDir, entry.name, "tree", stateDirName, "journal.jsonl");
+      if (existsSync(wtJournal)) allLines.push(...readLines(wtJournal));
+    }
+  }
+
   // Sort by timestamp field if present
   return allLines.sort((a, b) => {
     const tsA = extractTimestamp(a);
@@ -165,11 +178,20 @@ export function readAllJournals(baseStateDir: string): string[] {
 }
 
 /**
- * Read journal lines for a specific run under runs/<runId>/journal.jsonl.
+ * Read journal lines for a specific run.
+ * Checks run-scoped path (runs/<runId>/journal.jsonl) first,
+ * then worktree path (worktrees/<runId>/tree/<stateDirName>/journal.jsonl).
  */
 export function readRunJournal(baseStateDir: string, runId: string): string[] {
+  // Run-scoped journal
   const runJournal = join(baseStateDir, "runs", runId, "journal.jsonl");
   if (existsSync(runJournal)) return readLines(runJournal);
+
+  // Worktree journal
+  const stateDirName = basename(baseStateDir);
+  const wtJournal = join(baseStateDir, "worktrees", runId, "tree", stateDirName, "journal.jsonl");
+  if (existsSync(wtJournal)) return readLines(wtJournal);
+
   return [];
 }
 
