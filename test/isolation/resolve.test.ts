@@ -37,9 +37,9 @@ function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
 }
 
 describe("resolveIsolationMode", () => {
-  it("returns shared when solo run with no flags", () => {
+  it("returns run-scoped when solo run with no flags", () => {
     const result = resolveIsolationMode({}, []);
-    expect(result).toEqual({ mode: "shared" });
+    expect(result).toEqual({ mode: "run-scoped" });
   });
 
   it("returns worktree when --worktree flag is set", () => {

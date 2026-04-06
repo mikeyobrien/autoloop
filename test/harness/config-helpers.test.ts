@@ -109,14 +109,16 @@ describe("buildLoopContext", () => {
     expect(loop.review.args).toEqual(["-p", "--dangerously-skip-permissions"]);
   });
 
-  it("sets isolation mode to shared by default for solo run", () => {
+  it("sets isolation mode to run-scoped by default for solo run", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
     });
 
-    expect(loop.runtime.isolationMode).toBe("shared");
-    expect(loop.paths.baseStateDir).toBe(loop.paths.stateDir);
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(loop.runtime.runId);
+    expect(loop.paths.baseStateDir).not.toContain("/runs/");
     expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
   });
 
@@ -221,15 +223,15 @@ describe("buildLoopContext run-scoped isolation", () => {
     expect(loop.paths.stateDir).not.toBe(loop.paths.baseStateDir);
   });
 
-  it("routes journalFile to run-scoped dir", () => {
+  it("keeps journalFile global even in run-scoped mode", () => {
     const projectDir = makeProjectWithActiveRun();
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
     });
 
-    expect(loop.paths.journalFile).toContain("/runs/");
-    expect(loop.paths.journalFile).toContain(loop.runtime.runId);
+    expect(loop.paths.journalFile).not.toContain("/runs/");
     expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
+    expect(loop.paths.journalFile).toContain(".autoloop");
   });
 
   it("keeps registryFile at baseStateDir (not run-scoped)", () => {
@@ -321,5 +323,85 @@ describe("buildLoopContext run-scoped isolation", () => {
     });
 
     expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
+  });
+});
+
+describe("solo-run default run-scoping", () => {
+  it("solo run (no active runs) gets run-scoped isolation by default", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+  });
+
+  it("solo run stateDir is under runs/<id>/", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(loop.runtime.runId);
+    expect(loop.paths.baseStateDir).not.toContain("/runs/");
+  });
+
+  it("solo run journalFile stays at global .autoloop/journal.jsonl", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).toMatch(/\.autoloop\/journal\.jsonl$/);
+  });
+
+  it("solo run registryFile stays global", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.paths.registryFile).not.toContain("/runs/");
+    expect(loop.paths.registryFile).toMatch(/registry\.jsonl$/);
+  });
+
+  it("--no-worktree still returns shared mode even for solo run", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      noWorktree: true,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("shared");
+    expect(loop.paths.baseStateDir).toBe(loop.paths.stateDir);
+  });
+});
+
+describe("global journal behavior", () => {
+  it("journal path is global for solo run-scoped mode", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
+  });
+
+  it("journal path is global for concurrent run-scoped mode", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    seedRegistry(join(projectDir, ".autoloop"), [
+      { run_id: "run-other", status: "running", preset: "autocode" },
+    ]);
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
   });
 });
