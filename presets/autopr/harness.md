@@ -9,6 +9,7 @@ Global rules:
 - Missing evidence means no publish. If checks were not run, say so explicitly in the PR draft.
 - Do not invent verification, issue links, labels, reviewers, or mergeability state.
 - Prefer exact git / gh CLI evidence over summaries from earlier iterations.
+- **Remote-first base comparison (mandatory)**: All base-branch comparisons — merge-base, commit list, file diff — must use the remote tracking ref (`origin/<base>`), not the local ref. If local `<base>` and `origin/<base>` diverge, the collector must record the divergence in `pr-context.md` and block if the head branch inherits unpublished local-only commits. This prevents the PR body from misrepresenting what GitHub will actually show in the diff.
 - If `{{STATE_DIR}}/pr-request.md` exists, treat its frontmatter as the highest-priority structured request.
 - The freeform objective prompt is still valid input, but structured request fields override it.
 - Derive defaults when safe: head branch from git, base branch from repo default or `main`, mode defaults to `publish`, draft defaults to `false`.
