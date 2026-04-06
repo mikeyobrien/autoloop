@@ -32,6 +32,7 @@ vi.mock("../../src/config.js", () => ({
 
 vi.mock("../../src/topology.js", () => ({
   loadTopology: vi.fn(() => ({ roles: [] })),
+  renderTopologyInspect: vi.fn(),
 }));
 
 vi.mock("../../src/profiles.js", () => ({
@@ -44,6 +45,7 @@ vi.mock("../../src/usage.js", () => ({
 
 import { dispatchInspect } from "../../src/commands/inspect.js";
 import * as harness from "../../src/harness/index.js";
+import * as topo from "../../src/topology.js";
 
 describe("dispatchInspect journal", () => {
   beforeEach(() => {
@@ -72,5 +74,65 @@ describe("dispatchInspect journal", () => {
   it("dispatches 'inspect journal --run <id>' with explicit project dir", () => {
     dispatchInspect(["journal", "--run", "run-xyz", "/my/project"]);
     expect(harness.renderJournal).toHaveBeenCalledWith("/my/project", "run-xyz");
+  });
+});
+
+describe("dispatchInspect topology", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+  });
+
+  it("dispatches 'inspect topology' to renderTopologyInspect", () => {
+    dispatchInspect(["topology"]);
+    expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
+      expect.any(String), "terminal", undefined,
+    );
+  });
+
+  it("dispatches 'inspect topology --format graph'", () => {
+    dispatchInspect(["topology", "--format", "graph"]);
+    expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
+      expect.any(String), "graph", undefined,
+    );
+  });
+
+  it("dispatches 'inspect topology --format json'", () => {
+    dispatchInspect(["topology", "--format", "json"]);
+    expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
+      expect.any(String), "json", undefined,
+    );
+  });
+
+  it("dispatches 'inspect topology --run <id>'", () => {
+    dispatchInspect(["topology", "--run", "run-abc"]);
+    expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
+      expect.any(String), "terminal", "run-abc",
+    );
+  });
+});
+
+describe("dispatchInspect catch-all error", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env["MINILOOPS_PROJECT_DIR"] = "/tmp/test-project";
+  });
+
+  it("prints valid targets for unknown artifact", () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    dispatchInspect(["bogus"]);
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("Unknown inspect target `bogus`");
+    expect(output).toContain("Valid targets:");
+    expect(output).toContain("topology");
+    spy.mockRestore();
+  });
+
+  it("suggests closest target for near-miss", () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    dispatchInspect(["topolog"]);
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("Did you mean `topology`");
+    spy.mockRestore();
   });
 });

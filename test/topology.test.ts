@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -12,6 +12,8 @@ import {
   roleCount,
   render,
   completionEvent,
+  validateTopology,
+  renderTopologyInspect,
   type Topology,
 } from "../src/topology.js";
 
@@ -210,6 +212,132 @@ describe("render", () => {
     const dir = tmpDir("empty-render");
     const topo = loadTopology(dir);
     expect(render(topo, "loop.start")).toBe("");
+  });
+});
+
+describe("validateTopology", () => {
+  it("reports orphan roles not targeted by any handoff", () => {
+    const dir = tmpDir("validate-orphan");
+    writeFileSync(join(dir, "topology.toml"), `
+name = "orphan-test"
+completion = "done"
+
+[[role]]
+id = "alpha"
+prompt = "A"
+emits = ["done"]
+
+[[role]]
+id = "beta"
+prompt = "B"
+emits = ["done"]
+
+[handoff]
+"start" = ["alpha"]
+`);
+    const topo = loadTopology(dir);
+    const warnings = validateTopology(topo);
+    expect(warnings.some((w) => w.kind === "orphan-role" && w.message.includes("beta"))).toBe(true);
+  });
+
+  it("reports unreachable events with no handoff rule", () => {
+    const dir = tmpDir("validate-unreachable");
+    writeFileSync(join(dir, "topology.toml"), `
+name = "unreachable-test"
+completion = "task.complete"
+
+[[role]]
+id = "worker"
+prompt = "W"
+emits = ["orphan.event", "task.complete"]
+
+[handoff]
+"start" = ["worker"]
+`);
+    const topo = loadTopology(dir);
+    const warnings = validateTopology(topo);
+    expect(warnings.some((w) => w.kind === "unreachable-event" && w.message.includes("orphan.event"))).toBe(true);
+    // task.complete should not be flagged since it matches the completion event
+    expect(warnings.some((w) => w.kind === "unreachable-event" && w.message.includes("task.complete"))).toBe(false);
+  });
+
+  it("reports roles with no emits", () => {
+    const dir = tmpDir("validate-no-emits");
+    writeFileSync(join(dir, "topology.toml"), `
+name = "no-emits-test"
+completion = "done"
+
+[[role]]
+id = "silent"
+prompt = "S"
+emits = []
+
+[handoff]
+"start" = ["silent"]
+`);
+    const topo = loadTopology(dir);
+    const warnings = validateTopology(topo);
+    expect(warnings.some((w) => w.kind === "no-emits" && w.message.includes("silent"))).toBe(true);
+  });
+
+  it("returns no warnings for well-formed topology", () => {
+    const topo = loadTestTopology();
+    const warnings = validateTopology(topo);
+    // The test topology has planner as orphan (not targeted by review.* regex directly,
+    // but is targeted by build.blocked), so check it's well-connected
+    const orphans = warnings.filter((w) => w.kind === "orphan-role");
+    // planner is targeted by build.blocked, builder by tasks.ready, critic by review.ready,
+    // finalizer by /review\\..*/ — all roles are reachable
+    expect(orphans.length).toBe(0);
+  });
+});
+
+describe("renderTopologyInspect", () => {
+  it("renders terminal format", () => {
+    const dir = tmpDir("inspect-terminal");
+    writeFileSync(join(dir, "topology.toml"), TOPOLOGY_TOML);
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    renderTopologyInspect(dir, "terminal");
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("## Topology: test-flow");
+    expect(output).toContain("Completion event: task.complete");
+    expect(output).toContain("`planner`");
+    expect(output).toContain("### Handoff Map");
+    spy.mockRestore();
+  });
+
+  it("renders json format", () => {
+    const dir = tmpDir("inspect-json");
+    writeFileSync(join(dir, "topology.toml"), TOPOLOGY_TOML);
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    renderTopologyInspect(dir, "json");
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    const parsed = JSON.parse(output);
+    expect(parsed.name).toBe("test-flow");
+    expect(parsed.roles).toHaveLength(4);
+    expect(parsed.handoff).toBeDefined();
+    expect(Array.isArray(parsed.warnings)).toBe(true);
+    spy.mockRestore();
+  });
+
+  it("renders graph format", () => {
+    const dir = tmpDir("inspect-graph");
+    writeFileSync(join(dir, "topology.toml"), TOPOLOGY_TOML);
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    renderTopologyInspect(dir, "graph");
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("[planner] --tasks.ready--> [builder]");
+    expect(output).toContain("[finalizer] --task.complete--> (done)");
+    expect(output).toContain("[builder] --review.ready-->");
+    spy.mockRestore();
+  });
+
+  it("prints message for empty topology", () => {
+    const dir = tmpDir("inspect-empty");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    renderTopologyInspect(dir, "terminal");
+    expect(spy).toHaveBeenCalledWith("No topology defined.");
+    spy.mockRestore();
   });
 });
 

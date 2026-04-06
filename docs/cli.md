@@ -105,6 +105,7 @@ If `--format` is omitted, inspect uses artifact-specific defaults:
 | `metrics` | `[run_id]` | `md`, `terminal`, `csv`, `json` | Per-iteration metrics table: role, event, elapsed time, exit code, outcome. Optional `run_id` selector filters to a specific run. `terminal` pretty-renders the markdown table for a terminal. |
 | `coordination` | — | `md`, `terminal` | Coordination events from the current run. `terminal` pretty-renders the markdown for a terminal. |
 | `chain` | — | `md`, `terminal` | Chain state — steps, outcomes, lineage. `terminal` pretty-renders the markdown for a terminal. |
+| `topology` | — | `terminal`, `json`, `graph` | Topology structure — roles, emits, handoff map, and validation warnings. `graph` renders an ASCII directed graph of event flow. |
 
 **Metrics output formats:**
 
@@ -135,6 +136,9 @@ autoloop inspect metrics --format md
 autoloop inspect metrics --format csv
 autoloop inspect metrics --format json
 autoloop inspect metrics run-mn9d3uk0-xi0m --format md
+autoloop inspect topology                      # defaults to terminal
+autoloop inspect topology --format graph       # ASCII directed graph
+autoloop inspect topology --format json        # structured JSON
 ```
 
 ### `memory`

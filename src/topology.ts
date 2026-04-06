@@ -239,3 +239,133 @@ function promptSummary(prompt: string): string {
   return "(none)";
 }
 
+/* ── inspect topology ─────────────────────────────────────── */
+
+export interface TopologyWarning {
+  kind: "orphan-role" | "unreachable-event" | "no-emits";
+  message: string;
+}
+
+export function validateTopology(topology: Topology): TopologyWarning[] {
+  const warnings: TopologyWarning[] = [];
+
+  const targetedRoleIds = handoffTargetIds(topology);
+  for (const role of topology.roles) {
+    if (!targetedRoleIds.includes(role.id)) {
+      warnings.push({ kind: "orphan-role", message: `role \`${role.id}\` is not targeted by any handoff rule` });
+    }
+    if (role.emits.length === 0) {
+      warnings.push({ kind: "no-emits", message: `role \`${role.id}\` has no emits` });
+    }
+  }
+
+  const emitted = allEmittedEvents(topology);
+  for (const event of emitted) {
+    if (!eventMatchesAny(event, topology.handoffKeys) && event !== topology.completion) {
+      warnings.push({ kind: "unreachable-event", message: `event \`${event}\` is emitted but has no matching handoff rule` });
+    }
+  }
+
+  return warnings;
+}
+
+export function renderTopologyInspect(projectDir: string, format: string, _runId?: string): void {
+  const topology = loadTopology(projectDir);
+
+  if (topology.roles.length === 0) {
+    console.log("No topology defined.");
+    return;
+  }
+
+  switch (format) {
+    case "json":
+      renderTopologyJson(topology);
+      break;
+    case "graph":
+      renderTopologyGraph(topology);
+      break;
+    default:
+      renderTopologyTerminal(topology);
+      break;
+  }
+}
+
+function renderTopologyJson(topology: Topology): void {
+  const warnings = validateTopology(topology);
+  const out = {
+    name: topology.name,
+    completion: topology.completion,
+    roles: topology.roles.map((r) => ({
+      id: r.id,
+      emits: r.emits,
+      prompt: promptSummary(r.prompt),
+    })),
+    handoff: topology.handoff,
+    warnings: warnings.map((w) => ({ kind: w.kind, message: w.message })),
+  };
+  console.log(JSON.stringify(out, null, 2));
+}
+
+function renderTopologyGraph(topology: Topology): void {
+  const lines: string[] = [];
+  for (const role of topology.roles) {
+    for (const event of role.emits) {
+      const targets = resolveEventTargets(topology, event);
+      if (event === topology.completion) {
+        lines.push(`[${role.id}] --${event}--> (done)`);
+      } else if (targets.length > 0) {
+        lines.push(`[${role.id}] --${event}--> [${targets.join(", ")}]`);
+      } else {
+        lines.push(`[${role.id}] --${event}--> (?)`);
+      }
+    }
+  }
+  console.log(lines.join("\n"));
+}
+
+function resolveEventTargets(topology: Topology, event: string): string[] {
+  const targets: string[] = [];
+  for (const key of topology.handoffKeys) {
+    if (eventMatchesPattern(event, key)) {
+      for (const t of topology.handoff[key] ?? []) {
+        if (!targets.includes(t)) targets.push(t);
+      }
+    }
+  }
+  return targets;
+}
+
+function renderTopologyTerminal(topology: Topology): void {
+  const lines: string[] = [];
+  lines.push("## Topology: " + (topology.name || "(unnamed)"));
+  lines.push("");
+  lines.push("Completion event: " + (topology.completion || "(none)"));
+  lines.push("");
+
+  lines.push("### Roles");
+  for (const role of topology.roles) {
+    lines.push("- `" + role.id + "` — emits: " + listText(role.emits));
+    lines.push("  prompt: " + promptSummary(role.prompt));
+  }
+  lines.push("");
+
+  lines.push("### Handoff Map");
+  for (const key of topology.handoffKeys) {
+    const targets = topology.handoff[key] ?? [];
+    const isRegex = key.startsWith("/") && key.endsWith("/");
+    const annotation = isRegex ? " (regex)" : "";
+    lines.push("- " + key + annotation + " → [" + targets.join(", ") + "]");
+  }
+  lines.push("");
+
+  const warnings = validateTopology(topology);
+  if (warnings.length > 0) {
+    lines.push("### Warnings");
+    for (const w of warnings) {
+      lines.push("- " + w.message);
+    }
+  }
+
+  console.log(lines.join("\n"));
+}
+

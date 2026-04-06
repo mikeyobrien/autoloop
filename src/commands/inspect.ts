@@ -6,6 +6,11 @@ import * as topo from "../topology.js";
 import * as profiles from "../profiles.js";
 import { printInspectUsage } from "../usage.js";
 
+const INSPECT_TARGETS = [
+  "scratchpad", "prompt", "output", "journal", "memory",
+  "coordination", "chain", "metrics", "profiles", "topology",
+];
+
 interface InspectSpec {
   artifact: string;
   selector: string;
@@ -50,6 +55,9 @@ export function dispatchInspect(args: string[]): boolean {
     case "chain":
       console.log(chains.renderChainState(projectDir));
       return true;
+    case "topology":
+      topo.renderTopologyInspect(projectDir, format, spec.run);
+      return true;
     case "profiles":
       renderProfilesInspect(projectDir);
       return true;
@@ -61,9 +69,17 @@ export function dispatchInspect(args: string[]): boolean {
       if (!selector) { console.log("inspect output requires an iteration selector"); return true; }
       harness.renderOutput(projectDir, selector, spec.run);
       return true;
-    default:
-      console.log("unsupported inspect target `" + artifact + "`");
+    default: {
+      const validTargets = INSPECT_TARGETS;
+      const suggestion = findClosestTarget(artifact, validTargets);
+      console.log("Unknown inspect target `" + artifact + "`.");
+      if (suggestion) {
+        console.log("Did you mean `" + suggestion + "`?");
+      }
+      console.log("");
+      console.log("Valid targets: " + validTargets.join(", "));
       return true;
+    }
   }
 }
 
@@ -151,4 +167,24 @@ function renderProfilesInspect(projectDir: string): void {
   } catch (err) {
     console.log("Error resolving profiles: " + (err instanceof Error ? err.message : String(err)));
   }
+}
+
+function findClosestTarget(input: string, targets: string[]): string | null {
+  let best: string | null = null;
+  let bestScore = Infinity;
+  for (const t of targets) {
+    if (t.startsWith(input) || input.startsWith(t)) {
+      const d = Math.abs(t.length - input.length);
+      if (d < bestScore) { bestScore = d; best = t; }
+    }
+  }
+  if (best) return best;
+  // simple character overlap heuristic
+  for (const t of targets) {
+    let overlap = 0;
+    for (const ch of input) { if (t.includes(ch)) overlap++; }
+    const score = input.length - overlap;
+    if (score < bestScore) { bestScore = score; best = t; }
+  }
+  return bestScore <= 2 ? best : null;
 }

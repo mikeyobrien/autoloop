@@ -80,15 +80,29 @@ export function printEmitUsage(): void {
 
 export function printInspectUsage(): void {
   console.log("Usage:");
-  console.log("  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]");
-  console.log("");
-  console.log("Defaults when --format is omitted:");
-  console.log("  scratchpad, prompt, memory, coordination, chain, metrics -> terminal");
-  console.log("  output -> text");
-  console.log("  journal -> json");
+  console.log("  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]");
   console.log("");
   console.log("Artifacts:");
-  console.log("  scratchpad, prompt, output, journal, memory, coordination, chain, metrics, profiles");
+  console.log("");
+  console.log("  Artifact       Selector      Formats                 Default");
+  console.log("  ─────────────  ────────────  ──────────────────────  ────────");
+  console.log("  scratchpad     —             md, terminal            terminal");
+  console.log("  prompt         <iteration>   md, terminal            terminal");
+  console.log("  output         <iteration>   text                    text");
+  console.log("  journal        —             json                    json");
+  console.log("  memory         —             md, terminal, json      terminal");
+  console.log("  coordination   —             md, terminal            terminal");
+  console.log("  chain          —             md, terminal            terminal");
+  console.log("  metrics        [run_id]      md, terminal, csv, json terminal");
+  console.log("  profiles       —             terminal                terminal");
+  console.log("  topology       —             terminal, json, graph   terminal");
+  console.log("");
+  console.log("Examples:");
+  console.log("  autoloop inspect scratchpad");
+  console.log("  autoloop inspect prompt 5 --format md");
+  console.log("  autoloop inspect topology");
+  console.log("  autoloop inspect topology --format graph");
+  console.log("  autoloop inspect topology --format json");
 }
 
 export function printMemoryUsage(): void {
