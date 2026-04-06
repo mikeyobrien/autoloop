@@ -39,6 +39,7 @@ function sendCommand(handle: KiroSessionHandle, cmd: unknown): any {
   const len = new DataView(handle.dataBuffer).getUint32(0);
   const resultJson = decoder.decode(data.slice(4, 4 + len));
   Atomics.store(control, 0, 0); // reset for next command
+  Atomics.notify(control, 0);  // wake worker waiting on Atomics.wait(control, 0, 2)
   return JSON.parse(resultJson);
 }
 
