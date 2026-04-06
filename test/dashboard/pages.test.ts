@@ -32,6 +32,14 @@ describe("page routes", () => {
     expect(html).toContain("alpine");
   });
 
+  it("textarea has Cmd+Enter and Ctrl+Enter shortcuts", async () => {
+    const app = createApp(makeCtx());
+    const res = await app.request("/");
+    const html = await res.text();
+    expect(html).toContain('@keydown.meta.enter="startLoop()"');
+    expect(html).toContain('@keydown.ctrl.enter="startLoop()"');
+  });
+
   it("GET /static/alpine.min.js returns JavaScript", async () => {
     const app = createApp(makeCtx());
     const res = await app.request("/static/alpine.min.js");
