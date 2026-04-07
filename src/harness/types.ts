@@ -50,6 +50,7 @@ export interface LoopContext {
     stateDir: string;
     journalFile: string;
     memoryFile: string;
+    runMemoryFile: string;
     tasksFile: string;
     registryFile: string;
     toolPath: string;

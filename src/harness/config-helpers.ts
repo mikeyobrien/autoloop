@@ -346,6 +346,11 @@ export function buildLoopContext(
       ? join(effectiveStateDir, "tasks.jsonl")
       : join(stateDir, "runs", runId, "tasks.jsonl");
 
+  const runMemoryFile =
+    isolation.mode === "run-scoped" || isolation.mode === "worktree"
+      ? join(effectiveStateDir, "memory.jsonl")
+      : join(stateDir, "runs", runId, "memory.jsonl");
+
   // Only paths, runtime, launch, profiles, and store survive — reloadLoop fills the rest from config.
   const seed = {
     paths: {
@@ -357,6 +362,7 @@ export function buildLoopContext(
           ? join(effectiveStateDir, "journal.jsonl")
           : journalFile,
       memoryFile,
+      runMemoryFile,
       tasksFile,
       registryFile,
       toolPath: join(effectiveStateDir, "autoloops"),
