@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Autonomous LLM loop harness and control plane for long-horizon autonomous work",
   "type": "module",
   "main": "dist/main.js",
