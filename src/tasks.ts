@@ -1,5 +1,5 @@
 import { appendFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import * as config from "./config.js";
 import { readLines } from "./harness/journal.js";
 import { extractField, jsonField } from "./json.js";
@@ -22,21 +22,13 @@ export interface MaterializedTasks {
 export function resolveFile(projectDir: string): string {
   const envPath = process.env.AUTOLOOP_TASKS_FILE;
   if (envPath) return envPath;
-  const cfg = config.loadProject(projectDir);
-  return join(
-    projectDir,
-    config.get(cfg, "core.tasks_file", ".autoloop/tasks.jsonl"),
-  );
+  return config.resolveTasksFile(projectDir);
 }
 
 export function resolveFileIn(projectDir: string, workDir: string): string {
   const envPath = process.env.AUTOLOOP_TASKS_FILE;
   if (envPath) return envPath;
-  const cfg = config.loadProject(projectDir);
-  return join(
-    workDir,
-    config.get(cfg, "core.tasks_file", ".autoloop/tasks.jsonl"),
-  );
+  return config.resolveTasksFileIn(projectDir, workDir);
 }
 
 export function materialize(lines: string[]): MaterializedTasks {

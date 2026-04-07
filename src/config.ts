@@ -214,6 +214,22 @@ export function resolveMemoryFileIn(
   );
 }
 
+export function resolveTasksFile(projectDir: string): string {
+  const config = loadProject(projectDir);
+  return join(
+    projectDir,
+    get(config, "core.tasks_file", ".autoloop/tasks.jsonl"),
+  );
+}
+
+export function resolveTasksFileIn(
+  projectDir: string,
+  workDir: string,
+): string {
+  const config = loadProject(projectDir);
+  return join(workDir, get(config, "core.tasks_file", ".autoloop/tasks.jsonl"));
+}
+
 export function stateDirName(projectDir: string): string {
   const config = loadProject(projectDir);
   return get(config, "core.state_dir", ".autoloop");

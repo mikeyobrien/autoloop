@@ -79,7 +79,7 @@ export function emit(projectDir: string, topic: string, payload: string): void {
 
   // Task completion gate: block completion if open tasks remain
   if (topic === validation.completionEvent) {
-    const tasksFile = resolveTasksFile(projectDir);
+    const tasksFile = config.resolveTasksFile(projectDir);
     const openTasks = materializeOpenFrom(tasksFile);
     if (openTasks.length > 0) {
       rejectTaskGate(journalFile, topic, openTasks, validation);
@@ -327,13 +327,6 @@ export function resolveEmitJournalFile(projectDir: string): string {
   const envEvents = process.env.AUTOLOOP_EVENTS_FILE;
   if (envEvents) return envEvents;
   return config.resolveJournalFile(projectDir);
-}
-
-function resolveTasksFile(projectDir: string): string {
-  const envPath = process.env.AUTOLOOP_TASKS_FILE;
-  if (envPath) return envPath;
-  const cfg = config.loadProject(projectDir);
-  return config.get(cfg, "core.tasks_file", ".autoloop/tasks.jsonl");
 }
 
 function rejectTaskGate(
