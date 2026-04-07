@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -549,5 +549,204 @@ describe("dashboard /api/runs/:id/events", () => {
     expect(body.events).toHaveLength(2);
     expect(body.events[0].topic).toBe("loop.start");
     expect(body.events[1].topic).toBe("build.blocked");
+  });
+});
+
+describe("dashboard /api/runs/:id/artifacts", () => {
+  it("returns artifacts summary for a run", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+
+    const events = [
+      JSON.stringify({
+        run: "run-art-001",
+        topic: "loop.start",
+        fields: { preset: "autocode", timestamp: new Date().toISOString() },
+      }),
+      JSON.stringify({
+        run: "run-art-001",
+        topic: "iteration.finish",
+        iteration: "1",
+        timestamp: new Date().toISOString(),
+      }),
+    ];
+    writeFileSync(journalPath, `${events.join("\n")}\n`, "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request("/api/runs/run-art-001/artifacts");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.events).toBeDefined();
+    expect(body.events.total).toBe(2);
+    expect(body.iterations).toBe(1);
+  });
+});
+
+describe("dashboard /api/runs/:id/artifact", () => {
+  it("returns 400 when path is missing", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request("/api/runs/run-001/artifact");
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("path required");
+  });
+
+  it("returns 400 for path traversal with ..", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request(
+      "/api/runs/run-001/artifact?path=../../etc/passwd.md",
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("path traversal not allowed");
+  });
+
+  it("returns 400 for absolute paths", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request(
+      "/api/runs/run-001/artifact?path=/etc/passwd.md",
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("absolute paths not allowed");
+  });
+
+  it("returns 400 for non-.md files", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request(
+      "/api/runs/run-001/artifact?path=secret.json",
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("only .md files supported");
+  });
+
+  it("returns 404 for missing files", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request(
+      "/api/runs/run-001/artifact?path=nonexistent.md",
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns file content for valid .md files", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+    writeFileSync(join(projectDir, "plan.md"), "# My Plan\nDetails here.");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request("/api/runs/run-001/artifact?path=plan.md");
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toBe("# My Plan\nDetails here.");
+  });
+
+  it("blocks symlink path traversal outside workDir", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+
+    // Create a file outside the project dir
+    const outsideDir = mkdtempSync(join(tmpdir(), "outside-"));
+    writeFileSync(join(outsideDir, "secret.md"), "secret content");
+
+    // Create a symlink inside the project dir pointing outside
+    try {
+      symlinkSync(join(outsideDir, "secret.md"), join(projectDir, "escape.md"));
+    } catch {
+      // skip test on platforms that don't support symlinks
+      return;
+    }
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+    });
+
+    const res = await app.request("/api/runs/run-001/artifact?path=escape.md");
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("path traversal not allowed");
   });
 });

@@ -360,6 +360,7 @@ function scanDir(
       )
         continue;
       if (entry.name === "node_modules") continue;
+      if (entry.isSymbolicLink()) continue;
       const fullPath = join(currentDir, entry.name);
       if (entry.isDirectory()) {
         scanDir(baseDir, fullPath, results, depth + 1);

@@ -60,9 +60,8 @@ export function topicMatchesFilter(topic: string, pattern: string): boolean {
   }
   // Glob: convert * to regex
   if (pattern.includes("*")) {
-    const re = new RegExp(
-      `^${pattern.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`,
-    );
+    const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^${escaped.replace(/\*/g, ".*")}$`);
     return re.test(topic);
   }
   return false;
