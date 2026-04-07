@@ -1,65 +1,85 @@
 # Releasing
 
-Binary releases are published by GitHub Actions from annotated tags.
+Releases are published to npm by GitHub Actions from version tags.
+
+## Prerequisites
+
+- `main` branch is green (CI passes).
+- `package.json` version matches the tag you are about to create.
 
 ## Release flow
 
-1. Make sure `main` is green.
-2. Create an annotated semver tag:
+1. Bump the version in `package.json`.
+2. Commit the version bump:
 
 ```bash
-git tag -a v0.1.0 -m "v0.1.0"
+git commit -am "release: v0.2.1"
 ```
 
-3. Push the tag:
+3. Create an annotated semver tag:
 
 ```bash
-git push origin v0.1.0
+git tag -a v0.2.1 -m "v0.2.1"
 ```
 
-4. Watch `.github/workflows/release.yml`.
-5. Verify the GitHub Release contains:
-   - `autoloops-v0.1.0-linux-x64.tar.gz`
-   - `autoloops-v0.1.0-macos-arm64.tar.gz`
-   - `SHA256SUMS.txt`
-
-## What the workflow does
-
-> **Note:** The release pipeline references below are from the pre-TypeScript (Tonic) era and need to be updated for the TS port. The current TS build uses `npm run build` (tsc) and `npm test` (Vitest).
-
-- runs `npm test`
-- compiles TypeScript via `npm run build`
-- packages release archives
-- publishes the archives and checksums to GitHub Releases
-
-## Install with the HTTPS installer
+4. Push the commit and tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash
+git push origin main --follow-tags
 ```
 
-Pin a version:
+5. Watch `.github/workflows/publish-npm.yml`. The workflow:
+   - checks out the repo
+   - installs dependencies (`npm ci`)
+   - builds TypeScript (`npm run build` → `tsc`)
+   - runs tests (`npm test` → Vitest with `--experimental-vm-modules`)
+   - verifies the tag version matches `package.json`
+   - skips publish if the version is already on npm
+   - publishes to npm with `--provenance --access public`
+
+6. Verify the package is live:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash -s -- --version v0.1.4
+npm view @mobrienv/autoloop@0.2.1
 ```
 
-Install to a custom directory:
+## CI pipeline
+
+Every push to `main` and every PR triggers `.github/workflows/ci.yml`:
+
+| Step | Command |
+|------|---------|
+| Build | `npm run build` (tsc → `dist/`) |
+| Test | `npm test` (Vitest) |
+
+Node 24 is used in both CI and publish workflows.
+
+## Local quality checks
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mikeyobrien/autoloop/main/install.sh | bash -s -- --dir /usr/local/bin
+npm run check   # biome lint + tsc --noEmit + vitest with coverage
+npm run lint     # biome check src/ test/
+npm test         # vitest run
 ```
 
-The installer resolves the correct asset for the current platform, tolerates older macOS `darwin-arm64` asset names from existing releases, downloads `SHA256SUMS.txt` when available, and installs `autoloops` into `~/.local/bin` by default.
+## npm publish details
 
-## Install from a release archive
+- **Package name**: `@mobrienv/autoloop`
+- **Access**: public (scoped)
+- **Provenance**: enabled — npm attestations are generated via OIDC `id-token: write` permission
+- **Trigger**: push of a `v*` tag, or manual `workflow_dispatch`
+- **Idempotent**: if the version is already published, the workflow exits cleanly without error
+- **Trusted publishing**: the workflow upgrades npm to latest for OIDC-based provenance support
 
-```bash
-tar -xzf autoloops-v0.1.0-linux-x64.tar.gz
-chmod +x autoloops-v0.1.0-linux-x64/autoloops
-mkdir -p ~/.local/bin
-mv autoloops-v0.1.0-linux-x64/autoloops ~/.local/bin/autoloops
-```
+## What gets published
 
-The release binary does not require a source checkout for normal CLI use.
+The `files` field in `package.json` controls the npm tarball contents:
 
+- `bin/autoloop` — Node.js entry point (`#!/usr/bin/env node`, imports `dist/main.js`)
+- `dist/` — compiled TypeScript output (ES2022, Node16 module resolution, with source maps and declarations)
+- `presets/` — bundled preset configurations
+- `README.md`
+
+## Engine requirement
+
+The package declares `"engines": { "node": ">=18" }`.
