@@ -34,7 +34,7 @@ export function createApp(ctx: DashboardContext): Hono {
 
   app.route("/api", apiRoutes(ctx));
 
-  pageRoutes(app);
+  pageRoutes(app, ctx.projectDir);
 
   return app;
 }

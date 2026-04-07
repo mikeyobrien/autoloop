@@ -1,10 +1,11 @@
-export function htmlShell(): string {
+export function htmlShell(projectName?: string): string {
+  const displayName = projectName || "autoloop";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>autoloop dashboard</title>
+<title>autoloop / ${displayName}</title>
 <style>
 :root {
   --bg: #fff; --fg: #1a1a1a; --muted: #666; --border: #e0e0e0;
@@ -148,7 +149,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 <body x-data="dashboard()" x-init="startPolling()">
 
 <header>
-  <h1>autoloop dashboard</h1>
+  <h1>autoloop <span style="color:var(--muted);font-weight:400">/ ${displayName}</span></h1>
   <span class="updated" x-text="lastUpdated ? 'updated ' + lastUpdated : 'loading...'"></span>
 </header>
 
@@ -166,7 +167,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
   <details class="section" :open="sectionOpen[cat.key]" @toggle="sectionUserToggled[cat.key] = true; sectionOpen[cat.key] = $el.open">
     <summary>
       <span x-text="cat.label"></span>
-      <span class="badge" :data-status="cat.key" x-text="cat.items.length"></span>
+      <span class="badge" :data-status="cat.key" x-text="cat.total"></span>
     </summary>
     <ul class="run-list">
       <template x-for="run in cat.items" :key="run.run_id">
@@ -194,6 +195,12 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
         </li>
       </template>
       <li class="empty" x-show="cat.items.length === 0">None</li>
+      <li x-show="cat.capped" style="text-align:center;padding:0.3rem;list-style:none">
+        <button @click="sectionShowAll[cat.key] = true" style="background:none;border:1px solid var(--border);border-radius:4px;padding:0.25rem 0.6rem;color:var(--muted);cursor:pointer;font-size:0.75rem" x-text="'Show all ' + cat.total + ' runs'"></button>
+      </li>
+      <li x-show="sectionShowAll[cat.key] && cat.total > 10" style="text-align:center;padding:0.3rem;list-style:none">
+        <button @click="sectionShowAll[cat.key] = false" style="background:none;border:1px solid var(--border);border-radius:4px;padding:0.25rem 0.6rem;color:var(--muted);cursor:pointer;font-size:0.75rem">Show fewer</button>
+      </li>
     </ul>
   </details>
 </template>
@@ -493,6 +500,7 @@ function dashboard() {
     lastUpdated: null,
     sectionOpen: { active: false, watching: false, stuck: false, failed: false, completed: false },
     sectionUserToggled: {},
+    sectionShowAll: {},
     showVerbose: false,
     guideMessage: "",
     guideFlash: "",
@@ -523,12 +531,20 @@ function dashboard() {
     },
 
     get categories() {
+      const CAP = 10;
+      const cap = (key, items) => {
+        const total = items.length;
+        const show = this.sectionShowAll[key] ? items : items.slice(0, CAP);
+        return { items: show, total, capped: total > CAP && !this.sectionShowAll[key] };
+      };
+      const fc = cap("failed", this.runs.recentFailed);
+      const cc = cap("completed", this.runs.recentCompleted);
       return [
-        { key: "active", label: "Active", items: this.runs.active },
-        { key: "watching", label: "Watching", items: this.runs.watching },
-        { key: "stuck", label: "Stuck", items: this.runs.stuck },
-        { key: "failed", label: "Failed", items: this.runs.recentFailed },
-        { key: "completed", label: "Completed", items: this.runs.recentCompleted },
+        { key: "active", label: "Active", items: this.runs.active, total: this.runs.active.length, capped: false },
+        { key: "watching", label: "Watching", items: this.runs.watching, total: this.runs.watching.length, capped: false },
+        { key: "stuck", label: "Stuck", items: this.runs.stuck, total: this.runs.stuck.length, capped: false },
+        { key: "failed", label: "Failed", items: fc.items, total: fc.total, capped: fc.capped },
+        { key: "completed", label: "Completed", items: cc.items, total: cc.total, capped: cc.capped },
       ];
     },
 
@@ -541,7 +557,12 @@ function dashboard() {
     async fetchRuns() {
       try {
         const res = await fetch("/api/runs");
-        this.runs = await res.json();
+        const data = await res.json();
+        const byRecent = (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+        for (const key of ['active', 'watching', 'stuck', 'recentFailed', 'recentCompleted']) {
+          if (data[key]) data[key].sort(byRecent);
+        }
+        this.runs = data;
         this.lastUpdated = new Date().toLocaleTimeString();
         const defaultOpen = ['active', 'watching', 'stuck'];
         for (const cat of this.categories) {
