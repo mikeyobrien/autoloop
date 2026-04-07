@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { Hono } from "hono";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
 import { collectArtifacts } from "../../harness/artifacts.js";
@@ -134,6 +134,16 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     const workDir = result?.work_dir || result?.worktree_path || ctx.projectDir;
     const fullPath = join(workDir, filePath);
     if (!existsSync(fullPath)) {
+      return c.json({ error: "file not found" }, 404);
+    }
+    // Resolve symlinks and verify the real path stays within workDir
+    try {
+      const realPath = realpathSync(fullPath);
+      const realWorkDir = realpathSync(resolve(workDir));
+      if (!realPath.startsWith(realWorkDir + "/")) {
+        return c.json({ error: "path traversal not allowed" }, 400);
+      }
+    } catch {
       return c.json({ error: "file not found" }, 404);
     }
     const content = readFileSync(fullPath, "utf-8");

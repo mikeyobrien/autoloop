@@ -94,8 +94,9 @@ export function collectArtifacts(
 
     events.total++;
     const cat = topicCategory(event.topic);
-    if (cat in events) {
-      events[cat as keyof typeof events]++;
+    const key = cat === "error" ? "errors" : cat;
+    if (key in events) {
+      events[key as keyof typeof events]++;
     }
 
     // Track iteration count
