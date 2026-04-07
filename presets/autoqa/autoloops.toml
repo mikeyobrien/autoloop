@@ -3,8 +3,8 @@ event_loop.completion_event = "task.complete"
 event_loop.completion_promise = "LOOP_COMPLETE"
 event_loop.required_events = ["surfaces.identified"]
 
-backend.kind = "command"
-backend.command = "claude"
+backend.kind = "pi"
+backend.command = "pi"
 backend.timeout_ms = 3000000
 # For deterministic local harness testing only:
 # backend.kind = "command"
