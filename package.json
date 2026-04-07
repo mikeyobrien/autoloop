@@ -11,6 +11,7 @@
     "bin/autoloop",
     "dist",
     "presets",
+    "plugins",
     "README.md"
   ],
   "engines": {
@@ -46,7 +47,8 @@
     "test:coverage": "node --experimental-vm-modules node_modules/.bin/vitest run --coverage",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest",
     "check": "biome check src/ test/ && tsc --noEmit && npm run test:coverage",
-    "prepare": "husky"
+    "prepare": "husky",
+    "version": "node -e \"const p=require('./plugins/autoloop/.claude-plugin/plugin.json');p.version=require('./package.json').version;require('fs').writeFileSync('./plugins/autoloop/.claude-plugin/plugin.json',JSON.stringify(p,null,2)+'\\n')\" && git add plugins/autoloop/.claude-plugin/plugin.json"
   },
   "lint-staged": {
     "*.{ts,js,json}": [

@@ -1,0 +1,9 @@
+{
+  "name": "autoloop",
+  "version": "0.2.1",
+  "description": "Run and operate autoloops — start runs, monitor progress, inject guidance, manage worktrees, inspect artifacts, and clean up.",
+  "homepage": "https://github.com/mikeyobrien/autoloop-ts",
+  "repository": "https://github.com/mikeyobrien/autoloop-ts",
+  "license": "MIT",
+  "keywords": ["autoloop", "ai-agents", "autonomous", "coding"]
+}
