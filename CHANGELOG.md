@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.1] - 2026-04-07
+### Added
+- **Dashboard**: Visual indicators (checkmark/green badge) for successfully merged worktree runs.
+
 ## [0.2.0] - 2026-04-07
 
 ### Features
