@@ -11,6 +11,7 @@ export type CoordinationTopic =
   | "context.archived"
   | "chain.spawn";
 export type ChainTopic = "chain.start" | "chain.complete";
+export type OperatorTopic = "operator.guidance" | "operator.guidance.consumed";
 export type WaveTopic = string;
 export type CoreSystemTopic =
   | LoopTopic
@@ -22,6 +23,7 @@ export type KnownTopic =
   | CoreSystemTopic
   | CoordinationTopic
   | ChainTopic
+  | OperatorTopic
   | WaveTopic
   | string;
 
