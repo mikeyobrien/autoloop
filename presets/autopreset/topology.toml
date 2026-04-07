@@ -1,0 +1,32 @@
+name = "autopreset"
+completion = "task.complete"
+
+[[role]]
+id = "designer"
+emits = ["design.ready"]
+prompt_file = "roles/designer.md"
+
+[[role]]
+id = "generator"
+emits = ["review.ready", "generation.blocked"]
+prompt_file = "roles/generator.md"
+
+[[role]]
+id = "validator"
+emits = ["review.passed", "review.rejected"]
+prompt_file = "roles/validator.md"
+
+[[role]]
+id = "finalizer"
+emits = ["queue.advance", "finalization.failed", "task.complete"]
+prompt_file = "roles/finalizer.md"
+
+[handoff]
+"loop.start" = ["designer"]
+"queue.advance" = ["designer"]
+"generation.blocked" = ["designer"]
+"design.ready" = ["generator"]
+"review.ready" = ["validator"]
+"review.rejected" = ["generator"]
+"review.passed" = ["finalizer"]
+"finalization.failed" = ["generator"]
