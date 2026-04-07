@@ -1,8 +1,8 @@
 # Memory Reference
 
-Loop memory is a persistent, append-only store that carries learnings, preferences, and metadata across iterations and runs. It lives in `.autoloop/memory.jsonl` and is injected into each iteration prompt within a configurable character budget.
+Loop memory is a two-tier, append-only store that carries learnings, preferences, and metadata across iterations. It is split into **project memory** (durable, shared across runs) and **run memory** (ephemeral, per-run). Preferences are always project-scoped. Learnings and meta default to run-scoped but can be promoted to project memory.
 
-Memory is **durable** — entries survive across runs. It is also **soft-deletable** — entries are never physically removed; instead, a tombstone entry marks the target as inactive.
+Memory is **soft-deletable** — entries are never physically removed; instead, a tombstone entry marks the target as inactive.
 
 ## File format
 
@@ -78,6 +78,33 @@ IDs are auto-assigned based on line count:
 
 IDs are unique within the file and are used for tombstone targeting and deduplication.
 
+## Two-tier scoping
+
+Memory is split into two tiers:
+
+| Tier | Path | Lifetime | Content |
+|------|------|----------|---------|
+| Project | `<workDir>/.autoloop/memory.jsonl` | Permanent | Preferences, promoted learnings |
+| Run | `<stateDir>/memory.jsonl` | Per-run | Learnings (default), meta (always) |
+
+**Project memory** is resolved via `AUTOLOOP_MEMORY_FILE` env or `core.memory_file` config. It persists across all runs.
+
+**Run memory** is derived from `AUTOLOOP_STATE_DIR` (the per-run state directory). No new env var or config key is needed.
+
+### Default scoping rules
+
+| Command | Target Tier | Override |
+|---------|-------------|----------|
+| `memory add learning <text>` | Run | `--project` flag → Project |
+| `memory add preference <cat> <text>` | Project | None (always project) |
+| `memory add meta <key> <value>` | Run | None (always run) |
+| `memory promote <id>` | Run → Project | N/A |
+| `memory remove <id>` | Whichever tier contains it | N/A |
+
+### Fallback behavior
+
+When `AUTOLOOP_STATE_DIR` is not set (e.g. running outside a loop context), all writes fall back to project memory. This preserves backward compatibility.
+
 ## Materialization
 
 Before memory is rendered into the prompt, it goes through **materialization** — a process that produces a clean, deduplicated view from the raw append-only log.
@@ -95,25 +122,32 @@ The result is a materialized view with no duplicates and no tombstoned entries, 
 
 ## Prompt injection
 
-Materialized memory is rendered as a text block and injected into the iteration prompt between the objective and the topology section. The rendered format groups entries by category:
+Materialized memory is rendered as a text block and injected into the iteration prompt between the objective and the topology section. The rendered format groups entries by tier and category:
 
 ```
 Loop memory:
+Project memory:
 Preferences:
-- [mem-2] [Workflow] Always run tests before emitting review.ready
+- [mem-1] [Workflow] Always run tests before emitting review.ready
 Learnings:
-- [mem-1] (manual) Do not document task.progress as a normal emit example
+- [mem-3] (promoted) Use .tsx for JSX files
+
+Run memory:
+Learnings:
+- [mem-1] (manual) This task uses vitest for testing
 Meta:
 - [meta-1] smoke_iteration: 2
 ```
 
-Empty categories are omitted. If no entries survive materialization, the memory block is omitted entirely.
+When run memory is empty, the "Run memory:" section is omitted. When project memory is empty, the "Project memory:" section is omitted. The "Loop memory:" header is always present if either tier has content.
 
-Normal iteration prompts and metareview review prompts also include a small **Context pressure** summary derived from the same materialized memory. That summary reports rendered memory size vs budget, active entry counts by category, and whether the prompt memory is currently being truncated.
+Empty categories are omitted. If no entries survive materialization in either tier, the memory block is omitted entirely.
+
+Normal iteration prompts and metareview review prompts also include a small **Context pressure** summary derived from the same materialized memory. That summary reports rendered memory size vs budget, active entry counts by tier and category (e.g. "2 project preferences, 10 run learnings, 2 run meta"), and whether the prompt memory is currently being truncated.
 
 ### Budget truncation
 
-The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **8000**). If the text exceeds the budget, it is sliced at the character boundary, `\n...` is appended, and a footer reports the active entry counts plus rendered-vs-budget size so prompt pressure is visible inside the clipped memory block itself. A budget of `0` disables truncation. When truncation happens, the separate **Context pressure** block still reports the full rendered size so the agent and metareview can tell that prompt memory is under pressure even though the visible memory block has been clipped.
+The rendered text is truncated to `memory.prompt_budget_chars` characters (default: **8000**). The combined text renders project memory first, then run memory. Truncation drops lines from the bottom, so **run memory entries are dropped before project entries**. Within each tier, the existing drop order applies: meta → learnings → preferences (bottom to top).
 
 ## CLI commands
 
@@ -123,11 +157,12 @@ All memory mutations happen through the `autoloop` CLI (or the loop's event tool
 
 ```sh
 autoloop memory add learning "durable lesson text"
+autoloop memory add learning --project "lesson for all runs"
 ```
 
-The `source` field is set to `"manual"` for CLI-added entries.
+By default, learnings are written to **run memory**. Use `--project` to write to project memory instead. When `AUTOLOOP_STATE_DIR` is not set, learnings always go to project memory.
 
-If the new entry pushes rendered memory over `memory.prompt_budget_chars`, the CLI prints a warning with the rendered size and budget so operators can prune memory or raise the budget before the next prompt silently clips it.
+The `source` field is set to `"manual"` for CLI-added entries.
 
 ### Add a preference
 
@@ -143,6 +178,8 @@ The first argument after `preference` is the category label.
 autoloop memory add meta <key> "value text"
 ```
 
+Meta entries are written to **run memory** by default. When `AUTOLOOP_STATE_DIR` is not set, they fall back to project memory.
+
 ### Remove an entry
 
 ```sh
@@ -154,13 +191,23 @@ Appends a tombstone targeting `<id>`. If no reason is provided, the reason defau
 
 If the target ID is missing or already inactive, the CLI prints a warning instead of appending a no-op tombstone.
 
+When `AUTOLOOP_STATE_DIR` is set, `remove` searches both run and project memory (run first).
+
+### Promote a learning
+
+```sh
+autoloop memory promote <id>
+```
+
+Copies a run-scoped learning to project memory and tombstones the run copy. Only learnings can be promoted. Prints the new project-scoped ID. Requires `AUTOLOOP_STATE_DIR` to be set.
+
 ### List memory
 
 ```sh
 autoloop memory list
 ```
 
-Prints the materialized memory (same format as prompt injection, without budget truncation). Rendered entries include their stable IDs so `memory remove` is directly actionable.
+Prints the materialized memory (same format as prompt injection, without budget truncation). When `AUTOLOOP_STATE_DIR` is set, shows both project and run memory. Rendered entries include their stable IDs so `memory remove` is directly actionable.
 
 ### Memory status
 
@@ -176,7 +223,7 @@ Prints the rendered size, configured budget, over/under-budget percentage, and a
 autoloop memory find "routing lag"
 ```
 
-Searches active entries across IDs, categories, text, sources, keys, and values, then prints matching entries with their IDs.
+Searches active entries across IDs, categories, text, sources, keys, and values, then prints matching entries with their IDs. When `AUTOLOOP_STATE_DIR` is set, searches both project and run memory.
 
 ### Inspect memory
 
