@@ -1,0 +1,55 @@
+# Changelog
+
+## [0.2.0] - 2026-04-07
+
+### Features
+
+- **Dashboard**: Alpine.js SPA with events API, iteration display (X/N), review event rendering, worktree workspace view, structured prompt rendering, Markdown rendering for event details, event summary enrichment, and merged-success indicators
+- **Worktree isolation**: Full worktree creation lifecycle, merge/clean commands, orphan detection, journal scanning, merge strategy CLI override, automerge lifecycle, and conflict detection with remediation hints
+- **Layered config**: Precedence system (defaults < user < project < CLI), per-key provenance tracking, `config show --json`, and config path resolution
+- **Presets**: Scan `~/.config/autoloop/presets/` for user presets, preset-aware health states and supervision policy, action-oriented preset descriptions, and preset categories
+- **Profiles**: Profile support for preset role tuning
+- **Chains**: Chain-aware operator surfaces with merged registry discovery, chain handoff with runId propagation, category-aware isolation decision model, and inline chain option propagation
+- **Kiro backend**: ACP client module, Kiro agent role mapping, ACP session lifecycle and sync iteration dispatch
+- **Task management**: Task system and autopr preset
+- **Human-readable run IDs**
+- **Automerge preset** with `--automerge` chain sugar and cross-run journal merge
+- **Dashboard command** with Hono server and JSON API
+- **Inspect topology** target with terminal/json/graph formats
+- **Runs clean** command with age-based retention
+- **Developer toolchain**: `bin/dev` dispatcher, lint/format/code coverage pre-commit gates, git hooks
+- **Isolation mode resolution** and run-scoped state directories
+- Print last 200 lines of backend stdout after each iteration
+- Show effective backend args in `autoloop loops show`
+- Show Started At column in `autoloop loops list`
+- BASE column in worktree list output
+- Compact worktree indicators in list views
+- Origin-check middleware and input validation for dashboard
+
+### Fixes
+
+- Remote-first base comparison for autopr to prevent inherited unpublished commits
+- Honor `XDG_CONFIG_HOME`/`APPDATA` in user config path resolution
+- Correct `--automerge` projectDir derivation; suppress worktree for planning steps
+- Skip inline automerge for chain-triggered runs
+- Prefer routed events over completion promise; prevent completion_promise from overriding invalid routed events
+- Gate decorative display banners on tty output
+- Detect and reclassify killed runs that remain as active in dashboard
+- Resolve run-scoped and worktree journals in dashboard events API
+- Rewrite run-scoped prompt paths
+- Provide fallback git identity for worktree merges
+- Harden ACP session lifecycle and worker synchronization
+- Make claude backend defaults portable
+- Let autofix exit cleanly when no bug is found
+- Show created timestamps in inspect memory markdown output
+
+### Refactoring
+
+- Move `resolveTasksFile` to config.ts for consistency
+- Extract `resolveOutcome` and progress closure in iteration.ts
+- Extract `DerivedRunContext` to deduplicate prompt derivation
+- Simplify `buildLoopContext` and `reloadLoop` in config-helpers
+- Deduplicate helpers across worktree, inspect, topology, and journal modules
+- Rename `MINILOOPS_*` env vars to `AUTOLOOP_*` across runtime, tests, and docs
+
+## [0.1.4] - Previous release
