@@ -1,6 +1,6 @@
 import { resolveRoleAgent } from "../agent-map.js";
-import type { MemoryStats } from "../memory.js";
 import * as memory from "../memory.js";
+import type { TwoTierMemoryStats } from "../memory-render.js";
 import { materialize as materializeTasks } from "../tasks.js";
 import { renderTasksPrompt } from "../tasks-render.js";
 import * as topology from "../topology.js";
@@ -40,7 +40,7 @@ export interface IterationContext {
 interface DerivedRunContext {
   scratchpadText: string;
   memoryText: string;
-  memoryStats: MemoryStats;
+  memoryStats: TwoTierMemoryStats;
   tasksText: string;
   tasksStats: { open: number; done: number; total: number };
   guidanceMessages: string[];
@@ -62,12 +62,14 @@ function deriveRunContext(
   );
   return {
     scratchpadText: renderRunScratchpadPrompt(runLines),
-    memoryText: memory.renderFile(
+    memoryText: memory.renderTwoTier(
       loop.paths.memoryFile,
+      loop.paths.runMemoryFile,
       loop.memory.budgetChars,
     ),
-    memoryStats: memory.statsFile(
+    memoryStats: memory.statsTwoTier(
       loop.paths.memoryFile,
+      loop.paths.runMemoryFile,
       loop.memory.budgetChars,
     ),
     tasksText,
@@ -468,7 +470,7 @@ function reviewInstructionsText(loop: LoopContext): string {
 }
 
 function contextPressureText(
-  memoryStats: MemoryStats,
+  memoryStats: TwoTierMemoryStats,
   tasksStats: { open: number; done: number; total: number },
   invalidCount: number,
   lastRejected: string,
@@ -498,15 +500,32 @@ function tasksPressureSummary(stats: {
   return `${stats.open} open, ${stats.done} done (${stats.total} total)`;
 }
 
-function memoryPressureSummary(stats: MemoryStats): string {
-  const entryDetail = `${stats.totalEntries} entries (${stats.preferences} preferences, ${stats.learnings} learnings, ${stats.meta} meta)`;
+function memoryPressureSummary(stats: TwoTierMemoryStats): string {
+  const p = stats.project;
+  const r = stats.run;
+  const parts: string[] = [];
+  if (p.preferences.length > 0)
+    parts.push(`${p.preferences.length} project preferences`);
+  if (p.learnings.length > 0)
+    parts.push(`${p.learnings.length} project learnings`);
+  if (r.learnings.length > 0) parts.push(`${r.learnings.length} run learnings`);
+  if (r.meta.length > 0) parts.push(`${r.meta.length} run meta`);
+  if (p.meta.length > 0) parts.push(`${p.meta.length} project meta`);
+  const totalEntries =
+    p.preferences.length +
+    p.learnings.length +
+    p.meta.length +
+    r.preferences.length +
+    r.learnings.length +
+    r.meta.length;
+  const entryDetail = `${totalEntries} entries (${parts.length > 0 ? parts.join(", ") : "empty"})`;
   if (stats.truncated) {
-    return `${stats.renderedChars}/${stats.budgetChars} chars across ${entryDetail} — truncated by ${stats.renderedChars - stats.budgetChars} chars (drop order: meta → learnings → preferences)`;
+    return `${stats.combinedRenderedChars}/${stats.budgetChars} chars across ${entryDetail} — truncated by ${stats.combinedRenderedChars - stats.budgetChars} chars (drop order: meta → learnings → preferences)`;
   }
   if (stats.budgetChars <= 0) {
-    return `${stats.renderedChars} chars across ${entryDetail}; prompt budget disabled`;
+    return `${stats.combinedRenderedChars} chars across ${entryDetail}; prompt budget disabled`;
   }
-  return `${stats.renderedChars}/${stats.budgetChars} chars across ${entryDetail}`;
+  return `${stats.combinedRenderedChars}/${stats.budgetChars} chars across ${entryDetail}`;
 }
 
 function invalidEmitHint(invalidCount: number, lastRejected: string): string {

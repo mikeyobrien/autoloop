@@ -58,3 +58,25 @@ describe("truncateText", () => {
     expect(truncateText(text, -1, emptyMemory)).toBe(text);
   });
 });
+
+describe("two-tier truncation ordering", () => {
+  it("drops run memory entries before project entries", () => {
+    // Combined memory for truncation detail tracking
+    const combined: MaterializedMemory = {
+      preferences: ["pref1"],
+      learnings: ["learn1", "learn2"],
+      meta: ["meta1"],
+    };
+    // Simulate two-tier rendered text: project first, run second
+    const text =
+      "Loop memory:\nProject memory:\nPreferences:\n- [mem-1] [cat] pref1\nRun memory:\nLearnings:\n- [mem-1] (s) learn1\n- [mem-2] (s) learn2\nMeta:\n- [meta-1] k: v";
+    // Budget that fits project section but not run
+    const projEnd = text.indexOf("Run memory:");
+    const budget = projEnd + 5;
+    const result = truncateText(text, budget, combined);
+    expect(result).toContain("Project memory:");
+    expect(result).toContain("pref1");
+    expect(result).toContain("memory truncated");
+    expect(result).not.toContain("meta-1");
+  });
+});
