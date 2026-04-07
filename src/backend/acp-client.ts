@@ -1,5 +1,5 @@
+import { type ChildProcess, spawn } from "node:child_process";
 import * as acp from "@agentclientprotocol/sdk";
-import { spawn, type ChildProcess } from "node:child_process";
 
 export interface AcpClientOptions {
   command: string;
@@ -8,6 +8,7 @@ export interface AcpClientOptions {
   trustAllTools: boolean;
   agentName?: string;
   modelId?: string;
+  verbose?: boolean;
 }
 
 export interface AcpSession {
@@ -28,7 +29,35 @@ export interface AcpPromptResult {
   error?: string;
 }
 
-export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession> {
+/**
+ * Format an ACP SessionUpdate for verbose stderr output.
+ * Returns null for event types that should be silenced.
+ */
+export function formatStreamingUpdate(
+  update: acp.SessionUpdate,
+): string | null {
+  switch (update.sessionUpdate) {
+    case "agent_message_chunk":
+      return update.content?.type === "text" ? update.content.text : null;
+    case "agent_thought_chunk":
+      return update.content?.type === "text"
+        ? `[thinking] ${update.content.text}\n`
+        : null;
+    case "tool_call":
+      return `[tool:${update.kind ?? "other"}] ${update.title}\n`;
+    case "tool_call_update":
+      if (update.status === "completed")
+        return `[tool:✓] ${update.title ?? ""}\n`;
+      if (update.status === "failed") return `[tool:✗] ${update.title ?? ""}\n`;
+      return null;
+    default:
+      return null;
+  }
+}
+
+export async function initAcpSession(
+  opts: AcpClientOptions,
+): Promise<AcpSession> {
   const child = spawn(opts.command, opts.args, {
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
@@ -47,7 +76,10 @@ export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession
     textBuffer: "",
     stderrBuffer: "",
     options: opts,
-    closed: null as unknown as Promise<{ code: number | null; signal: string | null }>,
+    closed: null as unknown as Promise<{
+      code: number | null;
+      signal: string | null;
+    }>,
   };
 
   // Buffer stderr for diagnostics
@@ -73,16 +105,26 @@ export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession
         stdin.write(chunk, (err) => (err ? reject(err) : resolve()));
       });
     },
-    close() { stdin.end(); },
-    abort(reason) { stdin.destroy(reason instanceof Error ? reason : new Error(String(reason))); },
+    close() {
+      stdin.end();
+    },
+    abort(reason) {
+      stdin.destroy(
+        reason instanceof Error ? reason : new Error(String(reason)),
+      );
+    },
   });
 
   let buffer = "";
   const decoder = new TextDecoder();
   let msgController: ReadableStreamDefaultController<unknown>;
   const parsedMessages = new ReadableStream<unknown>({
-    start(controller) { msgController = controller; },
-    cancel() { stdout.destroy(); },
+    start(controller) {
+      msgController = controller;
+    },
+    cancel() {
+      stdout.destroy();
+    },
   });
 
   stdout.on("data", (chunk: Buffer) => {
@@ -97,39 +139,62 @@ export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession
           // Filter kiro-cli private notifications — the ACP SDK doesn't know about
           // _kiro.dev/* methods and responds with -32601 "Method not found".
           // These are private kiro-cli extensions the ACP SDK does not handle.
-          if (msg.method && typeof msg.method === "string" && msg.method.startsWith("_kiro.dev/")) {
+          if (
+            msg.method &&
+            typeof msg.method === "string" &&
+            msg.method.startsWith("_kiro.dev/")
+          ) {
             continue;
           }
           msgController.enqueue(msg);
-        } catch { /* skip malformed */ }
+        } catch {
+          /* skip malformed */
+        }
       }
     }
   });
   stdout.on("end", () => {
     if (buffer.trim()) {
-      try { msgController.enqueue(JSON.parse(buffer.trim())); } catch { /* skip */ }
+      try {
+        msgController.enqueue(JSON.parse(buffer.trim()));
+      } catch {
+        /* skip */
+      }
     }
     msgController.close();
   });
-  stdout.on("error", (err) => { msgController.error(err); });
+  stdout.on("error", (err) => {
+    msgController.error(err);
+  });
 
   // Use ndJsonStream only for writable serialization; readable is our manual parser
   const dummyReadable = new ReadableStream<Uint8Array>({ start() {} });
   const ndJson = acp.ndJsonStream(writable, dummyReadable);
-  const stream: acp.Stream = { readable: parsedMessages as ReadableStream<acp.AnyMessage>, writable: ndJson.writable };
+  const stream: acp.Stream = {
+    readable: parsedMessages as ReadableStream<acp.AnyMessage>,
+    writable: ndJson.writable,
+  };
 
   const client: acp.Client = {
-    async requestPermission(params: acp.RequestPermissionRequest): Promise<acp.RequestPermissionResponse> {
+    async requestPermission(
+      params: acp.RequestPermissionRequest,
+    ): Promise<acp.RequestPermissionResponse> {
       if (opts.trustAllTools && params.options?.length) {
-        const allow = params.options.find(o => o.kind === "allow_always") ?? params.options.find(o => o.kind === "allow_once");
-        if (allow) return { outcome: { outcome: "selected", optionId: allow.optionId } };
+        const allow =
+          params.options.find((o) => o.kind === "allow_always") ??
+          params.options.find((o) => o.kind === "allow_once");
+        if (allow)
+          return { outcome: { outcome: "selected", optionId: allow.optionId } };
       }
       return { outcome: { outcome: "cancelled" } };
     },
     async sessionUpdate(params: acp.SessionNotification): Promise<void> {
       const { update } = params;
       if (!update) return;
-      if (update.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") {
+      if (
+        update.sessionUpdate === "agent_message_chunk" &&
+        update.content?.type === "text"
+      ) {
         session.textBuffer += update.content.text;
       }
     },
@@ -145,15 +210,24 @@ export async function initAcpSession(opts: AcpClientOptions): Promise<AcpSession
   });
 
   // Create session
-  const result = await session.connection.newSession({ cwd: opts.cwd, mcpServers: [] });
+  const result = await session.connection.newSession({
+    cwd: opts.cwd,
+    mcpServers: [],
+  });
   session.sessionId = result.sessionId;
 
   // Optionally set mode/model
   if (opts.agentName) {
-    await session.connection.setSessionMode({ sessionId: session.sessionId, modeId: opts.agentName });
+    await session.connection.setSessionMode({
+      sessionId: session.sessionId,
+      modeId: opts.agentName,
+    });
   }
   if (opts.modelId) {
-    await session.connection.unstable_setSessionModel({ sessionId: session.sessionId, modelId: opts.modelId });
+    await session.connection.unstable_setSessionModel({
+      sessionId: session.sessionId,
+      modelId: opts.modelId,
+    });
   }
 
   return session;
@@ -180,7 +254,12 @@ export async function sendAcpPrompt(
     }
   }
   // unreachable, but satisfies TS
-  return { output: session.textBuffer, stopReason: "end_turn", timedOut: false, error: "retry exhausted" };
+  return {
+    output: session.textBuffer,
+    stopReason: "end_turn",
+    timedOut: false,
+    error: "retry exhausted",
+  };
 }
 
 async function sendAcpPromptOnce(
@@ -205,7 +284,9 @@ async function sendAcpPromptOnce(
   const crashPromise = session.closed.then(({ code, signal }) => {
     const stderr = session.stderrBuffer.trim();
     const detail = stderr ? `\n${stderr}` : "";
-    throw new Error(`kiro-cli exited unexpectedly: code=${code} signal=${signal}${detail}`);
+    throw new Error(
+      `kiro-cli exited unexpectedly: code=${code} signal=${signal}${detail}`,
+    );
   });
 
   try {
@@ -218,13 +299,26 @@ async function sendAcpPromptOnce(
       crashPromise,
     ]);
     clearTimeout(timer);
-    return { output: session.textBuffer, stopReason: response.stopReason, timedOut: false };
+    return {
+      output: session.textBuffer,
+      stopReason: response.stopReason,
+      timedOut: false,
+    };
   } catch (err) {
     clearTimeout(timer);
     if (timedOut) {
-      return { output: session.textBuffer, stopReason: "cancelled", timedOut: true };
+      return {
+        output: session.textBuffer,
+        stopReason: "cancelled",
+        timedOut: true,
+      };
     }
-    return { output: session.textBuffer, stopReason: "end_turn", timedOut: false, error: String(err) };
+    return {
+      output: session.textBuffer,
+      stopReason: "end_turn",
+      timedOut: false,
+      error: String(err),
+    };
   }
 }
 
@@ -233,12 +327,20 @@ export async function terminateAcpSession(session: AcpSession): Promise<void> {
   if (!child.pid || child.killed) return;
 
   // Cancel any in-flight turn before killing
-  try { session.connection.cancel({ sessionId: session.sessionId }); } catch { /* may not have a session */ }
+  try {
+    session.connection.cancel({ sessionId: session.sessionId });
+  } catch {
+    /* may not have a session */
+  }
 
   // Kill the entire process tree — MCP servers run in their own process groups
   // and won't die from just killing the parent.
   const pid = child.pid;
-  try { process.kill(-pid, "SIGTERM"); } catch { /* process group may not exist */ }
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    /* process group may not exist */
+  }
   child.kill("SIGTERM");
 
   const exited = await Promise.race([
@@ -246,7 +348,11 @@ export async function terminateAcpSession(session: AcpSession): Promise<void> {
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
   ]);
   if (!exited && !child.killed) {
-    try { process.kill(-pid, "SIGKILL"); } catch { /* already dead */ }
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      /* already dead */
+    }
     child.kill("SIGKILL");
   }
 }
