@@ -6,6 +6,14 @@ export interface MaterializedMemory {
   meta: string[];
 }
 
+export interface TwoTierMemoryStats {
+  project: MaterializedMemory;
+  run: MaterializedMemory;
+  combinedRenderedChars: number;
+  budgetChars: number;
+  truncated: boolean;
+}
+
 export function truncateText(
   text: string,
   budgetChars: number,

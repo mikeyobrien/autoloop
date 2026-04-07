@@ -4,7 +4,10 @@ import * as config from "./config.js";
 import { readIfExists, readLines } from "./harness/journal.js";
 import { extractField, jsonField } from "./json.js";
 import { bulletList } from "./markdown.js";
-import type { MaterializedMemory } from "./memory-render.js";
+import type {
+  MaterializedMemory,
+  TwoTierMemoryStats,
+} from "./memory-render.js";
 import { truncateText } from "./memory-render.js";
 
 export interface MemoryStats {
@@ -140,6 +143,12 @@ export function remove(projectDir: string, id: string, reason: string): void {
 }
 
 function renderMaterialized(memory: MaterializedMemory): string {
+  const sections = renderSections(memory);
+  if (!sections) return "";
+  return "Loop memory:\n" + sections;
+}
+
+function renderSections(memory: MaterializedMemory): string {
   if (
     memory.preferences.length === 0 &&
     memory.learnings.length === 0 &&
@@ -148,11 +157,159 @@ function renderMaterialized(memory: MaterializedMemory): string {
     return "";
   }
   return (
-    "Loop memory:\n" +
     renderPreferences(memory.preferences) +
     renderLearnings(memory.learnings) +
     renderMeta(memory.meta)
   );
+}
+
+// --- Two-tier memory functions ---
+
+export function resolveRunFile(stateDir: string): string {
+  return join(stateDir, "memory.jsonl");
+}
+
+export function addRunLearning(
+  stateDir: string,
+  text: string,
+  source: string,
+): void {
+  const path = resolveRunFile(stateDir);
+  appendMemoryEntry(
+    path,
+    memoryLine(
+      nextId(path, "mem"),
+      "learning",
+      jsonField("text", text) +
+        ", " +
+        jsonField("source", source) +
+        ", " +
+        jsonField("created", currentTime()),
+    ),
+  );
+  console.log("stored learning");
+}
+
+export function addRunMeta(stateDir: string, key: string, value: string): void {
+  const path = resolveRunFile(stateDir);
+  appendMemoryEntry(
+    path,
+    memoryLine(
+      nextId(path, "meta"),
+      "meta",
+      jsonField("key", key) +
+        ", " +
+        jsonField("value", value) +
+        ", " +
+        jsonField("created", currentTime()),
+    ),
+  );
+  console.log("stored meta");
+}
+
+export function removeFromEither(
+  projectDir: string,
+  stateDir: string,
+  id: string,
+  reason: string,
+): void {
+  const runPath = resolveRunFile(stateDir);
+  const runMemory = materialize(readLines(runPath));
+  if (activeEntryExists(runMemory, id)) {
+    removeExistingEntry(runPath, id, reason);
+    return;
+  }
+  const projPath = resolveFile(projectDir);
+  const projMemory = materialize(readLines(projPath));
+  if (activeEntryExists(projMemory, id)) {
+    removeExistingEntry(projPath, id, reason);
+    return;
+  }
+  console.log(`warning: no active entry with ID ${id} found`);
+}
+
+export function promote(
+  projectDir: string,
+  stateDir: string,
+  id: string,
+): void {
+  const runPath = resolveRunFile(stateDir);
+  const runMemory = materialize(readLines(runPath));
+  const all = [
+    ...runMemory.preferences,
+    ...runMemory.learnings,
+    ...runMemory.meta,
+  ];
+  const entry = all.find((e) => extractField(e, "id") === id);
+  if (!entry) {
+    console.log(`error: no active entry with ID ${id} in run memory`);
+    return;
+  }
+  if (extractField(entry, "type") !== "learning") {
+    console.log("error: only learnings can be promoted");
+    return;
+  }
+  const projPath = resolveFile(projectDir);
+  const newId = nextId(projPath, "mem");
+  appendMemoryEntry(
+    projPath,
+    memoryLine(
+      newId,
+      "learning",
+      jsonField("text", extractField(entry, "text")) +
+        ", " +
+        jsonField("source", "promoted") +
+        ", " +
+        jsonField("created", currentTime()),
+    ),
+  );
+  removeExistingEntry(runPath, id, "promoted");
+  console.log(newId);
+}
+
+export function renderTwoTier(
+  projectPath: string,
+  runPath: string,
+  budgetChars: number,
+): string {
+  const projMemory = materialize(readLines(projectPath));
+  const runMemory = materialize(readLines(runPath));
+  const projSections = renderSections(projMemory);
+  const runSections = renderSections(runMemory);
+  if (!projSections && !runSections) return "";
+  let text = "Loop memory:\n";
+  if (projSections) text += "Project memory:\n" + projSections;
+  if (runSections) text += "Run memory:\n" + runSections;
+  const combined: MaterializedMemory = {
+    preferences: [...projMemory.preferences, ...runMemory.preferences],
+    learnings: [...projMemory.learnings, ...runMemory.learnings],
+    meta: [...projMemory.meta, ...runMemory.meta],
+  };
+  return truncateText(text, budgetChars, combined);
+}
+
+export function statsTwoTier(
+  projectPath: string,
+  runPath: string,
+  budgetChars: number,
+): TwoTierMemoryStats {
+  const projMemory = materialize(readLines(projectPath));
+  const runMemory = materialize(readLines(runPath));
+  const projSections = renderSections(projMemory);
+  const runSections = renderSections(runMemory);
+  let text = "";
+  if (projSections || runSections) {
+    text = "Loop memory:\n";
+    if (projSections) text += "Project memory:\n" + projSections;
+    if (runSections) text += "Run memory:\n" + runSections;
+  }
+  return {
+    project: projMemory,
+    run: runMemory,
+    combinedRenderedChars: text.length,
+    budgetChars,
+    truncated: budgetChars > 0 && text.length > budgetChars,
+  };
 }
 
 function renderPreferences(entries: string[]): string {
@@ -338,7 +495,7 @@ function activeEntryExists(memory: MaterializedMemory, id: string): boolean {
   return all.some((entry) => extractField(entry, "id") === id);
 }
 
-function materialize(lines: string[]): MaterializedMemory {
+export function materialize(lines: string[]): MaterializedMemory {
   const reversed = [...lines].reverse();
   const seen: string[] = [];
   const tombstoned: string[] = [];
