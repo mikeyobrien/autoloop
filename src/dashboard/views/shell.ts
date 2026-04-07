@@ -170,7 +170,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
     <div>
       <div class="field"><label>Status: </label><span x-text="selectedRunDetail.status"></span></div>
       <div class="field"><label>Preset: </label><span x-text="selectedRunDetail.preset"></span></div>
-      <div class="field"><label>Objective: </label><span x-text="selectedRunDetail.objective"></span></div>
+      <div class="field"><label>Objective: </label><div class="md-content" style="display:inline" x-html="renderMarkdown(selectedRunDetail.objective)"></div></div>
       <div class="field"><label>Iteration: </label><span x-text="selectedRunDetail.iteration + '/' + (selectedRunDetail.max_iterations || '?')"></span></div>
       <div class="field"><label>Workspace: </label><span :title="workspacePath(selectedRunDetail)" x-text="workspaceLabel(selectedRunDetail)"></span></div>
       <div class="field"><label>Created: </label><span :title="selectedRunDetail.created_at" x-text="timeAgo(selectedRunDetail.created_at) + ' ago'"></span></div>
@@ -187,6 +187,14 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       </template>
     </div>
   </template>
+  <div x-show="selectedRunDetail && selectedRunDetail.status === 'running'" style="display:grid;grid-template-columns:1fr auto;gap:0.4rem;align-items:center;margin:0.75rem 0;padding:0.6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+    <input type="text" x-model="guideMessage" placeholder="Send guidance to this run..." @keydown.enter="sendGuide()"
+      style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:4px;font-size:0.8rem;font-family:inherit;background:var(--bg);color:var(--fg)">
+    <div style="display:flex;gap:0.4rem;align-items:center">
+      <button @click="sendGuide()" style="padding:0.4rem 0.8rem;border:none;border-radius:4px;background:var(--active);color:#fff;cursor:pointer;font-size:0.8rem;white-space:nowrap">Send</button>
+      <span x-show="guideFlash" x-text="guideFlash" x-transition.opacity style="font-size:0.75rem;color:var(--completed)"></span>
+    </div>
+  </div>
   <div class="events-list">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <h3>Events</h3>
@@ -301,12 +309,6 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       </details>
     </template>
     <p class="empty" x-show="visibleRunEvents().length === 0">No events</p>
-  </div>
-  <div x-show="selectedRunDetail && selectedRunDetail.status === 'active'" style="display:flex;gap:0.4rem;align-items:center;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
-    <input type="text" x-model="guideMessage" placeholder="Send guidance..." @keydown.enter="sendGuide()"
-      style="flex:1;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:4px;font-size:0.8rem;font-family:inherit;background:var(--bg);color:var(--fg)">
-    <button @click="sendGuide()" style="padding:0.4rem 0.8rem;border:none;border-radius:4px;background:var(--active);color:#fff;cursor:pointer;font-size:0.8rem;white-space:nowrap">Send</button>
-    <span x-show="guideFlash" x-text="guideFlash" x-transition.opacity style="font-size:0.75rem;color:var(--completed)"></span>
   </div>
 </div>
 
@@ -539,17 +541,14 @@ function dashboard() {
     },
 
     eventDisplayEntries(ev) {
-      if (ev.topic === 'iteration.start' && ev.fields && typeof ev.fields === 'object') {
+      if (ev.fields && typeof ev.fields === 'object') {
         const entries = [];
         for (const [k, v] of Object.entries(ev)) {
           if (k === 'fields') continue;
           entries.push([k, v]);
         }
-        const fieldKeys = ['recent_event', 'suggested_roles', 'allowed_events', 'backpressure', 'prompt'];
-        for (const fk of fieldKeys) {
-          if (ev.fields[fk] !== undefined) {
-            entries.push([fk, ev.fields[fk]]);
-          }
+        for (const [fk, fv] of Object.entries(ev.fields)) {
+          entries.push([fk, fv]);
         }
         return entries;
       }
