@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
@@ -135,13 +136,16 @@ function selfCommand(argv: string[]): string {
 function resolveBundleRoot(argv: string[]): string {
   const envRoot = process.env.AUTOLOOPS_BUNDLE_ROOT;
   if (envRoot) return envRoot;
-  // Try to resolve from the script location
+  // Resolve relative to this file — works for both source and npm-installed binary
+  const thisFile = fileURLToPath(import.meta.url);
+  const candidate = resolve(thisFile, "../..");
+  if (existsSync(join(candidate, "presets"))) return candidate;
+  // Fallback: try argv[1] heuristic (works when running from source via bin/)
   const scriptPath = argv[1] ?? "";
   if (scriptPath) {
-    // The bundle root is the directory containing the script's parent project
     const scriptDir = resolve(scriptPath, "..");
-    const candidate = resolve(scriptDir, "..");
-    if (existsSync(join(candidate, "presets"))) return candidate;
+    const argvCandidate = resolve(scriptDir, "..");
+    if (existsSync(join(argvCandidate, "presets"))) return argvCandidate;
   }
   return ".";
 }
