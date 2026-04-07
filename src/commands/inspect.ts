@@ -13,6 +13,7 @@ const INSPECT_TARGETS = [
   "prompt",
   "output",
   "journal",
+  "artifacts",
   "memory",
   "tasks",
   "coordination",
@@ -28,6 +29,9 @@ interface InspectSpec {
   projectDir: string;
   format: string;
   run?: string;
+  topics?: string[];
+  iterFilter?: string;
+  allRuns?: boolean;
 }
 
 export function dispatchInspect(args: string[]): boolean {
@@ -53,11 +57,19 @@ export function dispatchInspect(args: string[]): boolean {
       console.log(tasks.listTasks(projectDir));
       return true;
     case "journal":
-      if (spec.run) {
-        harness.renderJournal(projectDir, spec.run);
+      if (format === "json") {
+        // Backward compat: raw JSON lines
+        if (spec.run) {
+          harness.renderJournal(projectDir, spec.run);
+        } else {
+          harness.renderAllJournals(projectDir);
+        }
       } else {
-        harness.renderAllJournals(projectDir);
+        harness.renderJournalTimeline(projectDir, spec);
       }
+      return true;
+    case "artifacts":
+      harness.renderArtifacts(projectDir, format, spec.run);
       return true;
     case "coordination":
       harness.renderCoordinationFormat(projectDir, format, spec.run);
@@ -105,6 +117,9 @@ function parseInspectArgs(args: string[]): InspectSpec {
   const artifact = args[0] ?? "";
   let format = "";
   let run: string | undefined;
+  const topics: string[] = [];
+  let iterFilter: string | undefined;
+  let allRuns = false;
   const positionals: string[] = [];
 
   let i = 1;
@@ -115,6 +130,19 @@ function parseInspectArgs(args: string[]): InspectSpec {
     } else if (args[i] === "--run") {
       run = args[i + 1] ?? "";
       i += 2;
+    } else if (args[i] === "--topic") {
+      const val = args[i + 1] ?? "";
+      if (val) topics.push(val);
+      i += 2;
+    } else if (args[i] === "--iter") {
+      iterFilter = args[i + 1] ?? "";
+      i += 2;
+    } else if (args[i] === "--all-runs") {
+      allRuns = true;
+      i++;
+    } else if (args[i] === "--json") {
+      format = "json";
+      i++;
     } else {
       positionals.push(args[i]);
       i++;
@@ -134,12 +162,21 @@ function parseInspectArgs(args: string[]): InspectSpec {
       ? positionals[1]
       : (positionals[0] ?? resolveRuntimeProjectDir());
 
-  return { artifact, selector, projectDir, format, run };
+  return {
+    artifact,
+    selector,
+    projectDir,
+    format,
+    run,
+    topics: topics.length > 0 ? topics : undefined,
+    iterFilter,
+    allRuns,
+  };
 }
 
 function inspectDefaultFormat(artifact: string): string {
   if (artifact === "output") return "text";
-  if (artifact === "journal") return "json";
+  if (artifact === "journal") return "terminal";
   return "terminal";
 }
 

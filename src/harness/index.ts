@@ -14,6 +14,7 @@ import {
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "../worktree/meta.js";
+import { collectArtifacts, formatArtifacts } from "./artifacts.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
@@ -41,6 +42,7 @@ import {
   readRunJournal,
   readRunLines,
 } from "./journal.js";
+import { formatTimeline } from "./journal-format.js";
 import { maybeRunMetareview } from "./metareview.js";
 import { collectMetricsRows, formatMetrics } from "./metrics.js";
 import {
@@ -396,6 +398,50 @@ export function runParallelBranchCli(
 
   writeFileSync(join(branchDir, "result.md"), renderBranchResult(result));
   writeParallelBranchSummary(branchDir, result);
+}
+
+export function renderJournalTimeline(
+  projectDir: string,
+  spec: {
+    topics?: string[];
+    iterFilter?: string;
+    allRuns?: boolean;
+    run?: string;
+  },
+): void {
+  let lines: string[];
+  if (spec.allRuns) {
+    const stateDir = config.stateDirPath(projectDir);
+    lines = readAllJournals(stateDir);
+    if (lines.length === 0) {
+      // Fallback to current journal file
+      const journalFile = resolveEmitJournalFile(projectDir);
+      lines = readRunLines(journalFile, ensureRenderRunId(journalFile));
+    }
+  } else {
+    const { journalFile, runId } = resolveJournalAndRun(projectDir, spec.run);
+    lines = readRunLines(journalFile, runId);
+  }
+  const output = formatTimeline(lines, {
+    topics: spec.topics,
+    iterFilter: spec.iterFilter,
+  });
+  console.log(output);
+}
+
+export function renderArtifacts(
+  projectDir: string,
+  format: string,
+  runOverride?: string,
+): void {
+  const { journalFile, runId } = resolveJournalAndRun(projectDir, runOverride);
+  const lines = readRunLines(journalFile, runId);
+  const artifacts = collectArtifacts(lines, projectDir);
+  if (format === "json") {
+    console.log(JSON.stringify(artifacts, null, 2));
+  } else {
+    console.log(formatArtifacts(artifacts));
+  }
 }
 
 // --- Private implementation ---

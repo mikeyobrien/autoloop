@@ -2,6 +2,7 @@ export type LoopTopic = "loop.start" | "loop.complete" | "loop.stop";
 export type IterationTopic = "iteration.start" | "iteration.finish";
 export type BackendTopic = "backend.start" | "backend.finish";
 export type ReviewTopic = "review.start" | "review.finish";
+export type ArtifactTopic = "artifact.created";
 export type CoordinationTopic =
   | "issue.discovered"
   | "issue.resolved"
@@ -9,7 +10,8 @@ export type CoordinationTopic =
   | "slice.verified"
   | "slice.committed"
   | "context.archived"
-  | "chain.spawn";
+  | "chain.spawn"
+  | ArtifactTopic;
 export type ChainTopic = "chain.start" | "chain.complete";
 export type OperatorTopic = "operator.guidance" | "operator.guidance.consumed";
 export type WaveTopic = string;

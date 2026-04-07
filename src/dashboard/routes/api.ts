@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Hono } from "hono";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
+import { collectArtifacts } from "../../harness/artifacts.js";
 import {
   appendOperatorEvent,
   latestIterationForRun,
@@ -84,6 +87,57 @@ export function apiRoutes(ctx: DashboardContext): Hono {
       }
     });
     return c.json({ events });
+  });
+
+  api.get("/runs/:id/artifacts", (c) => {
+    const id = c.req.param("id");
+    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    if (Array.isArray(result)) {
+      return c.json(
+        { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
+        409,
+      );
+    }
+    const runId = result?.run_id || id;
+    const runJournal =
+      result?.journal_file || resolveRunJournalPath(ctx.stateDir, runId);
+    const lines = runJournal
+      ? readRunLines(runJournal, runId)
+      : readRunLines(ctx.journalPath, runId);
+    const workDir = result?.work_dir || result?.worktree_path || ctx.projectDir;
+    const artifacts = collectArtifacts(lines, ctx.projectDir, workDir);
+    return c.json(artifacts);
+  });
+
+  api.get("/runs/:id/artifact", (c) => {
+    const filePath = c.req.query("path");
+    if (!filePath || filePath.trim() === "") {
+      return c.json({ error: "path required" }, 400);
+    }
+    if (filePath.includes("..")) {
+      return c.json({ error: "path traversal not allowed" }, 400);
+    }
+    if (filePath.startsWith("/")) {
+      return c.json({ error: "absolute paths not allowed" }, 400);
+    }
+    if (!filePath.endsWith(".md")) {
+      return c.json({ error: "only .md files supported" }, 400);
+    }
+    const id = c.req.param("id");
+    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    if (Array.isArray(result)) {
+      return c.json(
+        { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
+        409,
+      );
+    }
+    const workDir = result?.work_dir || result?.worktree_path || ctx.projectDir;
+    const fullPath = join(workDir, filePath);
+    if (!existsSync(fullPath)) {
+      return c.json({ error: "file not found" }, 404);
+    }
+    const content = readFileSync(fullPath, "utf-8");
+    return c.text(content);
   });
 
   api.get("/presets", (c) => {

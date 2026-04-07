@@ -128,7 +128,10 @@ export function printInspectUsage(): void {
     "  prompt         <iteration>   md, terminal            terminal",
   );
   console.log("  output         <iteration>   text                    text");
-  console.log("  journal        —             json                    json");
+  console.log(
+    "  journal        [--topic/--iter/--all-runs/--json]  terminal, json  terminal",
+  );
+  console.log("  artifacts      [--run]       terminal, json      terminal");
   console.log(
     "  memory         —             md, terminal, json      terminal",
   );

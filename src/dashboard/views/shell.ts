@@ -11,6 +11,9 @@ export function htmlShell(): string {
   --card-bg: #fafafa; --badge-bg: #eee;
   --active: #2563eb; --watching: #d97706; --stuck: #dc2626;
   --failed: #dc2626; --completed: #16a34a;
+  --cat-loop: #06b6d4; --cat-iteration: #d97706; --cat-backend: #666;
+  --cat-review: #c026d3; --cat-coordination: #2563eb; --cat-error: #dc2626;
+  --cat-operator: #ef4444; --cat-completion: #16a34a;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -109,6 +112,37 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .merged-badge { color: var(--completed); font-weight: 600; }
 .merge-detail { margin-top: 0.5rem; padding: 0.5rem; background: color-mix(in srgb, var(--completed) 8%, transparent); border: 1px solid color-mix(in srgb, var(--completed) 25%, transparent); border-radius: 4px; }
 .merge-detail .field label { color: var(--completed); }
+
+.detail-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-top: 0.75rem; margin-bottom: 0; }
+.detail-tab { background: none; border: none; padding: 0.4rem 0.8rem; font-size: 0.8rem; font-family: monospace; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.detail-tab:hover { color: var(--fg); }
+.detail-tab.active { color: var(--active); border-bottom-color: var(--active); font-weight: 600; }
+
+.topic-chip { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.15rem 0.4rem; border: 1px solid var(--border); border-left-width: 3px; border-radius: 4px; background: none; font-size: 0.7rem; font-family: monospace; cursor: pointer; color: var(--muted); }
+.topic-chip.active { color: var(--fg); background: var(--card-bg); }
+.topic-chip .badge { font-size: 0.6rem; padding: 0 0.25rem; }
+
+.journal-search { width: 100%; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem; font-family: inherit; background: var(--bg); color: var(--fg); }
+
+.iter-group { border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.4rem; }
+.iter-group > summary { cursor: pointer; padding: 0.3rem 0.5rem; font-size: 0.75rem; font-family: monospace; color: var(--muted); background: var(--card-bg); list-style: none; }
+.iter-group > summary::-webkit-details-marker { display: none; }
+.iter-group > summary::before { content: "\\25b6 "; font-size: 0.6rem; }
+.iter-group[open] > summary::before { content: "\\25bc "; }
+
+.artifacts-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; }
+.artifact-stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; text-align: center; }
+.artifact-stat-value { font-size: 1.2rem; font-weight: 700; font-family: monospace; }
+.artifact-stat-label { font-size: 0.7rem; color: var(--muted); }
+.artifacts-bar-chart { margin: 0.5rem 0; }
+.bar-row { display: grid; grid-template-columns: 80px 1fr 40px; gap: 0.4rem; align-items: center; font-size: 0.75rem; margin-bottom: 0.2rem; }
+.bar-label { text-align: right; color: var(--muted); font-family: monospace; }
+.bar-track { height: 14px; background: var(--badge-bg); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; min-width: 2px; }
+.bar-count { font-family: monospace; text-align: right; }
+.artifact-doc-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+.artifact-view-btn { padding: 0.15rem 0.5rem; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); color: var(--fg); cursor: pointer; font-size: 0.7rem; }
+.artifact-view-btn:hover { background: var(--badge-bg); }
 </style>
 </head>
 <body x-data="dashboard()" x-init="startPolling()">
@@ -195,7 +229,12 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
       <span x-show="guideFlash" x-text="guideFlash" x-transition.opacity style="font-size:0.75rem;color:var(--completed)"></span>
     </div>
   </div>
-  <div class="events-list">
+  <div class="detail-tabs" x-show="selectedRunDetail">
+    <button class="detail-tab" :class="{ active: detailTab === 'events' }" @click="detailTab = 'events'">Events</button>
+    <button class="detail-tab" :class="{ active: detailTab === 'journal' }" @click="detailTab = 'journal'">Journal</button>
+    <button class="detail-tab" :class="{ active: detailTab === 'artifacts' }" @click="detailTab = 'artifacts'">Artifacts</button>
+  </div>
+  <div x-show="detailTab === 'events'" class="events-list">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <h3>Events</h3>
       <label style="font-size:0.75rem;cursor:pointer"><input type="checkbox" x-model="showVerbose" style="margin-right:0.3rem">Show backend events</label>
@@ -310,6 +349,133 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
     </template>
     <p class="empty" x-show="visibleRunEvents().length === 0">No events</p>
   </div>
+  <div x-show="detailTab === 'journal'" class="events-list">
+    <div style="margin-bottom:0.5rem">
+      <input type="text" class="journal-search" x-model="journalSearch" placeholder="Search events...">
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.5rem">
+      <template x-for="cat in journalCategoryChips()" :key="cat.key">
+        <button class="topic-chip" :class="{ active: journalCategoryFilter[cat.key] }" :style="'border-color:' + cat.color" @click="journalCategoryFilter[cat.key] = !journalCategoryFilter[cat.key]">
+          <span x-text="cat.label"></span>
+          <span class="badge" x-text="cat.count"></span>
+        </button>
+      </template>
+    </div>
+    <template x-for="group in journalGroups()" :key="group.key">
+      <details class="iter-group" open>
+        <summary x-text="group.label + ' (' + group.events.length + ' events)'"></summary>
+        <template x-for="(ev, idx) in group.events" :key="idx">
+          <details :class="eventClasses(ev)">
+            <summary x-text="eventSummary(ev)"></summary>
+            <div style="padding:0.3rem">
+              <template x-for="[k,v] in eventDisplayEntries(ev)" :key="k">
+                <div class="event-field">
+                  <strong x-text="k + ':'"></strong>
+                  <template x-if="isRoutingBadgeField(k)">
+                    <span x-html="renderRoutingValue(k, v)"></span>
+                  </template>
+                  <template x-if="!isRoutingBadgeField(k) && isMarkdownField(ev.topic, k)">
+                    <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
+                      <div class="md-content" x-html="renderMarkdown(typeof v === 'object' ? JSON.stringify(v,null,2) : String(v))"></div>
+                    </template>
+                  </template>
+                  <template x-if="!isRoutingBadgeField(k) && isMarkdownField(ev.topic, k)">
+                    <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
+                      <details>
+                        <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
+                        <div class="md-content" style="font-size:0.7rem;margin-top:0.2rem" x-html="renderMarkdown(typeof v === 'object' ? JSON.stringify(v,null,2) : String(v))"></div>
+                      </details>
+                    </template>
+                  </template>
+                  <template x-if="!isRoutingBadgeField(k) && !isMarkdownField(ev.topic, k)">
+                    <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length <= 200">
+                      <pre x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
+                    </template>
+                  </template>
+                  <template x-if="!isRoutingBadgeField(k) && !isMarkdownField(ev.topic, k)">
+                    <template x-if="String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length > 200">
+                      <details>
+                        <summary x-text="k + ' (' + String(typeof v === 'object' ? JSON.stringify(v,null,2) : v).length + ' chars)'"></summary>
+                        <pre style="white-space:pre-wrap;font-size:0.7rem;margin-top:0.2rem" x-text="typeof v === 'object' ? JSON.stringify(v,null,2) : String(v)"></pre>
+                      </details>
+                    </template>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </details>
+        </template>
+      </details>
+    </template>
+    <p class="empty" x-show="journalGroups().length === 0">No matching events</p>
+  </div>
+  <div x-show="detailTab === 'artifacts'" class="events-list">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+      <h3 style="font-size:0.95rem">Artifacts</h3>
+      <button @click="fetchArtifacts()" style="padding:0.2rem 0.6rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);cursor:pointer;font-size:0.75rem">Refresh</button>
+    </div>
+
+    <div x-show="artifactsData" class="artifacts-grid">
+      <div class="artifact-stat-card">
+        <div class="artifact-stat-value" x-text="artifactsData?.events?.total || 0"></div>
+        <div class="artifact-stat-label">Events</div>
+      </div>
+      <div class="artifact-stat-card">
+        <div class="artifact-stat-value" x-text="artifactsData?.iterations || 0"></div>
+        <div class="artifact-stat-label">Iterations</div>
+      </div>
+      <div class="artifact-stat-card">
+        <div class="artifact-stat-value" x-text="(artifactsData?.artifacts?.memoryLearnings || 0) + (artifactsData?.artifacts?.memoryMeta || 0)"></div>
+        <div class="artifact-stat-label">Memory</div>
+      </div>
+      <div class="artifact-stat-card">
+        <div class="artifact-stat-value" x-text="artifactsData?.artifacts?.guidanceSent || 0"></div>
+        <div class="artifact-stat-label">Guidance</div>
+      </div>
+    </div>
+
+    <div x-show="artifactsData" class="artifacts-bar-chart">
+      <template x-for="cat in artifactsCategoryBars()" :key="cat.key">
+        <div class="bar-row">
+          <span class="bar-label" x-text="cat.label"></span>
+          <div class="bar-track">
+            <div class="bar-fill" :style="'width:' + cat.pct + '%;background:' + cat.color"></div>
+          </div>
+          <span class="bar-count" x-text="cat.count"></span>
+        </div>
+      </template>
+    </div>
+
+    <div x-show="artifactsData" style="font-size:0.8rem;font-family:monospace;margin:0.75rem 0">
+      <div>commits: <span x-text="artifactsData?.output?.commits || 0"></span></div>
+      <div>files changed: <span x-text="artifactsData?.output?.filesChanged < 0 ? '-' : artifactsData?.output?.filesChanged"></span></div>
+      <div>journal size: <span x-text="formatBytes(artifactsData?.output?.journalSizeBytes || 0)"></span></div>
+      <div>backpressure: <span x-text="artifactsData?.artifacts?.backpressure || 0"></span> rejected</div>
+    </div>
+
+    <div x-show="artifactsData && artifactsData.documents && artifactsData.documents.length > 0">
+      <h4 style="font-size:0.85rem;margin:0.75rem 0 0.5rem">Documents</h4>
+      <template x-for="doc in artifactsData?.documents || []" :key="doc.path">
+        <div class="artifact-doc-row">
+          <span x-text="doc.title || doc.path"></span>
+          <span class="badge" x-text="doc.kind"></span>
+          <template x-if="doc.missing">
+            <span style="color:var(--failed);font-size:0.7rem">(missing)</span>
+          </template>
+          <template x-if="!doc.missing">
+            <button class="artifact-view-btn" @click="viewArtifactDoc(doc.path)">View</button>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <div x-show="artifactDocContent !== null" style="margin-top:0.75rem">
+      <button @click="artifactDocContent = null; artifactDocPath = ''" style="padding:0.2rem 0.6rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);cursor:pointer;font-size:0.75rem;margin-bottom:0.5rem">\u2190 Back</button>
+      <div class="md-content" x-html="renderMarkdown(artifactDocContent || '')"></div>
+    </div>
+
+    <p class="empty" x-show="!artifactsData">Click Refresh to load artifacts</p>
+  </div>
 </div>
 
 <script defer src="/static/alpine.min.js"></script>
@@ -330,6 +496,31 @@ function dashboard() {
     showVerbose: false,
     guideMessage: "",
     guideFlash: "",
+    artifactsData: null,
+    artifactDocContent: null,
+    artifactDocPath: '',
+    detailTab: 'events',
+    journalSearch: '',
+    journalCategoryFilter: {
+      loop: true,
+      iteration: true,
+      backend: false,
+      review: true,
+      coordination: true,
+      error: true,
+      operator: true,
+      completion: true,
+    },
+    categoryColors: {
+      loop: '#06b6d4',
+      iteration: '#d97706',
+      backend: '#666',
+      review: '#c026d3',
+      coordination: '#2563eb',
+      error: '#dc2626',
+      operator: '#ef4444',
+      completion: '#16a34a',
+    },
 
     get categories() {
       return [
@@ -375,6 +566,9 @@ function dashboard() {
 
     async selectRun(runId) {
       this.selectedRun = runId;
+      this.artifactsData = null;
+      this.artifactDocContent = null;
+      this.artifactDocPath = '';
       try {
         const detailRes = await fetch("/api/runs/" + runId);
         if (detailRes.ok) this.selectedRunDetail = await detailRes.json();
@@ -662,6 +856,49 @@ function dashboard() {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
 
+    async fetchArtifacts() {
+      if (!this.selectedRun) return;
+      try {
+        const res = await fetch('/api/runs/' + this.selectedRun + '/artifacts');
+        if (res.ok) this.artifactsData = await res.json();
+      } catch (e) { /* ignore */ }
+    },
+
+    async viewArtifactDoc(path) {
+      if (!this.selectedRun) return;
+      try {
+        const res = await fetch('/api/runs/' + this.selectedRun + '/artifact?path=' + encodeURIComponent(path));
+        if (res.ok) {
+          this.artifactDocContent = await res.text();
+          this.artifactDocPath = path;
+        }
+      } catch (e) { /* ignore */ }
+    },
+
+    artifactsCategoryBars() {
+      if (!this.artifactsData) return [];
+      const ev = this.artifactsData.events;
+      const max = Math.max(ev.loop, ev.iteration, ev.backend, ev.review, ev.coordination, ev.operator, ev.routing, ev.errors, 1);
+      return [
+        { key: 'loop', label: 'loop', count: ev.loop, pct: (ev.loop / max) * 100, color: 'var(--cat-loop)' },
+        { key: 'iteration', label: 'iteration', count: ev.iteration, pct: (ev.iteration / max) * 100, color: 'var(--cat-iteration)' },
+        { key: 'backend', label: 'backend', count: ev.backend, pct: (ev.backend / max) * 100, color: 'var(--cat-backend)' },
+        { key: 'review', label: 'review', count: ev.review, pct: (ev.review / max) * 100, color: 'var(--cat-review)' },
+        { key: 'coordination', label: 'coord', count: ev.coordination, pct: (ev.coordination / max) * 100, color: 'var(--cat-coordination)' },
+        { key: 'operator', label: 'operator', count: ev.operator, pct: (ev.operator / max) * 100, color: 'var(--cat-operator)' },
+        { key: 'routing', label: 'routing', count: ev.routing, pct: (ev.routing / max) * 100, color: 'var(--cat-routing, #6366f1)' },
+        { key: 'errors', label: 'errors', count: ev.errors, pct: (ev.errors / max) * 100, color: 'var(--cat-error)' },
+      ];
+    },
+
+    formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      if (bytes < 1024) return bytes + ' B';
+      const kb = bytes / 1024;
+      if (kb < 1024) return kb.toFixed(1) + ' KB';
+      return (kb / 1024).toFixed(1) + ' MB';
+    },
+
     visibleRunEvents() {
       return this.selectedRunEvents.filter(ev => this.showVerbose || !this.isBackendEvent(ev));
     },
@@ -685,6 +922,65 @@ function dashboard() {
       const classes = ['event-item', this.eventCategory(ev)];
       if ((ev.topic || '') === 'iteration.start') classes.push('ev-highlight');
       return classes.join(' ');
+    },
+
+    topicCategoryKey(ev) {
+      const t = String(ev?.topic || '');
+      if (['event.invalid','wave.timeout','wave.failed','loop.stop'].includes(t)) return 'error';
+      if (t === 'task.complete' || t === 'loop.complete') return 'completion';
+      if (t.startsWith('loop.')) return 'loop';
+      if (t.startsWith('iteration.')) return 'iteration';
+      if (t.startsWith('backend.')) return 'backend';
+      if (t.startsWith('review.')) return 'review';
+      if (t.startsWith('operator.')) return 'operator';
+      return 'coordination';
+    },
+
+    journalCategoryChips() {
+      const counts = {};
+      for (const k of Object.keys(this.journalCategoryFilter)) counts[k] = 0;
+      for (const ev of this.selectedRunEvents) {
+        const cat = this.topicCategoryKey(ev);
+        if (cat in counts) counts[cat]++;
+      }
+      const labels = { loop: 'Loop', iteration: 'Iteration', backend: 'Backend', review: 'Review', coordination: 'Coordination', error: 'Error', operator: 'Operator', completion: 'Completion' };
+      return Object.keys(this.journalCategoryFilter).map(key => ({
+        key,
+        label: labels[key] || key,
+        color: this.categoryColors[key] || '#666',
+        count: counts[key] || 0,
+        enabled: this.journalCategoryFilter[key],
+      }));
+    },
+
+    filteredJournalEvents() {
+      const search = (this.journalSearch || '').toLowerCase();
+      return this.selectedRunEvents.filter(ev => {
+        const cat = this.topicCategoryKey(ev);
+        if (!this.journalCategoryFilter[cat]) return false;
+        if (search) {
+          const text = JSON.stringify(ev).toLowerCase();
+          if (!text.includes(search)) return false;
+        }
+        return true;
+      });
+    },
+
+    journalGroups() {
+      const events = this.filteredJournalEvents();
+      const groups = {};
+      const order = [];
+      for (const ev of events) {
+        const iter = ev.iteration;
+        const key = iter ? 'iter-' + iter : 'system';
+        if (!groups[key]) {
+          const label = iter ? '\\u2500\\u2500 iter ' + iter + ' \\u2500\\u2500' : '\\u2500\\u2500 system \\u2500\\u2500';
+          groups[key] = { key, label, events: [] };
+          order.push(key);
+        }
+        groups[key].events.push(ev);
+      }
+      return order.map(k => groups[k]);
     },
 
     eventSummary(ev) {

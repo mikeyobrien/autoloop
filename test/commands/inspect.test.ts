@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/harness/index.js", () => ({
   renderJournal: vi.fn(),
   renderAllJournals: vi.fn(),
+  renderJournalTimeline: vi.fn(),
+  renderArtifacts: vi.fn(),
   renderScratchpadFormat: vi.fn(),
   renderCoordinationFormat: vi.fn(),
   renderMetrics: vi.fn(),
@@ -56,14 +58,23 @@ describe("dispatchInspect journal", () => {
     process.env.AUTOLOOP_PROJECT_DIR = "/tmp/test-project";
   });
 
-  it("dispatches 'inspect journal' to renderAllJournals", () => {
+  it("dispatches 'inspect journal' to renderJournalTimeline (default terminal format)", () => {
     dispatchInspect(["journal"]);
-    expect(harness.renderAllJournals).toHaveBeenCalledTimes(1);
-    expect(harness.renderJournal).not.toHaveBeenCalled();
+    expect(harness.renderJournalTimeline).toHaveBeenCalledTimes(1);
+    expect(harness.renderJournalTimeline).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ artifact: "journal" }),
+    );
   });
 
-  it("dispatches 'inspect journal --run <id>' to renderJournal with run ID", () => {
-    dispatchInspect(["journal", "--run", "abc-123"]);
+  it("dispatches 'inspect journal --json' to renderAllJournals (backward compat)", () => {
+    dispatchInspect(["journal", "--json"]);
+    expect(harness.renderAllJournals).toHaveBeenCalledTimes(1);
+    expect(harness.renderJournalTimeline).not.toHaveBeenCalled();
+  });
+
+  it("dispatches 'inspect journal --run <id> --json' to renderJournal", () => {
+    dispatchInspect(["journal", "--run", "abc-123", "--json"]);
     expect(harness.renderJournal).toHaveBeenCalledWith(
       expect.any(String),
       "abc-123",
@@ -71,15 +82,39 @@ describe("dispatchInspect journal", () => {
     expect(harness.renderAllJournals).not.toHaveBeenCalled();
   });
 
-  it("dispatches 'inspect journal' with explicit project dir", () => {
-    dispatchInspect(["journal", "/some/project"]);
-    expect(harness.renderAllJournals).toHaveBeenCalledWith("/some/project");
+  it("dispatches 'inspect journal --topic loop --iter 3'", () => {
+    dispatchInspect(["journal", "--topic", "loop", "--iter", "3"]);
+    expect(harness.renderJournalTimeline).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        topics: ["loop"],
+        iterFilter: "3",
+      }),
+    );
   });
 
-  it("dispatches 'inspect journal --run <id>' with explicit project dir", () => {
-    dispatchInspect(["journal", "--run", "run-xyz", "/my/project"]);
-    expect(harness.renderJournal).toHaveBeenCalledWith(
-      "/my/project",
+  it("dispatches 'inspect journal --all-runs'", () => {
+    dispatchInspect(["journal", "--all-runs"]);
+    expect(harness.renderJournalTimeline).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ allRuns: true }),
+    );
+  });
+
+  it("dispatches 'inspect artifacts' to renderArtifacts", () => {
+    dispatchInspect(["artifacts"]);
+    expect(harness.renderArtifacts).toHaveBeenCalledWith(
+      expect.any(String),
+      "terminal",
+      undefined,
+    );
+  });
+
+  it("dispatches 'inspect artifacts --run <id> --json'", () => {
+    dispatchInspect(["artifacts", "--run", "run-xyz", "--json"]);
+    expect(harness.renderArtifacts).toHaveBeenCalledWith(
+      expect.any(String),
+      "json",
       "run-xyz",
     );
   });
