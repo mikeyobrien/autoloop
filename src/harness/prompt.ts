@@ -15,6 +15,7 @@ import {
 import { resolveRoleAgent } from "../agent-map.js";
 import type { LoopContext } from "./index.js";
 import {
+  appendHarnessEvent,
   extractField,
   extractIteration,
   extractTopic,
@@ -42,6 +43,7 @@ interface DerivedRunContext {
   memoryStats: MemoryStats;
   tasksText: string;
   tasksStats: { open: number; done: number; total: number };
+  guidanceMessages: string[];
   routing: RoutingContext;
   backpressure: string;
   invalidCount: number;
@@ -74,6 +76,7 @@ function deriveRunContext(
       done: tasksMaterialized.done.length,
       total: tasksMaterialized.open.length + tasksMaterialized.done.length,
     },
+    guidanceMessages: drainGuidance(runLines),
     routing: iterationRoutingContext(loop.topology, runLines),
     backpressure: latestInvalidNote(runLines),
     invalidCount: invalidEventCount(runLines),
@@ -90,6 +93,18 @@ export function buildIterationContext(
   const activeRole = derived.routing.allowedRoles.length === 1 ? derived.routing.allowedRoles[0] : "";
   const roleAgent = resolveRoleAgent(loop.agentMap, loop.launch.preset, activeRole) || "";
 
+  const prompt = renderIterationPromptText(loop, iteration, derived);
+
+  if (derived.guidanceMessages.length > 0) {
+    appendHarnessEvent(
+      loop.paths.journalFile,
+      loop.runtime.runId,
+      String(iteration),
+      "operator.guidance.consumed",
+      `Consumed ${derived.guidanceMessages.length} guidance message(s)`,
+    );
+  }
+
   return {
     iteration,
     recentEvent: derived.routing.recentEvent,
@@ -99,7 +114,7 @@ export function buildIterationContext(
     lastRejected: derived.lastRejected,
     scratchpadText: derived.scratchpadText,
     memoryText: derived.memoryText,
-    prompt: renderIterationPromptText(loop, iteration, derived),
+    prompt,
     roleAgent,
   };
 }
@@ -269,6 +284,7 @@ export function renderIterationPromptText(
     memoryText,
     tasksText,
     tasksStats,
+    guidanceMessages,
     scratchpadText,
     invalidCount,
     lastRejected,
@@ -282,6 +298,7 @@ export function renderIterationPromptText(
     "Objective:\n" +
     loop.objective +
     "\n\n" +
+    renderGuidanceSection(guidanceMessages) +
     (memoryText ? `${memoryText}\n` : "") +
     (tasksText ? `${tasksText}\n` : "") +
     topology.renderWithContext(
@@ -347,6 +364,7 @@ export function renderReviewPromptText(
     tasksText,
     memoryStats,
     tasksStats,
+    guidanceMessages,
     routing,
     backpressure,
     invalidCount,
@@ -367,6 +385,7 @@ export function renderReviewPromptText(
     reviewInstructionsText(loop) +
     contextPressureText(memoryStats, tasksStats, invalidCount, lastRejected) +
     backpressureText(backpressure) +
+    renderGuidanceSection(guidanceMessages) +
     (memoryText ? `${memoryText}\n` : "") +
     (tasksText ? `${tasksText}\n` : "") +
     `Review trigger iteration: ${iteration}\n` +
@@ -397,6 +416,40 @@ export function renderReviewPromptText(
     latestIteration +
     " --format text\n\n" +
     "If no improvements are needed, store a short learning explaining why and exit cleanly.\n"
+  );
+}
+
+export function drainGuidance(runLines: string[]): string[] {
+  // Find the index of the last operator.guidance.consumed marker
+  let consumedIdx = -1;
+  for (let i = runLines.length - 1; i >= 0; i--) {
+    if (extractTopic(runLines[i]) === "operator.guidance.consumed") {
+      consumedIdx = i;
+      break;
+    }
+  }
+
+  // Collect all operator.guidance events after the last consumed marker
+  const messages: string[] = [];
+  for (let i = consumedIdx + 1; i < runLines.length; i++) {
+    if (extractTopic(runLines[i]) === "operator.guidance") {
+      const payload = extractField(runLines[i], "payload");
+      if (payload) messages.push(payload);
+    }
+  }
+  return messages;
+}
+
+function renderGuidanceSection(guidance: string[]): string {
+  if (guidance.length === 0) return "";
+  const body =
+    guidance.length === 1
+      ? guidance[0]
+      : guidance.map((g, i) => `${i + 1}. ${g}`).join("\n");
+  return (
+    "## OPERATOR GUIDANCE\n\n" +
+    body +
+    "\n\n\u26a0\ufe0f Act on this guidance in this iteration. It will not be repeated.\n\n"
   );
 }
 

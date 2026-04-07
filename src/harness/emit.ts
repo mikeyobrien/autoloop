@@ -186,6 +186,8 @@ export function routingTopic(topic: string): boolean {
     "backend.start",
     "backend.finish",
     "event.invalid",
+    "operator.guidance",
+    "operator.guidance.consumed",
     "",
   ]);
   if (nonRouting.has(topic)) return false;
