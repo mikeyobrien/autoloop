@@ -135,6 +135,11 @@ export function setKiroSessionMode(
 export function terminateKiroSession(handle: KiroSessionHandle): void {
   sendCommand(handle, { type: "terminate" });
   acpChildPid = undefined;
+  // Drain stderr — worker thread process.stderr.write() calls may still be
+  // in-flight from sessionUpdate callbacks. A brief sync sleep lets them flush
+  // before we kill the worker.
+  const drain = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(drain, 0, 0, 50);
   // Signal shutdown
   const control = new Int32Array(handle.controlBuffer);
   Atomics.store(control, 0, 3);
