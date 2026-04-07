@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
+import { dispatchGuide } from "./commands/guide.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
 import { dispatchInspect } from "./commands/inspect.js";
 import { dispatchList } from "./commands/list.js";
@@ -79,6 +80,9 @@ function dispatch(args: string[], argv: string[]): void {
     case "config":
       dispatchConfig(args.slice(1));
       return;
+    case "guide":
+      dispatchGuide(args.slice(1));
+      return;
     case "dashboard":
       dispatchDashboard(args.slice(1), bundleRoot, selfCmd);
       return;
@@ -122,6 +126,7 @@ function isCliCommand(value: string): boolean {
     "branch-run",
     "worktree",
     "config",
+    "guide",
     "dashboard",
     "--help",
     "-h",
