@@ -29,6 +29,6 @@ If blocked:
 
 Rules:
 - Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` in all generated harness.md and role prompt files.
-- Never hardcode `.autoloop/` paths in generated content.
+- Never hardcode raw autoloop state paths in generated content — use {{STATE_DIR}} and {{TOOL_PATH}} placeholders instead.
 - Match the style of existing bundled presets (autocode, autofix, etc.).
 - The generated `autoloops.toml` should default to `backend.kind = "command"` and `backend.command = "claude"`.

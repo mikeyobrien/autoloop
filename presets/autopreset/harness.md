@@ -24,7 +24,7 @@ Generated preset structure (all files are required):
 ```
 
 Preset authoring rules (the generated preset must follow these):
-- Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` placeholders in harness.md and role prompts — never hardcode `.autoloop/` paths.
+- Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` placeholders in harness.md and role prompts — never hardcode raw autoloop state paths.
 - Every event in every role's `emits` list must appear in the `[handoff]` map.
 - `"loop.start"` must be mapped in the handoff to the role that kicks off the loop.
 - `event_loop.completion_event` must match the completion event in at least one role's `emits`.

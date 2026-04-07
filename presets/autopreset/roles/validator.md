@@ -15,7 +15,7 @@ Validation checklist:
 - [ ] Every `prompt_file` path in topology.toml points to a file that exists.
 - [ ] Every event in every role's `emits` list appears in the `[handoff]` map.
 - [ ] `"loop.start"` is mapped in the handoff section.
-- [ ] `harness.md` exists and uses `{{STATE_DIR}}`/`{{TOOL_PATH}}` placeholders (no hardcoded `.autoloop/` paths).
+- [ ] `harness.md` exists and uses `{{STATE_DIR}}`/`{{TOOL_PATH}}` placeholders (no hardcoded raw autoloop state paths).
 - [ ] Role prompt files use `{{STATE_DIR}}`/`{{TOOL_PATH}}` placeholders where they reference state files or the event tool.
 - [ ] Role prompts open with identity and state boundaries.
 - [ ] `README.md` exists.
