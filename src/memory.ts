@@ -70,6 +70,11 @@ export function findProject(projectDir: string, pattern: string): string {
   return renderMatches(findEntries(memory, pattern), pattern);
 }
 
+export function findInFile(path: string, pattern: string): string {
+  const mem = materialize(readLines(path));
+  return renderMatches(findEntries(mem, pattern), pattern);
+}
+
 export function addLearning(
   projectDir: string,
   text: string,
