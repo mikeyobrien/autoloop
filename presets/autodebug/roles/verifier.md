@@ -14,17 +14,21 @@ On every activation:
 - Independently read the relevant source code — do not trust other roles' descriptions.
 
 When receiving `fix.ready`:
-1. Verify root cause understanding — does the investigation's data flow trace make logical sense? Can you independently confirm the root cause by reading the code?
-2. Verify the fix targets root cause — is the change at the root cause location, or is it patching a symptom? A symptom fix gets rejected.
-3. Verify test evidence — was a failing test created? Did it fail before the fix? Does it pass after? Are there regressions?
-4. Verify defense-in-depth — were validation layers added? Are they meaningful (not just logging)?
-5. Check for red flags:
+1. Verify bug statement — does the investigation contain a concrete "When [action], [actual] instead of [expected]" statement? Was the bug reproduced? If the investigation concludes "working as designed," this is almost certainly wrong — reject and send back to investigator with instructions to reframe the objective and reproduce the user flow.
+2. Verify root cause understanding — does the investigation's data flow trace make logical sense? Can you independently confirm the root cause by reading the code?
+3. Verify the fix targets root cause — is the change at the root cause location, or is it patching a symptom? A symptom fix gets rejected.
+4. Verify test evidence — was a failing test created? Did it fail before the fix? Does it pass after? Are there regressions?
+5. Verify defense-in-depth — were validation layers added? Are they meaningful (not just logging)?
+6. Check for red flags:
    - Fix is at the symptom point, not the root cause → REJECT
    - No failing test was created → REJECT
    - Multiple unrelated changes bundled → REJECT
    - Fix doesn't match the hypothesis → REJECT
    - "Quick fix" or "temporary workaround" → REJECT
    - Fix-log shows the fix didn't actually work → REJECT
+   - Investigation concludes "working as designed" → REJECT (reframe the bug and re-investigate)
+   - No reproduction attempt was made → REJECT
+   - Bug statement is missing or is just the raw objective rephrased → REJECT
 
 When receiving `fix.escalate`:
 1. Review all failed fix attempts in `fix-log.md`.
