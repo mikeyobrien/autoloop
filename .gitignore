@@ -5,5 +5,7 @@ dist/
 .tonic/
 .agents/
 test-results/
+coverage/
 PROMPT.md
 kiro-loop.sh
+.claude/settings.local.json
