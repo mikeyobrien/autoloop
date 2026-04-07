@@ -44,7 +44,11 @@ async function handleCommand(cmd: any): Promise<unknown> {
   switch (cmd.type) {
     case "init": {
       session = await initAcpSession({ ...cmd.opts, verbose });
-      return { ok: true, sessionId: session.sessionId };
+      return {
+        ok: true,
+        sessionId: session.sessionId,
+        childPid: session.process.pid,
+      };
     }
     case "prompt": {
       if (!session) return { ok: false, error: "no session" };

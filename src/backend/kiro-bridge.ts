@@ -14,10 +14,21 @@ const DATA_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB for prompt/response data
 const POLL_INTERVAL_MS = 500;
 
 let interrupted = false;
+/** PID of the detached kiro-cli child process (set after init). */
+let acpChildPid: number | undefined;
 
 /** Signal the bridge to abort the current blocking wait. */
 export function signalInterrupt(): void {
   interrupted = true;
+  // Forward the signal to the detached child process group so kiro-cli
+  // exits even though it doesn't share our process group.
+  if (acpChildPid) {
+    try {
+      process.kill(-acpChildPid, "SIGTERM");
+    } catch {
+      /* child may already be gone */
+    }
+  }
 }
 
 export interface KiroSessionHandle {
@@ -76,6 +87,7 @@ export function initKiroSession(opts: AcpClientOptions): KiroSessionHandle {
   const result = sendCommand(handle, { type: "init", opts });
   if (!result.ok)
     throw new Error("Failed to init kiro session: " + result.error);
+  acpChildPid = result.childPid ?? undefined;
   return handle;
 }
 
@@ -122,6 +134,7 @@ export function setKiroSessionMode(
 
 export function terminateKiroSession(handle: KiroSessionHandle): void {
   sendCommand(handle, { type: "terminate" });
+  acpChildPid = undefined;
   // Signal shutdown
   const control = new Int32Array(handle.controlBuffer);
   Atomics.store(control, 0, 3);
