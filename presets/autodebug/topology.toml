@@ -1,0 +1,34 @@
+name = "autodebug"
+completion = "task.complete"
+
+[[role]]
+id = "investigator"
+emits = ["rootcause.ready"]
+prompt_file = "roles/investigator.md"
+
+[[role]]
+id = "strategist"
+emits = ["hypothesis.ready", "rootcause.rejected"]
+prompt_file = "roles/strategist.md"
+
+[[role]]
+id = "fixer"
+emits = ["fix.ready", "fix.escalate", "hypothesis.disproven"]
+prompt_file = "roles/fixer.md"
+
+[[role]]
+id = "verifier"
+emits = ["rootcause.rejected", "hypothesis.rejected", "fix.rejected", "fix.verified", "task.complete"]
+prompt_file = "roles/verifier.md"
+
+[handoff]
+"loop.start" = ["investigator"]
+"rootcause.rejected" = ["investigator"]
+"rootcause.ready" = ["strategist"]
+"hypothesis.rejected" = ["investigator"]
+"hypothesis.ready" = ["fixer"]
+"fix.rejected" = ["investigator"]
+"hypothesis.disproven" = ["investigator"]
+"fix.escalate" = ["verifier"]
+"fix.ready" = ["verifier"]
+"fix.verified" = ["verifier"]
