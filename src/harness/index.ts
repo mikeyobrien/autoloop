@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { AcpClientOptions } from "../backend/acp-client.js";
 import {
   initKiroSession,
+  signalInterrupt,
   terminateKiroSession,
 } from "../backend/kiro-bridge.js";
 import * as config from "../config.js";
@@ -82,6 +83,15 @@ export function run(
   const onSignal = (signal: NodeJS.Signals) => {
     if (signalHandled) return;
     signalHandled = true;
+    signalInterrupt();
+    try {
+      if (loop.kiroSession) {
+        terminateKiroSession(loop.kiroSession);
+        loop.kiroSession = undefined;
+      }
+    } catch {
+      /* best-effort */
+    }
     try {
       registryStop(loop, currentIteration, "interrupted");
     } catch {
@@ -127,6 +137,7 @@ export function run(
       trustAllTools: loop.store.kiro_trust_all_tools !== false,
       agentName: (loop.store.kiro_agent as string) || undefined,
       modelId: (loop.store.kiro_model as string) || undefined,
+      verbose: loop.runtime.logLevel === "debug",
     };
     loop.kiroSession = initKiroSession(acpOpts);
   }

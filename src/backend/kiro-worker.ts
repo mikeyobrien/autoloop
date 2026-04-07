@@ -15,9 +15,10 @@ import {
   terminateAcpSession,
 } from "./acp-client.js";
 
-const { controlBuffer, dataBuffer } = workerData as {
+const { controlBuffer, dataBuffer, verbose } = workerData as {
   controlBuffer: SharedArrayBuffer;
   dataBuffer: SharedArrayBuffer;
+  verbose: boolean;
 };
 
 const control = new Int32Array(controlBuffer);
@@ -42,7 +43,7 @@ function writeResult(result: unknown): void {
 async function handleCommand(cmd: any): Promise<unknown> {
   switch (cmd.type) {
     case "init": {
-      session = await initAcpSession(cmd.opts);
+      session = await initAcpSession({ ...cmd.opts, verbose });
       return { ok: true, sessionId: session.sessionId };
     }
     case "prompt": {

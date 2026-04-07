@@ -197,6 +197,10 @@ export async function initAcpSession(
       ) {
         session.textBuffer += update.content.text;
       }
+      if (opts.verbose) {
+        const line = formatStreamingUpdate(update);
+        if (line) process.stderr.write(line);
+      }
     },
   };
 

@@ -11,6 +11,14 @@ import type { AcpClientOptions } from "./acp-client.js";
 import type { BackendRunResult } from "./types.js";
 
 const DATA_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB for prompt/response data
+const POLL_INTERVAL_MS = 500;
+
+let interrupted = false;
+
+/** Signal the bridge to abort the current blocking wait. */
+export function signalInterrupt(): void {
+  interrupted = true;
+}
 
 export interface KiroSessionHandle {
   worker: Worker;
@@ -34,7 +42,12 @@ function sendCommand(handle: KiroSessionHandle, cmd: unknown): any {
   Atomics.notify(control, 0);
 
   // Block until worker signals result (control[0] = 2)
-  Atomics.wait(control, 0, 1);
+  // Poll with timeout so SIGINT can interrupt the wait
+  while (Atomics.wait(control, 0, 1, POLL_INTERVAL_MS) === "timed-out") {
+    if (interrupted) {
+      throw new Error("kiro bridge interrupted by signal");
+    }
+  }
 
   // Read result
   const len = new DataView(handle.dataBuffer).getUint32(0);
@@ -56,7 +69,7 @@ export function initKiroSession(opts: AcpClientOptions): KiroSessionHandle {
     "kiro-worker.js",
   );
   const worker = new Worker(workerPath, {
-    workerData: { controlBuffer, dataBuffer },
+    workerData: { controlBuffer, dataBuffer, verbose: opts.verbose ?? false },
   });
 
   const handle: KiroSessionHandle = { worker, controlBuffer, dataBuffer };
