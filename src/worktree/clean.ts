@@ -1,6 +1,8 @@
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { isProcessAlive } from "../loops/health.js";
+import { getRun } from "../registry/read.js";
 import { shellQuote } from "../utils.js";
 import type { WorktreeStatus } from "./meta.js";
 import { isOrphanWorktree, readMeta, updateStatus } from "./meta.js";
@@ -45,10 +47,22 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
 
     const orphan = isOrphanWorktree(meta);
 
-    // Skip running worktrees unless --force or orphaned (path already gone)
+    // Skip running worktrees unless --force, orphaned, or owner process is dead
     if (meta.status === "running" && !force && !orphan) {
-      skipped.push(runId);
-      continue;
+      const registryPath = join(mainStateDir, "registry.jsonl");
+      const record = getRun(registryPath, runId);
+      const ownerDead = record?.pid != null && !isProcessAlive(record.pid);
+      if (!ownerDead) {
+        skipped.push(runId);
+        continue;
+      }
+      // Owner process is dead — mark as failed and allow cleanup
+      try {
+        updateStatus(metaDir, "failed");
+        meta.status = "failed";
+      } catch {
+        /* best-effort */
+      }
     }
 
     // Without --all, only clean terminal-status or orphaned worktrees

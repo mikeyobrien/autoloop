@@ -82,7 +82,7 @@ function elapsedMs(r: RunRecord, nowMs: number): number | null {
   return nowMs - updatedMs;
 }
 
-function isProcessAlive(pid: number): boolean {
+export function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;

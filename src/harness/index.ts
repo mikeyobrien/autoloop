@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AcpClientOptions } from "../backend/acp-client.js";
 import {
@@ -75,8 +75,8 @@ export function run(
   appendLoopStart(loop);
   registryStart(loop);
 
-  // Track current iteration for signal handler
-  const currentIteration = 0;
+  // Track current iteration for signal handler (must be mutable)
+  let currentIteration = 0;
   let signalHandled = false;
 
   const onSignal = (signal: NodeJS.Signals) => {
@@ -86,6 +86,23 @@ export function run(
       registryStop(loop, currentIteration, "interrupted");
     } catch {
       /* best-effort */
+    }
+    // Update worktree meta so the run isn't stuck as "running"
+    if (loop.paths.worktreeMetaDir) {
+      try {
+        updateWorktreeStatus(loop.paths.worktreeMetaDir, "failed");
+      } catch {
+        /* best-effort */
+      }
+    }
+    // Remove active wave marker so future waves aren't blocked
+    const waveMarker = join(loop.paths.stateDir, "waves", "active");
+    if (existsSync(waveMarker)) {
+      try {
+        unlinkSync(waveMarker);
+      } catch {
+        /* best-effort */
+      }
     }
     process.removeListener("SIGINT", onSignal);
     process.removeListener("SIGTERM", onSignal);
@@ -115,8 +132,12 @@ export function run(
   }
 
   let summary: RunSummary;
+  const trackedIterate = (ctx: LoopContext, iter: number): RunSummary => {
+    currentIteration = iter;
+    return iterateWith(ctx, iter, trackedIterate);
+  };
   try {
-    summary = iterate(loop, 1);
+    summary = trackedIterate(loop, 1);
   } finally {
     if (loop.kiroSession) {
       terminateKiroSession(loop.kiroSession);
@@ -379,7 +400,11 @@ function resolveJournalAndRun(
   return { journalFile, runId: ensureRenderRunId(journalFile) };
 }
 
-function iterate(loop: LoopContext, iteration: number): RunSummary {
+function iterateWith(
+  loop: LoopContext,
+  iteration: number,
+  recurse: (loop: LoopContext, iteration: number) => RunSummary,
+): RunSummary {
   const liveLoop = reloadLoop(loop);
   liveLoop.kiroSession = loop.kiroSession;
   installRuntimeTools(liveLoop);
@@ -388,5 +413,9 @@ function iterate(loop: LoopContext, iteration: number): RunSummary {
   if (iteration > reviewed.limits.maxIterations) {
     return stopMaxIterations(reviewed, iteration);
   }
-  return runIteration(reviewed, iteration, iterate);
+  return runIteration(reviewed, iteration, recurse);
+}
+
+function iterate(loop: LoopContext, iteration: number): RunSummary {
+  return iterateWith(loop, iteration, iterate);
 }
