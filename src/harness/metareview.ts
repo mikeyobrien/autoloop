@@ -1,3 +1,4 @@
+import { runKiroIterationSync } from "../backend/kiro-bridge.js";
 import { jsonBool, jsonField, jsonFieldRaw } from "../json.js";
 import { reloadLoop } from "./config-helpers.js";
 import { printReviewBanner } from "./display.js";
@@ -5,7 +6,6 @@ import { appendEvent, readRunLines } from "./journal.js";
 import { buildReviewCommand, runProcess } from "./parallel.js";
 import { renderReviewPromptText } from "./prompt.js";
 import type { LoopContext } from "./types.js";
-import { runKiroIterationSync } from "../backend/kiro-bridge.js";
 
 export function maybeRunMetareview(
   loop: LoopContext,
@@ -57,13 +57,18 @@ export function runMetareviewReview(
       jsonField("timeout_ms", String(loop.review.timeoutMs)),
   );
 
-  const { output, exitCode, timedOut } = loop.review.kind === "kiro" && loop.kiroSession
-    ? runKiroIterationSync(loop.kiroSession, reviewPrompt, loop.review.timeoutMs)
-    : runProcess(
-        buildReviewCommand(loop, iteration, reviewPrompt),
-        loop.review.timeoutMs,
-        loop.review.kind,
-      );
+  const { output, exitCode, timedOut } =
+    loop.review.kind === "kiro" && loop.kiroSession
+      ? runKiroIterationSync(
+          loop.kiroSession,
+          reviewPrompt,
+          loop.review.timeoutMs,
+        )
+      : runProcess(
+          buildReviewCommand(loop, iteration, reviewPrompt),
+          loop.review.timeoutMs,
+          loop.review.kind,
+        );
 
   appendEvent(
     loop.paths.journalFile,

@@ -13,6 +13,10 @@ export async function runKiroIteration(
     exitCode: result.error ? 1 : 0,
     timedOut: result.timedOut,
     providerKind: "kiro",
-    errorCategory: result.timedOut ? "timeout" : result.error ? "non_zero_exit" : "none",
+    errorCategory: result.timedOut
+      ? "timeout"
+      : result.error
+        ? "non_zero_exit"
+        : "none",
   };
 }

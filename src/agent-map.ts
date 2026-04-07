@@ -48,7 +48,8 @@ export function resolveRoleAgent(
 
 function buildAgentMap(parsed: Record<string, unknown>): AgentMap {
   const defaults = parsed["defaults"] as Record<string, unknown> | undefined;
-  const globalDefault = typeof defaults?.["agent"] === "string" ? defaults["agent"] : "";
+  const globalDefault =
+    typeof defaults?.["agent"] === "string" ? defaults["agent"] : "";
 
   const presets: Record<string, PresetAgentMap> = {};
   const presetSection = parsed["preset"] as Record<string, unknown> | undefined;
@@ -64,7 +65,8 @@ function buildAgentMap(parsed: Record<string, unknown>): AgentMap {
 }
 
 function buildPresetAgentMap(section: Record<string, unknown>): PresetAgentMap {
-  const defaultAgent = typeof section["default"] === "string" ? section["default"] : "";
+  const defaultAgent =
+    typeof section["default"] === "string" ? section["default"] : "";
   const roles: Record<string, string> = {};
   for (const [key, value] of Object.entries(section)) {
     if (key !== "default" && typeof value === "string") {

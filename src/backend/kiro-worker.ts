@@ -8,8 +8,12 @@
  *   Commands: { type: "init", opts } | { type: "prompt", prompt, timeoutMs } | { type: "terminate" }
  */
 import { parentPort, workerData } from "node:worker_threads";
-import { initAcpSession, sendAcpPrompt, terminateAcpSession } from "./acp-client.js";
 import type { AcpSession } from "./acp-client.js";
+import {
+  initAcpSession,
+  sendAcpPrompt,
+  terminateAcpSession,
+} from "./acp-client.js";
 
 const { controlBuffer, dataBuffer } = workerData as {
   controlBuffer: SharedArrayBuffer;
@@ -49,10 +53,16 @@ async function handleCommand(cmd: any): Promise<unknown> {
     case "set_mode": {
       if (!session) return { ok: false, error: "no session" };
       try {
-        await session.connection.setSessionMode({ sessionId: session.sessionId, modeId: cmd.agentName });
+        await session.connection.setSessionMode({
+          sessionId: session.sessionId,
+          modeId: cmd.agentName,
+        });
         return { ok: true };
       } catch (err: unknown) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
       }
     }
     case "terminate": {
@@ -76,7 +86,10 @@ async function handleCommand(cmd: any): Promise<unknown> {
     try {
       result = await handleCommand(cmd);
     } catch (err: unknown) {
-      result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+      result = {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
 
     writeResult(result);

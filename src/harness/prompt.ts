@@ -1,3 +1,4 @@
+import { resolveRoleAgent } from "../agent-map.js";
 import type { MemoryStats } from "../memory.js";
 import * as memory from "../memory.js";
 import { materialize as materializeTasks } from "../tasks.js";
@@ -12,7 +13,6 @@ import {
   routingTopic,
   systemTopic,
 } from "./emit.js";
-import { resolveRoleAgent } from "../agent-map.js";
 import type { LoopContext } from "./index.js";
 import {
   appendHarnessEvent,
@@ -90,8 +90,12 @@ export function buildIterationContext(
 ): IterationContext {
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
   const derived = deriveRunContext(loop, runLines);
-  const activeRole = derived.routing.allowedRoles.length === 1 ? derived.routing.allowedRoles[0] : "";
-  const roleAgent = resolveRoleAgent(loop.agentMap, loop.launch.preset, activeRole) || "";
+  const activeRole =
+    derived.routing.allowedRoles.length === 1
+      ? derived.routing.allowedRoles[0]
+      : "";
+  const roleAgent =
+    resolveRoleAgent(loop.agentMap, loop.launch.preset, activeRole) || "";
 
   const prompt = renderIterationPromptText(loop, iteration, derived);
 

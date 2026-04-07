@@ -3,9 +3,10 @@
  * Uses SharedArrayBuffer + Atomics to block the main thread
  * while the worker processes async ACP operations.
  */
-import { Worker } from "node:worker_threads";
+
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
 import type { AcpClientOptions } from "./acp-client.js";
 import type { BackendRunResult } from "./types.js";
 
@@ -39,7 +40,7 @@ function sendCommand(handle: KiroSessionHandle, cmd: unknown): any {
   const len = new DataView(handle.dataBuffer).getUint32(0);
   const resultJson = decoder.decode(data.slice(4, 4 + len));
   Atomics.store(control, 0, 0); // reset for next command
-  Atomics.notify(control, 0);  // wake worker waiting on Atomics.wait(control, 0, 2)
+  Atomics.notify(control, 0); // wake worker waiting on Atomics.wait(control, 0, 2)
   return JSON.parse(resultJson);
 }
 
@@ -49,14 +50,19 @@ export function initKiroSession(opts: AcpClientOptions): KiroSessionHandle {
   const control = new Int32Array(controlBuffer);
   Atomics.store(control, 0, 0);
 
-  const workerPath = join(fileURLToPath(import.meta.url), "..", "kiro-worker.js");
+  const workerPath = join(
+    fileURLToPath(import.meta.url),
+    "..",
+    "kiro-worker.js",
+  );
   const worker = new Worker(workerPath, {
     workerData: { controlBuffer, dataBuffer },
   });
 
   const handle: KiroSessionHandle = { worker, controlBuffer, dataBuffer };
   const result = sendCommand(handle, { type: "init", opts });
-  if (!result.ok) throw new Error("Failed to init kiro session: " + result.error);
+  if (!result.ok)
+    throw new Error("Failed to init kiro session: " + result.error);
   return handle;
 }
 
@@ -80,15 +86,24 @@ export function runKiroIterationSync(
     exitCode: result.error ? 1 : 0,
     timedOut: result.timedOut || false,
     providerKind: "kiro",
-    errorCategory: result.timedOut ? "timeout" : result.error ? "non_zero_exit" : "none",
+    errorCategory: result.timedOut
+      ? "timeout"
+      : result.error
+        ? "non_zero_exit"
+        : "none",
   };
 }
 
-export function setKiroSessionMode(handle: KiroSessionHandle, agentName: string): void {
+export function setKiroSessionMode(
+  handle: KiroSessionHandle,
+  agentName: string,
+): void {
   const result = sendCommand(handle, { type: "set_mode", agentName });
   if (!result.ok) {
     // Non-fatal: log but don't crash the loop
-    process.stderr.write(`[autoloop] warning: failed to set kiro agent mode "${agentName}": ${result.error}\n`);
+    process.stderr.write(
+      `[autoloop] warning: failed to set kiro agent mode "${agentName}": ${result.error}\n`,
+    );
   }
 }
 

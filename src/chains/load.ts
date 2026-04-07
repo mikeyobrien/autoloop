@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import TOML from "@iarna/toml";
 import * as config from "../config.js";
@@ -73,7 +73,10 @@ export function listKnownPresets(): string[] {
   try {
     const entries = readdirSync(userDir, { withFileTypes: true });
     const userNames = entries
-      .filter((e) => e.isDirectory() && config.projectHasConfig(join(userDir, e.name)))
+      .filter(
+        (e) =>
+          e.isDirectory() && config.projectHasConfig(join(userDir, e.name)),
+      )
       .map((e) => e.name)
       .filter((n) => !builtIn.includes(n));
     return [...builtIn, ...userNames];

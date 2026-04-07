@@ -105,7 +105,11 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     }
     const body = await c.req.json<{ message?: string }>();
     const message = body.message;
-    if (!message || typeof message !== "string" || message.trim().length === 0) {
+    if (
+      !message ||
+      typeof message !== "string" ||
+      message.trim().length === 0
+    ) {
       return c.json({ error: "message required" }, 400);
     }
     if (message.length > 10_000) {
