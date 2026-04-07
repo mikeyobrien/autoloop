@@ -108,6 +108,30 @@ parallel.max_branches = 3
 parallel.branch_timeout_ms = 180000
 ```
 
+### Isolation / Worktree
+
+Controls whether runs get their own git worktree for file-level isolation. See [Worktree Reference](worktree.md) for CLI flags and merge semantics.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `worktree.enabled` | bool | `false` | Enable worktree isolation by default for this preset. Equivalent to passing `--worktree` on every run. |
+| `isolation.enabled` | bool | `false` | Alias for `worktree.enabled`. Either key triggers worktree mode. |
+| `worktree.branch_prefix` | string | `"autoloop"` | Prefix for worktree branch names. Branches are created as `<prefix>/<run-id>`. |
+| `worktree.merge_strategy` | string | `"squash"` | How worktree branches merge back into the base branch. Overridden by `--merge-strategy` CLI flag. |
+| `worktree.cleanup` | string | `"on_success"` | When to remove the worktree after the run. `"on_success"` removes only after a successful completion. |
+
+Resolution priority: `--worktree` flag → `--no-worktree` flag → config `worktree.enabled`/`isolation.enabled` → auto-detect based on concurrent runs.
+
+### Profiles
+
+Profiles inject per-role prompt fragments into preset topologies. See [Profiles](profiles.md) for the full directory layout and composition rules.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `profiles.default` | list | `[]` (empty) | Profile specs activated on every run unless `--no-default-profiles` is passed. Each entry is `"repo:<name>"` or `"user:<name>"`. |
+
+The `--profile` CLI flag adds profiles on top of the defaults. Use `--no-default-profiles` to suppress the config defaults and apply only explicitly listed profiles.
+
 ### Memory
 
 | Key | Type | Default | Description |
@@ -127,6 +151,7 @@ parallel.branch_timeout_ms = 180000
 | `core.state_dir` | string | `".autoloop"` | Directory for runtime state (journal, memory, tools). |
 | `core.journal_file` | string | `".autoloop/journal.jsonl"` | Path to the journal file. |
 | `core.memory_file` | string | `".autoloop/memory.jsonl"` | Path to the memory file. |
+| `core.tasks_file` | string | `".autoloop/tasks.jsonl"` | Path to the tasks file (used by the `task` tool). |
 | `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. Still accepted; prefer `journal_file`. |
 | `core.log_level` | string | `"info"` | Log verbosity. Valid levels: `debug`, `info`, `warn`, `error`, `none`. Overridden by `-v`/`--verbose` (sets `debug`). Exported as `AUTOLOOP_LOG_LEVEL`. |
 | `core.run_id_format` | string | `"human"` | Run ID format: `"human"` for readable `<word>-<word>` ids, `"compact"` for legacy timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
@@ -158,7 +183,15 @@ harness.instructions_file = "harness.md"
 core.state_dir = ".autoloop"
 core.journal_file = ".autoloop/journal.jsonl"
 core.memory_file = ".autoloop/memory.jsonl"
+core.tasks_file = ".autoloop/tasks.jsonl"
 # core.log_level = "info"
+
+worktree.enabled = false
+worktree.branch_prefix = "autoloop"
+worktree.merge_strategy = "squash"
+worktree.cleanup = "on_success"
+
+# profiles.default = ["repo:phoenix"]
 ```
 
 ## Mock backend mode
@@ -188,6 +221,38 @@ backend.trust_all_tools = true
 Or use the CLI flag: `autoloop run autocode -b kiro`.
 
 The `trust_all_tools` key (default `true`) auto-approves all tool permission requests from the agent. Set to `false` to reject tool calls. The `agent` and `model` keys are optional — when set, they configure the ACP session mode and model at initialization.
+
+### Session lifecycle
+
+Unlike `pi` and `command` backends which spawn a new process per iteration, the kiro backend maintains a **single persistent child process** across the entire run. The harness communicates with `kiro-cli acp` over a bidirectional JSON-RPC 2.0 channel using `SharedArrayBuffer` + `Atomics` for synchronous blocking on the main thread.
+
+Sequence: spawn `kiro-cli acp` → `initialize` handshake → (optional) `setSessionMode` / `unstable_setSessionModel` → iteration prompts via `prompt` commands → `terminate` on loop exit.
+
+Conversation history and tool permissions accumulate across iterations within the same session.
+
+### agents.toml — per-role agent routing
+
+When using the kiro backend with a multi-role topology, an `agents.toml` file in the project directory can map each role to a different agent. This lets you route the planner to one agent and the builder to another.
+
+```toml
+# agents.toml
+
+[defaults]
+agent = "general"           # fallback for any role not listed below
+
+[preset.autocode]
+default = "code-agent"      # default for all autocode roles
+builder = "gpu-dev"         # override for the builder role specifically
+critic = "code-reviewer"    # override for the critic role
+```
+
+Resolution order (most specific wins):
+1. `preset.<name>.<role>` — role-specific agent for a preset
+2. `preset.<name>.default` — default agent for a preset
+3. `defaults.agent` — global fallback
+4. `backend.agent` config key — used when no `agents.toml` exists
+
+The resolved agent name is passed to the ACP session via `setSessionMode` at the start of each iteration.
 
 ## Preset patterns
 

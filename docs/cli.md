@@ -210,6 +210,36 @@ If no reason is given, the source is recorded as `"manual"`.
 
 If the target ID is missing or already inactive, the CLI prints a warning instead of appending a no-op tombstone.
 
+### `dashboard`
+
+Start the web dashboard.
+
+```bash
+autoloop dashboard [options]
+```
+
+Launches an HTTP server serving the autoloop dashboard — a web UI for viewing runs, events, worktrees, and loop state. The dashboard reads from the `.autoloop/` state directory in the resolved project directory.
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--port, -p <port>` | Port to listen on (default: `4800`) |
+| `--host <host>` | Host to bind to (default: `127.0.0.1`) |
+| `--project-dir <dir>` | Project directory (default: `.`) |
+| `--help, -h` | Show help |
+
+The server handles `SIGINT` and `SIGTERM` for graceful shutdown. If the port is already in use, the process exits with code 1.
+
+**Examples:**
+
+```bash
+autoloop dashboard                           # http://127.0.0.1:4800
+autoloop dashboard -p 3000                   # custom port
+autoloop dashboard --host 0.0.0.0 -p 8080   # bind to all interfaces
+autoloop dashboard --project-dir /path/to/project
+```
+
 ### `chain`
 
 Manage named chains defined in `chains.toml`.
@@ -322,6 +352,79 @@ autoloop loops artifacts run-mn9d3uk0-xi0m  # artifact paths
 autoloop loops watch run-mn9d3uk0-xi0m      # live watch
 autoloop loops health                       # exception summary
 autoloop loops health --verbose             # include completions
+```
+
+### `worktree`
+
+Manage git worktrees used for run isolation.
+
+```bash
+autoloop worktree [subcommand] [args...]
+```
+
+Worktrees provide git-level isolation for runs. Each isolated run gets its own worktree branch, and this command surfaces their status, lets you merge results back, and clean up when done. See [Worktree & Isolation](worktree.md) for the full model.
+
+#### `worktree list`
+
+List all tracked worktrees with status, branch, base, merge strategy, and creation time.
+
+```bash
+autoloop worktree              # default subcommand
+autoloop worktree list
+```
+
+Prints `No worktrees found.` when no worktree metadata exists.
+
+#### `worktree show`
+
+Display detailed information for a specific worktree.
+
+```bash
+autoloop worktree show <run-id>
+```
+
+Shows: run ID, status (with `(orphan)` suffix if the worktree path no longer exists), branch, base branch, merge strategy, worktree path, created/merged/removed timestamps.
+
+#### `worktree merge`
+
+Merge a worktree branch back to the base branch.
+
+```bash
+autoloop worktree merge <run-id> [--strategy <squash|merge|rebase>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--strategy <squash\|merge\|rebase>` | Override the merge strategy recorded in the worktree metadata |
+
+On success, prints a confirmation. On failure, lists conflicting files and prints a recovery hint. Exits with code 1 on merge failure.
+
+#### `worktree clean`
+
+Remove worktree directories and metadata.
+
+```bash
+autoloop worktree clean [--all] [--force] [<run-id>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Clean all worktrees, including running ones |
+| `--force` | Force deletion without prompts |
+| `<run-id>` | Target a specific run (optional) |
+
+By default, removes orphaned worktrees (where the worktree path no longer exists on disk) and worktrees in terminal status (`merged`, `failed`, `removed`). Reports the count of cleaned and skipped worktrees.
+
+**Examples:**
+
+```bash
+autoloop worktree                                    # list all
+autoloop worktree show run-mn9d3uk0-xi0m             # detail view
+autoloop worktree merge run-mn9d3uk0-xi0m            # merge with recorded strategy
+autoloop worktree merge run-mn9d3uk0-xi0m --strategy squash
+autoloop worktree clean                              # clean orphans + terminal
+autoloop worktree clean --all                        # clean everything
+autoloop worktree clean --force run-mn9d3uk0-xi0m    # force-clean specific run
 ```
 
 ### `pi-adapter`
