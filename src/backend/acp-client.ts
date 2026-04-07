@@ -62,7 +62,6 @@ export async function initAcpSession(
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
     env: process.env,
-    detached: true, // create process group so we can kill the tree with process.kill(-pid)
   });
 
   if (!child.stdout || !child.stdin) {
