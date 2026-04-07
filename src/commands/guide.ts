@@ -11,7 +11,11 @@ export function dispatchGuide(args: string[]): void {
     messageArgs = args.slice(2);
   }
 
-  if (messageArgs.length === 0 || messageArgs[0] === "--help" || messageArgs[0] === "-h") {
+  if (
+    messageArgs.length === 0 ||
+    messageArgs[0] === "--help" ||
+    messageArgs[0] === "-h"
+  ) {
     console.log(
       'Usage: autoloops guide [--run <runId>] "guidance message"\n' +
         "Inject operator guidance into the next loop iteration.",

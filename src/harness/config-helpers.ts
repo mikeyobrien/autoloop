@@ -470,11 +470,14 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     launch: loop.launch,
     store: {
       ...loop.store,
-      ...(backend.kind === "kiro" ? {
-        kiro_trust_all_tools: config.get(cfg, "backend.trust_all_tools", "true") !== "false",
-        kiro_agent: config.get(cfg, "backend.agent", ""),
-        kiro_model: config.get(cfg, "backend.model", ""),
-      } : {}),
+      ...(backend.kind === "kiro"
+        ? {
+            kiro_trust_all_tools:
+              config.get(cfg, "backend.trust_all_tools", "true") !== "false",
+            kiro_agent: config.get(cfg, "backend.agent", ""),
+            kiro_model: config.get(cfg, "backend.model", ""),
+          }
+        : {}),
     },
     agentMap: loadAgentMap(pd),
   };

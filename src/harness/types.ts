@@ -1,6 +1,6 @@
-import type * as topo from "../topology.js";
-import type { KiroSessionHandle } from "../backend/kiro-bridge.js";
 import type { AgentMap } from "../agent-map.js";
+import type { KiroSessionHandle } from "../backend/kiro-bridge.js";
+import type * as topo from "../topology.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
 
