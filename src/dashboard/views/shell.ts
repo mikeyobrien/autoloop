@@ -302,6 +302,12 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
     </template>
     <p class="empty" x-show="visibleRunEvents().length === 0">No events</p>
   </div>
+  <div x-show="selectedRunDetail && selectedRunDetail.status === 'active'" style="display:flex;gap:0.4rem;align-items:center;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+    <input type="text" x-model="guideMessage" placeholder="Send guidance..." @keydown.enter="sendGuide()"
+      style="flex:1;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:4px;font-size:0.8rem;font-family:inherit;background:var(--bg);color:var(--fg)">
+    <button @click="sendGuide()" style="padding:0.4rem 0.8rem;border:none;border-radius:4px;background:var(--active);color:#fff;cursor:pointer;font-size:0.8rem;white-space:nowrap">Send</button>
+    <span x-show="guideFlash" x-text="guideFlash" x-transition.opacity style="font-size:0.75rem;color:var(--completed)"></span>
+  </div>
 </div>
 
 <script defer src="/static/alpine.min.js"></script>
@@ -320,6 +326,8 @@ function dashboard() {
     sectionOpen: { active: false, watching: false, stuck: false, failed: false, completed: false },
     sectionUserToggled: {},
     showVerbose: false,
+    guideMessage: "",
+    guideFlash: "",
 
     get categories() {
       return [
@@ -378,6 +386,30 @@ function dashboard() {
         const data = await res.json();
         this.selectedRunEvents = data.events;
       } catch (e) { /* ignore */ }
+    },
+
+    async sendGuide() {
+      if (!this.guideMessage.trim() || !this.selectedRun) return;
+      try {
+        const res = await fetch("/api/runs/" + this.selectedRun + "/guide", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: this.guideMessage }),
+        });
+        if (res.ok) {
+          this.guideMessage = "";
+          this.guideFlash = "Sent";
+          setTimeout(() => { this.guideFlash = ""; }, 2000);
+          await this.fetchEvents(this.selectedRun);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          this.guideFlash = data.error || "Failed";
+          setTimeout(() => { this.guideFlash = ""; }, 3000);
+        }
+      } catch (e) {
+        this.guideFlash = "Error";
+        setTimeout(() => { this.guideFlash = ""; }, 3000);
+      }
     },
 
     async startLoop() {

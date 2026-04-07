@@ -1,7 +1,12 @@
 import { spawn } from "node:child_process";
 import { Hono } from "hono";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
-import { readRunLines, resolveRunJournalPath } from "../../harness/journal.js";
+import {
+  appendOperatorEvent,
+  latestIterationForRun,
+  readRunLines,
+  resolveRunJournalPath,
+} from "../../harness/journal.js";
 import { categorizeRuns } from "../../loops/health.js";
 import { mergedFindRunByPrefix } from "../../registry/discover.js";
 import type { RunRecord } from "../../registry/types.js";
@@ -84,6 +89,42 @@ export function apiRoutes(ctx: DashboardContext): Hono {
   api.get("/presets", (c) => {
     const presets = listPresetsWithDescriptions(ctx.projectDir);
     return c.json({ presets });
+  });
+
+  api.post("/runs/:id/guide", async (c) => {
+    const id = c.req.param("id");
+    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    if (result === undefined) {
+      return c.json({ error: "not found" }, 404);
+    }
+    if (Array.isArray(result)) {
+      return c.json(
+        { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
+        409,
+      );
+    }
+    const body = await c.req.json<{ message?: string }>();
+    const message = body.message;
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
+      return c.json({ error: "message required" }, 400);
+    }
+    if (message.length > 10_000) {
+      return c.json({ error: "message too long (max 10000 chars)" }, 400);
+    }
+    const runId = result.run_id;
+    const journalPath =
+      result.journal_file ||
+      resolveRunJournalPath(ctx.stateDir, runId) ||
+      ctx.journalPath;
+    const iteration = latestIterationForRun(journalPath, runId) || "1";
+    appendOperatorEvent(
+      journalPath,
+      runId,
+      iteration,
+      "operator.guidance",
+      message.trim(),
+    );
+    return c.json({ status: "ok" });
   });
 
   api.post("/runs", async (c) => {
