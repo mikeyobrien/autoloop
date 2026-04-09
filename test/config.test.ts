@@ -31,7 +31,7 @@ describe("load", () => {
   it("returns defaults for missing file", () => {
     const cfg = load("/nonexistent/path/autoloops.toml");
     expect(get(cfg, "event_loop.max_iterations", "0")).toBe("3");
-    expect(get(cfg, "backend.kind", "")).toBe("pi");
+    expect(get(cfg, "backend.command", "")).toBe("claude");
   });
 
   it("parses TOML config", () => {
@@ -231,7 +231,7 @@ describe("loadLayered", () => {
     process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "nonexistent.toml");
     const dir = tmpDir("empty-project");
     const { config: cfg, provenance } = loadLayered(dir);
-    expect(get(cfg, "backend.kind", "")).toBe("pi");
+    expect(get(cfg, "backend.command", "")).toBe("claude");
     expect(provenance["backend.kind"]).toBe("default");
     expect(provenance["backend.command"]).toBe("default");
   });

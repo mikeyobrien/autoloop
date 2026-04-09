@@ -271,7 +271,7 @@ export function defaults(): Config {
       completion_event: "task.complete",
       required_events: "",
     },
-    backend: { kind: "pi", command: "pi", timeout_ms: "300000" },
+    backend: { kind: "", command: "claude", timeout_ms: "300000" },
     parallel: {
       enabled: "false",
       max_branches: "3",

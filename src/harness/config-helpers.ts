@@ -98,10 +98,9 @@ export function installRuntimeTools(loop: LoopContext): void {
 }
 
 export function resolveProcessKind(kind: string, command: string): string {
-  if (kind === "pi") return "pi";
+  if (kind === "pi" || piBinary(command)) return "pi";
   if (kind === "kiro") return "kiro";
-  if (kind === "command") return "command";
-  return piBinary(command) ? "pi" : "command";
+  return "command";
 }
 
 function piBinary(command: string): boolean {
@@ -491,7 +490,7 @@ function readBackendConfig(
   const command = processStringOverride(
     bo,
     "command",
-    config.get(cfg, "backend.command", "pi"),
+    config.get(cfg, "backend.command", "claude"),
   );
   const kind = resolveProcessKind(
     processStringOverride(bo, "kind", config.get(cfg, "backend.kind", "")),

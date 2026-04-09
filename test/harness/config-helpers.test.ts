@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildLoopContext,
   injectClaudePermissions,
+  resolveProcessKind,
 } from "../../src/harness/config-helpers.js";
 import type { RunRecord } from "../../src/registry/types.js";
 
@@ -57,6 +58,36 @@ function seedRegistry(stateDir: string, records: Partial<RunRecord>[]): void {
   );
   writeFileSync(join(stateDir, "registry.jsonl"), `${lines.join("\n")}\n`);
 }
+
+describe("resolveProcessKind", () => {
+  it("returns pi when kind is explicitly pi", () => {
+    expect(resolveProcessKind("pi", "pi")).toBe("pi");
+  });
+
+  it("returns pi when command is pi even if kind is command", () => {
+    expect(resolveProcessKind("command", "pi")).toBe("pi");
+  });
+
+  it("returns pi when command is a full path to pi", () => {
+    expect(resolveProcessKind("command", "/usr/local/bin/pi")).toBe("pi");
+  });
+
+  it("returns pi when kind is empty and command is pi", () => {
+    expect(resolveProcessKind("", "pi")).toBe("pi");
+  });
+
+  it("returns command for non-pi commands with kind command", () => {
+    expect(resolveProcessKind("command", "claude")).toBe("command");
+  });
+
+  it("returns command for non-pi commands with empty kind", () => {
+    expect(resolveProcessKind("", "claude")).toBe("command");
+  });
+
+  it("returns kiro when kind is kiro", () => {
+    expect(resolveProcessKind("kiro", "kiro")).toBe("kiro");
+  });
+});
 
 describe("injectClaudePermissions", () => {
   it("adds Claude permissions flags for Claude command backends", () => {
@@ -380,6 +411,29 @@ describe("buildLoopContext run-scoped isolation", () => {
     });
 
     expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
+  });
+});
+
+describe("default backend", () => {
+  it("defaults to claude with permissions injection when no backend is configured", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.command).toBe("claude");
+    expect(loop.backend.kind).toBe("command");
+    expect(loop.backend.args).toEqual(["-p", "--dangerously-skip-permissions"]);
+  });
+
+  it("review backend also defaults to claude", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.review.command).toBe("claude");
+    expect(loop.review.args).toEqual(["-p", "--dangerously-skip-permissions"]);
   });
 });
 
