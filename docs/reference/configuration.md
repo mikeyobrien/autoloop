@@ -2,7 +2,7 @@
 
 All runtime configuration lives in `autoloops.toml` at the root of a loop's project directory. Keys use flat dot-notation (`section.key = value`). The legacy `autoloops.conf` format is also accepted — the harness checks for `autoloops.toml` first and falls back to `autoloops.conf`.
 
-Configuration drives the control plane: iteration limits, backend selection, review policy, parallelism bounds, and memory budgets are all declarative settings in this file. See [Platform Architecture](platform.md) for how configuration fits into the broader system.
+Configuration drives the control plane: iteration limits, backend selection, review policy, parallelism bounds, and memory budgets are all declarative settings in this file. See [Platform Architecture](../concepts/platform.md) for how configuration fits into the broader system.
 
 Configuration is **hot-reloaded** every iteration. You can change any value mid-run and it takes effect on the next iteration without restarting.
 
@@ -110,7 +110,7 @@ parallel.branch_timeout_ms = 180000
 
 ### Isolation / Worktree
 
-Controls whether runs get their own git worktree for file-level isolation. See [Worktree Reference](worktree.md) for CLI flags and merge semantics.
+Controls whether runs get their own git worktree for file-level isolation. See [Worktree Reference](../features/worktree.md) for CLI flags and merge semantics.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -124,7 +124,7 @@ Resolution priority: `--worktree` flag → `--no-worktree` flag → config `work
 
 ### Profiles
 
-Profiles inject per-role prompt fragments into preset topologies. See [Profiles](profiles.md) for the full directory layout and composition rules.
+Profiles inject per-role prompt fragments into preset topologies. See [Profiles](../features/profiles.md) for the full directory layout and composition rules.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

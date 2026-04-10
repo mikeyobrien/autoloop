@@ -60,7 +60,7 @@ prompt_file = "roles/verifier.md"
 - `completion` sets the topology-level completion event. It can also be set in `autoloops.toml` via `event_loop.completion_event` — the topology value takes precedence, with the config value used as a fallback.
 - `"loop.start"` is the synthetic event emitted at iteration 1. Use it to define which role kicks off the loop.
 
-See [`docs/topology.md`](topology.md) for the full reference.
+See [`docs/topology.md`](../reference/topology.md) for the full reference.
 
 ## Step 2: Write role prompts
 
@@ -170,10 +170,10 @@ core.memory_file = ".autoloop/memory.jsonl"
 
 - `event_loop.required_events` — events that must have been emitted at least once before `task.complete` is accepted. Use this to enforce quality gates (e.g., require a review pass before completion).
 - `event_loop.completion_promise` — fallback string the model can output as plain text to signal completion when the event tool is unavailable.
-- `review.enabled` — enables the metareview review loop. See [`docs/metareview.md`](metareview.md).
+- `review.enabled` — enables the metareview review loop. See [`docs/metareview.md`](../reference/metareview.md).
 - `backend.kind` — `"pi"` for the Pi adapter (production), `"command"` for custom/mock backends.
 
-See [`docs/configuration.md`](configuration.md) for the full key reference.
+See [`docs/configuration.md`](../reference/configuration.md) for the full key reference.
 
 ## Step 5: Run the preset
 

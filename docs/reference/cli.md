@@ -1,6 +1,6 @@
 # CLI Reference
 
-The CLI is a thin shell over the autoloop control plane. It launches runs, inspects artifacts, and manages memory and chains — but contains no loop logic itself. See [Platform Architecture](platform.md) for how the CLI fits into the broader system.
+The CLI is a thin shell over the autoloop control plane. It launches runs, inspects artifacts, and manages memory and chains — but contains no loop logic itself. See [Platform Architecture](../concepts/platform.md) for how the CLI fits into the broader system.
 
 autoloop exposes all functionality through a single binary with subcommands.
 
@@ -330,7 +330,7 @@ Print an exception-focused health summary of all runs.
 autoloop loops health [--verbose]
 ```
 
-Reads the registry and categorizes runs using preset-aware thresholds (see [Operator Health](operator-health.md) for the full policy table):
+Reads the registry and categorizes runs using preset-aware thresholds (see [Operator Health](../features/operator-health.md) for the full policy table):
 - **Active**: currently running and recently updated
 - **Watching**: running but quiet longer than the preset's warning threshold — investigate soon
 - **Stuck**: running but quiet longer than the preset's stuck threshold — likely needs intervention
@@ -362,7 +362,7 @@ Manage git worktrees used for run isolation.
 autoloop worktree [subcommand] [args...]
 ```
 
-Worktrees provide git-level isolation for runs. Each isolated run gets its own worktree branch, and this command surfaces their status, lets you merge results back, and clean up when done. See [Worktree & Isolation](worktree.md) for the full model.
+Worktrees provide git-level isolation for runs. Each isolated run gets its own worktree branch, and this command surfaces their status, lets you merge results back, and clean up when done. See [Worktree & Isolation](../features/worktree.md) for the full model.
 
 #### `worktree list`
 

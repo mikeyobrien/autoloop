@@ -2,7 +2,7 @@
 
 Autoloop ships a family of `auto*` preset workflows. Each one is a self-contained agentic loop with a distinct behavioral center, topology, and shared-state contract. This document is the canonical taxonomy.
 
-Presets are the primary product surface of the autoloop control plane. New workflows are added as preset directories — not as code changes to the runtime. See [Platform Architecture](platform.md) for how presets fit into the broader system.
+Presets are the primary product surface of the autoloop control plane. New workflows are added as preset directories — not as code changes to the runtime. See [Platform Architecture](../concepts/platform.md) for how presets fit into the broader system.
 
 Across the family, the intended posture is fail-closed rather than rubber-stamp: verifier, checker, judge, reporter, and final-gate roles should prefer explicit evidence, surface uncertainty, and reject weak proof instead of quietly approving work.
 
