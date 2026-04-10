@@ -1,6 +1,14 @@
 import { defineConfig } from 'vitepress'
+import { llmstxtPlugin } from 'vitepress-plugin-llmstxt'
 
 export default defineConfig({
+  vite: {
+    plugins: [llmstxtPlugin({
+      hostname: 'https://mikeyobrien.github.io/autoloop',
+      mdFiles: false,
+      ignore: ['**/rfcs/**', '**/plans/**', '**/reports/**', '**/launches/**', '**/archive-*']
+    })]
+  },
   title: 'autoloop',
   description: 'Autonomous loop orchestration for AI agents',
   base: '/autoloop/',
