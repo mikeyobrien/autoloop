@@ -62,6 +62,9 @@
     "test:coverage": "node --experimental-vm-modules node_modules/.bin/vitest run --coverage",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest",
     "check": "biome check src/ test/ && tsc --noEmit && npm run test:coverage",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "prepare": "husky",
     "version": "node -e \"const p=require('./plugins/autoloop/.claude-plugin/plugin.json');p.version=require('./package.json').version;require('fs').writeFileSync('./plugins/autoloop/.claude-plugin/plugin.json',JSON.stringify(p,null,2)+'\\n')\" && git add plugins/autoloop/.claude-plugin/plugin.json"
   },
@@ -78,6 +81,7 @@
     "lint-staged": "^16.4.0",
     "playwright": "^1.59.1",
     "typescript": "^5.9.3",
+    "vitepress": "^1.6.4",
     "vitest": "^3.0.0"
   },
   "dependencies": {
