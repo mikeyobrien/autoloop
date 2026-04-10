@@ -10,25 +10,26 @@ Releases are published to npm by GitHub Actions from version tags.
 ## Release flow
 
 1. Bump the version in `package.json`.
-2. Commit the version bump:
+2. Update `CHANGELOG.md` with a release section for the new version.
+3. Commit the release prep:
 
 ```bash
-git commit -am "release: v0.2.1"
+git commit -am "release: vX.Y.Z"
 ```
 
-3. Create an annotated semver tag:
+4. Create an annotated semver tag:
 
 ```bash
-git tag -a v0.2.1 -m "v0.2.1"
+git tag -a vX.Y.Z -m "vX.Y.Z"
 ```
 
-4. Push the commit and tag:
+5. Push the commit and tag:
 
 ```bash
 git push origin main --follow-tags
 ```
 
-5. Watch `.github/workflows/publish-npm.yml`. The workflow:
+6. Watch `.github/workflows/publish-npm.yml`. The workflow:
    - checks out the repo
    - installs dependencies (`npm ci`)
    - builds TypeScript (`npm run build` → `tsc`)
@@ -37,10 +38,10 @@ git push origin main --follow-tags
    - skips publish if the version is already on npm
    - publishes to npm with `--provenance --access public`
 
-6. Verify the package is live:
+7. Verify the package is live:
 
 ```bash
-npm view @mobrienv/autoloop@0.2.1
+npm view @mobrienv/autoloop@X.Y.Z
 ```
 
 ## CI pipeline
@@ -70,6 +71,7 @@ npm test         # vitest run
 - **Trigger**: push of a `v*` tag, or manual `workflow_dispatch`
 - **Idempotent**: if the version is already published, the workflow exits cleanly without error
 - **Trusted publishing**: the workflow upgrades npm to latest for OIDC-based provenance support
+- **GitHub Releases**: npm publish is automated; GitHub release notes still need to be created separately if you want a public release page for launch links or social posts
 
 ## What gets published
 

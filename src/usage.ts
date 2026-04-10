@@ -8,9 +8,9 @@ export function printUsage(): void {
   console.log("  autoloop run <preset-name|preset-dir> [prompt...] [flags]");
   console.log("  autoloop emit <topic> [summary]");
   console.log(
-    "  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv>]",
+    "  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]",
   );
-  console.log("  autoloop memory <list|add|remove> [args]");
+  console.log("  autoloop memory <list|status|find|add|remove> [args]");
   console.log("  autoloop task <add|complete|update|remove|list> [args]");
   console.log("  autoloop list");
   console.log("  autoloop loops [--all]");

@@ -37,7 +37,7 @@ autoloop run <preset-name|preset-dir> [prompt...] [flags]
 ```
 
 The preset argument is required. It must be one of:
-- A bundled preset name (e.g. `autocode`, `autoqa`) — resolved to `examples/<name>/` under the installed project.
+- A bundled preset name (e.g. `autocode`, `autoqa`) — resolved to `presets/<name>/` under the installed package.
 - An explicit path to a directory containing `autoloops.toml` (or `autoloops.conf`).
 - `.` to run from the current directory.
 

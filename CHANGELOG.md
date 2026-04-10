@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0] - 2026-04-09
+### Added
+- **Debugging preset**: new `autodebug` preset for structured reproduce -> investigate -> fix -> verify loops.
+- **Dashboard operator polish**: recent runs sort newest-first, capped lists with show-more controls, and clearer project labeling.
+- **Default backend update**: bundled presets now default to Claude instead of Pi for a more ready-to-run out-of-the-box path.
+
+### Docs
+- Refreshed README positioning around dashboard, inspect, worktrees, and launch-ready product surfaces.
+- Corrected CLI docs to point bundled preset resolution at `presets/<name>/`.
+- Updated release docs to use version placeholders, require changelog updates, and call out separate GitHub release-note creation.
+
 ## [0.2.1] - 2026-04-07
 ### Added
 - **Dashboard**: Visual indicators (checkmark/green badge) for successfully merged worktree runs.

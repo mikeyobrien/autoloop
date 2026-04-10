@@ -1,7 +1,7 @@
 {
   "name": "@mobrienv/autoloop",
   "version": "0.3.0",
-  "description": "Autonomous LLM loop harness and control plane for long-horizon autonomous work",
+  "description": "Simpler, opinionated loop harness for inspectable long-running agent workflows",
   "type": "module",
   "main": "dist/main.js",
   "bin": {
