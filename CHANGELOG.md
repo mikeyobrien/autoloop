@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.4.0] - 2026-04-10
+### Added
+- **Inspect explorer**: richer journal timeline, artifact summaries, and dashboard explorer views for digging into completed runs.
+- **Autopreset preset**: new `autopreset` workflow for generating user-local presets from natural-language operator intent.
+- **AutoQA hardening**: adversarial hands-on driving, UX critique, and tool auto-discovery to make evaluation loops more concrete.
+- **Verbose ACP streaming**: backend plumbing for richer live streaming and worker synchronization during ACP-backed runs.
+- **Claude Code integration**: bundled Claude Code plugin metadata for launch-ready operator surfaces.
+
+### Changed
+- **Default backend update**: bundled presets now default to Claude instead of Pi for a more ready-to-run out-of-the-box path.
+- **Dashboard operator polish**: recent runs sort newest-first, cap long sections with show-more controls, and display clearer project labeling.
+
+### Fixed
+- **Backend shutdown/interrupt handling**: improved stderr draining, foreground Ctrl-C behavior, and detached-process cleanup for backend workers.
+- **Inspect/dashboard safety**: fixed error counting and hardened symlink/regex/path handling around artifact and inspect surfaces.
+- **Worktree/run reliability**: prevented stuck runs caused by signal/dead-PID edge cases.
+
+### Docs
+- Refreshed README positioning around dashboard, inspect, worktrees, and launch-ready product surfaces.
+- Added new RFCs for dashboard, artifact rendering, and verbose streaming.
+
 ## [0.3.0] - 2026-04-09
 ### Added
 - **Debugging preset**: new `autodebug` preset for structured reproduce -> investigate -> fix -> verify loops.

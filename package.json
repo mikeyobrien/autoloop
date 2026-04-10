@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Simpler, opinionated loop harness for inspectable long-running agent workflows",
   "type": "module",
   "main": "dist/main.js",
@@ -10,8 +10,23 @@
   "files": [
     "bin/autoloop",
     "dist",
-    "presets",
-    "plugins",
+    "plugins/autoloop",
+    "presets/autocode",
+    "presets/autodebug",
+    "presets/autodoc",
+    "presets/autofix",
+    "presets/autoideas",
+    "presets/automerge",
+    "presets/autoperf",
+    "presets/autopr",
+    "presets/autopreset",
+    "presets/autoqa",
+    "presets/autoresearch",
+    "presets/autoreview",
+    "presets/autosec",
+    "presets/autosimplify",
+    "presets/autospec",
+    "presets/autotest",
     "README.md"
   ],
   "engines": {

@@ -79,7 +79,8 @@ The `files` field in `package.json` controls the npm tarball contents:
 
 - `bin/autoloop` — Node.js entry point (`#!/usr/bin/env node`, imports `dist/main.js`)
 - `dist/` — compiled TypeScript output (ES2022, Node16 module resolution, with source maps and declarations)
-- `presets/` — bundled preset configurations
+- `plugins/autoloop` — Claude plugin metadata and bundled skill assets
+- explicit `presets/<name>/` entries for the supported bundled presets only (avoids shipping stray local preset directories)
 - `README.md`
 
 ## Engine requirement
