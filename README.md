@@ -9,6 +9,8 @@ It’s early and still evolving. autoloop is not a replacement for ralph-orchest
 [![npm version](https://img.shields.io/npm/v/@mobrienv/autoloop)](https://www.npmjs.com/package/@mobrienv/autoloop)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
 
+**[Read the docs →](https://mikeyobrien.github.io/autoloop/)**
+
 [![autoloop hero showing the CLI surface and local dashboard](docs/launches/autoloop-readme-hero.png)](docs/launches/autoloop-hybrid-launch-video-x.mp4)
 
 ## Why autoloop exists
@@ -196,7 +198,7 @@ Bundled presets give you opinionated starting points for common workflows like c
 
 ## Creating custom presets
 
-A preset is a directory containing `autoloops.toml`, `topology.toml`, `harness.md`, and a `roles/` folder. See [Creating presets](docs/guides/creating-presets.md) for the full guide, or examine any `presets/<name>/` directory as a working example.
+A preset is a directory containing `autoloops.toml`, `topology.toml`, `harness.md`, and a `roles/` folder. See [Creating presets](https://mikeyobrien.github.io/autoloop/guides/creating-presets) for the full guide, or examine any `presets/<name>/` directory as a working example.
 
 Some older or internal layouts may still include `miniloops.toml`, but `autoloops.toml` is the canonical entry point for new presets.
 
@@ -253,22 +255,22 @@ export MOCK_FIXTURE_PATH=test/fixtures/backend/complete-success.json
 node bin/autoloop run . -b "node dist/testing/mock-backend.js"
 ```
 
-See [CLI reference](docs/reference/cli.md#mock-backend) for fixture schema and bundled scenarios.
+See [CLI reference](https://mikeyobrien.github.io/autoloop/reference/cli#mock-backend) for fixture schema and bundled scenarios.
 
 ## Further reading
 
-- [Platform architecture](docs/concepts/platform.md)
-- [Configuration reference](docs/reference/configuration.md)
-- [Creating presets](docs/guides/creating-presets.md)
-- [Topology and event routing](docs/reference/topology.md)
-- [Memory system](docs/reference/memory.md)
-- [Dynamic chains](docs/features/dynamic-chains.md)
-- [CLI reference](docs/reference/cli.md)
-- [Dashboard](docs/features/dashboard.md)
-- [Profiles](docs/features/profiles.md)
-- [Tasks](docs/features/tasks.md)
-- [Worktree isolation](docs/features/worktree.md)
-- [Releasing](docs/development/releasing.md)
+- [Platform architecture](https://mikeyobrien.github.io/autoloop/concepts/platform)
+- [Configuration reference](https://mikeyobrien.github.io/autoloop/reference/configuration)
+- [Creating presets](https://mikeyobrien.github.io/autoloop/guides/creating-presets)
+- [Topology and event routing](https://mikeyobrien.github.io/autoloop/reference/topology)
+- [Memory system](https://mikeyobrien.github.io/autoloop/reference/memory)
+- [Dynamic chains](https://mikeyobrien.github.io/autoloop/features/dynamic-chains)
+- [CLI reference](https://mikeyobrien.github.io/autoloop/reference/cli)
+- [Dashboard](https://mikeyobrien.github.io/autoloop/features/dashboard)
+- [Profiles](https://mikeyobrien.github.io/autoloop/features/profiles)
+- [Tasks](https://mikeyobrien.github.io/autoloop/features/tasks)
+- [Worktree isolation](https://mikeyobrien.github.io/autoloop/features/worktree)
+- [Releasing](https://mikeyobrien.github.io/autoloop/development/releasing)
 
 ## Contributing
 
