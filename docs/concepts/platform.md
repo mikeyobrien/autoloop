@@ -17,7 +17,7 @@ autoloop is the execution engine and state model for long-horizon autonomous wor
 - Self-contained workflow definitions: topology, roles, harness instructions, config
 - Each preset answers "what does this loop do?" with a clear behavioral center
 - Enumerable, validatable, composable via chains
-- See [auto-workflows.md](auto-workflows.md) for the full taxonomy
+- See [auto-workflows.md](../guides/auto-workflows.md) for the full taxonomy
 
 ### Journals and artifacts (state model)
 

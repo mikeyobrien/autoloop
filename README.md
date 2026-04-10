@@ -196,7 +196,7 @@ Bundled presets give you opinionated starting points for common workflows like c
 
 ## Creating custom presets
 
-A preset is a directory containing `autoloops.toml`, `topology.toml`, `harness.md`, and a `roles/` folder. See [Creating presets](docs/creating-presets.md) for the full guide, or examine any `presets/<name>/` directory as a working example.
+A preset is a directory containing `autoloops.toml`, `topology.toml`, `harness.md`, and a `roles/` folder. See [Creating presets](docs/guides/creating-presets.md) for the full guide, or examine any `presets/<name>/` directory as a working example.
 
 Some older or internal layouts may still include `miniloops.toml`, but `autoloops.toml` is the canonical entry point for new presets.
 
@@ -253,22 +253,22 @@ export MOCK_FIXTURE_PATH=test/fixtures/backend/complete-success.json
 node bin/autoloop run . -b "node dist/testing/mock-backend.js"
 ```
 
-See [CLI reference](docs/cli.md#mock-backend) for fixture schema and bundled scenarios.
+See [CLI reference](docs/reference/cli.md#mock-backend) for fixture schema and bundled scenarios.
 
 ## Further reading
 
-- [Platform architecture](docs/platform.md)
-- [Configuration reference](docs/configuration.md)
-- [Creating presets](docs/creating-presets.md)
-- [Topology and event routing](docs/topology.md)
-- [Memory system](docs/memory.md)
-- [Dynamic chains](docs/dynamic-chains.md)
-- [CLI reference](docs/cli.md)
-- [Dashboard](docs/dashboard.md)
-- [Profiles](docs/profiles.md)
-- [Tasks](docs/tasks.md)
-- [Worktree isolation](docs/worktree.md)
-- [Releasing](docs/releasing.md)
+- [Platform architecture](docs/concepts/platform.md)
+- [Configuration reference](docs/reference/configuration.md)
+- [Creating presets](docs/guides/creating-presets.md)
+- [Topology and event routing](docs/reference/topology.md)
+- [Memory system](docs/reference/memory.md)
+- [Dynamic chains](docs/features/dynamic-chains.md)
+- [CLI reference](docs/reference/cli.md)
+- [Dashboard](docs/features/dashboard.md)
+- [Profiles](docs/features/profiles.md)
+- [Tasks](docs/features/tasks.md)
+- [Worktree isolation](docs/features/worktree.md)
+- [Releasing](docs/development/releasing.md)
 
 ## Contributing
 
