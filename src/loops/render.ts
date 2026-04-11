@@ -36,7 +36,7 @@ export function renderRunDetail(r: RunRecord): string {
     field("Latest", r.latest_event),
   ];
   if (r.stop_reason) lines.push(field("Stop", r.stop_reason));
-  lines.push(field("Isolation", r.isolation_mode || "shared"));
+  lines.push(field("Isolation", r.isolation_mode || "run-scoped"));
   if (r.worktree_name) lines.push(field("Worktree", r.worktree_name));
   if (r.worktree_path) lines.push(field("WT Path", r.worktree_path));
   lines.push(field("Created", r.created_at));

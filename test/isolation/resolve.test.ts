@@ -47,9 +47,9 @@ describe("resolveIsolationMode", () => {
     expect(result).toEqual({ mode: "worktree" });
   });
 
-  it("returns shared when --no-worktree flag is set even with active runs", () => {
+  it("returns run-scoped when --no-worktree flag is set even with active runs", () => {
     const result = resolveIsolationMode({ noWorktree: true }, [makeRecord()]);
-    expect(result).toEqual({ mode: "shared" });
+    expect(result).toEqual({ mode: "run-scoped" });
   });
 
   it("returns worktree when config enabled (worktree.enabled or isolation.enabled)", () => {
@@ -57,12 +57,12 @@ describe("resolveIsolationMode", () => {
     expect(result).toEqual({ mode: "worktree" });
   });
 
-  it("returns shared when config enabled but --no-worktree overrides", () => {
+  it("returns run-scoped when config enabled but --no-worktree overrides", () => {
     const result = resolveIsolationMode(
       { configEnabled: true, noWorktree: true },
       [],
     );
-    expect(result).toEqual({ mode: "shared" });
+    expect(result).toEqual({ mode: "run-scoped" });
   });
 
   it("--worktree takes priority over --no-worktree", () => {

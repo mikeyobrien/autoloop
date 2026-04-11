@@ -41,7 +41,7 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
         max_iterations: Number(f.max_iterations) || 0,
         stop_reason: "",
         latest_event: topic,
-        isolation_mode: f.isolation_mode ?? "shared",
+        isolation_mode: f.isolation_mode ?? "run-scoped",
         worktree_name: f.worktree_name ?? "",
         worktree_path: f.worktree_path ?? "",
       });

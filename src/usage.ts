@@ -87,7 +87,7 @@ export function printRunUsage(): void {
   console.log("Isolation:");
   console.log("  --worktree             Run in an isolated git worktree");
   console.log(
-    "  --no-worktree          Force shared checkout (disable worktree)",
+    "  --no-worktree          Disable worktree isolation (use run-scoped)",
   );
   console.log(
     "  --merge-strategy <s>   Merge strategy: squash (default), merge, rebase",

@@ -297,7 +297,7 @@ export function appendLoopStart(loop: LoopContext): void {
       ", " +
       jsonField("parent_run_id", loop.launch.parentRunId) +
       ", " +
-      jsonField("isolation_mode", loop.runtime.isolationMode ?? "shared") +
+      jsonField("isolation_mode", loop.runtime.isolationMode ?? "run-scoped") +
       ", " +
       jsonField("worktree_name", loop.paths.worktreeBranch || "") +
       ", " +

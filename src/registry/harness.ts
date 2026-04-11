@@ -29,7 +29,7 @@ function baseRecord(loop: LoopContext): RunRecord {
     max_iterations: loop.limits.maxIterations,
     stop_reason: "",
     latest_event: "loop.start",
-    isolation_mode: loop.runtime.isolationMode ?? "shared",
+    isolation_mode: loop.runtime.isolationMode ?? "run-scoped",
     worktree_name: loop.paths.worktreeBranch || "",
     worktree_path: loop.paths.worktreePath || "",
     pid: process.pid,

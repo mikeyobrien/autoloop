@@ -23,7 +23,7 @@ export interface IsolationResult {
  *
  * Priority:
  *  1. Explicit --worktree flag → "worktree"
- *  2. Explicit --no-worktree flag → "shared"
+ *  2. Explicit --no-worktree flag → "run-scoped"
  *  3. Config isolation.enabled → "worktree"
  *  4. Other active runs exist with code roles → "run-scoped" + warning
  *  5. Other active runs exist (non-code) → "run-scoped"
@@ -38,7 +38,7 @@ export function resolveIsolationMode(
   }
 
   if (request.noWorktree) {
-    return { mode: "shared" };
+    return { mode: "run-scoped" };
   }
 
   if (request.configEnabled) {

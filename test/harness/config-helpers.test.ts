@@ -174,8 +174,8 @@ describe("buildLoopContext", () => {
       workDir: projectDir,
       noWorktree: true, // override to avoid actual git worktree creation
     });
-    // noWorktree takes precedence, so mode is shared — but let's test without it
-    expect(loop.runtime.isolationMode).toBe("shared");
+    // noWorktree takes precedence, so mode is run-scoped (not worktree)
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
   });
 
   it("falls back to isolation.enabled when worktree.enabled is absent", () => {
@@ -188,8 +188,8 @@ describe("buildLoopContext", () => {
       workDir: projectDir,
       noWorktree: true,
     });
-    // noWorktree overrides config, so still shared
-    expect(loop.runtime.isolationMode).toBe("shared");
+    // noWorktree overrides config, so run-scoped (not worktree)
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
   });
 
   it("defaults run ids to human-readable word pairs", () => {
@@ -480,15 +480,15 @@ describe("solo-run default run-scoping", () => {
     expect(loop.paths.registryFile).toMatch(/registry\.jsonl$/);
   });
 
-  it("--no-worktree still returns shared mode even for solo run", () => {
+  it("--no-worktree returns run-scoped mode for solo run", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
       noWorktree: true,
     });
 
-    expect(loop.runtime.isolationMode).toBe("shared");
-    expect(loop.paths.baseStateDir).toBe(loop.paths.stateDir);
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.stateDir).toContain("/runs/");
   });
 });
 
