@@ -7,6 +7,7 @@ It’s a simpler, more opinionated loop harness for long-running agent work: ins
 It’s early and still evolving. autoloop is not a replacement for ralph-orchestrator — it’s a cleaner path for exploring a simpler UX without breaking Ralph.
 
 [![npm version](https://img.shields.io/npm/v/@mobrienv/autoloop)](https://www.npmjs.com/package/@mobrienv/autoloop)
+[![docs](https://img.shields.io/badge/docs-live-blue)](https://mikeyobrien.github.io/autoloop/)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
 
 **[Read the docs →](https://mikeyobrien.github.io/autoloop/)**
