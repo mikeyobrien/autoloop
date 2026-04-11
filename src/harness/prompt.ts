@@ -378,7 +378,34 @@ export function renderReviewPromptText(
   } = derived;
   const latestIteration = String(maxReviewPromptIteration(runLines));
 
+  const adversarialPreamble =
+    iteration === 1 && loop.review.adversarialFirst
+      ? "You are the adversarial gate for this loop. Your job is to be skeptical.\n" +
+        "Assume the loop is wasting compute until proven otherwise.\n\n" +
+        "After reviewing iteration 1 output, you MUST emit exactly one verdict:\n\n" +
+        "- CONTINUE: The approach is correct AND more iterations will meaningfully improve output.\n" +
+        "- REDIRECT: The approach is wrong or suboptimal. Provide a corrected task prompt.\n" +
+        "- TAKEOVER: The task is trivial enough to solve now, or so broken that iterating won't help. Provide the solution directly.\n" +
+        "- EXIT: Iteration 1 output is already sufficient. Stop.\n\n" +
+        "Default to EXIT or REDIRECT. Only CONTINUE if you can articulate what specific improvements further iterations will produce.\n\n"
+      : "";
+
+  const verdictSchema =
+    "\n## Verdict\n\n" +
+    "You MUST include a JSON verdict block in your response:\n\n" +
+    "```json\n" +
+    "{\n" +
+    '  "verdict": "CONTINUE | REDIRECT | TAKEOVER | EXIT",\n' +
+    '  "confidence": 0.0,\n' +
+    '  "reasoning": "One paragraph explaining the decision",\n' +
+    '  "redirect_prompt": "New/amended task prompt (REDIRECT only)",\n' +
+    '  "takeover_output": "Direct solution content (TAKEOVER only)",\n' +
+    '  "suggestions": ["Optional list of specific improvements for CONTINUE"]\n' +
+    "}\n" +
+    "```\n";
+
   return (
+    adversarialPreamble +
     "You are the metareview meta-reviewer for this loop.\n\n" +
     "Your job is to improve the loop itself, not to finish the task directly.\n" +
     "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" +
@@ -421,7 +448,8 @@ export function renderReviewPromptText(
     " inspect output " +
     latestIteration +
     " --format text\n\n" +
-    "If no improvements are needed, store a short learning explaining why and exit cleanly.\n"
+    "If no improvements are needed, store a short learning explaining why and exit cleanly.\n" +
+    verdictSchema
   );
 }
 

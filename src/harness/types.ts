@@ -17,6 +17,17 @@ export interface ProfileInfo {
   warnings: string[];
 }
 
+export type VerdictKind = "CONTINUE" | "REDIRECT" | "TAKEOVER" | "EXIT";
+
+export interface Verdict {
+  verdict: VerdictKind;
+  confidence: number;
+  reasoning: string;
+  redirect_prompt?: string;
+  takeover_output?: string;
+  suggestions?: string[];
+}
+
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
@@ -32,6 +43,7 @@ export interface LoopContext {
   review: {
     enabled: boolean;
     every: number;
+    adversarialFirst: boolean;
     kind: string;
     command: string;
     args: string[];
@@ -74,6 +86,7 @@ export interface LoopContext {
   store: Record<string, unknown>;
   agentMap: AgentMap | null;
   kiroSession?: KiroSessionHandle;
+  lastVerdict?: Verdict;
 }
 
 export interface RunOptions {

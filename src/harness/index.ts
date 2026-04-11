@@ -55,7 +55,7 @@ import {
   writeParallelBranchSummary,
 } from "./parallel.js";
 import { renderRunScratchpadFull } from "./scratchpad.js";
-import { stopMaxIterations } from "./stop.js";
+import { completeLoop, stopMaxIterations } from "./stop.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export type { LoopContext, RunOptions, RunSummary };
@@ -466,6 +466,25 @@ function iterateWith(
   liveLoop.kiroSession = loop.kiroSession;
   installRuntimeTools(liveLoop);
   const reviewed = maybeRunMetareview(liveLoop, iteration);
+  const verdict = reviewed.lastVerdict;
+
+  if (verdict) {
+    if (verdict.verdict === "EXIT")
+      return completeLoop(reviewed, iteration, "verdict_exit");
+    if (verdict.verdict === "TAKEOVER")
+      return completeLoop(reviewed, iteration, "verdict_takeover");
+    if (verdict.verdict === "REDIRECT") {
+      const redirectPath = join(reviewed.paths.stateDir, "redirect.md");
+      const redirectContent = readIfExists(redirectPath);
+      if (redirectContent) {
+        reviewed.objective =
+          "IMPORTANT: The metareviewer has redirected this task. Disregard your previous approach. New direction:\n" +
+          redirectContent +
+          "\n\n" +
+          reviewed.objective;
+      }
+    }
+  }
 
   if (iteration > reviewed.limits.maxIterations) {
     return stopMaxIterations(reviewed, iteration);

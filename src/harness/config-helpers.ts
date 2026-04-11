@@ -567,6 +567,9 @@ function readReviewConfig(
   return {
     enabled: truthySetting(config.get(cfg, "review.enabled", "true")),
     every: resolveReviewEvery(cfg, topoData),
+    adversarialFirst: truthySetting(
+      config.get(cfg, "review.adversarial_first", "true"),
+    ),
     kind,
     command,
     args: configListWithFallback(cfg, "review.args", backend.args),
