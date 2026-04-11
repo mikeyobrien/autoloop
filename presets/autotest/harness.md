@@ -19,3 +19,5 @@ State files:
 - `{{STATE_DIR}}/test-plan.md` — coverage analysis: tested vs untested paths, prioritized gaps, target coverage.
 - `{{STATE_DIR}}/test-report.md` — compiled report: tests written, pass/fail results, coverage deltas.
 - `{{STATE_DIR}}/progress.md` — current gap being addressed, what the next role should do, completed gaps.
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

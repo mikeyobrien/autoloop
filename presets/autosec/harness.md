@@ -18,3 +18,5 @@ State files:
 - `{{STATE_DIR}}/sec-findings.md` — raw findings from scanning: location, type, severity, evidence.
 - `{{STATE_DIR}}/sec-report.md` — compiled security report: confirmed findings, fixes applied, remaining risks.
 - `{{STATE_DIR}}/progress.md` — current finding being analyzed, what the next role should do.
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

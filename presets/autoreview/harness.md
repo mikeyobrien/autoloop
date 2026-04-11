@@ -18,3 +18,5 @@ State files:
 - `{{STATE_DIR}}/review-context.md` — the diff, affected files, surrounding context, and architectural notes.
 - `{{STATE_DIR}}/review-findings.md` — structured findings with severity, location, description, and suggested fix.
 - `{{STATE_DIR}}/progress.md` — current review pass, what the next role should do.
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

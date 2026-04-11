@@ -21,3 +21,6 @@ State files:
 - `{{STATE_DIR}}/spec-brief.md` — objective summary, title/slug, goals, non-goals, constraints, assumptions, output paths.
 - `{{STATE_DIR}}/spec-research.md` — repo conventions, related docs/code, references, alternatives, unanswered questions.
 - `{{STATE_DIR}}/progress.md` — current phase, artifact paths, revision notes, critic checklist.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

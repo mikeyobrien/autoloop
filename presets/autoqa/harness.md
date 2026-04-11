@@ -50,3 +50,6 @@ State files:
 - `{{STATE_DIR}}/progress.md` — current validation step, what the next role should do, completed steps, UX observations per step.
 - `{{STATE_DIR}}/qa-report.md` — the compiled validation report with pass/fail results, evidence, and UX findings.
 - `{{STATE_DIR}}/logs/` — captured output from server drives, CLI runs, and other hands-on steps.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

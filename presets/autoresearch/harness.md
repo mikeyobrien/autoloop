@@ -26,3 +26,5 @@ LLM-as-judge:
 - The judge returns JSON with `{"pass": true|false, "reason": "..."}` and exits 0 (pass) or 1 (fail).
 - Use the judge when hard metrics alone are insufficient (e.g., code quality, semantic correctness).
 - The judge does not override weak or missing hard evidence.
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

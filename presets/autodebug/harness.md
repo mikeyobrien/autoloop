@@ -36,3 +36,6 @@ Debugging techniques available (embed in investigation):
 - Defense-in-depth: after finding root cause, add validation at 4 layers (entry point, business logic, environment guards, debug instrumentation).
 - Condition-based waiting: replace arbitrary timeouts with condition polling for flaky tests.
 - Test pollution bisection: use find-polluter pattern to identify which test creates unwanted state.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

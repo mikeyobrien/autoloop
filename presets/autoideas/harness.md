@@ -29,3 +29,5 @@ State files:
 - `{{STATE_DIR}}/scan-areas.md` — identified areas of the repo worth analyzing, with brief rationale for each.
 - `{{STATE_DIR}}/progress.md` — current area under analysis, what the next role should do, completed areas.
 - `{{STATE_DIR}}/ideas-report.md` — the compiled output report with reviewer-validated suggestions.
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

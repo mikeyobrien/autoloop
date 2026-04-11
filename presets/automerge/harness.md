@@ -8,3 +8,6 @@ Instructions:
 1. Read `handoff.md` in the current work directory. The `## Parent Run` section contains `parent_run_id: <id>`.
 2. Execute `autoloop worktree merge <parent-run-id>` to merge the worktree.
 3. Report success or failure via the completion event.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

@@ -17,3 +17,6 @@ State files:
 - `{{STATE_DIR}}/doc-plan.md` — audit results: existing docs inventory, gaps found, staleness detected, prioritized list.
 - `{{STATE_DIR}}/doc-report.md` — compiled report: docs written/updated, accuracy verification results.
 - `{{STATE_DIR}}/progress.md` — current gap being addressed, what the next role should do.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

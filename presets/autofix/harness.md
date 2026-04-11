@@ -23,3 +23,5 @@ State files:
 - `{{STATE_DIR}}/bug-report.md` — the original bug report, reproduction steps, and root cause analysis.
 - `{{STATE_DIR}}/fix-log.md` — log of fixes applied: what was changed, why, verification results.
 - `{{STATE_DIR}}/progress.md` — current bug being fixed, what the next role should do.
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

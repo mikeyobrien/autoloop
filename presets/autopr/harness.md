@@ -25,3 +25,6 @@ Role boundaries (strict):
 - The drafter writes `{{STATE_DIR}}/pr-draft.md`; it does not validate or publish.
 - The validator checks the draft against the actual repo state and request; it does not publish.
 - The publisher performs the side effect (`gh pr create`, `gh pr edit`, `gh pr merge --auto`, etc.) and records the result.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

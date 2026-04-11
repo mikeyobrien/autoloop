@@ -36,3 +36,6 @@ Role boundaries (strict):
 - The generator writes preset files and emits `review.ready`. It does not design or validate.
 - The validator independently checks the generated preset and emits `review.passed` or `review.rejected`. It does not generate.
 - The finalizer checks whole-task completeness and emits `queue.advance` or `task.complete`.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

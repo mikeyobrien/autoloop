@@ -24,3 +24,10 @@ Role boundaries (strict):
 - The critic independently verifies the builder's work and emits `review.passed` or `review.rejected`. It does not build.
 - The finalizer checks whole-task completeness and emits `queue.advance` or `task.complete`.
 - If the routing topology says your next event is X, emit X — do not attempt completion or skip-ahead events.
+
+Terminal blockers:
+- If `build.blocked` has fired twice for the same reason, the planner MUST NOT re-plan the same blocker. Instead, update `{{STATE_DIR}}/plan.md` status to `TERMINAL BLOCKER` and emit `tasks.ready` so the builder can emit `build.blocked` one final time, routing to the finalizer for loop termination.
+- The finalizer receiving a `build.blocked` route SHOULD check `{{STATE_DIR}}/plan.md` for `TERMINAL BLOCKER` status and emit `task.complete` with a failure summary rather than `queue.advance`.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.

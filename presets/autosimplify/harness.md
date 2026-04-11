@@ -23,3 +23,6 @@ State files:
 - `{{STATE_DIR}}/simplify-context.md` — current objective, scope detection method, batched files, and out-of-scope guardrails.
 - `{{STATE_DIR}}/simplify-plan.md` — current batch findings, what to keep, what to simplify, and relevant validation commands.
 - `{{STATE_DIR}}/progress.md` — active batch, edits made, verification evidence, rejected attempts, and next action.
+
+Parallel conflict handling:
+- Multiple autoloop runs may execute in parallel on the same repository. If you encounter unexpected file changes, merge conflicts, or write failures caused by another agent's concurrent edits, do not panic or rollback their changes. Re-read the file and continue attempting your edit.
