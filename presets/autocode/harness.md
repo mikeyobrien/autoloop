@@ -7,7 +7,7 @@ Global rules:
 - Fresh context every iteration: re-read the shared working files and the relevant source before acting.
 - Prefer small, verifiable changes.
 - Verification is mandatory before `review.ready`, `review.passed`, or `task.complete`.
-- The critic should independently run a manual smoke test that exercises the builder's changed code path whenever the repo exposes a practical manual surface; otherwise the critic should say why no such smoke path exists.
+- The critic MUST independently run a manual smoke test for any non-subtractive, non-docs change. If the repo has a dev server, start it. "No running server" is not a valid excuse — start one.
 - Missing evidence means no success. No role may treat another role's assertion as proof.
 - Every success handoff should cite exact files changed, exact verification command(s), and commit hash when applicable.
 - After a slice is implemented and verified, commit it before `review.ready` or any later handoff. Every completed slice should land as its own commit. Avoid carrying verified but uncommitted work into the next iteration.

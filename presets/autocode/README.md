@@ -16,7 +16,7 @@ Autocode is not an approval machine.
 
 - Planner decomposes work into the next smallest slice.
 - Builder implements and proves the slice.
-- Critic tries to break the slice, including independently running a manual smoke test that exercises the builder's changed code path whenever a practical manual surface is available, and rejects on missing evidence.
+- Critic tries to break the slice with at least one novel verification the builder didn't perform, including a mandatory smoke test for non-subtractive changes, and rejects on missing evidence.
 - Finalizer tries to prove the whole task is still incomplete before allowing completion.
 
 Success is evidence-based, not prose-based. Only the finalizer may emit `task.complete`.
