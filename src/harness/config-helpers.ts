@@ -21,7 +21,11 @@ import {
   splitCsv,
   uniqueGeneratedId,
 } from "../utils.js";
-import { createWorktree } from "../worktree/create.js";
+import {
+  createWorktree,
+  resolveGitRoot,
+  tryResolveGitRoot,
+} from "../worktree/create.js";
 import {
   extractField,
   extractIteration,
@@ -232,9 +236,10 @@ export function buildLoopContext(
   const resolvedProjectDir = absolutePath(projectDir);
   const resolvedWorkDir = absolutePath(runOptions.workDir || ".");
   const cfg = config.loadProject(resolvedProjectDir);
+  const stateDirAnchor = tryResolveGitRoot(resolvedWorkDir) ?? resolvedWorkDir;
   const stateDir = join(
-    resolvedWorkDir,
-    config.get(cfg, "core.state_dir", ".miniloop"),
+    stateDirAnchor,
+    config.get(cfg, "core.state_dir", ".autoloop"),
   );
   const journalFile = config.resolveJournalFileIn(
     resolvedProjectDir,
@@ -284,16 +289,20 @@ export function buildLoopContext(
   let worktreeMetaDir = "";
 
   if (isolation.mode === "worktree") {
+    const gitRoot = resolveGitRoot(resolvedWorkDir);
     const branchPrefix = config.get(cfg, "worktree.branch_prefix", "autoloop");
     const mergeStrategy =
       runOptions.mergeStrategy ||
       config.get(cfg, "worktree.merge_strategy", "squash");
     const wt = createWorktree({
-      mainProjectDir: resolvedProjectDir,
-      mainStateDir: stateDir,
+      mainStateDir: join(
+        gitRoot,
+        config.get(cfg, "core.state_dir", ".autoloop"),
+      ),
       runId,
       branchPrefix,
       mergeStrategy,
+      workDir: resolvedWorkDir,
     });
     effectiveWorkDir = wt.worktreePath;
     worktreeBranch = wt.branch;
@@ -301,7 +310,7 @@ export function buildLoopContext(
     worktreeMetaDir = wt.metaDir;
     effectiveStateDir = join(
       wt.worktreePath,
-      config.get(cfg, "core.state_dir", ".miniloop"),
+      config.get(cfg, "core.state_dir", ".autoloop"),
     );
   }
 

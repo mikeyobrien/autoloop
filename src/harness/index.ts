@@ -192,9 +192,9 @@ export function run(
           | "rebase";
         try {
           mergeWorktree({
-            mainProjectDir: loop.paths.mainProjectDir,
             metaDir: loop.paths.worktreeMetaDir,
             strategy,
+            workDir: loop.paths.workDir,
           });
           log(
             loop,
@@ -216,10 +216,10 @@ export function run(
       if (shouldClean) {
         try {
           cleanWorktrees({
-            mainProjectDir: loop.paths.mainProjectDir,
             mainStateDir: loop.paths.baseStateDir,
             runId: loop.runtime.runId,
             force: cleanupPolicy === "always",
+            workDir: loop.paths.workDir,
           });
           log(loop, "info", `worktree cleaned for run ${loop.runtime.runId}`);
         } catch (err: unknown) {

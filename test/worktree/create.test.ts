@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createWorktree } from "../../src/worktree/create.js";
+import { createWorktree, resolveGitRoot } from "../../src/worktree/create.js";
 import { readMeta } from "../../src/worktree/meta.js";
 
 function makeGitRepo(): string {
@@ -28,9 +28,9 @@ describe("createWorktree", () => {
     const stateDir = join(repo, ".autoloop");
 
     const result = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-test1",
+      workDir: repo,
     });
 
     // Worktree directory exists and is a git working tree
@@ -55,10 +55,10 @@ describe("createWorktree", () => {
     const stateDir = join(repo, ".autoloop");
 
     const result = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-custom",
       branchPrefix: "wt",
+      workDir: repo,
     });
 
     expect(result.branch).toBe("wt/run-custom");
@@ -70,17 +70,17 @@ describe("createWorktree", () => {
 
     // Create first worktree
     createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-dup",
+      workDir: repo,
     });
 
     // Second attempt with same runId should fail due to branch collision
     expect(() =>
       createWorktree({
-        mainProjectDir: repo,
         mainStateDir: stateDir,
         runId: "run-dup",
+        workDir: repo,
       }),
     ).toThrow(/already exists/);
   });
@@ -90,13 +90,39 @@ describe("createWorktree", () => {
     const stateDir = join(repo, ".autoloop");
 
     const result = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-merge",
       mergeStrategy: "rebase",
+      workDir: repo,
     });
 
     const meta = readMeta(result.metaDir);
     expect(meta?.merge_strategy).toBe("rebase");
+  });
+});
+
+describe("resolveGitRoot", () => {
+  it("resolves git root from within a repo", () => {
+    const repo = makeGitRepo();
+    const subDir = join(repo, "subdir");
+    execSync("mkdir -p subdir", { cwd: repo, stdio: "pipe" });
+
+    const resolved = resolveGitRoot(subDir);
+    expect(resolved).toBe(realpathSync(repo));
+  });
+
+  it("returns the same canonical path regardless of subdirectory depth", () => {
+    const repo = makeGitRepo();
+    execSync("mkdir -p a/b/c", { cwd: repo, stdio: "pipe" });
+
+    expect(resolveGitRoot(repo)).toBe(resolveGitRoot(join(repo, "a/b/c")));
+  });
+
+  it("throws when called outside a git repo", () => {
+    const nonGitDir = mkdtempSync(join(tmpdir(), "autoloop-ts-non-git-"));
+
+    expect(() => resolveGitRoot(nonGitDir)).toThrow(
+      /requires the current directory to be inside a git repository/,
+    );
   });
 });

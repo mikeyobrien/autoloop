@@ -124,9 +124,9 @@ function doMerge(
 ): void {
   const metaDir = join(stateDir, "worktrees", runId);
   const result = mergeWorktree({
-    mainProjectDir: projectDir,
     metaDir,
     strategy,
+    workDir: projectDir,
   });
 
   if (result.success) {
@@ -148,11 +148,11 @@ function doClean(
   opts: { runId?: string; all?: boolean; force?: boolean },
 ): void {
   const result = cleanWorktrees({
-    mainProjectDir: projectDir,
     mainStateDir: stateDir,
     runId: opts.runId,
     all: opts.all,
     force: opts.force,
+    workDir: projectDir,
   });
 
   if (result.removed.length === 0) {

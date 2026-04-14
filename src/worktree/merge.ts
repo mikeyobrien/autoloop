@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { shellQuote } from "../utils.js";
+import { resolveGitRoot } from "./create.js";
 import type { WorktreeMeta } from "./meta.js";
 import { readMeta, updateStatus } from "./meta.js";
 
@@ -7,9 +8,9 @@ const DEFAULT_GIT_NAME = "autoloop";
 const DEFAULT_GIT_EMAIL = "autoloop@local";
 
 export interface MergeOpts {
-  mainProjectDir: string;
   metaDir: string;
   strategy?: "squash" | "merge" | "rebase";
+  workDir: string;
 }
 
 export interface MergeResult {
@@ -19,7 +20,8 @@ export interface MergeResult {
 }
 
 export function mergeWorktree(opts: MergeOpts): MergeResult {
-  const { mainProjectDir, metaDir, strategy = "squash" } = opts;
+  const { metaDir, strategy = "squash", workDir } = opts;
+  const gitRoot = resolveGitRoot(workDir);
 
   const meta = readMeta(metaDir);
   if (!meta) throw new Error(`no worktree meta found in ${metaDir}`);
@@ -28,24 +30,24 @@ export function mergeWorktree(opts: MergeOpts): MergeResult {
 
   const baseBranch = meta.base_branch;
   const branch = meta.branch;
-  const gitEnv = resolveGitEnv(mainProjectDir);
+  const gitEnv = resolveGitEnv(gitRoot);
 
   // Checkout base branch
-  exec(mainProjectDir, `git checkout ${shellQuote(baseBranch)}`, gitEnv);
+  exec(gitRoot, `git checkout ${shellQuote(baseBranch)}`, gitEnv);
 
   try {
     if (strategy === "squash") {
-      exec(mainProjectDir, `git merge --squash ${shellQuote(branch)}`, gitEnv);
+      exec(gitRoot, `git merge --squash ${shellQuote(branch)}`, gitEnv);
       exec(
-        mainProjectDir,
+        gitRoot,
         `git commit --no-edit -m ${shellQuote(`merge worktree ${meta.run_id} (squash)`)}`,
         gitEnv,
       );
     } else if (strategy === "rebase") {
-      exec(mainProjectDir, `git rebase ${shellQuote(branch)}`, gitEnv);
+      exec(gitRoot, `git rebase ${shellQuote(branch)}`, gitEnv);
     } else {
       exec(
-        mainProjectDir,
+        gitRoot,
         `git merge --no-ff ${shellQuote(branch)} -m ${shellQuote(`merge worktree ${meta.run_id}`)}`,
         gitEnv,
       );
@@ -53,12 +55,12 @@ export function mergeWorktree(opts: MergeOpts): MergeResult {
   } catch (err: unknown) {
     // Attempt to detect conflicts and abort
     const msg = err instanceof Error ? err.message : String(err);
-    const conflicts = detectConflicts(mainProjectDir);
+    const conflicts = detectConflicts(gitRoot);
     try {
       if (strategy === "rebase") {
-        exec(mainProjectDir, "git rebase --abort", gitEnv);
+        exec(gitRoot, "git rebase --abort", gitEnv);
       } else {
-        exec(mainProjectDir, "git merge --abort", gitEnv);
+        exec(gitRoot, "git merge --abort", gitEnv);
       }
     } catch {
       /* abort best-effort */

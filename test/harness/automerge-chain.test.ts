@@ -25,10 +25,15 @@ vi.mock("../../src/worktree/create.js", () => ({
     branch: "autoloop/fake-run",
     metaDir: "/tmp/fake-meta",
   })),
+  resolveGitRoot: vi.fn((cwd: string) => cwd),
 }));
 
 vi.mock("../../src/worktree/clean.js", () => ({
   cleanWorktrees: vi.fn(),
+}));
+
+vi.mock("../../src/worktree/merge.js", () => ({
+  mergeWorktree: vi.fn(),
 }));
 
 vi.mock("../../src/harness/iteration.js", () => ({
