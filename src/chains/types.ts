@@ -1,6 +1,17 @@
+/**
+ * Per-step backend override. Shape mirrors the subset of keys consumed by
+ * readBackendConfig() in src/harness/config-helpers.ts: command, kind, args,
+ * prompt_mode. timeout_ms is accepted but currently only honored from config.
+ *
+ * Precedence at merge time: step.backendOverride > runOptions.backendOverride
+ * (CLI -b flag) > preset autoloops.toml defaults.
+ */
+export type StepBackendOverride = Record<string, unknown>;
+
 export interface ChainStep {
   name: string;
   presetDir: string;
+  backendOverride?: StepBackendOverride;
 }
 
 export interface ChainSpec {
