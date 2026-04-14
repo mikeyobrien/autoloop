@@ -129,6 +129,21 @@ describe("parseChainsFromToml — per-step backend override", () => {
     );
   });
 
+  it("accepts timeout_ms as a backend override key", () => {
+    const parsed = {
+      chain: [
+        {
+          name: "timeout-chain",
+          step: [{ preset: "autocode", backend: { timeout_ms: 60000 } }],
+        },
+      ],
+    };
+    const cfg = parseChainsFromToml(parsed, bundleRoot);
+    expect(cfg.chains[0].steps[0].backendOverride).toEqual({
+      timeout_ms: 60000,
+    });
+  });
+
   it("rejects a chain that mixes 'steps' and '[[chain.step]]'", () => {
     const parsed = {
       chain: [

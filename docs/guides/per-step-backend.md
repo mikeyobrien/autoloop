@@ -45,7 +45,7 @@ Each step's `backend` table may contain any subset of:
 | `command`     | backend executable name                             |
 | `args`        | array of CLI args (e.g. `--model`, `--thinking`)    |
 | `prompt_mode` | `"arg"` / `"stdin"` / `"acp"`                       |
-| `timeout_ms`  | per-invocation timeout (forward-compat)             |
+| `timeout_ms`  | per-invocation timeout                              |
 
 Unknown keys are rejected with a clear error.
 

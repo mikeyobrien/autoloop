@@ -12,9 +12,9 @@ import type {
   StepBackendOverride,
 } from "./types.js";
 
-// Keys accepted inside a per-step `backend = { ... }` table. Matches the subset
-// that src/harness/config-helpers.ts::readBackendConfig reads from overrides,
-// plus timeout_ms (forward-compat; currently read from cfg only).
+// Keys accepted inside a per-step `backend = { ... }` table. Must match the
+// subset that src/harness/config-helpers.ts::readBackendConfig reads from
+// overrides.
 const ALLOWED_BACKEND_OVERRIDE_KEYS = new Set([
   "kind",
   "command",

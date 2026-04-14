@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildLoopContext,
   injectClaudePermissions,
+  processIntOverride,
+  reloadLoop,
   resolveProcessKind,
 } from "../../src/harness/config-helpers.js";
 import type { RunRecord } from "../../src/registry/types.js";
@@ -514,5 +516,60 @@ describe("global journal behavior", () => {
     expect(loop.runtime.isolationMode).toBe("run-scoped");
     expect(loop.paths.journalFile).not.toContain("/runs/");
     expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
+  });
+});
+
+describe("processIntOverride", () => {
+  it("returns the override value when it is a number", () => {
+    expect(
+      processIntOverride({ timeout_ms: 60000 }, "timeout_ms", 300000),
+    ).toBe(60000);
+  });
+
+  it("falls back when the key is absent", () => {
+    expect(processIntOverride({}, "timeout_ms", 300000)).toBe(300000);
+  });
+
+  it("falls back when the value is undefined", () => {
+    expect(
+      processIntOverride({ timeout_ms: undefined }, "timeout_ms", 300000),
+    ).toBe(300000);
+  });
+
+  it("throws when the value is a string", () => {
+    expect(() =>
+      processIntOverride({ timeout_ms: "60000" }, "timeout_ms", 300000),
+    ).toThrow(/backend override "timeout_ms" must be an integer/);
+  });
+
+  it("throws when the value is a float", () => {
+    expect(() =>
+      processIntOverride({ timeout_ms: 3.14 }, "timeout_ms", 300000),
+    ).toThrow(/backend override "timeout_ms" must be an integer/);
+  });
+});
+
+describe("buildLoopContext with backendOverride.timeout_ms", () => {
+  it("applies timeout_ms from backendOverride", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      backendOverride: { timeout_ms: 60000 },
+    });
+
+    expect(loop.backend.timeoutMs).toBe(60000);
+  });
+
+  it("applies timeout_ms from step backendOverride over CLI override", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      backendOverride: { timeout_ms: 300000 },
+    });
+
+    loop.runtime.backendOverride = { timeout_ms: 60000 };
+    const reloaded = reloadLoop(loop);
+
+    expect(reloaded.backend.timeoutMs).toBe(60000);
   });
 });

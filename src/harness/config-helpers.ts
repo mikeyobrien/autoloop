@@ -153,6 +153,25 @@ export function processListOverride(
   return Array.isArray(val) ? (val as string[]) : fallback;
 }
 
+export function processIntOverride(
+  override: Record<string, unknown>,
+  key: string,
+  fallback: number,
+): number {
+  const val = override[key];
+  if (val !== undefined) {
+    if (typeof val !== "number" || !Number.isInteger(val)) {
+      throw new Error(
+        `backend override "${key}" must be an integer, got ${
+          typeof val === "number" ? val : typeof val
+        }`,
+      );
+    }
+    return val;
+  }
+  return fallback;
+}
+
 export function claudeBackend(command: string): boolean {
   return command === "claude" || command.endsWith("/claude");
 }
@@ -511,7 +530,11 @@ function readBackendConfig(
       config.get(cfg, "backend.prompt_mode", "arg"),
     ),
   );
-  const timeoutMs = config.getInt(cfg, "backend.timeout_ms", 300000);
+  const timeoutMs = processIntOverride(
+    bo,
+    "timeout_ms",
+    config.getInt(cfg, "backend.timeout_ms", 300000),
+  );
   return { kind, command, args, promptMode, timeoutMs };
 }
 
