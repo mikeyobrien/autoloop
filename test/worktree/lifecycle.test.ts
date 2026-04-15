@@ -46,7 +46,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
+      workDir: repo,
       mainStateDir: stateDir,
       runId: "run-strategy",
       mergeStrategy: "rebase",
@@ -61,7 +61,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
+      workDir: repo,
       mainStateDir: stateDir,
       runId: "run-automerge",
       mergeStrategy: "squash",
@@ -72,17 +72,17 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
 
     // Simulate automerge
     const mergeResult = mergeWorktree({
-      mainProjectDir: repo,
       metaDir: wt.metaDir,
       strategy: "squash",
+      workDir: repo,
     });
     expect(mergeResult.success).toBe(true);
 
     // Simulate cleanup (on_success policy — run succeeded)
     const cleanResult = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-automerge",
+      workDir: repo,
     });
     expect(cleanResult.removed).toContain("run-automerge");
     expect(existsSync(wt.worktreePath)).toBe(false);
@@ -93,7 +93,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
+      workDir: repo,
       mainStateDir: stateDir,
       runId: "run-keep",
     });
@@ -112,7 +112,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
+      workDir: repo,
       mainStateDir: stateDir,
       runId: "run-never-clean",
     });
@@ -129,7 +129,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
+      workDir: repo,
       mainStateDir: stateDir,
       runId: "run-always-clean",
     });
@@ -138,10 +138,10 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
 
     // cleanup=always with force removes failed worktrees
     const cleanResult = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-always-clean",
       force: true,
+      workDir: repo,
     });
     expect(cleanResult.removed).toContain("run-always-clean");
     expect(existsSync(wt.worktreePath)).toBe(false);
@@ -152,7 +152,7 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
+      workDir: repo,
       mainStateDir: stateDir,
       runId: "run-fail-noclean",
     });
@@ -161,9 +161,9 @@ describe("worktree lifecycle: merge-strategy and cleanup", () => {
 
     // on_success policy: should clean terminal-status worktrees (failed is terminal)
     const cleanResult = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-fail-noclean",
+      workDir: repo,
     });
     // clean.ts removes failed worktrees since they're terminal status
     expect(cleanResult.removed).toContain("run-fail-noclean");

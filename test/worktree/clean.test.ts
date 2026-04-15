@@ -31,16 +31,16 @@ describe("cleanWorktrees", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-clean1",
+      workDir: repo,
     });
 
     updateStatus(wt.metaDir, "merged");
 
     const result = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
+      workDir: repo,
     });
 
     expect(result.removed).toContain("run-clean1");
@@ -52,14 +52,14 @@ describe("cleanWorktrees", () => {
     const stateDir = join(repo, ".autoloop");
 
     createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-running",
+      workDir: repo,
     });
 
     const result = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
+      workDir: repo,
     });
 
     expect(result.removed).toEqual([]);
@@ -71,16 +71,16 @@ describe("cleanWorktrees", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-force",
+      workDir: repo,
     });
 
     const result = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-force",
       force: true,
+      workDir: repo,
     });
 
     expect(result.removed).toContain("run-force");
@@ -92,22 +92,22 @@ describe("cleanWorktrees", () => {
     const stateDir = join(repo, ".autoloop");
 
     createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-keep",
+      workDir: repo,
     });
 
     const wt2 = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-remove",
+      workDir: repo,
     });
     updateStatus(wt2.metaDir, "failed");
 
     const result = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-remove",
+      workDir: repo,
     });
 
     expect(result.removed).toContain("run-remove");
@@ -119,8 +119,8 @@ describe("cleanWorktrees", () => {
     const stateDir = join(repo, ".autoloop");
 
     const result = cleanWorktrees({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
+      workDir: repo,
     });
 
     expect(result.removed).toEqual([]);

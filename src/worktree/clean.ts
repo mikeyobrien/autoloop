@@ -4,15 +4,16 @@ import { join } from "node:path";
 import { isProcessAlive } from "../loops/health.js";
 import { getRun } from "../registry/read.js";
 import { shellQuote } from "../utils.js";
+import { resolveGitRoot } from "./create.js";
 import type { WorktreeStatus } from "./meta.js";
 import { isOrphanWorktree, readMeta, updateStatus } from "./meta.js";
 
 export interface CleanOpts {
-  mainProjectDir: string;
   mainStateDir: string;
   runId?: string;
   all?: boolean;
   force?: boolean;
+  workDir: string;
 }
 
 export interface CleanResult {
@@ -27,7 +28,8 @@ const TERMINAL_STATUSES: ReadonlySet<WorktreeStatus> = new Set([
 ]);
 
 export function cleanWorktrees(opts: CleanOpts): CleanResult {
-  const { mainProjectDir, mainStateDir, force = false } = opts;
+  const { mainStateDir, force = false, workDir } = opts;
+  const gitRoot = resolveGitRoot(workDir);
   const worktreesDir = join(mainStateDir, "worktrees");
 
   if (!existsSync(worktreesDir)) return { removed: [], skipped: [] };
@@ -84,7 +86,7 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
         execSync(
           `git worktree remove ${shellQuote(meta.worktree_path)}${forceFlag}`,
           {
-            cwd: mainProjectDir,
+            cwd: gitRoot,
             stdio: "pipe",
           },
         );
@@ -102,7 +104,7 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
     try {
       const deleteFlag = force ? "-D" : "-d";
       execSync(`git branch ${deleteFlag} ${shellQuote(meta.branch)}`, {
-        cwd: mainProjectDir,
+        cwd: gitRoot,
         stdio: "pipe",
       });
     } catch {

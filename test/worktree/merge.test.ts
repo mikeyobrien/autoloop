@@ -86,9 +86,9 @@ describe("mergeWorktree", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-merge1",
+      workDir: repo,
     });
 
     // Add a file in the worktree
@@ -99,8 +99,8 @@ describe("mergeWorktree", () => {
 
     const headIdentity = withMissingGitIdentity(() => {
       const result = mergeWorktree({
-        mainProjectDir: repo,
         metaDir: wt.metaDir,
+        workDir: repo,
       });
 
       expect(result.success).toBe(true);
@@ -122,10 +122,10 @@ describe("mergeWorktree", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-merge2",
       mergeStrategy: "merge",
+      workDir: repo,
     });
 
     addFileAndCommit(wt.worktreePath, "feature2.txt", "world", "add feature2");
@@ -133,9 +133,9 @@ describe("mergeWorktree", () => {
 
     const headIdentity = withMissingGitIdentity(() => {
       const result = mergeWorktree({
-        mainProjectDir: repo,
         metaDir: wt.metaDir,
         strategy: "merge",
+        workDir: repo,
       });
 
       expect(result.success).toBe(true);
@@ -153,13 +153,16 @@ describe("mergeWorktree", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-running",
+      workDir: repo,
     });
 
     expect(() =>
-      mergeWorktree({ mainProjectDir: repo, metaDir: wt.metaDir }),
+      mergeWorktree({
+        metaDir: wt.metaDir,
+        workDir: repo,
+      }),
     ).toThrow(/still running/);
   });
 
@@ -168,17 +171,20 @@ describe("mergeWorktree", () => {
     const stateDir = join(repo, ".autoloop");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-alrmerged",
+      workDir: repo,
     });
 
     addFileAndCommit(wt.worktreePath, "f.txt", "x", "add f");
     updateStatus(wt.metaDir, "completed");
-    mergeWorktree({ mainProjectDir: repo, metaDir: wt.metaDir });
+    mergeWorktree({ metaDir: wt.metaDir, workDir: repo });
 
     expect(() =>
-      mergeWorktree({ mainProjectDir: repo, metaDir: wt.metaDir }),
+      mergeWorktree({
+        metaDir: wt.metaDir,
+        workDir: repo,
+      }),
     ).toThrow(/already merged/);
   });
 
@@ -190,9 +196,9 @@ describe("mergeWorktree", () => {
     addFileAndCommit(repo, "shared.txt", "main content", "add shared on main");
 
     const wt = createWorktree({
-      mainProjectDir: repo,
       mainStateDir: stateDir,
       runId: "run-conflict",
+      workDir: repo,
     });
 
     // Modify the same file differently in the worktree
@@ -215,8 +221,8 @@ describe("mergeWorktree", () => {
 
     // Checkout back to base to set up for merge
     const result = mergeWorktree({
-      mainProjectDir: repo,
       metaDir: wt.metaDir,
+      workDir: repo,
     });
 
     expect(result.success).toBe(false);
