@@ -4,7 +4,24 @@ import TOML from "@iarna/toml";
 import * as config from "../config.js";
 import { parseStringList } from "../utils.js";
 import { defaultBudget, parseBudgetFromToml } from "./budget.js";
-import type { Budget, ChainSpec, ChainStep, ChainsConfig } from "./types.js";
+import type {
+  Budget,
+  ChainSpec,
+  ChainStep,
+  ChainsConfig,
+  StepBackendOverride,
+} from "./types.js";
+
+// Keys accepted inside a per-step `backend = { ... }` table. Must match the
+// subset that src/harness/config-helpers.ts::readBackendConfig reads from
+// overrides.
+const ALLOWED_BACKEND_OVERRIDE_KEYS = new Set([
+  "kind",
+  "command",
+  "args",
+  "prompt_mode",
+  "timeout_ms",
+]);
 
 export function load(projectDir: string): ChainsConfig {
   const path = join(projectDir, "chains.toml");
@@ -132,20 +149,40 @@ function loadExisting(path: string, projectDir: string): ChainsConfig {
   return parseChainsFromToml(parsed as Record<string, unknown>, projectDir);
 }
 
-function parseChainsFromToml(
+export function parseChainsFromToml(
   parsed: Record<string, unknown>,
   projectDir: string,
 ): ChainsConfig {
   const rawChains = (parsed.chain ?? []) as Array<{
     name?: string;
     steps?: string[];
+    step?: Array<{ preset?: string; backend?: Record<string, unknown> }>;
   }>;
   const chains = rawChains
     .filter((c) => typeof c.name === "string" && c.name !== "")
-    .map((c) => ({
-      name: c.name as string,
-      steps: resolveSteps(c.steps ?? [], projectDir),
-    }));
+    .map((c) => {
+      const name = c.name as string;
+      const hasStringSteps = Array.isArray(c.steps) && c.steps.length > 0;
+      const hasStructured = Array.isArray(c.step) && c.step.length > 0;
+
+      if (hasStringSteps && hasStructured) {
+        throw new Error(
+          `chain "${name}": cannot define both 'steps = [...]' and '[[chain.step]]'. ` +
+            `Pick one form (prefer [[chain.step]] if you need per-step backend overrides).`,
+        );
+      }
+
+      if (hasStructured) {
+        return {
+          name,
+          steps: resolveStructuredSteps(c.step ?? [], projectDir, name),
+        };
+      }
+      return {
+        name,
+        steps: resolveSteps(c.steps ?? [], projectDir),
+      };
+    });
 
   const budget = parseBudgetFromToml(parsed.budget);
   return { chains, budget };
@@ -156,4 +193,59 @@ function resolveSteps(stepNames: string[], projectDir: string): ChainStep[] {
     name,
     presetDir: resolvePresetDir(name, projectDir),
   }));
+}
+
+function resolveStructuredSteps(
+  rawSteps: Array<{ preset?: string; backend?: Record<string, unknown> }>,
+  projectDir: string,
+  chainName: string,
+): ChainStep[] {
+  return rawSteps.map((raw, idx) => {
+    const preset = raw.preset;
+    if (typeof preset !== "string" || preset === "") {
+      throw new Error(
+        `chain "${chainName}" step ${idx + 1}: missing required 'preset' field`,
+      );
+    }
+    const step: ChainStep = {
+      name: preset,
+      presetDir: resolvePresetDir(preset, projectDir),
+    };
+    if (raw.backend !== undefined) {
+      step.backendOverride = validateBackendOverride(
+        raw.backend,
+        chainName,
+        preset,
+      );
+    }
+    return step;
+  });
+}
+
+function validateBackendOverride(
+  backend: unknown,
+  chainName: string,
+  preset: string,
+): StepBackendOverride {
+  if (
+    backend === null ||
+    typeof backend !== "object" ||
+    Array.isArray(backend)
+  ) {
+    throw new Error(
+      `chain "${chainName}" step "${preset}": 'backend' must be a table`,
+    );
+  }
+  const entries = Object.entries(backend as Record<string, unknown>);
+  const unknown = entries
+    .map(([k]) => k)
+    .filter((k) => !ALLOWED_BACKEND_OVERRIDE_KEYS.has(k));
+  if (unknown.length > 0) {
+    throw new Error(
+      `chain "${chainName}" step "${preset}": unknown backend keys: ${unknown.join(
+        ", ",
+      )}. Allowed: ${[...ALLOWED_BACKEND_OVERRIDE_KEYS].join(", ")}`,
+    );
+  }
+  return Object.fromEntries(entries);
 }

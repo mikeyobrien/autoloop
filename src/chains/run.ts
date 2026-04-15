@@ -186,10 +186,20 @@ function runSteps(
 
   const category = presetCategory(stepName, projectDir);
   const suppressWorktree = category === "planning" && runOptions.worktree;
+  // Precedence: step.backendOverride > runOptions.backendOverride (CLI -b) >
+  // preset autoloops.toml defaults. Shallow-merge is intentional — keys set by
+  // the step (e.g. args, command) fully replace the CLI-level value for that key,
+  // matching the behavior of readBackendConfig().
+  const mergedBackendOverride =
+    step.backendOverride !== undefined
+      ? { ...(runOptions.backendOverride ?? {}), ...step.backendOverride }
+      : runOptions.backendOverride;
+
   const stepOptions: harness.RunOptions = {
     ...runOptions,
     workDir: stepWorkDir,
     trigger: "chain",
+    backendOverride: mergedBackendOverride,
     ...(suppressWorktree ? { worktree: undefined, noWorktree: true } : {}),
   };
   const prompt = stepNum === 1 ? (runOptions.prompt ?? null) : null;
