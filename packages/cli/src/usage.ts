@@ -18,6 +18,9 @@ export function printUsage(): void {
   console.log("  autoloop loops artifacts <run-id>");
   console.log("  autoloop loops watch <run-id>");
   console.log("  autoloop loops health [--verbose]");
+  console.log(
+    "  autoloop control <show|capabilities|interrupt|guide> <run-id>",
+  );
   console.log("  autoloop chain <list|run> [args]");
   console.log("  autoloop runs clean [--max-age <days>]");
   console.log("  autoloop worktree <list|show|merge|clean> [args]");

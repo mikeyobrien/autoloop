@@ -5,6 +5,7 @@ import * as harness from "@mobrienv/autoloop-harness";
 import { cliPrintEvent } from "./cli/event-printer.js";
 import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
+import { dispatchControl } from "./commands/control.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
 import { dispatchGuide } from "./commands/guide.js";
 import { dispatchInspect } from "./commands/inspect.js";
@@ -97,6 +98,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "guide":
       dispatchGuide(args.slice(1));
       return;
+    case "control":
+      dispatchControl(args.slice(1));
+      return;
     case "dashboard":
       dispatchDashboard(args.slice(1), bundleRoot, selfCmd);
       return;
@@ -141,6 +145,7 @@ function isCliCommand(value: string): boolean {
     "worktree",
     "config",
     "guide",
+    "control",
     "dashboard",
     "--help",
     "-h",

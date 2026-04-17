@@ -1,9 +1,6 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type {
-  AcpClientOptions,
-  AcpSession,
-} from "@mobrienv/autoloop-backends/acp-client";
+import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import {
   initAcpSession,
   terminateAcpSession,
@@ -16,6 +13,20 @@ import {
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "@mobrienv/autoloop-core/worktree";
+import type { AcpClientOptions } from "./backend/acp-client.js";
+import {
+  initKiroSession,
+  signalInterrupt,
+  terminateKiroSession,
+} from "./backend/kiro-bridge.js";
+import type { LiveControlAdapter } from "../../../src/control/adapter.js";
+import {
+  drainControlRequests,
+  publishCapabilities,
+} from "../../../src/control/dispatch.js";
+import { kiroControlAdapter } from "../../../src/control/kiro-adapter.js";
+import { piControlAdapter } from "../../../src/control/pi-adapter.js";
+import { collectArtifacts, formatArtifacts } from "./artifacts.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
@@ -62,6 +73,10 @@ export async function run(
   installRuntimeTools(loop);
   appendLoopStart(loop);
   registryStart(loop);
+  loop.controlAdapter = buildControlAdapter(loop);
+  if (loop.controlAdapter) {
+    publishCapabilities(loop.paths.stateDir, loop.controlAdapter);
+  }
 
   // Track current iteration for abort handler (must be mutable)
   let currentIteration = 0;
@@ -110,6 +125,16 @@ export async function run(
   const onAbort = () => teardown();
   runOptions.signal?.addEventListener("abort", onAbort);
   if (runOptions.signal?.aborted) teardown();
+
+  const onSigusr1 = (): void => {
+    if (!loop.controlAdapter) return;
+    try {
+      drainControlRequests(loop.paths.stateDir, loop.controlAdapter);
+    } catch {
+      /* best-effort */
+    }
+  };
+  process.on("SIGUSR1", onSigusr1);
 
   log(
     loop,
@@ -279,6 +304,10 @@ export async function runParallelBranchCli(
   installRuntimeTools(branchLoop);
   appendLoopStart(branchLoop);
   registryStart(branchLoop);
+  branchLoop.controlAdapter = buildControlAdapter(branchLoop);
+  if (branchLoop.controlAdapter) {
+    publishCapabilities(branchLoop.paths.stateDir, branchLoop.controlAdapter);
+  }
 
   const seeded = seedBranchContext(branchLoop, routingEvent);
   const startMs = Date.now();
@@ -324,6 +353,7 @@ function iterateWith(
 ): Promise<RunSummary> {
   const liveLoop = reloadLoop(loop);
   liveLoop.kiroSession = loop.kiroSession;
+  liveLoop.controlAdapter = loop.controlAdapter;
   installRuntimeTools(liveLoop);
   return runReviewThenIterate(liveLoop, iteration, recurse);
 }
@@ -333,6 +363,13 @@ async function runReviewThenIterate(
   iteration: number,
   recurse: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
 ): Promise<RunSummary> {
+  if (liveLoop.controlAdapter) {
+    try {
+      drainControlRequests(liveLoop.paths.stateDir, liveLoop.controlAdapter);
+    } catch {
+      /* control drain is best-effort; next pass will retry */
+    }
+  }
   const reviewed = await maybeRunMetareview(liveLoop, iteration);
   const verdict = reviewed.lastVerdict;
 
@@ -362,4 +399,18 @@ async function runReviewThenIterate(
 
 function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
   return iterateWith(loop, iteration, iterate);
+}
+
+function buildControlAdapter(
+  loop: LoopContext,
+): LiveControlAdapter | undefined {
+  if (loop.backend.kind === "kiro") {
+    return kiroControlAdapter(loop.runtime.runId, {
+      triggerInterrupt: () => signalInterrupt(),
+    });
+  }
+  if (loop.backend.kind === "pi") {
+    return piControlAdapter(loop.runtime.runId);
+  }
+  return undefined;
 }

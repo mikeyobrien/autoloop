@@ -131,6 +131,16 @@ Status legend:
 
 ## Recently mitigated
 
+### LOOP-OPS-019 — Backend-neutral live supervisor control
+- Status: done (MVP)
+- Problem: Operators had no backend-neutral way to interrupt an in-flight turn or nudge the loop mid-iteration; guidance only landed on the next iteration boundary regardless of backend capability.
+- Improvement delivered:
+  - Added `autoloop control <show|capabilities|interrupt|guide>`.
+  - Introduced a run-scoped, file-backed control channel (`<state-dir>/control/`) with request/status JSONL and capabilities JSON.
+  - First real adapter: Kiro ACP publishes `interrupt` as supported and `control guide` can cancel the current turn so operator guidance is picked up immediately.
+  - Pi fits the same abstraction but honestly reports limited capability.
+- See: `docs/plans/2026-04-16-live-supervisor-control.md`.
+
 ### LOOP-OPS-016 — Concise stdout progress lines
 - Status: done
 - Problem: Parent process stdout was too quiet for useful monitoring.

@@ -2,6 +2,7 @@ import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LoopEventEmitter } from "./events.js";
+import type { LiveControlAdapter } from "../../../src/control/adapter.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
 
@@ -90,6 +91,7 @@ export interface LoopContext {
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;
+  controlAdapter?: LiveControlAdapter;
 }
 
 export interface RunOptions {
