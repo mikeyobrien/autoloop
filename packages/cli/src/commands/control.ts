@@ -2,6 +2,7 @@ import { join } from "node:path";
 import {
   appendRequest,
   buildRequest,
+  pendingRequests,
   readCapabilities,
   readStatuses,
   renderCapabilities,
@@ -74,7 +75,7 @@ function buildSnapshot(run: RunRecord): ControlSnapshot {
   return {
     run,
     capabilities: readCapabilities(dir),
-    pendingRequests: [],
+    pendingRequests: pendingRequests(dir),
     recentStatuses: readStatuses(dir),
   };
 }

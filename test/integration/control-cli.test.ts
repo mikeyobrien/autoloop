@@ -202,6 +202,33 @@ describe("integration: control command", () => {
     expect(reqs[0].reason).toBe("going off-track");
   });
 
+  it("control show surfaces pending requests from requests.jsonl", () => {
+    const project = makeTempProject("ctl-show-pending");
+    const fixture = join(FIXTURES_DIR, "complete-success.json");
+    runCli(["run", project, "show pending test"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
+    const runId = firstRunId(project);
+
+    // Queue an interrupt request directly (parent process is already gone).
+    const interruptRes = runCli(
+      ["control", "interrupt", runId, "-m", "please stop"],
+      { AUTOLOOP_PROJECT_DIR: project },
+      project,
+    );
+    expect(interruptRes.stdout).toContain("queued");
+
+    const show = runCli(
+      ["control", "show", runId],
+      { AUTOLOOP_PROJECT_DIR: project },
+      project,
+    );
+    expect(show.stdout).toContain("Recent control activity");
+    expect(show.stdout).toContain("pending");
+    expect(show.stdout).toContain("interrupt");
+    expect(show.stdout).toContain("please stop");
+  });
+
   it("reports an error when the run does not exist", () => {
     const project = makeTempProject("ctl-missing");
     const res = runCli(

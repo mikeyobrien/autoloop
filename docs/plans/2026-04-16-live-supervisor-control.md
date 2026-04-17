@@ -138,8 +138,11 @@ autoloop control guide <run-id> "<message>"     # durably append guidance + requ
 ```
 
 Rules:
-- `guide` always appends `operator.guidance` to the journal (unchanged semantics).
-- When the backend reports `interrupt: supported` and `--no-interrupt` is not set, `guide` *also* writes an `interrupt` control request. The combination is the common case: "new instructions, stop what you're doing, start the next iteration now".
+- `guide` always appends `operator.guidance` to the journal (unchanged semantics). This is what the next iteration actually reads — the durable, canonical path.
+- `guide` writes exactly **one** control request with verb `guide` whose payload carries an explicit `interrupt: boolean`. When `--no-interrupt` is not passed, `interrupt` is `true`; otherwise `false`. The adapter decides what to do with that flag:
+  - The Kiro adapter treats `guide + interrupt:true` as "also cancel the current turn"; its ack is `applied` with a `guidance-driven` detail.
+  - The Pi adapter accepts the guide durably (via the journal) and acks `applied` with a note that the interrupt component was ignored.
+  We intentionally do **not** also emit a separate `interrupt` request from `guide`. One request is enough to describe operator intent, it keeps the status log single-threaded, and it avoids coordinating two acks for what is conceptually one action. Operators who want a pure interrupt use `autoloop control interrupt`.
 - Partial run-id prefixes resolve through the existing merged-registry helper.
 - All commands work from the project root or a worktree checkout, just like `autoloop loops`.
 
@@ -199,8 +202,8 @@ Modified:
   - `status.jsonl` records `applied` with backend detail.
 - `autoloop control guide <run> "message"`:
   - Appends `operator.guidance` to the journal.
-  - Writes a control request with payload `{ message, interrupt: true }`.
-  - For a Kiro run, triggers the interrupt path. For a Pi run, status-acks `ignored` for the interrupt component while guidance is still durable.
+  - Writes **one** `guide` control request with payload `{ message, interrupt: true }`. No separate `interrupt` request is emitted — the interrupt intent is an attribute of the guide request.
+  - For a Kiro run, draining that request triggers the interrupt path and `status.jsonl` records `applied` with a `guidance-driven` detail. For a Pi run, the interrupt component is `ignored` while guidance is still durable.
 - All existing tests pass.
 - New tests cover: queue round-trip, Kiro adapter interrupt wiring, CLI dispatch end-to-end (with mock adapter), Pi adapter "limited" capability reporting.
 
