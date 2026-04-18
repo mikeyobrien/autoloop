@@ -2,31 +2,46 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { AgentMap } from "../../src/agent-map.js";
 import { resolvedFromLoopBackend } from "../../src/backend/types.js";
 import { buildIterationContext } from "../../src/harness/prompt.js";
 import type { LoopContext } from "../../src/harness/types.js";
-import type { Topology } from "../../src/topology.js";
+import type { Role, Topology } from "../../src/topology.js";
 
-function makeBackendLoop(name: string): LoopContext {
+interface BackendLoopOpts {
+  roles?: Role[];
+  handoff?: Record<string, string[]>;
+  handoffKeys?: string[];
+  agentMap?: AgentMap | null;
+  preset?: string;
+}
+
+function makeBackendLoop(
+  name: string,
+  opts: BackendLoopOpts = {},
+): LoopContext {
   const workDir = mkdtempSync(join(tmpdir(), `autoloop-backend-${name}-`));
   const stateDir = join(workDir, ".autoloop");
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(join(stateDir, "memory.jsonl"), "", "utf-8");
   writeFileSync(join(stateDir, "tasks.jsonl"), "", "utf-8");
   writeFileSync(join(stateDir, "journal.jsonl"), "", "utf-8");
+  const roles: Role[] = opts.roles ?? [
+    {
+      id: "builder",
+      prompt: "",
+      promptFile: "",
+      emits: ["review.ready"],
+    },
+  ];
+  const handoff = opts.handoff ?? { "loop.start": ["builder"] };
+  const handoffKeys = opts.handoffKeys ?? Object.keys(handoff);
   const topology: Topology = {
     name: "t",
     completion: "task.complete",
-    roles: [
-      {
-        id: "builder",
-        prompt: "",
-        promptFile: "",
-        emits: ["review.ready"],
-      },
-    ],
-    handoff: { "loop.start": ["builder"] },
-    handoffKeys: ["loop.start"],
+    roles,
+    handoff,
+    handoffKeys,
   };
   return {
     objective: "Backend resolution smoke",
@@ -85,13 +100,13 @@ function makeBackendLoop(name: string): LoopContext {
       isolationMode: "shared",
     },
     launch: {
-      preset: "autocode",
+      preset: opts.preset ?? "autocode",
       trigger: "cli",
       createdAt: new Date().toISOString(),
       parentRunId: "",
     },
     store: {},
-    agentMap: null,
+    agentMap: opts.agentMap ?? null,
   };
 }
 
@@ -147,5 +162,165 @@ describe("resolvedFromLoopBackend", () => {
       model: "",
     });
     expect(resolved.args).not.toBe(loop.backend.args);
+  });
+});
+
+describe("buildIterationContext role-level override resolution (slice 3)", () => {
+  it("applies role-level command, args, and model overrides while leaving untouched fields at loop defaults", () => {
+    const loop = makeBackendLoop("role-override", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendCommand: "claude-builder",
+          backendArgs: ["--model-preset", "builder"],
+          backendModel: "opus-4-7",
+        },
+      ],
+    });
+
+    const iter = buildIterationContext(loop, 1);
+
+    expect(iter.backend.command).toBe("claude-builder");
+    expect(iter.backend.args).toEqual(["--model-preset", "builder"]);
+    expect(iter.backend.model).toBe("opus-4-7");
+    expect(iter.backendModel).toBe("opus-4-7");
+    expect(iter.backend.kind).toBe(loop.backend.kind);
+    expect(iter.backend.promptMode).toBe(loop.backend.promptMode);
+    expect(iter.backend.timeoutMs).toBe(loop.backend.timeoutMs);
+  });
+
+  it("agents.toml wins over role.backendAgent when resolveRoleAgent returns non-empty", () => {
+    const agentMap: AgentMap = {
+      globalDefault: "",
+      presets: {
+        autocode: {
+          defaultAgent: "",
+          roles: { builder: "a-agent" },
+        },
+      },
+    };
+    const loop = makeBackendLoop("agents-wins", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendAgent: "r-agent",
+        },
+      ],
+      agentMap,
+    });
+
+    const iter = buildIterationContext(loop, 1);
+
+    expect(iter.backend.agent).toBe("a-agent");
+    expect(iter.backendAgent).toBe("a-agent");
+  });
+
+  it("role.backendAgent applies when agents.toml resolves to empty", () => {
+    const loop = makeBackendLoop("role-agent-only", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendAgent: "r-agent",
+        },
+      ],
+      agentMap: null,
+    });
+
+    const iter = buildIterationContext(loop, 1);
+
+    expect(iter.backend.agent).toBe("r-agent");
+    expect(iter.backendAgent).toBe("r-agent");
+  });
+
+  it("agents.toml applies when role has no backendAgent override", () => {
+    const agentMap: AgentMap = {
+      globalDefault: "",
+      presets: {
+        autocode: {
+          defaultAgent: "",
+          roles: { builder: "a-agent" },
+        },
+      },
+    };
+    const loop = makeBackendLoop("agents-only", { agentMap });
+
+    const iter = buildIterationContext(loop, 1);
+
+    expect(iter.backend.agent).toBe("a-agent");
+    expect(iter.backendAgent).toBe("a-agent");
+  });
+
+  it("returns the global-fallback baseline when allowedRoles is empty", () => {
+    const loop = makeBackendLoop("no-active", {
+      roles: [],
+      handoff: {},
+      handoffKeys: [],
+    });
+
+    const iter = buildIterationContext(loop, 1);
+
+    expect(iter.backend).toEqual(resolvedFromLoopBackend(loop));
+    expect(iter.backend.command).toBe(loop.backend.command);
+    expect(iter.backend.agent).toBe("");
+    expect(iter.backend.model).toBe("");
+    expect(iter.backendAgent).toBe("");
+    expect(iter.backendModel).toBe("");
+  });
+
+  it("first allowed role wins when multiple roles are suggested", () => {
+    const loop = makeBackendLoop("first-wins", {
+      roles: [
+        {
+          id: "planner",
+          prompt: "",
+          promptFile: "",
+          emits: ["tasks.ready"],
+          backendCommand: "planner-cmd",
+        },
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendCommand: "builder-cmd",
+        },
+      ],
+      handoff: { "loop.start": ["planner", "builder"] },
+    });
+
+    const iter = buildIterationContext(loop, 1);
+
+    expect(iter.allowedRoles).toEqual(["planner", "builder"]);
+    expect(iter.backend.command).toBe("planner-cmd");
+  });
+
+  it("iter.backend.args is a defensive copy of role.backendArgs", () => {
+    const roleArgs = ["--role-flag"];
+    const loop = makeBackendLoop("role-defensive", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendArgs: roleArgs,
+        },
+      ],
+    });
+
+    const iter = buildIterationContext(loop, 1);
+    iter.backend.args.push("--leak");
+
+    expect(roleArgs).toEqual(["--role-flag"]);
+    expect(loop.backend.args).toEqual(["--flag", "value"]);
   });
 });

@@ -46,9 +46,31 @@ export interface IterationContext {
 
 function resolveIterationBackend(
   loop: LoopContext,
-  _activeRole: string,
+  allowedRoles: string[],
 ): ResolvedIterationBackend {
-  return resolvedFromLoopBackend(loop);
+  const resolved = resolvedFromLoopBackend(loop);
+  if (allowedRoles.length === 0) return resolved;
+  const backendRole = allowedRoles[0];
+  const role = loop.topology.roles.find((r) => r.id === backendRole);
+  if (role) {
+    if (role.backendKind !== undefined) resolved.kind = role.backendKind;
+    if (role.backendCommand !== undefined)
+      resolved.command = role.backendCommand;
+    if (role.backendArgs !== undefined) resolved.args = [...role.backendArgs];
+    if (role.backendPromptMode !== undefined)
+      resolved.promptMode = role.backendPromptMode;
+    if (role.backendTimeoutMs !== undefined)
+      resolved.timeoutMs = role.backendTimeoutMs;
+    if (role.backendAgent !== undefined) resolved.agent = role.backendAgent;
+    if (role.backendModel !== undefined) resolved.model = role.backendModel;
+  }
+  const agentOverlay = resolveRoleAgent(
+    loop.agentMap,
+    loop.launch.preset,
+    backendRole,
+  );
+  if (agentOverlay) resolved.agent = agentOverlay;
+  return resolved;
 }
 
 interface DerivedRunContext {
@@ -112,7 +134,7 @@ export function buildIterationContext(
       : "";
   const roleAgent =
     resolveRoleAgent(loop.agentMap, loop.launch.preset, activeRole) || "";
-  const backend = resolveIterationBackend(loop, activeRole);
+  const backend = resolveIterationBackend(loop, derived.routing.allowedRoles);
 
   const prompt = renderIterationPromptText(loop, iteration, derived);
 
@@ -138,8 +160,8 @@ export function buildIterationContext(
     prompt,
     roleAgent,
     backend,
-    backendAgent: roleAgent,
-    backendModel: "",
+    backendAgent: backend.agent || roleAgent || "",
+    backendModel: backend.model,
   };
 }
 
