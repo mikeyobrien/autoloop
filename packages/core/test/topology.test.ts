@@ -387,3 +387,172 @@ describe("prompt_file support", () => {
     expect(topo.roles[0].prompt).toBe("Do something specific.");
   });
 });
+
+describe("role backend override fields", () => {
+  it("leaves all backend fields undefined when absent", () => {
+    const topo = loadTestTopology();
+    for (const role of topo.roles) {
+      expect(role.backendKind).toBeUndefined();
+      expect(role.backendCommand).toBeUndefined();
+      expect(role.backendArgs).toBeUndefined();
+      expect(role.backendPromptMode).toBeUndefined();
+      expect(role.backendTimeoutMs).toBeUndefined();
+      expect(role.backendAgent).toBeUndefined();
+      expect(role.backendModel).toBeUndefined();
+    }
+  });
+
+  it("renders role deck identically when no role defines backend fields", () => {
+    const topo = loadTestTopology();
+    const text = render(topo, "loop.start");
+    expect(text).not.toContain("backend_kind:");
+    expect(text).not.toContain("backend_command:");
+    expect(text).not.toContain("backend_model:");
+    expect(text).not.toContain("backend_agent:");
+    // byte-for-byte check on the first role block: nothing between emits and prompt
+    expect(text).toContain(
+      "- role `planner`\n  emits: tasks.ready\n  prompt: You are the planner.\n",
+    );
+  });
+
+  it("parses backend_command and backend_model on a role", () => {
+    const dir = tmpDir("role-backend-simple");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "planner"
+prompt = "Plan."
+emits = ["tasks.ready"]
+backend_command = "claude"
+backend_model = "claude-opus-4-7"
+
+[handoff]
+"loop.start" = ["planner"]
+`,
+    );
+    const topo = loadTopology(dir);
+    expect(topo.roles[0].backendCommand).toBe("claude");
+    expect(topo.roles[0].backendModel).toBe("claude-opus-4-7");
+    const text = render(topo, "loop.start");
+    expect(text).toContain("backend_command: claude");
+    expect(text).toContain("backend_model: claude-opus-4-7");
+  });
+
+  it("parses backend_args as a string array", () => {
+    const dir = tmpDir("role-backend-args");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "builder"
+prompt = "Build."
+emits = ["review.ready"]
+backend_command = "claude"
+backend_args = ["--print", "--permission-mode", "acceptEdits"]
+
+[handoff]
+"loop.start" = ["builder"]
+`,
+    );
+    const topo = loadTopology(dir);
+    expect(topo.roles[0].backendArgs).toEqual([
+      "--print",
+      "--permission-mode",
+      "acceptEdits",
+    ]);
+  });
+
+  it("parses every backend_* field and the full override suite", () => {
+    const dir = tmpDir("role-backend-full");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "critic"
+prompt = "Critique."
+emits = ["review.passed", "review.rejected"]
+backend_kind = "kiro"
+backend_command = "cursor-agent"
+backend_args = ["agent"]
+backend_prompt_mode = "stdin"
+backend_timeout_ms = 900000
+backend_agent = "reviewer"
+backend_model = "auto"
+
+[handoff]
+"review.ready" = ["critic"]
+`,
+    );
+    const topo = loadTopology(dir);
+    const role = topo.roles[0];
+    expect(role.backendKind).toBe("kiro");
+    expect(role.backendCommand).toBe("cursor-agent");
+    expect(role.backendArgs).toEqual(["agent"]);
+    expect(role.backendPromptMode).toBe("stdin");
+    expect(role.backendTimeoutMs).toBe(900000);
+    expect(role.backendAgent).toBe("reviewer");
+    expect(role.backendModel).toBe("auto");
+  });
+
+  it("ignores unknown extra role fields without throwing", () => {
+    const dir = tmpDir("role-unknown-fields");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "worker"
+prompt = "W"
+emits = ["done"]
+mystery_field = "irrelevant"
+backend_command = "claude"
+
+[handoff]
+"loop.start" = ["worker"]
+`,
+    );
+    expect(() => loadTopology(dir)).not.toThrow();
+    const topo = loadTopology(dir);
+    expect(topo.roles[0].backendCommand).toBe("claude");
+  });
+
+  it("exposes role backend fields in json inspect output", () => {
+    const dir = tmpDir("inspect-json-backend");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "planner"
+prompt = "P"
+emits = ["tasks.ready"]
+backend_command = "codex"
+backend_model = "gpt-5"
+
+[handoff]
+"loop.start" = ["planner"]
+`,
+    );
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    renderTopologyInspect(dir, "json");
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    const parsed = JSON.parse(output);
+    expect(parsed.roles[0].backend_command).toBe("codex");
+    expect(parsed.roles[0].backend_model).toBe("gpt-5");
+    spy.mockRestore();
+  });
+
+  it("omits backend keys from json when a role has no overrides", () => {
+    const dir = tmpDir("inspect-json-no-backend");
+    writeFileSync(join(dir, "topology.toml"), TOPOLOGY_TOML);
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    renderTopologyInspect(dir, "json");
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    const parsed = JSON.parse(output);
+    for (const role of parsed.roles) {
+      expect(role.backend_command).toBeUndefined();
+      expect(role.backend_kind).toBeUndefined();
+      expect(role.backend_model).toBeUndefined();
+    }
+    spy.mockRestore();
+  });
+});

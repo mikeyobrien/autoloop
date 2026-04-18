@@ -8,6 +8,13 @@ export interface Role {
   prompt: string;
   promptFile: string;
   emits: string[];
+  backendKind?: string;
+  backendCommand?: string;
+  backendArgs?: string[];
+  backendPromptMode?: string;
+  backendTimeoutMs?: number;
+  backendAgent?: string;
+  backendModel?: string;
 }
 
 export interface Topology {
@@ -141,6 +148,7 @@ function buildTopology(
         prompt: typeof r.prompt === "string" ? r.prompt : "",
         promptFile: typeof r.prompt_file === "string" ? r.prompt_file : "",
         emits: Array.isArray(r.emits) ? r.emits.map(String) : [],
+        ...parseRoleBackend(r),
       };
       return { ...role, prompt: rolePrompt(role, projectDir) };
     });
@@ -154,6 +162,77 @@ function buildTopology(
   }
 
   return { name, completion, roles, handoff, handoffKeys };
+}
+
+function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
+  const out: Partial<Role> = {};
+  if (typeof r.backend_kind === "string" && r.backend_kind !== "") {
+    out.backendKind = r.backend_kind;
+  }
+  if (typeof r.backend_command === "string" && r.backend_command !== "") {
+    out.backendCommand = r.backend_command;
+  }
+  if (Array.isArray(r.backend_args)) {
+    out.backendArgs = r.backend_args.map(String);
+  }
+  if (
+    typeof r.backend_prompt_mode === "string" &&
+    r.backend_prompt_mode !== ""
+  ) {
+    out.backendPromptMode = r.backend_prompt_mode;
+  }
+  if (
+    typeof r.backend_timeout_ms === "number" &&
+    Number.isFinite(r.backend_timeout_ms)
+  ) {
+    out.backendTimeoutMs = r.backend_timeout_ms;
+  }
+  if (typeof r.backend_agent === "string" && r.backend_agent !== "") {
+    out.backendAgent = r.backend_agent;
+  }
+  if (typeof r.backend_model === "string" && r.backend_model !== "") {
+    out.backendModel = r.backend_model;
+  }
+  return out;
+}
+
+export function roleHasBackendOverride(role: Role): boolean {
+  return (
+    role.backendKind !== undefined ||
+    role.backendCommand !== undefined ||
+    role.backendArgs !== undefined ||
+    role.backendPromptMode !== undefined ||
+    role.backendTimeoutMs !== undefined ||
+    role.backendAgent !== undefined ||
+    role.backendModel !== undefined
+  );
+}
+
+function renderRoleBackendLines(role: Role, indent: string): string[] {
+  if (!roleHasBackendOverride(role)) return [];
+  const lines: string[] = [];
+  if (role.backendKind !== undefined) {
+    lines.push(`${indent}backend_kind: ${role.backendKind}`);
+  }
+  if (role.backendCommand !== undefined) {
+    lines.push(`${indent}backend_command: ${role.backendCommand}`);
+  }
+  if (role.backendArgs !== undefined) {
+    lines.push(`${indent}backend_args: ${listText(role.backendArgs)}`);
+  }
+  if (role.backendPromptMode !== undefined) {
+    lines.push(`${indent}backend_prompt_mode: ${role.backendPromptMode}`);
+  }
+  if (role.backendTimeoutMs !== undefined) {
+    lines.push(`${indent}backend_timeout_ms: ${role.backendTimeoutMs}`);
+  }
+  if (role.backendAgent !== undefined) {
+    lines.push(`${indent}backend_agent: ${role.backendAgent}`);
+  }
+  if (role.backendModel !== undefined) {
+    lines.push(`${indent}backend_model: ${role.backendModel}`);
+  }
+  return lines;
 }
 
 function rolePrompt(role: Role, projectDir: string): string {
@@ -219,16 +298,11 @@ function regexMatch(topic: string, pattern: string): boolean {
 function renderRoles(roles: Role[]): string {
   let result = "";
   for (const role of roles) {
-    result +=
-      "- role `" +
-      role.id +
-      "`\n" +
-      "  emits: " +
-      listText(role.emits) +
-      "\n" +
-      "  prompt: " +
-      promptSummary(role.prompt) +
-      "\n";
+    result += `- role \`${role.id}\`\n  emits: ${listText(role.emits)}\n`;
+    for (const line of renderRoleBackendLines(role, "  ")) {
+      result += `${line}\n`;
+    }
+    result += `  prompt: ${promptSummary(role.prompt)}\n`;
   }
   return result;
 }
@@ -318,11 +392,28 @@ function renderTopologyJson(topology: Topology): void {
       id: r.id,
       emits: r.emits,
       prompt: promptSummary(r.prompt),
+      ...roleBackendJson(r),
     })),
     handoff: topology.handoff,
     warnings: warnings.map((w) => ({ kind: w.kind, message: w.message })),
   };
   console.log(JSON.stringify(out, null, 2));
+}
+
+function roleBackendJson(role: Role): Record<string, unknown> {
+  if (!roleHasBackendOverride(role)) return {};
+  const out: Record<string, unknown> = {};
+  if (role.backendKind !== undefined) out.backend_kind = role.backendKind;
+  if (role.backendCommand !== undefined)
+    out.backend_command = role.backendCommand;
+  if (role.backendArgs !== undefined) out.backend_args = role.backendArgs;
+  if (role.backendPromptMode !== undefined)
+    out.backend_prompt_mode = role.backendPromptMode;
+  if (role.backendTimeoutMs !== undefined)
+    out.backend_timeout_ms = role.backendTimeoutMs;
+  if (role.backendAgent !== undefined) out.backend_agent = role.backendAgent;
+  if (role.backendModel !== undefined) out.backend_model = role.backendModel;
+  return out;
 }
 
 function renderTopologyGraph(topology: Topology): void {
@@ -352,6 +443,9 @@ function renderTopologyTerminal(topology: Topology): void {
   lines.push("### Roles");
   for (const role of topology.roles) {
     lines.push(`- \`${role.id}\` — emits: ${listText(role.emits)}`);
+    for (const line of renderRoleBackendLines(role, "  ")) {
+      lines.push(line);
+    }
     lines.push(`  prompt: ${promptSummary(role.prompt)}`);
   }
   lines.push("");
