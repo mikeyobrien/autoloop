@@ -61,6 +61,8 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 
 Kind auto-detection: if `kind` is empty or unrecognized, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); otherwise `"command"`. The `"kiro"` kind is not auto-detected — set `backend.kind = "kiro"` explicitly, or use `-b kiro`.
 
+**Per-role overrides.** Any of `backend.kind`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.agent`, `backend.model` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
+
 ### Review (metareview)
 
 The review pass is a separate backend invocation that runs periodically for consolidation and hygiene. Most review keys default to the corresponding backend value if not set, but `review.timeout_ms` defaults to `300000` so large task timeouts do not also make reviews hang for a long time.
@@ -232,6 +234,8 @@ Conversation history and tool permissions accumulate across iterations within th
 
 ### agents.toml — per-role agent routing
 
+`agents.toml` is a Kiro **agent-only** overlay. It does not influence `backend_kind`, `backend_command`, `backend_args`, `backend_prompt_mode`, `backend_timeout_ms`, or `backend_model` — those come from the global `backend.*` config or per-role overrides in `topology.toml`.
+
 When using the kiro backend with a multi-role topology, an `agents.toml` file in the project directory can map each role to a different agent. This lets you route the planner to one agent and the builder to another.
 
 ```toml
@@ -250,7 +254,10 @@ Resolution order (most specific wins):
 1. `preset.<name>.<role>` — role-specific agent for a preset
 2. `preset.<name>.default` — default agent for a preset
 3. `defaults.agent` — global fallback
-4. `backend.agent` config key — used when no `agents.toml` exists
+4. `topology.toml` `backend_agent` on the role — used when no `agents.toml` resolves a value
+5. `backend.agent` config key — used when neither `agents.toml` nor a role-level `backend_agent` is set
+
+`agents.toml` wins over a role's `backend_agent` only when it resolves a non-empty value; otherwise the role's `backend_agent` is used.
 
 The resolved agent name is passed to the ACP session via `setSessionMode` at the start of each iteration.
 
