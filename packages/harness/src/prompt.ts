@@ -14,6 +14,10 @@ import { materialize as materializeTasks } from "@mobrienv/autoloop-core/tasks";
 import { renderTasksPrompt } from "@mobrienv/autoloop-core/tasks-render";
 import * as topology from "@mobrienv/autoloop-core/topology";
 import {
+  type ResolvedIterationBackend,
+  resolvedFromLoopBackend,
+} from "./backend/types.js";
+import {
   coordinationTopic,
   coreSystemTopic,
   parallelTopic,
@@ -35,6 +39,16 @@ export interface IterationContext {
   memoryText: string;
   prompt: string;
   roleAgent: string;
+  backend: ResolvedIterationBackend;
+  backendAgent: string;
+  backendModel: string;
+}
+
+function resolveIterationBackend(
+  loop: LoopContext,
+  _activeRole: string,
+): ResolvedIterationBackend {
+  return resolvedFromLoopBackend(loop);
 }
 
 interface DerivedRunContext {
@@ -98,6 +112,7 @@ export function buildIterationContext(
       : "";
   const roleAgent =
     resolveRoleAgent(loop.agentMap, loop.launch.preset, activeRole) || "";
+  const backend = resolveIterationBackend(loop, activeRole);
 
   const prompt = renderIterationPromptText(loop, iteration, derived);
 
@@ -122,6 +137,9 @@ export function buildIterationContext(
     memoryText: derived.memoryText,
     prompt,
     roleAgent,
+    backend,
+    backendAgent: roleAgent,
+    backendModel: "",
   };
 }
 
