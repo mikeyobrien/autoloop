@@ -50,7 +50,7 @@ export async function runIteration(
   appendIterationStart(loop, iter);
   log(loop, "debug", `iteration ${iteration} start`);
   appendBackendStart(loop, iter);
-  log(loop, "debug", `backend start command=${loop.backend.command}`);
+  log(loop, "debug", `backend start command=${iter.backend.command}`);
 
   const startEpoch = Math.floor(Date.now() / 1000);
 

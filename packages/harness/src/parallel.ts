@@ -348,13 +348,13 @@ export function appendBackendStart(
     loop.runtime.runId,
     String(iter.iteration),
     "backend.start",
-    jsonField("backend_kind", loop.backend.kind) +
+    jsonField("backend_kind", iter.backend.kind) +
       ", " +
-      jsonField("command", loop.backend.command) +
+      jsonField("command", iter.backend.command) +
       ", " +
-      jsonField("prompt_mode", loop.backend.promptMode) +
+      jsonField("prompt_mode", iter.backend.promptMode) +
       ", " +
-      jsonField("timeout_ms", String(loop.backend.timeoutMs)),
+      jsonField("timeout_ms", String(iter.backend.timeoutMs)),
   );
 }
 
