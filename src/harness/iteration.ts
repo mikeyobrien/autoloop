@@ -180,7 +180,9 @@ function rejectInvalidAndContinue(
     iter.allowedRoles,
     iter.allowedEvents,
   );
-  console.log(
+  log(
+    loop,
+    "info",
     `[reject] invalid event \`${emittedTopic}\`; recent event: \`${iter.recentEvent}\`; allowed next events: ${listText(iter.allowedEvents)}`,
   );
   progress(emittedTopic, "rejected:event.invalid");

@@ -26,7 +26,9 @@ export function stopMaxIterations(
     allowedRoles: [],
     outcome: "stop:max_iterations",
   });
-  console.log(
+  log(
+    loop,
+    "info",
     `Reached iteration limit: ${completed}/${loop.limits.maxIterations} iterations completed.`,
   );
   appendEvent(
