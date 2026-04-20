@@ -105,6 +105,13 @@ export interface RunOptions {
   mergeStrategy?: string;
   automerge?: boolean;
   keepWorktree?: boolean;
+  /**
+   * Optional abort signal. When provided, the CLI (or SDK caller) owns
+   * process signal handling; the harness only listens to this signal for
+   * graceful teardown. Without a signal the harness runs to completion
+   * and no signal-handling is installed.
+   */
+  signal?: AbortSignal;
 }
 
 export interface RunSummary {

@@ -78,13 +78,13 @@ export function run(
   appendLoopStart(loop);
   registryStart(loop);
 
-  // Track current iteration for signal handler (must be mutable)
+  // Track current iteration for abort handler (must be mutable)
   let currentIteration = 0;
-  let signalHandled = false;
+  let aborted = false;
 
-  const onSignal = (signal: NodeJS.Signals) => {
-    if (signalHandled) return;
-    signalHandled = true;
+  const teardown = () => {
+    if (aborted) return;
+    aborted = true;
     signalInterrupt();
     try {
       if (loop.kiroSession) {
@@ -116,13 +116,15 @@ export function run(
         /* best-effort */
       }
     }
-    process.removeListener("SIGINT", onSignal);
-    process.removeListener("SIGTERM", onSignal);
-    process.kill(process.pid, signal);
   };
 
-  process.on("SIGINT", onSignal);
-  process.on("SIGTERM", onSignal);
+  // SDK-friendly cancellation: caller owns process signal handling and
+  // passes an AbortSignal. The CLI entry (dispatchRun) installs SIGINT/
+  // SIGTERM handlers that abort this controller. Without a signal the
+  // harness simply runs to completion (no process.on handlers installed).
+  const onAbort = () => teardown();
+  runOptions.signal?.addEventListener("abort", onAbort);
+  if (runOptions.signal?.aborted) teardown();
 
   log(
     loop,
@@ -146,6 +148,12 @@ export function run(
 
   let summary: RunSummary;
   const trackedIterate = (ctx: LoopContext, iter: number): RunSummary => {
+    if (aborted)
+      return {
+        iterations: iter - 1,
+        stopReason: "interrupted",
+        runId: ctx.runtime.runId,
+      };
     currentIteration = iter;
     return iterateWith(ctx, iter, trackedIterate);
   };
@@ -155,11 +163,8 @@ export function run(
     if (loop.kiroSession) {
       terminateKiroSession(loop.kiroSession);
     }
+    runOptions.signal?.removeEventListener("abort", onAbort);
   }
-
-  // Clean up signal handlers on normal exit
-  process.removeListener("SIGINT", onSignal);
-  process.removeListener("SIGTERM", onSignal);
 
   // Post-run worktree lifecycle: status update, automerge, cleanup
   if (loop.runtime.isolationMode === "worktree" && loop.paths.worktreeMetaDir) {

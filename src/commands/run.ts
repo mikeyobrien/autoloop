@@ -56,12 +56,34 @@ export function dispatchRun(
     return true;
   }
 
-  harness.run(options.projectDir, normalizePrompt(options.prompt), selfCmd, {
-    ...options,
-    profiles: options.profiles.length > 0 ? options.profiles : undefined,
-    noDefaultProfiles: options.noDefaultProfiles || undefined,
-    ...chainableOptions(options),
-  });
+  // Install SIGINT/SIGTERM handlers that abort the harness via AbortSignal.
+  // Previously the harness installed process.on handlers itself; the CLI
+  // now owns that so the harness is embed-able from SDK consumers.
+  const abort = new AbortController();
+  let caughtSignal: NodeJS.Signals | null = null;
+  const onSig = (sig: NodeJS.Signals) => {
+    if (caughtSignal) return;
+    caughtSignal = sig;
+    abort.abort();
+  };
+  process.on("SIGINT", onSig);
+  process.on("SIGTERM", onSig);
+
+  try {
+    harness.run(options.projectDir, normalizePrompt(options.prompt), selfCmd, {
+      ...options,
+      profiles: options.profiles.length > 0 ? options.profiles : undefined,
+      noDefaultProfiles: options.noDefaultProfiles || undefined,
+      signal: abort.signal,
+      ...chainableOptions(options),
+    });
+  } finally {
+    process.removeListener("SIGINT", onSig);
+    process.removeListener("SIGTERM", onSig);
+    // Preserve historical exit-code behavior: re-raise the signal so the
+    // process exits with 128+signum rather than 0 on Ctrl-C.
+    if (caughtSignal) process.kill(process.pid, caughtSignal);
+  }
   return true;
 }
 
