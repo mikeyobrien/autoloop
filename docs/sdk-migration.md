@@ -140,8 +140,8 @@ stable and we know which files have legitimately low coverage.
 | 1.2 | ✅ | `eb69649` `AbortSignal` on `RunOptions` |
 | 1.3 | ✅ | `1bf9c2e` `LoopEvent` + `onEvent` |
 | 1.4 | ✅ | `d6a87b0` drop `console.log` from `iteration.ts` + `stop.ts` |
-| 1.5 | ⬜ | `harness/display.ts` → `cli/display.ts` |
-| 1.6 | ⬜ | `render*` → `cli/render.ts` |
+| 1.5 | ✅ | `1ace8fc` route harness display calls via `LoopEvent`; add `cli/event-printer.ts` |
+| 1.6 | ✅ | `bb1e33d` `render*` → `cli/render.ts`; drop unused `parentPort` |
 | 1.7 | ⬜ | `emit.ts` returns `Result` |
 | 1.8 | ⬜ | `async run()` |
 | 1.9 | ⬜ | public `src/index.ts` + `exports` map |
