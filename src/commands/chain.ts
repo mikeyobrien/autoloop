@@ -1,6 +1,9 @@
 import * as chains from "../chains.js";
 
-export function dispatchChain(args: string[], selfCmd: string): boolean {
+export async function dispatchChain(
+  args: string[],
+  selfCmd: string,
+): Promise<boolean> {
   const sub = args[0] ?? "";
 
   switch (sub) {
@@ -37,7 +40,7 @@ export function dispatchChain(args: string[], selfCmd: string): boolean {
         console.log(`chain \`${name}\` not found in chains.toml`);
         return true;
       }
-      chains.runChain(chainSpec, projectDir, selfCmd, {
+      await chains.runChain(chainSpec, projectDir, selfCmd, {
         prompt: normalizePrompt(prompt),
       });
       return true;

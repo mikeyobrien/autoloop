@@ -71,9 +71,9 @@ describe("harness.run onEvent (1.3)", () => {
     vi.clearAllMocks();
   });
 
-  it("emits iteration.start and loop.finish events", () => {
+  it("emits iteration.start and loop.finish events", async () => {
     const events: LoopEvent[] = [];
-    run(makeProject(), "prompt", "autoloop", {
+    await run(makeProject(), "prompt", "autoloop", {
       onEvent: (e) => events.push(e),
     });
     const types = events.map((e) => e.type);
@@ -83,9 +83,9 @@ describe("harness.run onEvent (1.3)", () => {
     expect(finish).toMatchObject({ stopReason: "completed", iterations: 1 });
   });
 
-  it("emits log events with the message and level", () => {
+  it("emits log events with the message and level", async () => {
     const events: LoopEvent[] = [];
-    run(makeProject(), "prompt", "autoloop", {
+    await run(makeProject(), "prompt", "autoloop", {
       onEvent: (e) => events.push(e),
     });
     const logs = events.filter((e) => e.type === "log");
@@ -96,8 +96,8 @@ describe("harness.run onEvent (1.3)", () => {
     expect(startLog).toBeDefined();
   });
 
-  it("does not require onEvent — runs complete without listener", () => {
-    const summary = run(makeProject(), "prompt", "autoloop", {});
+  it("does not require onEvent — runs complete without listener", async () => {
+    const summary = await run(makeProject(), "prompt", "autoloop", {});
     expect(summary.stopReason).toBe("completed");
   });
 });

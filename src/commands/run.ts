@@ -30,12 +30,12 @@ interface RunOptions {
   keepWorktree?: boolean;
 }
 
-export function dispatchRun(
+export async function dispatchRun(
   args: string[],
   _argv: string[],
   bundleRoot: string,
   selfCmd: string,
-): boolean {
+): Promise<boolean> {
   if (args[0] === "--help" || args[0] === "-h") {
     printRunUsage();
     return true;
@@ -44,7 +44,7 @@ export function dispatchRun(
   if (options.usageError) return true;
 
   if (options.chain) {
-    runInlineChain(options.chain, options.projectDir, selfCmd, options);
+    await runInlineChain(options.chain, options.projectDir, selfCmd, options);
     return true;
   }
 
@@ -53,7 +53,7 @@ export function dispatchRun(
     const presetName = basename(options.projectDir);
     const chainCsv = `${presetName},automerge`;
     const chainProjectDir = defaultChainProjectDir(bundleRoot);
-    runInlineChain(chainCsv, chainProjectDir, selfCmd, options);
+    await runInlineChain(chainCsv, chainProjectDir, selfCmd, options);
     return true;
   }
 
@@ -71,14 +71,19 @@ export function dispatchRun(
   process.on("SIGTERM", onSig);
 
   try {
-    harness.run(options.projectDir, normalizePrompt(options.prompt), selfCmd, {
-      ...options,
-      profiles: options.profiles.length > 0 ? options.profiles : undefined,
-      noDefaultProfiles: options.noDefaultProfiles || undefined,
-      signal: abort.signal,
-      onEvent: cliPrintEvent,
-      ...chainableOptions(options),
-    });
+    await harness.run(
+      options.projectDir,
+      normalizePrompt(options.prompt),
+      selfCmd,
+      {
+        ...options,
+        profiles: options.profiles.length > 0 ? options.profiles : undefined,
+        noDefaultProfiles: options.noDefaultProfiles || undefined,
+        signal: abort.signal,
+        onEvent: cliPrintEvent,
+        ...chainableOptions(options),
+      },
+    );
   } finally {
     process.removeListener("SIGINT", onSig);
     process.removeListener("SIGTERM", onSig);
@@ -293,12 +298,12 @@ function applyGlobalBackendOverride(options: RunOptions): RunOptions {
   };
 }
 
-function runInlineChain(
+async function runInlineChain(
   chainCsv: string,
   projectDir: string,
   selfCmd: string,
   options: RunOptions,
-): void {
+): Promise<void> {
   const chainSpec = chains.parseInlineChain(chainCsv, projectDir);
   const stepNames = chainSpec.steps.map((s) => s.name);
   const validation = chains.validatePresetVocabulary(stepNames, projectDir);
@@ -310,7 +315,7 @@ function runInlineChain(
     console.log(`Known presets: ${joinCsv(chains.listKnownPresets())}`);
     return;
   }
-  chains.runChain(chainSpec, projectDir, selfCmd, {
+  await chains.runChain(chainSpec, projectDir, selfCmd, {
     prompt: normalizePrompt(options.prompt),
     ...chainableOptions(options),
   });

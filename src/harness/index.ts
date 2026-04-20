@@ -42,12 +42,12 @@ import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export type { LoopContext, RunOptions, RunSummary };
 
-export function run(
+export async function run(
   projectDir: string,
   promptOverride: string | null,
   selfCommand: string,
   runOptions: RunOptions,
-): RunSummary {
+): Promise<RunSummary> {
   let loop = buildLoopContext(
     projectDir,
     promptOverride,

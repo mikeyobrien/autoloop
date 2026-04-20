@@ -25,17 +25,17 @@ import type {
   StepRecord,
 } from "./types.js";
 
-export function runChain(
+export async function runChain(
   chainSpec: ChainSpec,
   projectDir: string,
   selfCommand: string,
   runOptions: harness.RunOptions,
-): {
+): Promise<{
   completed: StepRecord[];
   outcome: string;
   failedStep?: number;
   failedReason?: string;
-} {
+}> {
   const chainName = chainSpec.name;
   const steps = chainSpec.steps;
   const cfg = config.loadProject(projectDir);
@@ -55,7 +55,7 @@ export function runChain(
       jsonField("step_count", String(steps.length)),
   );
 
-  const result = runSteps(
+  const result = await runSteps(
     steps,
     1,
     projectDir,
@@ -81,20 +81,20 @@ export function runChain(
   return result;
 }
 
-export function spawnDynamicChain(
+export async function spawnDynamicChain(
   spec: DynamicChainSpec,
   projectDir: string,
   selfCommand: string,
   runOptions: harness.RunOptions,
   parentId: string,
-): {
+): Promise<{
   outcome: string;
   reason?: string;
   chainId?: string;
   completed?: StepRecord[];
   failedStep?: number;
   failedReason?: string;
-} {
+}> {
   const budget = spec.budget ?? defaultBudget();
   const tracker = loadChainTracker(projectDir);
   const budgetResult = checkBudget(budget, tracker);
@@ -139,7 +139,7 @@ function chainStateRoot(projectDir: string): string {
   return join(config.stateDirPath(projectDir), "chains");
 }
 
-function runSteps(
+async function runSteps(
   steps: ChainSpec["steps"],
   stepNum: number,
   projectDir: string,
@@ -149,12 +149,12 @@ function runSteps(
   runOptions: harness.RunOptions,
   journalFile: string,
   completed: StepRecord[],
-): {
+): Promise<{
   completed: StepRecord[];
   outcome: string;
   failedStep?: number;
   failedReason?: string;
-} {
+}> {
   if (steps.length === 0) {
     return { completed, outcome: "all_steps_complete" };
   }
@@ -203,7 +203,7 @@ function runSteps(
     ...(suppressWorktree ? { worktree: undefined, noWorktree: true } : {}),
   };
   const prompt = stepNum === 1 ? (runOptions.prompt ?? null) : null;
-  const result = harness.run(presetDir, prompt, selfCommand, stepOptions);
+  const result = await harness.run(presetDir, prompt, selfCommand, stepOptions);
   const stopReason = result.stopReason;
 
   writeResultArtifact(stepWorkDir, stepNum, stepName, result);
@@ -392,19 +392,19 @@ function checkQualityGate(projectDir: string): {
   return { ok: true };
 }
 
-function executeDynamicChain(
+async function executeDynamicChain(
   spec: DynamicChainSpec,
   projectDir: string,
   selfCommand: string,
   runOptions: harness.RunOptions,
   parentId: string,
-): {
+): Promise<{
   outcome: string;
   chainId: string;
   completed?: StepRecord[];
   failedStep?: number;
   failedReason?: string;
-} {
+}> {
   const chainId = writeDynamicSpec(projectDir, { ...spec, parentId });
   const stepsCsv = spec.steps;
   const journalFile = config.resolveJournalFile(projectDir);
@@ -425,7 +425,7 @@ function executeDynamicChain(
 
   const chainSpec = parseInlineChain(joinCsv(stepsCsv), projectDir);
   const namedSpec: ChainSpec = { ...chainSpec, name: chainId };
-  const result = runChain(namedSpec, projectDir, selfCommand, runOptions);
+  const result = await runChain(namedSpec, projectDir, selfCommand, runOptions);
   return { ...result, chainId };
 }
 

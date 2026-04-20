@@ -73,18 +73,18 @@ describe("chain handoff runId propagation", () => {
     runCallCount = 0;
   });
 
-  it("includes runId in StepRecord", () => {
+  it("includes runId in StepRecord", async () => {
     const spec: ChainSpec = {
       name: "test-chain",
       steps: [{ name: "autocode", presetDir: "/presets/autocode" }],
     };
 
-    const result = runChain(spec, ".", "autoloop", {});
+    const result = await runChain(spec, ".", "autoloop", {});
     expect(result.completed).toHaveLength(1);
     expect(result.completed[0].runId).toBe("run-1");
   });
 
-  it("writes parent_run_id in handoff artifact for second step", () => {
+  it("writes parent_run_id in handoff artifact for second step", async () => {
     const spec: ChainSpec = {
       name: "test-chain",
       steps: [
@@ -93,7 +93,7 @@ describe("chain handoff runId propagation", () => {
       ],
     };
 
-    runChain(spec, ".", "autoloop", {});
+    await runChain(spec, ".", "autoloop", {});
 
     // Find the handoff.md written for step 2
     const handoffWrites = writeFileCalls.filter(
@@ -105,13 +105,13 @@ describe("chain handoff runId propagation", () => {
     expect(handoffContent).toContain("[run_id=run-1]");
   });
 
-  it("includes runId in result artifact", () => {
+  it("includes runId in result artifact", async () => {
     const spec: ChainSpec = {
       name: "test-chain",
       steps: [{ name: "autocode", presetDir: "/presets/autocode" }],
     };
 
-    runChain(spec, ".", "autoloop", {});
+    await runChain(spec, ".", "autoloop", {});
 
     const resultWrites = writeFileCalls.filter(
       ([path]) => path.includes("step-1") && path.endsWith("result.md"),

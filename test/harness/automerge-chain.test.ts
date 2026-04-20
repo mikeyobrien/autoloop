@@ -104,9 +104,9 @@ describe("automerge chain guard", () => {
     vi.clearAllMocks();
   });
 
-  it("skips inline automerge when trigger is 'chain'", () => {
+  it("skips inline automerge when trigger is 'chain'", async () => {
     const project = makeProject();
-    run(project, "test prompt", "autoloop", {
+    await run(project, "test prompt", "autoloop", {
       automerge: true,
       trigger: "chain",
       worktree: true,
@@ -114,9 +114,9 @@ describe("automerge chain guard", () => {
     expect(mergeWorktree).not.toHaveBeenCalled();
   });
 
-  it("fires inline automerge when trigger is 'cli'", () => {
+  it("fires inline automerge when trigger is 'cli'", async () => {
     const project = makeProject();
-    run(project, "test prompt", "autoloop", {
+    await run(project, "test prompt", "autoloop", {
       automerge: true,
       trigger: "cli",
       worktree: true,
@@ -124,9 +124,9 @@ describe("automerge chain guard", () => {
     expect(mergeWorktree).toHaveBeenCalled();
   });
 
-  it("fires inline automerge when trigger is undefined (defaults to cli)", () => {
+  it("fires inline automerge when trigger is undefined (defaults to cli)", async () => {
     const project = makeProject();
-    run(project, "test prompt", "autoloop", {
+    await run(project, "test prompt", "autoloop", {
       automerge: true,
       worktree: true,
     });

@@ -61,7 +61,7 @@ describe("runChain worktree suppression for planning steps", () => {
     vi.clearAllMocks();
   });
 
-  it("suppresses worktree flag for planning-category steps", () => {
+  it("suppresses worktree flag for planning-category steps", async () => {
     const spec: ChainSpec = {
       name: "test-chain",
       steps: [
@@ -70,7 +70,7 @@ describe("runChain worktree suppression for planning steps", () => {
       ],
     };
 
-    runChain(spec, ".", "autoloop", { worktree: true });
+    await runChain(spec, ".", "autoloop", { worktree: true });
 
     const calls = vi.mocked(harness.run).mock.calls;
     expect(calls).toHaveLength(2);
@@ -86,13 +86,13 @@ describe("runChain worktree suppression for planning steps", () => {
     expect(step2Options.noWorktree).toBe(true);
   });
 
-  it("does not suppress worktree when worktree is not requested", () => {
+  it("does not suppress worktree when worktree is not requested", async () => {
     const spec: ChainSpec = {
       name: "test-chain",
       steps: [{ name: "automerge", presetDir: "/presets/automerge" }],
     };
 
-    runChain(spec, ".", "autoloop", {});
+    await runChain(spec, ".", "autoloop", {});
 
     const calls = vi.mocked(harness.run).mock.calls;
     expect(calls).toHaveLength(1);

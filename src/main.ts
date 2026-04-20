@@ -18,13 +18,13 @@ import { dispatchWorktree } from "./commands/worktree.js";
 import * as harness from "./harness/index.js";
 import { printEmitUsage, printUsage } from "./usage.js";
 
-function main(): void {
+async function main(): Promise<void> {
   const argv = process.argv;
   const args = runtimeArgv(argv);
-  dispatch(args, argv);
+  await dispatch(args, argv);
 }
 
-function dispatch(args: string[], argv: string[]): void {
+async function dispatch(args: string[], argv: string[]): Promise<void> {
   const cmd = args[0] ?? "";
   const selfCmd = selfCommand(argv);
   const bundleRoot = resolveBundleRoot(argv);
@@ -35,7 +35,7 @@ function dispatch(args: string[], argv: string[]): void {
       printUsage();
       return;
     case "run":
-      dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
+      await dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
       return;
     case "emit":
       if (!args[1] || args[1] === "--help" || args[1] === "-h") {
@@ -76,7 +76,7 @@ function dispatch(args: string[], argv: string[]): void {
       dispatchRuns(args.slice(1));
       return;
     case "chain":
-      dispatchChain(args.slice(1), selfCmd);
+      await dispatchChain(args.slice(1), selfCmd);
       return;
     case "config":
       dispatchConfig(args.slice(1));
@@ -88,7 +88,7 @@ function dispatch(args: string[], argv: string[]): void {
       dispatchDashboard(args.slice(1), bundleRoot, selfCmd);
       return;
     default:
-      dispatchRun(args, argv, bundleRoot, selfCmd);
+      await dispatchRun(args, argv, bundleRoot, selfCmd);
   }
 }
 
@@ -156,4 +156,9 @@ function resolveBundleRoot(argv: string[]): string {
   return ".";
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(
+    `${err instanceof Error ? err.stack || err.message : String(err)}\n`,
+  );
+  process.exit(1);
+});

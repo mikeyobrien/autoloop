@@ -73,10 +73,10 @@ describe("harness.run abort signal (1.2)", () => {
     vi.clearAllMocks();
   });
 
-  it("returns stopReason=interrupted with a pre-aborted signal", () => {
+  it("returns stopReason=interrupted with a pre-aborted signal", async () => {
     const controller = new AbortController();
     controller.abort();
-    const summary = run(makeProject(), "prompt", "autoloop", {
+    const summary = await run(makeProject(), "prompt", "autoloop", {
       signal: controller.signal,
     });
     expect(summary.stopReason).toBe("interrupted");
@@ -84,10 +84,12 @@ describe("harness.run abort signal (1.2)", () => {
     expect(runIteration).not.toHaveBeenCalled();
   });
 
-  it("tears down via registryStop when the signal is pre-aborted", () => {
+  it("tears down via registryStop when the signal is pre-aborted", async () => {
     const controller = new AbortController();
     controller.abort();
-    run(makeProject(), "prompt", "autoloop", { signal: controller.signal });
+    await run(makeProject(), "prompt", "autoloop", {
+      signal: controller.signal,
+    });
     expect(registryStop).toHaveBeenCalledWith(
       expect.anything(),
       0,
@@ -95,13 +97,13 @@ describe("harness.run abort signal (1.2)", () => {
     );
   });
 
-  it("runs to completion when no signal is provided", () => {
-    const summary = run(makeProject(), "prompt", "autoloop", {});
+  it("runs to completion when no signal is provided", async () => {
+    const summary = await run(makeProject(), "prompt", "autoloop", {});
     expect(summary.stopReason).toBe("completed");
     expect(runIteration).toHaveBeenCalled();
   });
 
-  it("stops further iterations if aborted mid-run", () => {
+  it("stops further iterations if aborted mid-run", async () => {
     const controller = new AbortController();
     // First iteration: completes normally, then aborts before the 2nd.
     runIteration.mockImplementationOnce(
@@ -115,7 +117,7 @@ describe("harness.run abort signal (1.2)", () => {
       iterations: 1,
       exitCode: 0,
     }));
-    const summary = run(makeProject(), "prompt", "autoloop", {
+    const summary = await run(makeProject(), "prompt", "autoloop", {
       signal: controller.signal,
     });
     expect(summary.stopReason).toBe("interrupted");
