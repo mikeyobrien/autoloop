@@ -28,12 +28,7 @@ import {
   resolveJournalFileForRun,
 } from "./config-helpers.js";
 import { coordinationFromLines } from "./coordination.js";
-import {
-  log,
-  printProjectedMarkdown,
-  printProjectedText,
-  printSummary,
-} from "./display.js";
+import { log, printProjectedMarkdown, printProjectedText } from "./display.js";
 import { emit as emitCmd, resolveEmitJournalFile } from "./emit.js";
 import { runIteration } from "./iteration.js";
 import {
@@ -242,7 +237,16 @@ export function run(
     }
   }
 
-  printSummary(summary, loop);
+  loop.onEvent?.({
+    type: "summary",
+    runId: loop.runtime.runId,
+    iterations: summary.iterations,
+    stopReason: summary.stopReason,
+    journalFile: loop.paths.journalFile,
+    memoryFile: loop.paths.memoryFile,
+    reviewEvery: loop.review.every,
+    toolPath: loop.paths.toolPath,
+  });
   loop.onEvent?.({
     type: "loop.finish",
     iterations: summary.iterations,
@@ -363,6 +367,7 @@ export function runParallelBranchCli(
   projectDir: string,
   branchDir: string,
   selfCommand: string,
+  onEvent?: (event: import("./events.js").LoopEvent) => void,
 ): void {
   const launch = loadParallelBranchLaunch(branchDir);
   const branchPrompt = launch.prompt;
@@ -375,6 +380,7 @@ export function runParallelBranchCli(
     logLevel: logLevelVal,
     trigger: "branch",
   });
+  branchLoop.onEvent = onEvent;
   branchLoop = initStore(branchLoop);
   branchLoop.runtime.branchMode = true;
   branchLoop = applyRuntimeModeOverrides(branchLoop);

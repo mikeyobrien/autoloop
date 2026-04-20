@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { runKiroIterationSync } from "../backend/kiro-bridge.js";
 import { jsonBool, jsonField, jsonFieldRaw } from "../json.js";
 import { reloadLoop } from "./config-helpers.js";
-import { printReviewBanner } from "./display.js";
 import { appendEvent, readRunLines } from "./journal.js";
 import { buildReviewCommand, runProcess } from "./parallel.js";
 import { renderReviewPromptText } from "./prompt.js";
@@ -71,7 +70,7 @@ export function runMetareviewReview(
   loop: LoopContext,
   iteration: number,
 ): Verdict {
-  printReviewBanner(iteration);
+  loop.onEvent?.({ type: "review.banner", iteration });
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
   const reviewPrompt = renderReviewPromptText(loop, iteration, runLines);
 

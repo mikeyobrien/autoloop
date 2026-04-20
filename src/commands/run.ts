@@ -1,5 +1,6 @@
 import { basename, resolve } from "node:path";
 import * as chains from "../chains.js";
+import { cliPrintEvent } from "../cli/event-printer.js";
 import * as config from "../config.js";
 import { claudeBackend } from "../harness/config-helpers.js";
 import * as harness from "../harness/index.js";
@@ -75,6 +76,7 @@ export function dispatchRun(
       profiles: options.profiles.length > 0 ? options.profiles : undefined,
       noDefaultProfiles: options.noDefaultProfiles || undefined,
       signal: abort.signal,
+      onEvent: cliPrintEvent,
       ...chainableOptions(options),
     });
   } finally {

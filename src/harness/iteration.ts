@@ -4,13 +4,7 @@ import {
 } from "../backend/kiro-bridge.js";
 import { registryProgress } from "../registry/harness.js";
 import { listText } from "../utils.js";
-import {
-  log,
-  printBackendOutputTail,
-  printIterationBanner,
-  printIterationFooter,
-  printProgressLine,
-} from "./display.js";
+import { log } from "./display.js";
 import {
   appendInvalidEvent,
   invalidEvent,
@@ -47,7 +41,15 @@ export function runIteration(
   iterate: (loop: LoopContext, iteration: number) => RunSummary,
 ): RunSummary {
   const iter = buildIterationContext(loop, iteration);
-  printIterationBanner(loop, iter);
+  loop.onEvent?.({
+    type: "iteration.banner",
+    iteration: iter.iteration,
+    maxIterations: loop.limits.maxIterations,
+    allowedRoles: iter.allowedRoles,
+    recentEvent: iter.recentEvent,
+    allowedEvents: iter.allowedEvents,
+    lastRejected: iter.lastRejected,
+  });
   appendIterationStart(loop, iter);
   log(loop, "debug", `iteration ${iteration} start`);
   appendBackendStart(loop, iter);
@@ -83,8 +85,12 @@ export function runIteration(
   appendIterationFinish(loop, iter, output, exitCode, timedOut, elapsedS);
   registryProgress(loop, iteration);
   log(loop, "debug", `iteration ${iteration} finish exit_code=${exitCode}`);
-  printIterationFooter(iter, elapsedS);
-  printBackendOutputTail(output);
+  loop.onEvent?.({
+    type: "iteration.footer",
+    iteration: iter.iteration,
+    elapsedS,
+  });
+  loop.onEvent?.({ type: "backend.output", output });
 
   if (timedOut) return stopBackendTimeout(loop, iteration, output);
   if (exitCode !== 0) return stopBackendFailed(loop, iteration, output);
@@ -108,7 +114,8 @@ export function finishIteration(
   );
 
   const progress = (emittedTopic: string, outcome: string) =>
-    printProgressLine({
+    loop.onEvent?.({
+      type: "progress",
       runId: loop.runtime.runId,
       iteration: iter.iteration,
       recentEvent: iter.recentEvent,

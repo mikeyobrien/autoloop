@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { cliPrintEvent } from "./cli/event-printer.js";
 import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
@@ -60,7 +61,7 @@ function dispatch(args: string[], argv: string[]): void {
       dispatchPiAdapter(args.slice(1));
       return;
     case "branch-run":
-      harness.runParallelBranchCli(args[1], args[2], selfCmd);
+      harness.runParallelBranchCli(args[1], args[2], selfCmd, cliPrintEvent);
       return;
     case "memory":
       dispatchMemory(args.slice(1));

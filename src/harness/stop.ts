@@ -1,11 +1,6 @@
 import { jsonField } from "../json.js";
 import { registryComplete, registryStop } from "../registry/harness.js";
-import {
-  lastNChars,
-  log,
-  printFailureDiagnostic,
-  printProgressLine,
-} from "./display.js";
+import { lastNChars, log } from "./display.js";
 import { appendEvent } from "./journal.js";
 import type { LoopContext, RunSummary } from "./types.js";
 
@@ -19,7 +14,8 @@ export function stopMaxIterations(
     "warn",
     `loop stop reason=max_iterations completed_iterations=${completed} max_iterations=${loop.limits.maxIterations}`,
   );
-  printProgressLine({
+  loop.onEvent?.({
+    type: "progress",
     runId: loop.runtime.runId,
     iteration: completed,
     recentEvent: "loop.stop",
@@ -54,14 +50,19 @@ export function stopBackendFailed(
   output: string,
 ): RunSummary {
   log(loop, "error", `loop stop reason=backend_failed iteration=${iteration}`);
-  printProgressLine({
+  loop.onEvent?.({
+    type: "progress",
     runId: loop.runtime.runId,
     iteration,
     recentEvent: "loop.stop",
     allowedRoles: [],
     outcome: "stop:backend_failed",
   });
-  printFailureDiagnostic(output, "backend_failed");
+  loop.onEvent?.({
+    type: "failure.diagnostic",
+    output,
+    stopReason: "backend_failed",
+  });
   const tail = lastNChars(output, 500);
   appendEvent(
     loop.paths.journalFile,
@@ -84,14 +85,19 @@ export function stopBackendTimeout(
   output: string,
 ): RunSummary {
   log(loop, "error", `loop stop reason=backend_timeout iteration=${iteration}`);
-  printProgressLine({
+  loop.onEvent?.({
+    type: "progress",
     runId: loop.runtime.runId,
     iteration,
     recentEvent: "loop.stop",
     allowedRoles: [],
     outcome: "stop:backend_timeout",
   });
-  printFailureDiagnostic(output, "backend_timeout");
+  loop.onEvent?.({
+    type: "failure.diagnostic",
+    output,
+    stopReason: "backend_timeout",
+  });
   const tail = lastNChars(output, 500);
   appendEvent(
     loop.paths.journalFile,
