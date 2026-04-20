@@ -142,7 +142,7 @@ stable and we know which files have legitimately low coverage.
 | 1.4 | ✅ | `d6a87b0` drop `console.log` from `iteration.ts` + `stop.ts` |
 | 1.5 | ✅ | `1ace8fc` route harness display calls via `LoopEvent`; add `cli/event-printer.ts` |
 | 1.6 | ✅ | `bb1e33d` `render*` → `cli/render.ts`; drop unused `parentPort` |
-| 1.7 | ⬜ | `emit.ts` returns `Result` (blocked on user WIP) |
+| 1.7 | ✅ | `8fc1d3f` `emit.ts` returns `EmitResult`; process.* side effects moved to `main.ts` |
 | 1.8 | ✅ | `42438d6` `async run()` + cascading awaits |
 | 1.9 | ✅ | `012979b` public `src/index.ts` + `exports` map |
 | 1.10 | ✅ | `ad82906` SDK embed smoke test |
