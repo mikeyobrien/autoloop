@@ -135,11 +135,11 @@ stable and we know which files have legitimately low coverage.
 
 | # | Status | Commit |
 |---|---|---|
-| 0.1 | 🟡 in progress | baseline audit |
-| 1.1 | ⬜ | split `config.ts` schema / fs |
-| 1.2 | ⬜ | `AbortSignal` on `RunOptions` |
-| 1.3 | ⬜ | `LoopEvent` + `onEvent` |
-| 1.4 | ⬜ | drop `console.log` from `iteration.ts` + `stop.ts` |
+| 0.1 | ✅ | `c442991` baseline audit |
+| 1.1 | ✅ | `d9342db` split `config.ts` schema / fs |
+| 1.2 | ✅ | `eb69649` `AbortSignal` on `RunOptions` |
+| 1.3 | ✅ | `1bf9c2e` `LoopEvent` + `onEvent` |
+| 1.4 | ✅ | `d6a87b0` drop `console.log` from `iteration.ts` + `stop.ts` |
 | 1.5 | ⬜ | `harness/display.ts` → `cli/display.ts` |
 | 1.6 | ⬜ | `render*` → `cli/render.ts` |
 | 1.7 | ⬜ | `emit.ts` returns `Result` |
