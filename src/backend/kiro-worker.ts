@@ -7,7 +7,7 @@
  *   Worker → Main: write JSON result to dataBuffer, signal controlBuffer[0] = 2
  *   Commands: { type: "init", opts } | { type: "prompt", prompt, timeoutMs } | { type: "terminate" }
  */
-import { parentPort, workerData } from "node:worker_threads";
+import { workerData } from "node:worker_threads";
 import type { AcpSession } from "./acp-client.js";
 import {
   initAcpSession,

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Test inspect journal CLI dispatch and parseInspectArgs --run flag.
  */
 
-vi.mock("../../src/harness/index.js", () => ({
+vi.mock("../../src/cli/render.js", () => ({
   renderJournal: vi.fn(),
   renderAllJournals: vi.fn(),
   renderJournalTimeline: vi.fn(),
@@ -47,8 +47,8 @@ vi.mock("../../src/usage.js", () => ({
   printInspectUsage: vi.fn(),
 }));
 
+import * as render from "../../src/cli/render.js";
 import { dispatchInspect } from "../../src/commands/inspect.js";
-import * as harness from "../../src/harness/index.js";
 import * as topo from "../../src/topology.js";
 
 describe("dispatchInspect journal", () => {
@@ -60,8 +60,8 @@ describe("dispatchInspect journal", () => {
 
   it("dispatches 'inspect journal' to renderJournalTimeline (default terminal format)", () => {
     dispatchInspect(["journal"]);
-    expect(harness.renderJournalTimeline).toHaveBeenCalledTimes(1);
-    expect(harness.renderJournalTimeline).toHaveBeenCalledWith(
+    expect(render.renderJournalTimeline).toHaveBeenCalledTimes(1);
+    expect(render.renderJournalTimeline).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ artifact: "journal" }),
     );
@@ -69,22 +69,22 @@ describe("dispatchInspect journal", () => {
 
   it("dispatches 'inspect journal --json' to renderAllJournals (backward compat)", () => {
     dispatchInspect(["journal", "--json"]);
-    expect(harness.renderAllJournals).toHaveBeenCalledTimes(1);
-    expect(harness.renderJournalTimeline).not.toHaveBeenCalled();
+    expect(render.renderAllJournals).toHaveBeenCalledTimes(1);
+    expect(render.renderJournalTimeline).not.toHaveBeenCalled();
   });
 
   it("dispatches 'inspect journal --run <id> --json' to renderJournal", () => {
     dispatchInspect(["journal", "--run", "abc-123", "--json"]);
-    expect(harness.renderJournal).toHaveBeenCalledWith(
+    expect(render.renderJournal).toHaveBeenCalledWith(
       expect.any(String),
       "abc-123",
     );
-    expect(harness.renderAllJournals).not.toHaveBeenCalled();
+    expect(render.renderAllJournals).not.toHaveBeenCalled();
   });
 
   it("dispatches 'inspect journal --topic loop --iter 3'", () => {
     dispatchInspect(["journal", "--topic", "loop", "--iter", "3"]);
-    expect(harness.renderJournalTimeline).toHaveBeenCalledWith(
+    expect(render.renderJournalTimeline).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
         topics: ["loop"],
@@ -95,7 +95,7 @@ describe("dispatchInspect journal", () => {
 
   it("dispatches 'inspect journal --all-runs'", () => {
     dispatchInspect(["journal", "--all-runs"]);
-    expect(harness.renderJournalTimeline).toHaveBeenCalledWith(
+    expect(render.renderJournalTimeline).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ allRuns: true }),
     );
@@ -103,7 +103,7 @@ describe("dispatchInspect journal", () => {
 
   it("dispatches 'inspect artifacts' to renderArtifacts", () => {
     dispatchInspect(["artifacts"]);
-    expect(harness.renderArtifacts).toHaveBeenCalledWith(
+    expect(render.renderArtifacts).toHaveBeenCalledWith(
       expect.any(String),
       "terminal",
       undefined,
@@ -112,7 +112,7 @@ describe("dispatchInspect journal", () => {
 
   it("dispatches 'inspect artifacts --run <id> --json'", () => {
     dispatchInspect(["artifacts", "--run", "run-xyz", "--json"]);
-    expect(harness.renderArtifacts).toHaveBeenCalledWith(
+    expect(render.renderArtifacts).toHaveBeenCalledWith(
       expect.any(String),
       "json",
       "run-xyz",

@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import * as chains from "../chains.js";
+import * as render from "../cli/render.js";
 import * as config from "../config.js";
-import * as harness from "../harness/index.js";
 import * as memory from "../memory.js";
 import * as profiles from "../profiles.js";
 import * as tasks from "../tasks.js";
@@ -47,7 +47,7 @@ export function dispatchInspect(args: string[]): boolean {
 
   switch (artifact) {
     case "scratchpad":
-      harness.renderScratchpadFormat(projectDir, format, spec.run);
+      render.renderScratchpadFormat(projectDir, format, spec.run);
       return true;
     case "memory":
       if (format === "json") console.log(memory.rawProject(projectDir));
@@ -60,22 +60,22 @@ export function dispatchInspect(args: string[]): boolean {
       if (format === "json") {
         // Backward compat: raw JSON lines
         if (spec.run) {
-          harness.renderJournal(projectDir, spec.run);
+          render.renderJournal(projectDir, spec.run);
         } else {
-          harness.renderAllJournals(projectDir);
+          render.renderAllJournals(projectDir);
         }
       } else {
-        harness.renderJournalTimeline(projectDir, spec);
+        render.renderJournalTimeline(projectDir, spec);
       }
       return true;
     case "artifacts":
-      harness.renderArtifacts(projectDir, format, spec.run);
+      render.renderArtifacts(projectDir, format, spec.run);
       return true;
     case "coordination":
-      harness.renderCoordinationFormat(projectDir, format, spec.run);
+      render.renderCoordinationFormat(projectDir, format, spec.run);
       return true;
     case "metrics":
-      harness.renderMetrics(projectDir, format, selector || spec.run);
+      render.renderMetrics(projectDir, format, selector || spec.run);
       return true;
     case "chain":
       console.log(chains.renderChainState(projectDir));
@@ -91,14 +91,14 @@ export function dispatchInspect(args: string[]): boolean {
         console.log("inspect prompt requires an iteration selector");
         return true;
       }
-      harness.renderPromptFormat(projectDir, selector, format, spec.run);
+      render.renderPromptFormat(projectDir, selector, format, spec.run);
       return true;
     case "output":
       if (!selector) {
         console.log("inspect output requires an iteration selector");
         return true;
       }
-      harness.renderOutput(projectDir, selector, spec.run);
+      render.renderOutput(projectDir, selector, spec.run);
       return true;
     default: {
       const suggestion = findClosestTarget(artifact, INSPECT_TARGETS);

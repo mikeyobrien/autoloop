@@ -14,32 +14,20 @@ import {
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "../worktree/meta.js";
-import { collectArtifacts, formatArtifacts } from "./artifacts.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
-  emptyFallback,
   ensureLayout,
-  ensureRenderRunId,
   initStore,
   installRuntimeTools,
   iterationFieldForRun,
   reloadLoop,
-  resolveJournalFileForRun,
 } from "./config-helpers.js";
-import { coordinationFromLines } from "./coordination.js";
-import { log, printProjectedMarkdown, printProjectedText } from "./display.js";
-import { emit as emitCmd, resolveEmitJournalFile } from "./emit.js";
+import { log } from "./display.js";
+import { emit as emitCmd } from "./emit.js";
 import { runIteration } from "./iteration.js";
-import {
-  readAllJournals,
-  readIfExists,
-  readRunJournal,
-  readRunLines,
-} from "./journal.js";
-import { formatTimeline } from "./journal-format.js";
+import { readIfExists } from "./journal.js";
 import { maybeRunMetareview } from "./metareview.js";
-import { collectMetricsRows, formatMetrics } from "./metrics.js";
 import {
   appendLoopStart,
   branchStopReason,
@@ -49,7 +37,6 @@ import {
   seedBranchContext,
   writeParallelBranchSummary,
 } from "./parallel.js";
-import { renderRunScratchpadFull } from "./scratchpad.js";
 import { completeLoop, stopMaxIterations } from "./stop.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
@@ -258,111 +245,6 @@ export function run(
 
 export { emitCmd as emit };
 
-export function renderScratchpadFormat(
-  projectDir: string,
-  format: string,
-  runIdOverride?: string,
-): void {
-  const { journalFile, runId } = resolveJournalAndRun(
-    projectDir,
-    runIdOverride,
-  );
-  printProjectedMarkdown(
-    emptyFallback(renderRunScratchpadFull(readRunLines(journalFile, runId))),
-    format,
-  );
-}
-
-export function renderPromptFormat(
-  projectDir: string,
-  iteration: string,
-  format: string,
-  runIdOverride?: string,
-): void {
-  const { journalFile, runId } = resolveJournalAndRun(
-    projectDir,
-    runIdOverride,
-  );
-  const prompt = iterationFieldForRun(
-    journalFile,
-    runId,
-    iteration,
-    "iteration.start",
-    "prompt",
-  );
-  if (!prompt) {
-    console.log(`missing prompt projection for iteration ${iteration}`);
-    return;
-  }
-  printProjectedMarkdown(prompt, format);
-}
-
-export function renderOutput(
-  projectDir: string,
-  iteration: string,
-  runIdOverride?: string,
-): void {
-  const { journalFile, runId } = resolveJournalAndRun(
-    projectDir,
-    runIdOverride,
-  );
-  const output = iterationFieldForRun(
-    journalFile,
-    runId,
-    iteration,
-    "iteration.finish",
-    "output",
-  );
-  console.log(output || `missing output projection for iteration ${iteration}`);
-}
-
-export function renderJournal(projectDir: string, runId?: string): void {
-  if (runId) {
-    const stateDir = config.stateDirPath(projectDir);
-    const lines = readRunJournal(stateDir, runId);
-    console.log(lines.join("\n"));
-    return;
-  }
-  console.log(readIfExists(resolveEmitJournalFile(projectDir)));
-}
-
-export function renderAllJournals(projectDir: string): void {
-  const stateDir = config.stateDirPath(projectDir);
-  const lines = readAllJournals(stateDir);
-  if (lines.length > 0) {
-    console.log(lines.join("\n"));
-  } else {
-    renderJournal(projectDir);
-  }
-}
-
-export function renderCoordinationFormat(
-  projectDir: string,
-  format: string,
-  runIdOverride?: string,
-): void {
-  const { journalFile, runId } = resolveJournalAndRun(
-    projectDir,
-    runIdOverride,
-  );
-  const lines = readRunLines(journalFile, runId);
-  printProjectedMarkdown(emptyFallback(coordinationFromLines(lines)), format);
-}
-
-export function renderMetrics(
-  projectDir: string,
-  format: string,
-  runIdOverride?: string,
-): void {
-  const { journalFile, runId } = resolveJournalAndRun(
-    projectDir,
-    runIdOverride,
-  );
-  const lines = readRunLines(journalFile, runId);
-  const rows = collectMetricsRows(lines);
-  printProjectedText(formatMetrics(rows, format), format);
-}
-
 export function runParallelBranchCli(
   projectDir: string,
   branchDir: string,
@@ -424,62 +306,7 @@ export function runParallelBranchCli(
   writeParallelBranchSummary(branchDir, result);
 }
 
-export function renderJournalTimeline(
-  projectDir: string,
-  spec: {
-    topics?: string[];
-    iterFilter?: string;
-    allRuns?: boolean;
-    run?: string;
-  },
-): void {
-  let lines: string[];
-  if (spec.allRuns) {
-    const stateDir = config.stateDirPath(projectDir);
-    lines = readAllJournals(stateDir);
-    if (lines.length === 0) {
-      // Fallback to current journal file
-      const journalFile = resolveEmitJournalFile(projectDir);
-      lines = readRunLines(journalFile, ensureRenderRunId(journalFile));
-    }
-  } else {
-    const { journalFile, runId } = resolveJournalAndRun(projectDir, spec.run);
-    lines = readRunLines(journalFile, runId);
-  }
-  const output = formatTimeline(lines, {
-    topics: spec.topics,
-    iterFilter: spec.iterFilter,
-  });
-  console.log(output);
-}
-
-export function renderArtifacts(
-  projectDir: string,
-  format: string,
-  runOverride?: string,
-): void {
-  const { journalFile, runId } = resolveJournalAndRun(projectDir, runOverride);
-  const lines = readRunLines(journalFile, runId);
-  const artifacts = collectArtifacts(lines, projectDir);
-  if (format === "json") {
-    console.log(JSON.stringify(artifacts, null, 2));
-  } else {
-    console.log(formatArtifacts(artifacts));
-  }
-}
-
 // --- Private implementation ---
-
-function resolveJournalAndRun(
-  projectDir: string,
-  runIdOverride?: string,
-): { journalFile: string; runId: string } {
-  if (runIdOverride) {
-    return resolveJournalFileForRun(projectDir, runIdOverride);
-  }
-  const journalFile = resolveEmitJournalFile(projectDir);
-  return { journalFile, runId: ensureRenderRunId(journalFile) };
-}
 
 function iterateWith(
   loop: LoopContext,

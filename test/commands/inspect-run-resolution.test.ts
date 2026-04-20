@@ -35,7 +35,7 @@ import {
   renderOutput,
   renderPromptFormat,
   renderScratchpadFormat,
-} from "../../src/harness/index.js";
+} from "../../src/cli/render.js";
 
 function journalLine(
   run: string,
