@@ -3,7 +3,17 @@
   "version": "0.4.0",
   "description": "Simpler, opinionated loop harness for inspectable long-running agent workflows",
   "type": "module",
-  "main": "dist/main.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./cli": {
+      "default": "./dist/main.js"
+    }
+  },
   "bin": {
     "autoloop": "bin/autoloop"
   },

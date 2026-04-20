@@ -14,6 +14,29 @@ It’s early and still evolving. autoloop is not a replacement for ralph-orchest
 
 [![autoloop hero showing the CLI surface and local dashboard](docs/launches/autoloop-readme-hero.png)](docs/launches/autoloop-hybrid-launch-video-x.mp4)
 
+## Use as a library
+
+As of `0.5.0-sdk.0`, autoloop ships an embed-able runtime alongside the CLI. Pass an `AbortSignal` for cancellation and an `onEvent` callback to consume the structured event stream — no terminal output is produced unless you ask for it.
+
+```ts
+import { run, type LoopEvent } from "@mobrienv/autoloop";
+
+const controller = new AbortController();
+setTimeout(() => controller.abort(), 60_000);
+
+const summary = await run("./my-project", "build the login page", "autoloop", {
+  signal: controller.signal,
+  onEvent: (event: LoopEvent) => {
+    if (event.type === "iteration.start") console.log(`iter ${event.iteration}`);
+    if (event.type === "loop.finish") console.log(`done: ${event.stopReason}`);
+  },
+});
+
+console.log(summary); // { iterations, stopReason, runId }
+```
+
+The CLI entry (`bin/autoloop`) is still the primary interface; the library export is for agent frameworks and dashboards that want to drive loops in-process.
+
 ## Why autoloop exists
 
 ralph-orchestrator grew to include a lot of different experiments and ways of doing things. autoloop spins out a narrower set of ideas into something simpler and more opinionated.
