@@ -1,6 +1,6 @@
 # Autopreset
 
-Generate a new autoloop preset from a rough idea.
+Use when you want to scaffold a new autoloop preset from a rough idea.
 
 Shape:
 - designer — analyzes the idea, designs roles/events/handoffs

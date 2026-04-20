@@ -26,6 +26,7 @@ vi.mock("../../src/worktree/create.js", () => ({
     metaDir: "/tmp/fake-meta",
   })),
   resolveGitRoot: vi.fn((cwd: string) => cwd),
+  tryResolveGitRoot: vi.fn((cwd: string) => cwd),
 }));
 
 vi.mock("../../src/worktree/clean.js", () => ({

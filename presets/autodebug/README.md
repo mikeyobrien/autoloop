@@ -1,6 +1,6 @@
 # Autodebug
 
-Systematic debugging loop based on the [superpowers systematic-debugging skill](https://github.com/obra/superpowers/tree/main/skills/systematic-debugging).
+Use when you need a systematic, root-cause-first debugging loop based on the [superpowers systematic-debugging skill](https://github.com/obra/superpowers/tree/main/skills/systematic-debugging).
 
 Core philosophy: **NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST.**
 

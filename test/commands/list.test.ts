@@ -1,10 +1,24 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dispatchList } from "../../src/commands/list.js";
 
 const bundleRoot = resolve(import.meta.dirname, "../..");
 
 describe("dispatchList", () => {
+  // Isolate from user-level presets under $XDG_CONFIG_HOME/autoloop/presets
+  // which listKnownPresets() would otherwise union into the result.
+  const origXdg = process.env.XDG_CONFIG_HOME;
+  beforeAll(() => {
+    process.env.XDG_CONFIG_HOME = mkdtempSync(
+      resolve(tmpdir(), "autoloop-list-test-"),
+    );
+  });
+  afterAll(() => {
+    if (origXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = origXdg;
+  });
   it("prints each preset with its description", () => {
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => {
