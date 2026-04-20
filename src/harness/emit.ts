@@ -67,14 +67,23 @@ export function reservedParallelJoinedTopic(topic: string): boolean {
   return topic.endsWith(".parallel.joined");
 }
 
-export function emit(projectDir: string, topic: string, payload: string): void {
+export interface EmitResult {
+  ok: boolean;
+  topic?: string;
+  error?: string;
+}
+
+export function emit(
+  projectDir: string,
+  topic: string,
+  payload: string,
+): EmitResult {
   const journalFile = resolveEmitJournalFile(projectDir);
   mkdirSync(dirname(journalFile), { recursive: true });
   const validation = emitValidationContext(projectDir, journalFile);
 
   if (coordinationTopic(topic)) {
-    acceptEmit(journalFile, topic, payload, validation);
-    return;
+    return acceptEmit(journalFile, topic, payload, validation);
   }
 
   // Task completion gate: block completion if open tasks remain
@@ -82,8 +91,7 @@ export function emit(projectDir: string, topic: string, payload: string): void {
     const tasksFile = config.resolveTasksFile(projectDir);
     const openTasks = materializeOpenFrom(tasksFile);
     if (openTasks.length > 0) {
-      rejectTaskGate(journalFile, topic, openTasks, validation);
-      return;
+      return rejectTaskGate(journalFile, topic, openTasks, validation);
     }
   }
 
@@ -95,10 +103,9 @@ export function emit(projectDir: string, topic: string, payload: string): void {
       validation.completionEvent,
     )
   ) {
-    rejectEmit(journalFile, topic, validation);
-  } else {
-    acceptEmit(journalFile, topic, payload, validation);
+    return rejectEmit(journalFile, topic, validation);
   }
+  return acceptEmit(journalFile, topic, payload, validation);
 }
 
 export function invalidEvent(
@@ -255,7 +262,7 @@ function acceptEmit(
   topic: string,
   payload: string,
   validation: EmitValidation,
-): void {
+): EmitResult {
   appendAgentEvent(
     journalFile,
     validation.runId,
@@ -263,15 +270,14 @@ function acceptEmit(
     topic,
     payload,
   );
-  console.log(`emitted ${topic}`);
-  process.exitCode = 0;
+  return { ok: true, topic };
 }
 
 function rejectEmit(
   journalFile: string,
   topic: string,
   validation: EmitValidation,
-): void {
+): EmitResult {
   const message = invalidEmitMessage(topic, validation);
   appendInvalidEvent(
     journalFile,
@@ -282,8 +288,7 @@ function rejectEmit(
     validation.allowedRoles,
     validation.allowedEvents,
   );
-  process.stderr.write(`${message}\n`);
-  process.exitCode = 1;
+  return { ok: false, topic, error: message };
 }
 
 function invalidEmitMessage(topic: string, validation: EmitValidation): string {
@@ -336,7 +341,7 @@ function rejectTaskGate(
   topic: string,
   openTasks: TaskEntry[],
   validation: EmitValidation,
-): void {
+): EmitResult {
   appendEvent(
     journalFile,
     validation.runId,
@@ -348,10 +353,8 @@ function rejectTaskGate(
   );
 
   const taskLines = openTasks.map((t) => `  - [${t.id}] ${t.text}`).join("\n");
-  process.stderr.write(
-    `Cannot complete: ${openTasks.length} open tasks remain:\n${taskLines}\nComplete or remove these tasks before emitting ${topic}.\n`,
-  );
-  process.exitCode = 1;
+  const message = `Cannot complete: ${openTasks.length} open tasks remain:\n${taskLines}\nComplete or remove these tasks before emitting ${topic}.`;
+  return { ok: false, topic, error: message };
 }
 
 function truthySetting(value: string): boolean {

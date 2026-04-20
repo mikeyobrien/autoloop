@@ -24,6 +24,7 @@ export {
   type LayeredConfig,
   parseToml as parseConfigToml,
 } from "./config-schema.js";
+export type { EmitResult } from "./harness/emit.js";
 export type { LoopEvent, LoopEventEmitter } from "./harness/events.js";
 export { emit, run, runParallelBranchCli } from "./harness/index.js";
 export type {

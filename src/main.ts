@@ -37,17 +37,25 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "run":
       await dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
       return;
-    case "emit":
+    case "emit": {
       if (!args[1] || args[1] === "--help" || args[1] === "-h") {
         printEmitUsage();
         return;
       }
-      harness.emit(
+      const emitResult = harness.emit(
         resolveRuntimeProjectDir(),
         args[1],
         args.slice(2).join(" "),
       );
+      if (emitResult.ok) {
+        process.stdout.write(`emitted ${emitResult.topic}\n`);
+        process.exitCode = 0;
+      } else {
+        if (emitResult.error) process.stderr.write(`${emitResult.error}\n`);
+        process.exitCode = 1;
+      }
       return;
+    }
     case "list":
       dispatchList(args.slice(1), bundleRoot);
       return;

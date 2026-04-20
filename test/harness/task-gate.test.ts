@@ -46,19 +46,12 @@ describe("task completion gate", () => {
   it("blocks completion when open tasks remain", () => {
     addTask(dir, "unfinished work", "manual");
 
-    const stderrWrite = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
+    const result = emit(dir, "task.complete", "done");
 
-    emit(dir, "task.complete", "done");
-
-    expect(process.exitCode).toBe(1);
-    const output = stderrWrite.mock.calls.map((c) => c[0]).join("");
-    expect(output).toContain("Cannot complete");
-    expect(output).toContain("task-1");
-    expect(output).toContain("unfinished work");
-
-    stderrWrite.mockRestore();
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("Cannot complete");
+    expect(result.error).toContain("task-1");
+    expect(result.error).toContain("unfinished work");
 
     // Verify task.gate event was written to journal
     const journal = readFileSync(journalFile, "utf-8");
@@ -69,45 +62,32 @@ describe("task completion gate", () => {
     addTask(dir, "finished work", "manual");
     completeTask(dir, "task-1");
 
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = emit(dir, "task.complete", "all done");
 
-    emit(dir, "task.complete", "all done");
-
-    expect(process.exitCode).toBe(0);
-    consoleSpy.mockRestore();
+    expect(result.ok).toBe(true);
   });
 
   it("allows completion when no tasks file exists", () => {
-    // No tasks file at all — should pass through
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = emit(dir, "task.complete", "no tasks");
 
-    emit(dir, "task.complete", "no tasks");
-
-    expect(process.exitCode).toBe(0);
-    consoleSpy.mockRestore();
+    expect(result.ok).toBe(true);
   });
 
   it("allows completion when tasks are removed via tombstone", () => {
     addTask(dir, "removed work", "manual");
     removeTask(dir, "task-1", "not needed");
 
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = emit(dir, "task.complete", "clean");
 
-    emit(dir, "task.complete", "clean");
-
-    expect(process.exitCode).toBe(0);
-    consoleSpy.mockRestore();
+    expect(result.ok).toBe(true);
   });
 
   it("does not gate non-completion events", () => {
     addTask(dir, "open task", "manual");
     vi.stubEnv("AUTOLOOP_ALLOWED_EVENTS", "");
 
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = emit(dir, "research.complete", "partial progress");
 
-    emit(dir, "research.complete", "partial progress");
-
-    expect(process.exitCode).toBe(0);
-    consoleSpy.mockRestore();
+    expect(result.ok).toBe(true);
   });
 });
