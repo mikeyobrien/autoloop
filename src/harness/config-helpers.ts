@@ -513,6 +513,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
         : {}),
     },
     agentMap: loadAgentMap(pd),
+    onEvent: loop.onEvent,
   };
   return applyRuntimeModeOverrides(updated);
 }

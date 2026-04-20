@@ -194,6 +194,7 @@ export function log(loop: LoopContext, level: string, message: string): void {
   if (messageRank >= currentRank) {
     process.stderr.write(`[autoloops] [${level}] ${message}\n`);
   }
+  loop.onEvent?.({ type: "log", level, message });
 }
 
 export function printProjectedMarkdown(text: string, _format: string): void {

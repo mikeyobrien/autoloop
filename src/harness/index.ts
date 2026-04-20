@@ -72,6 +72,7 @@ export function run(
     selfCommand,
     runOptions,
   );
+  loop.onEvent = runOptions.onEvent;
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
@@ -155,6 +156,12 @@ export function run(
         runId: ctx.runtime.runId,
       };
     currentIteration = iter;
+    ctx.onEvent?.({
+      type: "iteration.start",
+      iteration: iter,
+      maxIterations: ctx.limits.maxIterations,
+      runId: ctx.runtime.runId,
+    });
     return iterateWith(ctx, iter, trackedIterate);
   };
   try {
@@ -236,6 +243,12 @@ export function run(
   }
 
   printSummary(summary, loop);
+  loop.onEvent?.({
+    type: "loop.finish",
+    iterations: summary.iterations,
+    stopReason: summary.stopReason,
+    runId: loop.runtime.runId,
+  });
   return { ...summary, runId: loop.runtime.runId };
 }
 

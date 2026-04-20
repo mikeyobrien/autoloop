@@ -1,6 +1,7 @@
 import type { AgentMap } from "../agent-map.js";
 import type { KiroSessionHandle } from "../backend/kiro-bridge.js";
 import type * as topo from "../topology.js";
+import type { LoopEventEmitter } from "./events.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
 
@@ -87,6 +88,8 @@ export interface LoopContext {
   agentMap: AgentMap | null;
   kiroSession?: KiroSessionHandle;
   lastVerdict?: Verdict;
+  /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
+  onEvent?: LoopEventEmitter;
 }
 
 export interface RunOptions {
@@ -112,6 +115,11 @@ export interface RunOptions {
    * and no signal-handling is installed.
    */
   signal?: AbortSignal;
+  /**
+   * Optional structured-event listener. Emitted alongside the existing
+   * terminal output; SDK consumers can drive custom UIs from this stream.
+   */
+  onEvent?: LoopEventEmitter;
 }
 
 export interface RunSummary {
