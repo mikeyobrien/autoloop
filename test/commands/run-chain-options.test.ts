@@ -93,6 +93,37 @@ describe("runInlineChain option propagation", () => {
     ]);
   });
 
+  it("forwards -b backend override through to chains.runChain", () => {
+    dispatchRun(
+      ["--chain", "autocode,autoqa", "-b", "pi", "."],
+      [],
+      ".",
+      "autoloop",
+    );
+
+    expect(chains.runChain).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(chains.runChain).mock.calls[0];
+    const runOptions = callArgs[3];
+
+    expect(runOptions.backendOverride).toBeDefined();
+    expect(runOptions.backendOverride.kind).toBe("pi");
+  });
+
+  it("omits backendOverride when -b is not specified", () => {
+    dispatchRun(
+      ["--chain", "autocode,autoqa", "."],
+      [],
+      ".",
+      "autoloop",
+    );
+
+    expect(chains.runChain).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(chains.runChain).mock.calls[0];
+    const runOptions = callArgs[3];
+
+    expect(runOptions.backendOverride).toBeUndefined();
+  });
+
   it("forwards --no-worktree through to chains.runChain", () => {
     dispatchRun(
       ["--chain", "autocode,autoqa", "--no-worktree", "."],
