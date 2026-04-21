@@ -339,6 +339,8 @@ export function appendBackendStart(
       ", " +
       jsonField("command", loop.backend.command) +
       ", " +
+      jsonField("args", joinCsv(loop.backend.args)) +
+      ", " +
       jsonField("prompt_mode", loop.backend.promptMode) +
       ", " +
       jsonField("timeout_ms", String(loop.backend.timeoutMs)),
