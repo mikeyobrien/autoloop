@@ -341,5 +341,6 @@ function chainableOptions(opts: RunOptions): Record<string, unknown> {
     mergeStrategy: opts.mergeStrategy,
     automerge: opts.automerge || undefined,
     keepWorktree: opts.keepWorktree || undefined,
+    backendOverride: Object.keys(opts.backendOverride).length > 0 ? opts.backendOverride : undefined,
   };
 }
