@@ -1,4 +1,4 @@
-import * as memory from "../memory.js";
+import * as memory from "@mobrienv/autoloop-core/memory";
 import { printMemoryAddUsage, printMemoryUsage } from "../usage.js";
 
 export function dispatchMemory(args: string[]): boolean {

@@ -1,5 +1,5 @@
+import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
 import type * as topo from "@mobrienv/autoloop-core/topology";
-import type { AgentMap } from "../agent-map.js";
 import type { KiroSessionHandle } from "../backend/kiro-bridge.js";
 import type { LoopEventEmitter } from "./events.js";
 

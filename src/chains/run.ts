@@ -7,13 +7,13 @@ import {
   jsonField,
   uniqueGeneratedId,
 } from "@mobrienv/autoloop-core";
+import * as config from "@mobrienv/autoloop-core/config";
 import {
   appendText,
   extractField,
   extractTopic,
   readLines,
 } from "@mobrienv/autoloop-core/journal";
-import * as config from "../config.js";
 import * as harness from "../harness/index.js";
 import { presetCategory } from "../isolation/resolve.js";
 import { checkBudget, defaultBudget } from "./budget.js";

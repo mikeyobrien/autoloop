@@ -5,6 +5,7 @@
 // stdout. They are NOT part of the embedded SDK surface: SDK consumers read
 // journals directly or via packages/core readers in Phase 2.
 
+import * as config from "@mobrienv/autoloop-core/config";
 import {
   readAllJournals,
   readIfExists,
@@ -12,7 +13,6 @@ import {
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
 import { formatTimeline } from "@mobrienv/autoloop-core/journal-format";
-import * as config from "../config.js";
 import { collectArtifacts, formatArtifacts } from "../harness/artifacts.js";
 import {
   emptyFallback,

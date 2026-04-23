@@ -6,16 +6,16 @@ import {
   listText,
   splitCsv,
 } from "@mobrienv/autoloop-core";
+import * as config from "@mobrienv/autoloop-core/config";
 import {
   appendAgentEvent,
   appendEvent,
   latestIterationForRun,
   latestRunId,
 } from "@mobrienv/autoloop-core/journal";
+import type { TaskEntry } from "@mobrienv/autoloop-core/tasks";
+import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
-import * as config from "../config.js";
-import type { TaskEntry } from "../tasks.js";
-import { materializeOpenFrom } from "../tasks.js";
 
 const COORDINATION_TOPICS = new Set([
   "issue.discovered",

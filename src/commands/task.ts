@@ -1,4 +1,4 @@
-import * as tasks from "../tasks.js";
+import * as tasks from "@mobrienv/autoloop-core/tasks";
 import { printTaskUsage } from "../usage.js";
 
 export function dispatchTask(args: string[]): boolean {

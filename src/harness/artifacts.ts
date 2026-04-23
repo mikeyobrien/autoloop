@@ -8,9 +8,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import type { JournalEvent } from "@mobrienv/autoloop-core";
 import { decodeEvent } from "@mobrienv/autoloop-core";
+import * as config from "@mobrienv/autoloop-core/config";
 import { topicCategory } from "@mobrienv/autoloop-core/journal-format";
-import * as config from "../config.js";
-import * as memory from "../memory.js";
+import * as memory from "@mobrienv/autoloop-core/memory";
 
 export interface DocumentArtifact {
   path: string;

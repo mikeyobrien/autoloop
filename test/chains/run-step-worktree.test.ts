@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Per RFC: "The automerge preset must run in the main tree."
  */
 
-vi.mock("../../src/config.js", () => ({
+vi.mock("@mobrienv/autoloop-core/config", () => ({
   loadProject: vi.fn(() => ({})),
   get: vi.fn(() => "compact"),
   stateDirPath: vi.fn(() => "/tmp/test-chain-state"),

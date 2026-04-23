@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import * as config from "../config.js";
+import * as config from "@mobrienv/autoloop-core/config";
 
 export function dispatchConfig(args: string[]): boolean {
   const sub = args[0] ?? "";

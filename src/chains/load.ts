@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import TOML from "@iarna/toml";
 import { parseStringList } from "@mobrienv/autoloop-core";
-import * as config from "../config.js";
+import * as config from "@mobrienv/autoloop-core/config";
 import { defaultBudget, parseBudgetFromToml } from "./budget.js";
 import type {
   Budget,

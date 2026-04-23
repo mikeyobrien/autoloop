@@ -14,6 +14,8 @@ import {
   splitCsv,
   uniqueGeneratedId,
 } from "@mobrienv/autoloop-core";
+import { loadAgentMap } from "@mobrienv/autoloop-core/agent-map";
+import * as config from "@mobrienv/autoloop-core/config";
 import {
   extractField,
   extractIteration,
@@ -23,12 +25,10 @@ import {
   readRunLines,
   resolveRunJournalPath,
 } from "@mobrienv/autoloop-core/journal";
+import * as profiles from "@mobrienv/autoloop-core/profiles";
 import * as topo from "@mobrienv/autoloop-core/topology";
-import { loadAgentMap } from "../agent-map.js";
-import * as config from "../config.js";
 import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
 import { createRunScopedDir } from "../isolation/run-scope.js";
-import * as profiles from "../profiles.js";
 import { activeRuns } from "../registry/read.js";
 import {
   createWorktree,

@@ -25,6 +25,34 @@
     "./config-schema": {
       "types": "./dist/config-schema.d.ts",
       "default": "./dist/config-schema.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./agent-map": {
+      "types": "./dist/agent-map.d.ts",
+      "default": "./dist/agent-map.js"
+    },
+    "./profiles": {
+      "types": "./dist/profiles.d.ts",
+      "default": "./dist/profiles.js"
+    },
+    "./tasks": {
+      "types": "./dist/tasks.d.ts",
+      "default": "./dist/tasks.js"
+    },
+    "./memory": {
+      "types": "./dist/memory.d.ts",
+      "default": "./dist/memory.js"
+    },
+    "./memory-render": {
+      "types": "./dist/memory-render.d.ts",
+      "default": "./dist/memory-render.js"
+    },
+    "./tasks-render": {
+      "types": "./dist/tasks-render.d.ts",
+      "default": "./dist/tasks-render.js"
     }
   },
   "files": [

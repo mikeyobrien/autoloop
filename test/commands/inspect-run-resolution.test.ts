@@ -14,7 +14,7 @@ vi.mock("../../src/harness/emit.js", () => ({
   emit: vi.fn(),
 }));
 
-vi.mock("../../src/config.js", () => ({
+vi.mock("@mobrienv/autoloop-core/config", () => ({
   loadProject: vi.fn(() => ({
     core: { state_dir: ".autoloop" },
   })),

@@ -1,9 +1,9 @@
+import * as config from "@mobrienv/autoloop-core/config";
 import {
   extractField,
   extractTopic,
   readLines,
 } from "@mobrienv/autoloop-core/journal";
-import * as config from "../config.js";
 
 export function renderChainState(projectDir: string): string {
   const journalFile = config.resolveJournalFile(projectDir);

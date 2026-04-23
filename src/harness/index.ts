@@ -1,5 +1,6 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import * as config from "@mobrienv/autoloop-core/config";
 import { readIfExists } from "@mobrienv/autoloop-core/journal";
 import type { AcpClientOptions } from "../backend/acp-client.js";
 import {
@@ -7,7 +8,6 @@ import {
   signalInterrupt,
   terminateKiroSession,
 } from "../backend/kiro-bridge.js";
-import * as config from "../config.js";
 import { registryStart, registryStop } from "../registry/harness.js";
 import { cleanWorktrees } from "../worktree/clean.js";
 import { mergeWorktree } from "../worktree/merge.js";

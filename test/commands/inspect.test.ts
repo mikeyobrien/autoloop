@@ -16,7 +16,7 @@ vi.mock("../../src/cli/render.js", () => ({
   renderOutput: vi.fn(),
 }));
 
-vi.mock("../../src/memory.js", () => ({
+vi.mock("@mobrienv/autoloop-core/memory", () => ({
   rawProject: vi.fn(() => "{}"),
   listProject: vi.fn(() => ""),
 }));
@@ -25,7 +25,7 @@ vi.mock("../../src/chains.js", () => ({
   renderChainState: vi.fn(() => ""),
 }));
 
-vi.mock("../../src/config.js", () => ({
+vi.mock("@mobrienv/autoloop-core/config", () => ({
   loadProject: vi.fn(() => ({})),
   getProfileDefaults: vi.fn(() => []),
   stateDirPath: vi.fn((d: string) => `${d}/.autoloop`),
@@ -36,7 +36,7 @@ vi.mock("@mobrienv/autoloop-core/topology", () => ({
   renderTopologyInspect: vi.fn(),
 }));
 
-vi.mock("../../src/profiles.js", () => ({
+vi.mock("@mobrienv/autoloop-core/profiles", () => ({
   resolveProfileFragments: vi.fn(() => ({
     fragments: new Map(),
     warnings: [],

@@ -12,6 +12,7 @@
 //     onEvent: (e: LoopEvent) => console.log(e.type),
 //   });
 
+export { loadProject as loadProjectConfig } from "@mobrienv/autoloop-core/config";
 // Pure config helpers, for consumers who want to inspect merged config
 // without re-implementing the schema layer.
 export {
@@ -23,7 +24,6 @@ export {
   type LayeredConfig,
   parseToml as parseConfigToml,
 } from "@mobrienv/autoloop-core/config-schema";
-export { loadProject as loadProjectConfig } from "./config.js";
 export type { EmitResult } from "./harness/emit.js";
 export type { LoopEvent, LoopEventEmitter } from "./harness/events.js";
 export { emit, run, runParallelBranchCli } from "./harness/index.js";

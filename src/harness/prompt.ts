@@ -1,4 +1,5 @@
 import { joinCsv, listText } from "@mobrienv/autoloop-core";
+import { resolveRoleAgent } from "@mobrienv/autoloop-core/agent-map";
 import {
   appendHarnessEvent,
   extractField,
@@ -7,12 +8,11 @@ import {
   readLines,
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
+import * as memory from "@mobrienv/autoloop-core/memory";
+import type { TwoTierMemoryStats } from "@mobrienv/autoloop-core/memory-render";
+import { materialize as materializeTasks } from "@mobrienv/autoloop-core/tasks";
+import { renderTasksPrompt } from "@mobrienv/autoloop-core/tasks-render";
 import * as topology from "@mobrienv/autoloop-core/topology";
-import { resolveRoleAgent } from "../agent-map.js";
-import * as memory from "../memory.js";
-import type { TwoTierMemoryStats } from "../memory-render.js";
-import { materialize as materializeTasks } from "../tasks.js";
-import { renderTasksPrompt } from "../tasks-render.js";
 import {
   coordinationTopic,
   coreSystemTopic,

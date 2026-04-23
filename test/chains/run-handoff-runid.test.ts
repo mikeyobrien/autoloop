@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let writeFileCalls: Array<[string, string]> = [];
 
-vi.mock("../../src/config.js", () => ({
+vi.mock("@mobrienv/autoloop-core/config", () => ({
   loadProject: vi.fn(() => ({})),
   get: vi.fn(() => "compact"),
   stateDirPath: vi.fn(() => "/tmp/test-chain-state"),

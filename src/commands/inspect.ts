@@ -1,11 +1,11 @@
 import { basename } from "node:path";
+import * as config from "@mobrienv/autoloop-core/config";
+import * as memory from "@mobrienv/autoloop-core/memory";
+import * as profiles from "@mobrienv/autoloop-core/profiles";
+import * as tasks from "@mobrienv/autoloop-core/tasks";
 import * as topo from "@mobrienv/autoloop-core/topology";
 import * as chains from "../chains.js";
 import * as render from "../cli/render.js";
-import * as config from "../config.js";
-import * as memory from "../memory.js";
-import * as profiles from "../profiles.js";
-import * as tasks from "../tasks.js";
 import { printInspectUsage } from "../usage.js";
 
 const INSPECT_TARGETS = [
