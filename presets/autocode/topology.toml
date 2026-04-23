@@ -24,7 +24,7 @@ prompt_file = "roles/finalizer.md"
 [handoff]
 "loop.start" = ["planner"]
 "queue.advance" = ["planner"]
-"build.blocked" = ["planner"]
+"build.blocked" = ["planner", "finalizer"]
 "tasks.ready" = ["builder"]
 "review.ready" = ["critic"]
 "review.rejected" = ["builder"]
