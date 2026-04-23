@@ -7,19 +7,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * the inline automerge in harness/index.ts must not fire for chain steps.
  */
 
-vi.mock("../../src/worktree/merge.js", () => ({
+vi.mock("@mobrienv/autoloop-core/worktree", () => ({
   mergeWorktree: vi.fn(),
-}));
-
-vi.mock("../../src/worktree/meta.js", () => ({
   updateStatus: vi.fn(),
   readMeta: vi.fn(() => ({ merge_strategy: "squash" })),
   metaDirForRun: vi.fn((_dir: string, _runId: string) => "/tmp/fake-meta"),
   writeMeta: vi.fn(),
   isOrphanWorktree: vi.fn(() => false),
-}));
-
-vi.mock("../../src/worktree/create.js", () => ({
   createWorktree: vi.fn(() => ({
     worktreePath: "/tmp/fake-worktree",
     branch: "autoloop/fake-run",
@@ -27,14 +21,8 @@ vi.mock("../../src/worktree/create.js", () => ({
   })),
   resolveGitRoot: vi.fn((cwd: string) => cwd),
   tryResolveGitRoot: vi.fn((cwd: string) => cwd),
-}));
-
-vi.mock("../../src/worktree/clean.js", () => ({
   cleanWorktrees: vi.fn(),
-}));
-
-vi.mock("../../src/worktree/merge.js", () => ({
-  mergeWorktree: vi.fn(),
+  listWorktreeMetas: vi.fn(() => []),
 }));
 
 vi.mock("../../src/harness/iteration.js", () => ({
@@ -73,8 +61,8 @@ vi.mock("../../src/harness/parallel.js", () => ({
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { mergeWorktree } from "@mobrienv/autoloop-core/worktree";
 import { run } from "../../src/harness/index.js";
-import { mergeWorktree } from "../../src/worktree/merge.js";
 
 function makeProject(configToml = ""): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-ts-automerge-chain-"));

@@ -8,6 +8,7 @@ import {
   uniqueGeneratedId,
 } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
+import { presetCategory } from "@mobrienv/autoloop-core/isolation/resolve";
 import {
   appendText,
   extractField,
@@ -15,7 +16,6 @@ import {
   readLines,
 } from "@mobrienv/autoloop-core/journal";
 import * as harness from "../harness/index.js";
-import { presetCategory } from "../isolation/resolve.js";
 import { checkBudget, defaultBudget } from "./budget.js";
 import { parseInlineChain } from "./load.js";
 import type {

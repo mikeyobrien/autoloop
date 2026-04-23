@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { LoopContext } from "../../src/harness/types.js";
 import {
@@ -9,7 +10,6 @@ import {
   registryStart,
   registryStop,
 } from "../../src/registry/harness.js";
-import type { RunRecord } from "../../src/registry/types.js";
 
 let tmpDir: string;
 let regPath: string;

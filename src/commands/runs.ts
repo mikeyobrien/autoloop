@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { parseFlag } from "@mobrienv/autoloop-core";
-import { cleanRunScopedDirs } from "../isolation/run-scope.js";
-import { activeRuns } from "../registry/read.js";
+import { cleanRunScopedDirs } from "@mobrienv/autoloop-core/isolation/run-scope";
+import { activeRuns } from "@mobrienv/autoloop-core/registry/read";
 
 const DEFAULT_MAX_AGE_DAYS = 7;
 

@@ -1,6 +1,6 @@
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { describe, expect, it } from "vitest";
 import { categorizeRecords } from "../../src/loops/health.js";
-import type { RunRecord } from "../../src/registry/types.js";
 
 function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
   return {

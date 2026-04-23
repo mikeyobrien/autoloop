@@ -1,5 +1,5 @@
-import { basename, join } from "node:path";
-import { shellQuote } from "@mobrienv/autoloop-core";
+import { join } from "node:path";
+import { normalizeBackendLabel, shellQuote } from "@mobrienv/autoloop-core";
 import { buildCommandInvocation, runShellCommand } from "./run-command.js";
 import { mockBackend } from "./run-mock.js";
 import { buildPiAdapterInvocation } from "./run-pi.js";
@@ -11,14 +11,7 @@ export type {
   BackendSpec,
 } from "./types.js";
 
-export function normalizeBackendLabel(command: string): string {
-  if (!command) return "";
-  const base = basename(command);
-  if (base === "claude") return "claude";
-  if (base === "pi") return "pi";
-  if (base === "kiro-cli") return "kiro";
-  return base || command;
-}
+export { normalizeBackendLabel };
 
 export function buildBackendShellCommand(ctx: BackendCommandContext): string {
   const promptPath = join(ctx.loop.paths.stateDir, "active-prompt.md");

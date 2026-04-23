@@ -1,5 +1,6 @@
-import { readMergedRegistry } from "../registry/discover.js";
-import type { RunRecord } from "../registry/types.js";
+import { isProcessAlive } from "@mobrienv/autoloop-core";
+import { readMergedRegistry } from "@mobrienv/autoloop-core/registry/discover";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { policyForPreset } from "./policy.js";
 import { renderListHeader, renderRunLine } from "./render.js";
 
@@ -80,15 +81,6 @@ function elapsedMs(r: RunRecord, nowMs: number): number | null {
   const updatedMs = new Date(r.updated_at).getTime();
   if (Number.isNaN(updatedMs)) return null;
   return nowMs - updatedMs;
-}
-
-export function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function isRecent(r: RunRecord, nowMs: number): boolean {

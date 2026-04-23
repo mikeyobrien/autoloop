@@ -35,7 +35,7 @@ vi.mock("../../src/harness/index.js", () => ({
   }),
 }));
 
-vi.mock("../../src/isolation/resolve.js", () => ({
+vi.mock("@mobrienv/autoloop-core/isolation/resolve", () => ({
   presetCategory: vi.fn((name: string) => {
     if (name === "automerge") return "planning";
     return "code";

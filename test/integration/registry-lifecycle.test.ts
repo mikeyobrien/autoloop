@@ -1,6 +1,6 @@
 import { join } from "node:path";
+import { readRegistry } from "@mobrienv/autoloop-core/registry/read";
 import { beforeAll, describe, expect, it } from "vitest";
-import { readRegistry } from "../../src/registry/read.js";
 import {
   ensureBuild,
   FIXTURES_DIR,

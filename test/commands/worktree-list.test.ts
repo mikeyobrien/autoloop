@@ -1,10 +1,10 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { WorktreeMeta } from "@mobrienv/autoloop-core/worktree";
+import { writeMeta } from "@mobrienv/autoloop-core/worktree";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchWorktree } from "../../src/commands/worktree.js";
-import type { WorktreeMeta } from "../../src/worktree/meta.js";
-import { writeMeta } from "../../src/worktree/meta.js";
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "autoloop-ts-wt-cmd-"));

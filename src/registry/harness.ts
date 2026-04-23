@@ -1,9 +1,12 @@
-import { normalizeBackendLabel } from "../backend/index.js";
+import { normalizeBackendLabel } from "@mobrienv/autoloop-core";
+import { stopReasonToStatus } from "@mobrienv/autoloop-core/registry/derive";
+import { getRun } from "@mobrienv/autoloop-core/registry/read";
+import type {
+  RegistryStatus,
+  RunRecord,
+} from "@mobrienv/autoloop-core/registry/types";
+import { appendRegistryEntry } from "@mobrienv/autoloop-core/registry/update";
 import type { LoopContext } from "../harness/types.js";
-import { stopReasonToStatus } from "./derive.js";
-import { getRun } from "./read.js";
-import type { RegistryStatus, RunRecord } from "./types.js";
-import { appendRegistryEntry } from "./update.js";
 
 function registryPath(loop: LoopContext): string {
   return loop.paths.registryFile;

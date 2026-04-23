@@ -1,4 +1,4 @@
-import type { RunRecord } from "../registry/types.js";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 
 /**
  * Render a concise one-line summary for a run record.

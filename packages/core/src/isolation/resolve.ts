@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolvePresetDir } from "../chains/load.js";
+import { resolvePresetDir } from "@mobrienv/autoloop-core";
 import type { RunRecord } from "../registry/types.js";
 
 export type IsolationMode = "shared" | "run-scoped" | "worktree";

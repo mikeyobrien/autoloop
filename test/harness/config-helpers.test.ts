@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { describe, expect, it } from "vitest";
 import {
   buildLoopContext,
@@ -9,7 +10,6 @@ import {
   reloadLoop,
   resolveProcessKind,
 } from "../../src/harness/config-helpers.js";
-import type { RunRecord } from "../../src/registry/types.js";
 
 function makeProject(
   configToml: string,

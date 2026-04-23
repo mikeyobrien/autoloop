@@ -1,9 +1,9 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { showArtifacts, showRun } from "../../src/loops/show.js";
-import type { RunRecord } from "../../src/registry/types.js";
 
 function makeRecord(id: string, preset = "autocode"): RunRecord {
   return {

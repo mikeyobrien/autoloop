@@ -1,4 +1,7 @@
-import { mergedActiveRuns, readMergedRegistry } from "../registry/discover.js";
+import {
+  mergedActiveRuns,
+  readMergedRegistry,
+} from "@mobrienv/autoloop-core/registry/discover";
 import { renderListHeader, renderRunLine } from "./render.js";
 
 /**

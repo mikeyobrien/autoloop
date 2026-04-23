@@ -17,6 +17,11 @@ import {
 import { loadAgentMap } from "@mobrienv/autoloop-core/agent-map";
 import * as config from "@mobrienv/autoloop-core/config";
 import {
+  presetCategory,
+  resolveIsolationMode,
+} from "@mobrienv/autoloop-core/isolation/resolve";
+import { createRunScopedDir } from "@mobrienv/autoloop-core/isolation/run-scope";
+import {
   extractField,
   extractIteration,
   extractTopic,
@@ -26,15 +31,13 @@ import {
   resolveRunJournalPath,
 } from "@mobrienv/autoloop-core/journal";
 import * as profiles from "@mobrienv/autoloop-core/profiles";
+import { activeRuns } from "@mobrienv/autoloop-core/registry/read";
 import * as topo from "@mobrienv/autoloop-core/topology";
-import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
-import { createRunScopedDir } from "../isolation/run-scope.js";
-import { activeRuns } from "../registry/read.js";
 import {
   createWorktree,
   resolveGitRoot,
   tryResolveGitRoot,
-} from "../worktree/create.js";
+} from "@mobrienv/autoloop-core/worktree";
 import { emitToolScript, piAdapterScript } from "./tools.js";
 import type { LoopContext, RunOptions } from "./types.js";
 

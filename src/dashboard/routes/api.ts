@@ -7,13 +7,13 @@ import {
   readRunLines,
   resolveRunJournalPath,
 } from "@mobrienv/autoloop-core/journal";
+import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
+import { metaDirForRun, readMeta } from "@mobrienv/autoloop-core/worktree";
 import { Hono } from "hono";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
 import { collectArtifacts } from "../../harness/artifacts.js";
 import { categorizeRuns } from "../../loops/health.js";
-import { mergedFindRunByPrefix } from "../../registry/discover.js";
-import type { RunRecord } from "../../registry/types.js";
-import { metaDirForRun, readMeta } from "../../worktree/meta.js";
 import type { DashboardContext } from "../app.js";
 
 function enrichWithWorktreeMeta(stateDir: string, record: RunRecord): void {

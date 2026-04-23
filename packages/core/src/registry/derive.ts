@@ -1,5 +1,8 @@
-import { decodeEvent, splitCsv } from "@mobrienv/autoloop-core";
-import { normalizeBackendLabel } from "../backend/index.js";
+import {
+  decodeEvent,
+  normalizeBackendLabel,
+  splitCsv,
+} from "@mobrienv/autoloop-core";
 import type { RegistryStatus, RunRecord } from "./types.js";
 
 /**

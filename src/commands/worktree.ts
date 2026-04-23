@@ -1,11 +1,14 @@
 import { join } from "node:path";
 import { parseFlag } from "@mobrienv/autoloop-core";
+import type { MergeOpts } from "@mobrienv/autoloop-core/worktree";
+import {
+  cleanWorktrees,
+  isOrphanWorktree,
+  listWorktreeMetas,
+  mergeWorktree,
+  readMeta,
+} from "@mobrienv/autoloop-core/worktree";
 import { formatTime } from "../loops/render.js";
-import { cleanWorktrees } from "../worktree/clean.js";
-import { listWorktreeMetas } from "../worktree/list.js";
-import type { MergeOpts } from "../worktree/merge.js";
-import { mergeWorktree } from "../worktree/merge.js";
-import { isOrphanWorktree, readMeta } from "../worktree/meta.js";
 
 export function dispatchWorktree(args: string[]): void {
   const projectDir = resolveProjectDir();

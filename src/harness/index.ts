@@ -2,6 +2,12 @@ import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readIfExists } from "@mobrienv/autoloop-core/journal";
+import {
+  cleanWorktrees,
+  mergeWorktree,
+  readMeta,
+  updateStatus as updateWorktreeStatus,
+} from "@mobrienv/autoloop-core/worktree";
 import type { AcpClientOptions } from "../backend/acp-client.js";
 import {
   initKiroSession,
@@ -9,12 +15,6 @@ import {
   terminateKiroSession,
 } from "../backend/kiro-bridge.js";
 import { registryStart, registryStop } from "../registry/harness.js";
-import { cleanWorktrees } from "../worktree/clean.js";
-import { mergeWorktree } from "../worktree/merge.js";
-import {
-  readMeta,
-  updateStatus as updateWorktreeStatus,
-} from "../worktree/meta.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,

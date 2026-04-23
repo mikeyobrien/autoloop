@@ -53,6 +53,58 @@
     "./tasks-render": {
       "types": "./dist/tasks-render.d.ts",
       "default": "./dist/tasks-render.js"
+    },
+    "./registry": {
+      "types": "./dist/registry/index.d.ts",
+      "default": "./dist/registry/index.js"
+    },
+    "./registry/discover": {
+      "types": "./dist/registry/discover.d.ts",
+      "default": "./dist/registry/discover.js"
+    },
+    "./registry/read": {
+      "types": "./dist/registry/read.d.ts",
+      "default": "./dist/registry/read.js"
+    },
+    "./registry/types": {
+      "types": "./dist/registry/types.d.ts",
+      "default": "./dist/registry/types.js"
+    },
+    "./registry/derive": {
+      "types": "./dist/registry/derive.d.ts",
+      "default": "./dist/registry/derive.js"
+    },
+    "./registry/rebuild": {
+      "types": "./dist/registry/rebuild.d.ts",
+      "default": "./dist/registry/rebuild.js"
+    },
+    "./registry/update": {
+      "types": "./dist/registry/update.d.ts",
+      "default": "./dist/registry/update.js"
+    },
+    "./worktree": {
+      "types": "./dist/worktree/index.d.ts",
+      "default": "./dist/worktree/index.js"
+    },
+    "./worktree/create": {
+      "types": "./dist/worktree/create.d.ts",
+      "default": "./dist/worktree/create.js"
+    },
+    "./worktree/meta": {
+      "types": "./dist/worktree/meta.d.ts",
+      "default": "./dist/worktree/meta.js"
+    },
+    "./isolation": {
+      "types": "./dist/isolation/index.d.ts",
+      "default": "./dist/isolation/index.js"
+    },
+    "./isolation/resolve": {
+      "types": "./dist/isolation/resolve.d.ts",
+      "default": "./dist/isolation/resolve.js"
+    },
+    "./isolation/run-scope": {
+      "types": "./dist/isolation/run-scope.d.ts",
+      "default": "./dist/isolation/run-scope.js"
     }
   },
   "files": [

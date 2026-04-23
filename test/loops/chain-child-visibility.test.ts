@@ -1,12 +1,12 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { healthSummary } from "../../src/loops/health.js";
 import { listRuns } from "../../src/loops/list.js";
 import { showRun } from "../../src/loops/show.js";
 import { watchRun } from "../../src/loops/watch.js";
-import type { RunRecord } from "../../src/registry/types.js";
 
 function makeRecord(overrides: Partial<RunRecord> = {}): RunRecord {
   const now = new Date();

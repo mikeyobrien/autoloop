@@ -1,5 +1,5 @@
-import { mergedFindRunByPrefix } from "../registry/discover.js";
-import type { RunRecord } from "../registry/types.js";
+import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { renderArtifacts, renderRunDetail } from "./render.js";
 
 /**

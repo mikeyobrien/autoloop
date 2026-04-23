@@ -11,6 +11,7 @@ export * from "./events/decode.js";
 export * from "./events/encode.js";
 export * from "./events/guards.js";
 export * from "./events/types.js";
+export * from "./helpers.js";
 export * from "./json.js";
 export * from "./markdown.js";
 export * from "./utils.js";

@@ -13,15 +13,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  *   - tears down cleanly when aborted mid-run (no further iterations)
  */
 
-vi.mock("../../src/worktree/merge.js", () => ({ mergeWorktree: vi.fn() }));
-vi.mock("../../src/worktree/meta.js", () => ({
+vi.mock("@mobrienv/autoloop-core/worktree", () => ({
+  mergeWorktree: vi.fn(),
   updateStatus: vi.fn(),
   readMeta: vi.fn(() => null),
   metaDirForRun: vi.fn(() => "/tmp/fake-meta"),
   writeMeta: vi.fn(),
   isOrphanWorktree: vi.fn(() => false),
-}));
-vi.mock("../../src/worktree/create.js", () => ({
   createWorktree: vi.fn(() => ({
     worktreePath: "/tmp/fake-worktree",
     branch: "autoloop/fake-run",
@@ -29,8 +27,9 @@ vi.mock("../../src/worktree/create.js", () => ({
   })),
   resolveGitRoot: vi.fn((cwd: string) => cwd),
   tryResolveGitRoot: vi.fn((cwd: string) => cwd),
+  cleanWorktrees: vi.fn(),
+  listWorktreeMetas: vi.fn(() => []),
 }));
-vi.mock("../../src/worktree/clean.js", () => ({ cleanWorktrees: vi.fn() }));
 
 const runIteration = vi.hoisted(() =>
   vi.fn((_loop: unknown, _iter: number, _recurse: unknown) => ({

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import TOML from "@iarna/toml";
-import { parseStringList } from "@mobrienv/autoloop-core";
+import { parseStringList, resolvePresetDir } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { defaultBudget, parseBudgetFromToml } from "./budget.js";
 import type {
@@ -58,15 +58,7 @@ export function loadBudget(projectDir: string): Budget {
   return parseBudgetFromToml(parsed.budget);
 }
 
-export function resolvePresetDir(name: string, projectDir: string): string {
-  const candidate = join(projectDir, `presets/${name}`);
-  if (existsSync(candidate)) return candidate;
-  const cwdCandidate = join(".", `presets/${name}`);
-  if (existsSync(cwdCandidate)) return cwdCandidate;
-  const userCandidate = join(config.userPresetsDir(), name);
-  if (existsSync(userCandidate)) return userCandidate;
-  return name;
-}
+export { resolvePresetDir };
 
 export function listKnownPresets(): string[] {
   const builtIn = [
