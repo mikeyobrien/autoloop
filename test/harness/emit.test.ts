@@ -5,6 +5,7 @@ import {
   dispatchParallelJoinBase,
   dispatchParallelJoinedTopic,
   invalidEvent,
+  operatorTopic,
   parallelDispatchBase,
   parallelJoinedTopic,
   parallelTopic,
@@ -25,6 +26,19 @@ describe("coordinationTopic", () => {
     expect(coordinationTopic("task.complete")).toBe(false);
     expect(coordinationTopic("loop.start")).toBe(false);
     expect(coordinationTopic("")).toBe(false);
+  });
+});
+
+describe("operatorTopic", () => {
+  it("recognizes operator topics", () => {
+    expect(operatorTopic("operator.guidance")).toBe(true);
+    expect(operatorTopic("operator.guidance.consumed")).toBe(true);
+  });
+
+  it("rejects non-operator topics", () => {
+    expect(operatorTopic("task.complete")).toBe(false);
+    expect(operatorTopic("operator.other")).toBe(false);
+    expect(operatorTopic("")).toBe(false);
   });
 });
 

@@ -27,6 +27,15 @@ export function coordinationTopic(topic: string): boolean {
   return COORDINATION_TOPICS.has(topic);
 }
 
+const OPERATOR_TOPICS = new Set([
+  "operator.guidance",
+  "operator.guidance.consumed",
+]);
+
+export function operatorTopic(topic: string): boolean {
+  return OPERATOR_TOPICS.has(topic);
+}
+
 const CORE_SYSTEM_TOPICS = new Set([
   "iteration.start",
   "iteration.finish",
@@ -83,6 +92,10 @@ export function emit(
   const validation = emitValidationContext(projectDir, journalFile);
 
   if (coordinationTopic(topic)) {
+    return acceptEmit(journalFile, topic, payload, validation);
+  }
+
+  if (operatorTopic(topic)) {
     return acceptEmit(journalFile, topic, payload, validation);
   }
 
