@@ -1,4 +1,6 @@
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   getPresetDescription,
@@ -170,5 +172,24 @@ describe("parseChainsFromToml — per-step backend override", () => {
     expect(cfg.chains.map((c) => c.name)).toEqual(["old", "new"]);
     expect(cfg.chains[0].steps[0].name).toBe("autocode");
     expect(cfg.chains[1].steps[0].name).toBe("autoreview");
+  });
+});
+
+describe("listKnownPresets — symlinks in user presets dir", () => {
+  it("includes presets that are symlinks to valid preset directories", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "autoloop-presets-"));
+    const userPresets = join(tmp, "autoloop", "presets");
+    mkdirSync(userPresets, { recursive: true });
+    const target = resolve(import.meta.dirname, "../../presets/autocode");
+    symlinkSync(target, join(userPresets, "linked-preset"), "dir");
+
+    const prev = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = tmp;
+    try {
+      expect(listKnownPresets()).toContain("linked-preset");
+    } finally {
+      if (prev === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = prev;
+    }
   });
 });

@@ -92,7 +92,8 @@ export function listKnownPresets(): string[] {
     const userNames = entries
       .filter(
         (e) =>
-          e.isDirectory() && config.projectHasConfig(join(userDir, e.name)),
+          (e.isDirectory() || e.isSymbolicLink()) &&
+          config.projectHasConfig(join(userDir, e.name)),
       )
       .map((e) => e.name)
       .filter((n) => !builtIn.includes(n));
