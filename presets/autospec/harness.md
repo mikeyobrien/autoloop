@@ -5,7 +5,7 @@ The loop turns a rough idea into durable planning artifacts that a later impleme
 Global rules:
 - Shared working files are the source of truth: `{{STATE_DIR}}/spec-brief.md`, `{{STATE_DIR}}/spec-research.md`, and `{{STATE_DIR}}/progress.md`.
 - The goal is durable artifacts, not endless discussion.
-- Default output paths are `docs/rfcs/<slug>.md` and `.agents/tasks/<project-name>/<slug>.code-task.md`.
+- All artifacts go in the run directory (`{{STATE_DIR}}/`): design doc, implementation plan, and code tasks.
 - If the repo has a clearly stronger local planning convention, follow it and record that decision explicitly in `{{STATE_DIR}}/spec-brief.md`.
 - Prefer the smallest artifact set that fully captures the decision. Keep intermediate files concise.
 - Use the event tool instead of prose-only handoffs.

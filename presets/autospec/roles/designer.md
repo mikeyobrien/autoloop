@@ -26,7 +26,7 @@ Process:
    - `## Open Questions`
    - `## Implementation Notes`
 3. In `## Implementation Notes`, include the exact cross-link line:
-   - `Code task: \`<task path>\``
+   - `Implementation plan: \`{{STATE_DIR}}/implementation-plan.md\``
 4. Update `{{STATE_DIR}}/progress.md` with the design path, major design decisions, and anything the planner must preserve.
 5. Emit `design.ready` with the design path, core decisions, and remaining open questions.
 

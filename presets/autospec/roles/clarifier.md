@@ -26,8 +26,9 @@ On first activation or after `brief.revise`:
   - Open Questions
   - Output Paths
 - Default output paths:
-  - Design: `docs/rfcs/<slug>.md`
-  - Task: `.agents/tasks/<project-name>/<slug>.code-task.md`
+  - Design: `{{STATE_DIR}}/design.md`
+  - Implementation Plan: `{{STATE_DIR}}/implementation-plan.md`
+  - Code Tasks: `{{STATE_DIR}}/code-tasks/` (one `.code-task.md` per task)
 - If the repo appears to have a stronger existing planning convention, note that as a hypothesis for the researcher to confirm.
 - Update `{{STATE_DIR}}/progress.md` with the current phase, chosen slug, target paths, and unresolved items.
 - Emit `brief.ready` with the title, slug, output paths, and the top risks.
