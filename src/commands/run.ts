@@ -365,6 +365,7 @@ function defaultChainProjectDir(bundleRoot: string): string {
 
 function chainableOptions(opts: RunOptions): Record<string, unknown> {
   return {
+    backendOverride: opts.backendOverride,
     worktree: opts.worktree || undefined,
     noWorktree: opts.noWorktree || undefined,
     mergeStrategy: opts.mergeStrategy,

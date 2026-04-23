@@ -51,6 +51,7 @@ If the preset argument is missing, the CLI exits with a usage error. If the argu
 | `-p <preset>`, `--preset <preset>` | Resolve a bundled preset name (for example `autocode`) or use an explicit custom preset directory. Useful when you want the prompt to start with path-like text or avoid positional ambiguity. |
 | `-v`, `--verbose` | Enable verbose logging. |
 | `--chain <steps>` | Run an inline chain instead of a single loop. `steps` is a comma-separated list of preset names (e.g. `autocode,autoqa,autoresearch`). |
+| `-- <args>` | Pass extra arguments through to the backend. Everything after `--` is appended to the backend's argument list. Combine with `-b` to override both the command and its flags from the CLI. |
 
 **Examples:**
 

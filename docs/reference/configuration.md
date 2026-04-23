@@ -29,7 +29,7 @@ Lines without `=` are skipped with a warning. Blank lines and comment lines are 
 
 `autoloops.toml` > `autoloops.conf` > built-in defaults.
 
-The CLI `-b`/`--backend` flag overrides backend settings at runtime (kind, command, args, prompt_mode) without changing the file.
+The CLI `-b`/`--backend` flag overrides backend settings at runtime (kind, command, args, prompt_mode) without changing the file. Extra backend arguments can be passed after `--` on the command line (e.g. `autoloops run autocode -b pi -- --model anthropic/claude-sonnet-4`). These are appended to the backend's argument list.
 
 ## Keys
 
