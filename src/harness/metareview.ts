@@ -1,9 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { jsonBool, jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
+import { appendEvent, readRunLines } from "@mobrienv/autoloop-core/journal";
 import { runKiroIterationSync } from "../backend/kiro-bridge.js";
-import { jsonBool, jsonField, jsonFieldRaw } from "../json.js";
 import { reloadLoop } from "./config-helpers.js";
-import { appendEvent, readRunLines } from "./journal.js";
 import { buildReviewCommand, runProcess } from "./parallel.js";
 import { renderReviewPromptText } from "./prompt.js";
 import type { LoopContext, Verdict, VerdictKind } from "./types.js";

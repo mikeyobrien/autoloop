@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import TOML from "@iarna/toml";
+import { parseStringList } from "@mobrienv/autoloop-core";
 import * as config from "../config.js";
-import { parseStringList } from "../utils.js";
 import { defaultBudget, parseBudgetFromToml } from "./budget.js";
 import type {
   Budget,

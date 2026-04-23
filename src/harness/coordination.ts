@@ -1,5 +1,4 @@
-import { decodeEvent } from "../events/decode.js";
-import { bulletList, heading } from "../markdown.js";
+import { bulletList, decodeEvent, heading } from "@mobrienv/autoloop-core";
 
 interface Issue {
   id: string;

@@ -5,6 +5,13 @@
 // stdout. They are NOT part of the embedded SDK surface: SDK consumers read
 // journals directly or via packages/core readers in Phase 2.
 
+import {
+  readAllJournals,
+  readIfExists,
+  readRunJournal,
+  readRunLines,
+} from "@mobrienv/autoloop-core/journal";
+import { formatTimeline } from "@mobrienv/autoloop-core/journal-format";
 import * as config from "../config.js";
 import { collectArtifacts, formatArtifacts } from "../harness/artifacts.js";
 import {
@@ -19,13 +26,6 @@ import {
   printProjectedText,
 } from "../harness/display.js";
 import { resolveEmitJournalFile } from "../harness/emit.js";
-import {
-  readAllJournals,
-  readIfExists,
-  readRunJournal,
-  readRunLines,
-} from "../harness/journal.js";
-import { formatTimeline } from "../harness/journal-format.js";
 import { collectMetricsRows, formatMetrics } from "../harness/metrics.js";
 import { renderRunScratchpadFull } from "../harness/scratchpad.js";
 

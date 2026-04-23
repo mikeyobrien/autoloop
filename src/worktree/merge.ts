@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { shellQuote } from "../utils.js";
+import { shellQuote } from "@mobrienv/autoloop-core";
 import { resolveGitRoot } from "./create.js";
 import type { WorktreeMeta } from "./meta.js";
 import { readMeta, updateStatus } from "./meta.js";

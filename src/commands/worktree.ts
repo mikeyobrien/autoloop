@@ -1,6 +1,6 @@
 import { join } from "node:path";
+import { parseFlag } from "@mobrienv/autoloop-core";
 import { formatTime } from "../loops/render.js";
-import { parseFlag } from "../utils.js";
 import { cleanWorktrees } from "../worktree/clean.js";
 import { listWorktreeMetas } from "../worktree/list.js";
 import type { MergeOpts } from "../worktree/merge.js";

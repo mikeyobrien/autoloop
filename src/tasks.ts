@@ -1,8 +1,8 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { extractField, jsonField } from "@mobrienv/autoloop-core";
+import { readLines } from "@mobrienv/autoloop-core/journal";
 import * as config from "./config.js";
-import { readLines } from "./harness/journal.js";
-import { extractField, jsonField } from "./json.js";
 
 export interface TaskEntry {
   id: string;

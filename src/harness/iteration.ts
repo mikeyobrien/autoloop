@@ -1,9 +1,15 @@
+import { listText } from "@mobrienv/autoloop-core";
+import {
+  extractField,
+  extractIteration,
+  extractTopic,
+  readRunLines,
+} from "@mobrienv/autoloop-core/journal";
 import {
   runKiroIterationSync,
   setKiroSessionMode,
 } from "../backend/kiro-bridge.js";
 import { registryProgress } from "../registry/harness.js";
-import { listText } from "../utils.js";
 import { log } from "./display.js";
 import {
   appendInvalidEvent,
@@ -11,12 +17,6 @@ import {
   parallelTriggerTopic,
   systemTopic,
 } from "./emit.js";
-import {
-  extractField,
-  extractIteration,
-  extractTopic,
-  readRunLines,
-} from "./journal.js";
 import {
   appendBackendFinish,
   appendBackendStart,

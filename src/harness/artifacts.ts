@@ -6,11 +6,11 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
+import type { JournalEvent } from "@mobrienv/autoloop-core";
+import { decodeEvent } from "@mobrienv/autoloop-core";
+import { topicCategory } from "@mobrienv/autoloop-core/journal-format";
 import * as config from "../config.js";
-import { decodeEvent } from "../events/decode.js";
-import type { JournalEvent } from "../events/types.js";
 import * as memory from "../memory.js";
-import { topicCategory } from "./journal-format.js";
 
 export interface DocumentArtifact {
   path: string;

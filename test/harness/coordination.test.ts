@@ -1,5 +1,5 @@
+import { encodeEvent } from "@mobrienv/autoloop-core";
 import { describe, expect, it } from "vitest";
-import { encodeEvent } from "../../src/events/encode.js";
 import { coordinationFromLines } from "../../src/harness/coordination.js";
 
 describe("coordinationFromLines", () => {

@@ -3,10 +3,10 @@
  * Converts raw journal events into a filterable, color-coded terminal timeline.
  */
 
-import { color } from "../cli/color.js";
-import { decodeEvent } from "../events/decode.js";
-import type { JournalEvent } from "../events/types.js";
-import { extractField } from "../json.js";
+import { color } from "./color.js";
+import { decodeEvent } from "./events/decode.js";
+import type { JournalEvent } from "./events/types.js";
+import { extractField } from "./json.js";
 
 /** Category-to-color mapping per RFC */
 const CATEGORY_COLORS: Record<string, string[]> = {

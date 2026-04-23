@@ -3,7 +3,7 @@ import {
   eventOneLiner,
   topicCategory,
   topicMatchesFilter,
-} from "../src/harness/journal-format.js";
+} from "../src/journal-format.js";
 
 describe("topicCategory", () => {
   it("maps loop.* to loop", () => {

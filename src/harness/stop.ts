@@ -1,7 +1,7 @@
-import { jsonField } from "../json.js";
+import { jsonField } from "@mobrienv/autoloop-core";
+import { appendEvent } from "@mobrienv/autoloop-core/journal";
 import { registryComplete, registryStop } from "../registry/harness.js";
 import { lastNChars, log } from "./display.js";
-import { appendEvent } from "./journal.js";
 import type { LoopContext, RunSummary } from "./types.js";
 
 export function stopMaxIterations(

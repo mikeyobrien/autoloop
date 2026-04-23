@@ -1,5 +1,5 @@
 import { basename, join } from "node:path";
-import { shellQuote } from "../utils.js";
+import { shellQuote } from "@mobrienv/autoloop-core";
 import { buildCommandInvocation, runShellCommand } from "./run-command.js";
 import { mockBackend } from "./run-mock.js";
 import { buildPiAdapterInvocation } from "./run-pi.js";

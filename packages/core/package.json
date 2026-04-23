@@ -1,0 +1,45 @@
+{
+  "name": "@mobrienv/autoloop-core",
+  "version": "0.6.0-sdk.0",
+  "description": "Pure core utilities for autoloop (events, journal, topology, config schema)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./journal": {
+      "types": "./dist/journal.d.ts",
+      "default": "./dist/journal.js"
+    },
+    "./journal-format": {
+      "types": "./dist/journal-format.d.ts",
+      "default": "./dist/journal-format.js"
+    },
+    "./topology": {
+      "types": "./dist/topology.d.ts",
+      "default": "./dist/topology.js"
+    },
+    "./config-schema": {
+      "types": "./dist/config-schema.d.ts",
+      "default": "./dist/config-schema.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

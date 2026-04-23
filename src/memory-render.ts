@@ -1,4 +1,4 @@
-import { joinCsv, lineSep } from "./utils.js";
+import { joinCsv, lineSep } from "@mobrienv/autoloop-core";
 
 export interface MaterializedMemory {
   preferences: string[];

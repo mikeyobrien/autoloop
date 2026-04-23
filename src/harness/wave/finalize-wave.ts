@@ -1,8 +1,10 @@
-import { jsonField } from "../../json.js";
-import * as topology from "../../topology.js";
-import { joinCsv } from "../../utils.js";
+import { joinCsv, jsonField } from "@mobrienv/autoloop-core";
+import {
+  appendEvent,
+  appendHarnessEvent,
+} from "@mobrienv/autoloop-core/journal";
+import * as topology from "@mobrienv/autoloop-core/topology";
 import { parallelDispatchBase, parallelJoinedTopic } from "../emit.js";
-import { appendEvent, appendHarnessEvent } from "../journal.js";
 import type { IterationContext } from "../prompt.js";
 import type { LoopContext, RunSummary } from "../types.js";
 import type { BranchResult, IterateFn } from "./types.js";

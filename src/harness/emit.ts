@@ -1,17 +1,21 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import * as config from "../config.js";
-import { jsonField } from "../json.js";
-import type { TaskEntry } from "../tasks.js";
-import { materializeOpenFrom } from "../tasks.js";
-import * as topology from "../topology.js";
-import { joinCsv, listText, splitCsv } from "../utils.js";
+import {
+  joinCsv,
+  jsonField,
+  listText,
+  splitCsv,
+} from "@mobrienv/autoloop-core";
 import {
   appendAgentEvent,
   appendEvent,
   latestIterationForRun,
   latestRunId,
-} from "./journal.js";
+} from "@mobrienv/autoloop-core/journal";
+import * as topology from "@mobrienv/autoloop-core/topology";
+import * as config from "../config.js";
+import type { TaskEntry } from "../tasks.js";
+import { materializeOpenFrom } from "../tasks.js";
 
 const COORDINATION_TOPICS = new Set([
   "issue.discovered",

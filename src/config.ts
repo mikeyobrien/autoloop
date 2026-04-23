@@ -18,9 +18,13 @@ import {
   parseToml,
   recordProvenance,
   stringifyValues,
-} from "./config-schema.js";
+} from "@mobrienv/autoloop-core/config-schema";
 
-export type { Config, LayeredConfig, Provenance } from "./config-schema.js";
+export type {
+  Config,
+  LayeredConfig,
+  Provenance,
+} from "@mobrienv/autoloop-core/config-schema";
 export {
   deepMerge,
   defaults,
@@ -33,7 +37,7 @@ export {
   parseToml,
   put,
   stringifyValues,
-} from "./config-schema.js";
+} from "@mobrienv/autoloop-core/config-schema";
 
 export function userConfigPath(): string {
   const envPath = process.env.AUTOLOOP_CONFIG;

@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { appendEvent } from "@mobrienv/autoloop-core/journal";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emit } from "../../src/harness/emit.js";
-import { appendEvent } from "../../src/harness/journal.js";
 import { addTask, completeTask, removeTask } from "../../src/tasks.js";
 
 function tmpProject(): string {

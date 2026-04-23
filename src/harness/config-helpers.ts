@@ -6,13 +6,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { loadAgentMap } from "../agent-map.js";
-import * as config from "../config.js";
-import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
-import { createRunScopedDir } from "../isolation/run-scope.js";
-import * as profiles from "../profiles.js";
-import { activeRuns } from "../registry/read.js";
-import * as topo from "../topology.js";
 import {
   assertNoRawAutoloopPaths,
   expandTemplatePlaceholders,
@@ -20,12 +13,7 @@ import {
   generateReadableId,
   splitCsv,
   uniqueGeneratedId,
-} from "../utils.js";
-import {
-  createWorktree,
-  resolveGitRoot,
-  tryResolveGitRoot,
-} from "../worktree/create.js";
+} from "@mobrienv/autoloop-core";
 import {
   extractField,
   extractIteration,
@@ -34,7 +22,19 @@ import {
   readLines,
   readRunLines,
   resolveRunJournalPath,
-} from "./journal.js";
+} from "@mobrienv/autoloop-core/journal";
+import * as topo from "@mobrienv/autoloop-core/topology";
+import { loadAgentMap } from "../agent-map.js";
+import * as config from "../config.js";
+import { presetCategory, resolveIsolationMode } from "../isolation/resolve.js";
+import { createRunScopedDir } from "../isolation/run-scope.js";
+import * as profiles from "../profiles.js";
+import { activeRuns } from "../registry/read.js";
+import {
+  createWorktree,
+  resolveGitRoot,
+  tryResolveGitRoot,
+} from "../worktree/create.js";
 import { emitToolScript, piAdapterScript } from "./tools.js";
 import type { LoopContext, RunOptions } from "./types.js";
 

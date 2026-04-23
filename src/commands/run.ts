@@ -1,4 +1,5 @@
 import { basename, resolve } from "node:path";
+import { joinCsv } from "@mobrienv/autoloop-core";
 import * as chains from "../chains.js";
 import { cliPrintEvent } from "../cli/event-printer.js";
 import * as config from "../config.js";
@@ -9,7 +10,6 @@ import {
   printRunUsage,
   unknownPresetError,
 } from "../usage.js";
-import { joinCsv } from "../utils.js";
 
 interface RunOptions {
   projectDir: string;

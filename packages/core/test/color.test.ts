@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { color, strip } from "../src/cli/color.js";
+import { color, strip } from "../src/color.js";
 
 describe("color", () => {
   const origEnv = { ...process.env };

@@ -1,10 +1,18 @@
+import { joinCsv, listText } from "@mobrienv/autoloop-core";
+import {
+  appendHarnessEvent,
+  extractField,
+  extractIteration,
+  extractTopic,
+  readLines,
+  readRunLines,
+} from "@mobrienv/autoloop-core/journal";
+import * as topology from "@mobrienv/autoloop-core/topology";
 import { resolveRoleAgent } from "../agent-map.js";
 import * as memory from "../memory.js";
 import type { TwoTierMemoryStats } from "../memory-render.js";
 import { materialize as materializeTasks } from "../tasks.js";
 import { renderTasksPrompt } from "../tasks-render.js";
-import * as topology from "../topology.js";
-import { joinCsv, listText } from "../utils.js";
 import {
   coordinationTopic,
   coreSystemTopic,
@@ -14,14 +22,6 @@ import {
   systemTopic,
 } from "./emit.js";
 import type { LoopContext } from "./index.js";
-import {
-  appendHarnessEvent,
-  extractField,
-  extractIteration,
-  extractTopic,
-  readLines,
-  readRunLines,
-} from "./journal.js";
 import { renderRunScratchpadPrompt } from "./scratchpad.js";
 
 export interface IterationContext {

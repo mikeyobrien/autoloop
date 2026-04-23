@@ -31,7 +31,7 @@ vi.mock("../../src/config.js", () => ({
   stateDirPath: vi.fn((d: string) => `${d}/.autoloop`),
 }));
 
-vi.mock("../../src/topology.js", () => ({
+vi.mock("@mobrienv/autoloop-core/topology", () => ({
   loadTopology: vi.fn(() => ({ roles: [] })),
   renderTopologyInspect: vi.fn(),
 }));
@@ -47,9 +47,9 @@ vi.mock("../../src/usage.js", () => ({
   printInspectUsage: vi.fn(),
 }));
 
+import * as topo from "@mobrienv/autoloop-core/topology";
 import * as render from "../../src/cli/render.js";
 import { dispatchInspect } from "../../src/commands/inspect.js";
-import * as topo from "../../src/topology.js";
 
 describe("dispatchInspect journal", () => {
   beforeEach(() => {

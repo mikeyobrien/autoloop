@@ -1,5 +1,9 @@
+import {
+  extractField,
+  extractTopic,
+  readLines,
+} from "@mobrienv/autoloop-core/journal";
 import * as config from "../config.js";
-import { extractField, extractTopic, readLines } from "../harness/journal.js";
 
 export function renderChainState(projectDir: string): string {
   const journalFile = config.resolveJournalFile(projectDir);

@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { shellQuote } from "@mobrienv/autoloop-core";
 import { isProcessAlive } from "../loops/health.js";
 import { getRun } from "../registry/read.js";
-import { shellQuote } from "../utils.js";
 import { resolveGitRoot } from "./create.js";
 import type { WorktreeStatus } from "./meta.js";
 import { isOrphanWorktree, readMeta, updateStatus } from "./meta.js";

@@ -1,21 +1,21 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import * as config from "../config.js";
-import * as harness from "../harness/index.js";
+import {
+  generateCompactId,
+  generateReadableId,
+  joinCsv,
+  jsonField,
+  uniqueGeneratedId,
+} from "@mobrienv/autoloop-core";
 import {
   appendText,
   extractField,
   extractTopic,
   readLines,
-} from "../harness/journal.js";
+} from "@mobrienv/autoloop-core/journal";
+import * as config from "../config.js";
+import * as harness from "../harness/index.js";
 import { presetCategory } from "../isolation/resolve.js";
-import { jsonField } from "../json.js";
-import {
-  generateCompactId,
-  generateReadableId,
-  joinCsv,
-  uniqueGeneratedId,
-} from "../utils.js";
 import { checkBudget, defaultBudget } from "./budget.js";
 import { parseInlineChain } from "./load.js";
 import type {

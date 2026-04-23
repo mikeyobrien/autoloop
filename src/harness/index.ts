@@ -1,5 +1,6 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { readIfExists } from "@mobrienv/autoloop-core/journal";
 import type { AcpClientOptions } from "../backend/acp-client.js";
 import {
   initKiroSession,
@@ -26,7 +27,6 @@ import {
 import { log } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { runIteration } from "./iteration.js";
-import { readIfExists } from "./journal.js";
 import { maybeRunMetareview } from "./metareview.js";
 import {
   appendLoopStart,

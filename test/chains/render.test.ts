@@ -1,6 +1,6 @@
+import { encodeEvent } from "@mobrienv/autoloop-core";
 import { describe, expect, it } from "vitest";
 import { renderChainLines } from "../../src/chains/render.js";
-import { encodeEvent } from "../../src/events/encode.js";
 
 function fieldsLine(topic: string, fields: Record<string, string>): string {
   return encodeEvent({

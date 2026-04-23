@@ -1,13 +1,13 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Role } from "@mobrienv/autoloop-core/topology";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   applyProfileFragments,
   parseProfileSpec,
   resolveProfileFragments,
 } from "../src/profiles.js";
-import type { Role } from "../src/topology.js";
 
 const TMP_BASE = join(tmpdir(), `autoloop-ts-test-profiles-${process.pid}`);
 

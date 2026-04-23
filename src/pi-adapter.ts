@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { shellWords } from "./utils.js";
+import { shellWords } from "@mobrienv/autoloop-core";
 
 const BRIDGE_SCRIPT = `
 import json

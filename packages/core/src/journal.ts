@@ -6,12 +6,12 @@ import {
   readFileSync,
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { encodeEvent } from "../events/encode.js";
+import { encodeEvent } from "./events/encode.js";
 import {
   extractField as jsonExtractField,
   extractTopic as jsonExtractTopic,
-} from "../json.js";
-import { lineSep } from "../utils.js";
+} from "./json.js";
+import { lineSep } from "./utils.js";
 
 export function appendEvent(
   path: string,

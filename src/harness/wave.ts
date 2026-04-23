@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { jsonField } from "../json.js";
-import * as md from "../markdown.js";
-import { generateCompactId, joinCsv } from "../utils.js";
-import { appendEvent, readIfExists } from "./journal.js";
+import * as md from "@mobrienv/autoloop-core";
+import { generateCompactId, joinCsv, jsonField } from "@mobrienv/autoloop-core";
+import { appendEvent, readIfExists } from "@mobrienv/autoloop-core/journal";
 import type { IterationContext } from "./prompt.js";
 import type { LoopContext } from "./types.js";
 import { finalizeParallelWave } from "./wave/finalize-wave.js";

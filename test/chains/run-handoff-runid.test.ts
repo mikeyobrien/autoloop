@@ -16,7 +16,7 @@ vi.mock("../../src/config.js", () => ({
   projectHasConfig: vi.fn(() => false),
 }));
 
-vi.mock("../../src/harness/journal.js", () => ({
+vi.mock("@mobrienv/autoloop-core/journal", () => ({
   appendText: vi.fn(),
   readLines: vi.fn(() => []),
   extractTopic: vi.fn(() => ""),
@@ -42,8 +42,9 @@ vi.mock("../../src/isolation/resolve.js", () => ({
   }),
 }));
 
-vi.mock("../../src/utils.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../src/utils.js")>();
+vi.mock("@mobrienv/autoloop-core", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@mobrienv/autoloop-core")>();
   return {
     ...actual,
     generateCompactId: vi.fn(() => "chain-test-1"),

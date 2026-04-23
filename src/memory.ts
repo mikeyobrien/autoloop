@@ -1,9 +1,8 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { bulletList, extractField, jsonField } from "@mobrienv/autoloop-core";
+import { readIfExists, readLines } from "@mobrienv/autoloop-core/journal";
 import * as config from "./config.js";
-import { readIfExists, readLines } from "./harness/journal.js";
-import { extractField, jsonField } from "./json.js";
-import { bulletList } from "./markdown.js";
 import type {
   MaterializedMemory,
   TwoTierMemoryStats,

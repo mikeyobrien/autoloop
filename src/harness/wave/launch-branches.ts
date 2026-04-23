@@ -1,12 +1,20 @@
 import { execSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { jsonField } from "../../json.js";
-import * as md from "../../markdown.js";
-import * as topology from "../../topology.js";
-import { joinCsv, listText, shellQuote } from "../../utils.js";
+import * as md from "@mobrienv/autoloop-core";
+import {
+  joinCsv,
+  jsonField,
+  listText,
+  shellQuote,
+} from "@mobrienv/autoloop-core";
+import {
+  appendEvent,
+  extractField,
+  readIfExists,
+} from "@mobrienv/autoloop-core/journal";
+import * as topology from "@mobrienv/autoloop-core/topology";
 import { parallelDispatchBase } from "../emit.js";
-import { appendEvent, extractField, readIfExists } from "../journal.js";
 import {
   renderBranchResult,
   runProcess,

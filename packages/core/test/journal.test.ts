@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readAllJournals, readRunJournal } from "../../src/harness/journal.js";
+import { readAllJournals, readRunJournal } from "../src/journal.js";
 
 const tmpDir = join(import.meta.dirname, "__tmp_journal_test__");
 

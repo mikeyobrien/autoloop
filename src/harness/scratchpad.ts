@@ -1,6 +1,9 @@
-import { decodeEvent } from "../events/decode.js";
-import { bulletList, heading } from "../markdown.js";
-import { lineSep } from "../utils.js";
+import {
+  bulletList,
+  decodeEvent,
+  heading,
+  lineSep,
+} from "@mobrienv/autoloop-core";
 
 interface ScratchpadEntry {
   iteration: string;

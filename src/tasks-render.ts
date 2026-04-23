@@ -1,5 +1,5 @@
+import { lineSep } from "@mobrienv/autoloop-core";
 import type { MaterializedTasks } from "./tasks.js";
-import { lineSep } from "./utils.js";
 
 export function renderTasksPrompt(
   tasks: MaterializedTasks,

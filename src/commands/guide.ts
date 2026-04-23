@@ -1,5 +1,8 @@
+import {
+  appendOperatorEvent,
+  latestRunId,
+} from "@mobrienv/autoloop-core/journal";
 import { resolveEmitJournalFile } from "../harness/emit.js";
-import { appendOperatorEvent, latestRunId } from "../harness/journal.js";
 
 export function dispatchGuide(args: string[]): void {
   let runId = "";

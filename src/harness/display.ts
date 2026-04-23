@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { lineSep, listText } from "../utils.js";
+import { lineSep, listText } from "@mobrienv/autoloop-core";
 import type { IterationContext } from "./prompt.js";
 import type { LoopContext, RunSummary } from "./types.js";
 

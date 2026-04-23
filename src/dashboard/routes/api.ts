@@ -1,15 +1,15 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { Hono } from "hono";
-import { listPresetsWithDescriptions } from "../../chains/load.js";
-import { collectArtifacts } from "../../harness/artifacts.js";
 import {
   appendOperatorEvent,
   latestIterationForRun,
   readRunLines,
   resolveRunJournalPath,
-} from "../../harness/journal.js";
+} from "@mobrienv/autoloop-core/journal";
+import { Hono } from "hono";
+import { listPresetsWithDescriptions } from "../../chains/load.js";
+import { collectArtifacts } from "../../harness/artifacts.js";
 import { categorizeRuns } from "../../loops/health.js";
 import { mergedFindRunByPrefix } from "../../registry/discover.js";
 import type { RunRecord } from "../../registry/types.js";

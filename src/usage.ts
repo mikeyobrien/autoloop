@@ -1,5 +1,5 @@
+import { joinCsv } from "@mobrienv/autoloop-core";
 import * as chains from "./chains.js";
-import { joinCsv } from "./utils.js";
 
 export function printUsage(): void {
   console.log("autoloop — autonomous LLM loop harness");

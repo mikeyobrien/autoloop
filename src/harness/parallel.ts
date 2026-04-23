@@ -1,18 +1,25 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  buildBackendShellCommand,
-  normalizeBackendLabel,
-  runBackendCommand,
-} from "../backend/index.js";
-import { jsonBool, jsonField, jsonFieldRaw } from "../json.js";
-import { joinCsv, listText, shellQuote, splitCsv } from "../utils.js";
+  joinCsv,
+  jsonBool,
+  jsonField,
+  jsonFieldRaw,
+  listText,
+  shellQuote,
+  splitCsv,
+} from "@mobrienv/autoloop-core";
 import {
   appendAgentEvent,
   appendEvent,
   extractField,
   readIfExists,
-} from "./journal.js";
+} from "@mobrienv/autoloop-core/journal";
+import {
+  buildBackendShellCommand,
+  normalizeBackendLabel,
+  runBackendCommand,
+} from "../backend/index.js";
 import type { IterationContext } from "./prompt.js";
 import type { LoopContext } from "./types.js";
 

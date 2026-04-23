@@ -1,4 +1,4 @@
-import { lineSep } from "../../utils.js";
+import { lineSep } from "@mobrienv/autoloop-core";
 import type { ParseResult } from "./types.js";
 
 export function parseParallelObjectives(

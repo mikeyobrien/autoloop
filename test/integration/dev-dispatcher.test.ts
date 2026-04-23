@@ -64,7 +64,7 @@ describe("bin/dev", () => {
 
   it("test subcommand delegates to vitest", () => {
     // Run a small, fast unit test to verify delegation without self-recursion
-    const out = run(["test", "test/json.test.ts"]);
-    expect(out).toContain("json");
+    const out = run(["test", "test/agent-map.test.ts"]);
+    expect(out).toContain("agent-map");
   }, 60_000);
 });

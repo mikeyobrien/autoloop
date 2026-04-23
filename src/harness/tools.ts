@@ -1,4 +1,4 @@
-import { joinCsv, shellQuote } from "../utils.js";
+import { joinCsv, shellQuote } from "@mobrienv/autoloop-core";
 import type { LoopContext } from "./index.js";
 
 export function emitToolScript(loop: LoopContext): string {

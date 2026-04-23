@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { shellQuote, shellWords } from "../utils.js";
+import { shellQuote, shellWords } from "@mobrienv/autoloop-core";
 import type { BackendRunResult } from "./types.js";
 
 export function buildCommandInvocation(

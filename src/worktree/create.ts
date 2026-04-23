@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { shellQuote } from "../utils.js";
+import { shellQuote } from "@mobrienv/autoloop-core";
 import type { WorktreeMeta } from "./meta.js";
 import { metaDirForRun, writeMeta } from "./meta.js";
 

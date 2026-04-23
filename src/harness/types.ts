@@ -1,6 +1,6 @@
+import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { AgentMap } from "../agent-map.js";
 import type { KiroSessionHandle } from "../backend/kiro-bridge.js";
-import type * as topo from "../topology.js";
 import type { LoopEventEmitter } from "./events.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
