@@ -10,7 +10,7 @@ the 27 atomic commits that get us there. Keep it updated as each commit lands.
 | 0 — baseline | 1 | This doc, clean check | — |
 | 1 — decouple in place | 10 | `run()` is embed-able (no workspaces yet) | `0.5.0-sdk.0` |
 | 2 — workspaces + core/harness | 8 | `@mobrienv/autoloop-{core,harness}` published | `0.6.0` |
-| 3 — specialty packages | 5 | presets, backends, dashboard, plugin extracted | `0.7.0` |
+| 3 — specialty packages | 4 | presets, backends, dashboard extracted | `0.7.0` |
 | 4 — docs + 1.0 | 3 | SDK docs, embed examples, frozen API | `1.0.0` |
 
 Phase-1 checkpoints (the ones that do the heavy decoupling):
@@ -123,13 +123,14 @@ audit commit so the baseline is actually green:
   and were timing out at the default 5s under parallel load (observed 4.2–4.6s
   isolated, intermittent fail in full run). Fix: bump `testTimeout` to 15s.
 
-### Coverage-threshold drift (not fixed in 0.1)
+### Coverage-threshold drift (resolved in Phase 2.8)
 
 `AGENTS.md` declares a ≥90% line / ≥90% branch gate. `vitest.config.ts` is
-currently set to `lines: 50, branches: 75, functions: 60`. Raising these
-thresholds belongs to its own commit — likely tied into 1.10 (SDK smoke test)
-or a dedicated commit at the end of Phase 1 once the decoupling surfaces are
-stable and we know which files have legitimately low coverage.
+currently set to `lines: 50, branches: 75, functions: 60`. Phase 2.8 owns the
+ratchet: each extracted package gets its own `vitest.config.ts` with a gate
+sized to its surface (core/harness aim for 90/90; CLI-heavy packages ratchet
+upward each release). Root-level config stays loose until 2.6 empties the
+root `src/`.
 
 ## Checkpoint log
 
@@ -155,12 +156,11 @@ stable and we know which files have legitimately low coverage.
 | 2.5 | ⬜ | extract `packages/harness` |
 | 2.6 | ⬜ | extract `packages/cli` (keeps `@mobrienv/autoloop`) |
 | 2.7 | ⬜ | `resolveBundleRoot` via `require.resolve` |
-| 2.8 | ⬜ | per-package coverage gate → publish `0.6.0` |
+| 2.8 | ⬜ | per-package coverage gate (core/harness → 90/90) → publish `0.6.0` |
 | 3.1 | ⬜ | `packages/presets` (data-only) |
 | 3.2 | ⬜ | `packages/backends` |
 | 3.3 | ⬜ | `packages/dashboard` |
-| 3.4 | ⬜ | `packages/plugin-claude` |
-| 3.5 | ⬜ | release script → publish `0.7.0` |
+| 3.4 | ⬜ | release script → publish `0.7.0` |
 | 4.1 | ⬜ | SDK docs |
 | 4.2 | ⬜ | embed examples |
 | 4.3 | ⬜ | `1.0.0` |
