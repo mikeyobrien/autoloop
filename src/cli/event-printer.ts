@@ -14,8 +14,8 @@ import {
   printProgressLine,
   printReviewBanner,
   printSummary,
-} from "../harness/display.js";
-import type { LoopEvent } from "../harness/events.js";
+} from "@mobrienv/autoloop-harness/display";
+import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 
 export function cliPrintEvent(event: LoopEvent): void {
   switch (event.type) {

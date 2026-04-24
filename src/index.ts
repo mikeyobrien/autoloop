@@ -24,9 +24,12 @@ export {
   type LayeredConfig,
   parseToml as parseConfigToml,
 } from "@mobrienv/autoloop-core/config-schema";
-export type { EmitResult } from "./harness/emit.js";
-export type { LoopEvent, LoopEventEmitter } from "./harness/events.js";
-export { emit, run, runParallelBranchCli } from "./harness/index.js";
+export { emit, run, runParallelBranchCli } from "@mobrienv/autoloop-harness";
+export type { EmitResult } from "@mobrienv/autoloop-harness/emit";
+export type {
+  LoopEvent,
+  LoopEventEmitter,
+} from "@mobrienv/autoloop-harness/events";
 export type {
   LoopContext,
   RunOptions,
@@ -34,4 +37,4 @@ export type {
   TriggerSource,
   Verdict,
   VerdictKind,
-} from "./harness/types.js";
+} from "@mobrienv/autoloop-harness/types";

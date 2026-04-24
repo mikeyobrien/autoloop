@@ -31,7 +31,7 @@ vi.mock("@mobrienv/autoloop-core/worktree", () => ({
   listWorktreeMetas: vi.fn(() => []),
 }));
 
-vi.mock("../../src/harness/iteration.js", () => ({
+vi.mock("@mobrienv/autoloop-harness/iteration", () => ({
   runIteration: vi.fn(() => ({
     stopReason: "completed",
     iterations: 1,
@@ -39,13 +39,14 @@ vi.mock("../../src/harness/iteration.js", () => ({
   })),
 }));
 
-vi.mock("../../src/harness/metareview.js", () => ({
+vi.mock("@mobrienv/autoloop-harness/metareview", () => ({
   maybeRunMetareview: vi.fn((loop: unknown) => loop),
 }));
 
-vi.mock("../../src/registry/harness.js", () => ({
+vi.mock("@mobrienv/autoloop-harness/registry-bridge", () => ({
   registryStart: vi.fn(),
   registryStop: vi.fn(),
+  registryProgress: vi.fn(),
 }));
 
 // Import from the PUBLIC SDK entry, not harness/index.ts.

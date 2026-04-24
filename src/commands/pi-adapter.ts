@@ -1,4 +1,4 @@
-import * as piAdapter from "../pi-adapter.js";
+import * as piAdapter from "@mobrienv/autoloop-harness/pi-adapter";
 
 export function dispatchPiAdapter(args: string[]): boolean {
   piAdapter.run(args);

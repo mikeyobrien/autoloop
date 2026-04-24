@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * for run-scoped and worktree-backed runs via --run flag.
  */
 
-vi.mock("../../src/harness/emit.js", () => ({
+vi.mock("@mobrienv/autoloop-harness/emit", () => ({
   resolveEmitJournalFile: vi.fn((projectDir: string) =>
     join(projectDir, ".autoloop", "journal.jsonl"),
   ),

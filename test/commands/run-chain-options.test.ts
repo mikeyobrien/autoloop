@@ -19,7 +19,7 @@ vi.mock("../../src/chains.js", () => ({
 }));
 
 // Also mock harness.run to prevent side effects from the non-chain path
-vi.mock("../../src/harness/index.js", () => ({
+vi.mock("@mobrienv/autoloop-harness", () => ({
   run: vi.fn(),
 }));
 

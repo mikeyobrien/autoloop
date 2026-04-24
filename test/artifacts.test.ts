@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { collectArtifacts } from "@mobrienv/autoloop-harness/artifacts";
 import { describe, expect, it } from "vitest";
-import { collectArtifacts } from "../src/harness/artifacts.js";
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "artifacts-test-"));

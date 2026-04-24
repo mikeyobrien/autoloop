@@ -13,21 +13,27 @@ import {
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
 import { formatTimeline } from "@mobrienv/autoloop-core/journal-format";
-import { collectArtifacts, formatArtifacts } from "../harness/artifacts.js";
+import {
+  collectArtifacts,
+  formatArtifacts,
+} from "@mobrienv/autoloop-harness/artifacts";
 import {
   emptyFallback,
   ensureRenderRunId,
   iterationFieldForRun,
   resolveJournalFileForRun,
-} from "../harness/config-helpers.js";
-import { coordinationFromLines } from "../harness/coordination.js";
+} from "@mobrienv/autoloop-harness/config-helpers";
+import { coordinationFromLines } from "@mobrienv/autoloop-harness/coordination";
 import {
   printProjectedMarkdown,
   printProjectedText,
-} from "../harness/display.js";
-import { resolveEmitJournalFile } from "../harness/emit.js";
-import { collectMetricsRows, formatMetrics } from "../harness/metrics.js";
-import { renderRunScratchpadFull } from "../harness/scratchpad.js";
+} from "@mobrienv/autoloop-harness/display";
+import { resolveEmitJournalFile } from "@mobrienv/autoloop-harness/emit";
+import {
+  collectMetricsRows,
+  formatMetrics,
+} from "@mobrienv/autoloop-harness/metrics";
+import { renderRunScratchpadFull } from "@mobrienv/autoloop-harness/scratchpad";
 
 export function renderScratchpadFormat(
   projectDir: string,

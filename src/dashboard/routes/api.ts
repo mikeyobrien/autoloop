@@ -10,9 +10,9 @@ import {
 import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { metaDirForRun, readMeta } from "@mobrienv/autoloop-core/worktree";
+import { collectArtifacts } from "@mobrienv/autoloop-harness/artifacts";
 import { Hono } from "hono";
 import { listPresetsWithDescriptions } from "../../chains/load.js";
-import { collectArtifacts } from "../../harness/artifacts.js";
 import { categorizeRuns } from "../../loops/health.js";
 import type { DashboardContext } from "../app.js";
 

@@ -22,7 +22,7 @@ vi.mock("@mobrienv/autoloop-core/journal", () => ({
   extractField: vi.fn(() => ""),
 }));
 
-vi.mock("../../src/harness/index.js", () => ({
+vi.mock("@mobrienv/autoloop-harness", () => ({
   run: vi.fn(() => ({ stopReason: "completion_event", iterations: 1 })),
 }));
 
@@ -53,9 +53,9 @@ vi.mock("node:fs", async () => {
   };
 });
 
+import * as harness from "@mobrienv/autoloop-harness";
 import { runChain } from "../../src/chains/run.js";
 import type { ChainSpec } from "../../src/chains/types.js";
-import * as harness from "../../src/harness/index.js";
 
 describe("runChain worktree suppression for planning steps", () => {
   beforeEach(() => {

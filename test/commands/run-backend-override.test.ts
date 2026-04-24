@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock harness.run to capture the options it receives
 const runSpy = vi.fn();
-vi.mock("../../src/harness/index.js", () => ({
+vi.mock("@mobrienv/autoloop-harness", () => ({
   run: (...args: unknown[]) => runSpy(...args),
 }));
 

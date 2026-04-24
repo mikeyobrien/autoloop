@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { cliPrintEvent } from "../../src/cli/event-printer.js";
 
-vi.mock("../../src/harness/display.js", () => ({
+vi.mock("@mobrienv/autoloop-harness/display", () => ({
   printBackendOutputTail: vi.fn(),
   printFailureDiagnostic: vi.fn(),
   printIterationBanner: vi.fn(),
@@ -28,7 +28,7 @@ import {
   printProgressLine,
   printReviewBanner,
   printSummary,
-} from "../../src/harness/display.js";
+} from "@mobrienv/autoloop-harness/display";
 
 afterEach(() => vi.clearAllMocks());
 

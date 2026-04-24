@@ -15,7 +15,7 @@ import {
   extractTopic,
   readLines,
 } from "@mobrienv/autoloop-core/journal";
-import * as harness from "../harness/index.js";
+import * as harness from "@mobrienv/autoloop-harness";
 import { checkBudget, defaultBudget } from "./budget.js";
 import { parseInlineChain } from "./load.js";
 import type {

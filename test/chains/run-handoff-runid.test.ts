@@ -24,7 +24,7 @@ vi.mock("@mobrienv/autoloop-core/journal", () => ({
 }));
 
 let runCallCount = 0;
-vi.mock("../../src/harness/index.js", () => ({
+vi.mock("@mobrienv/autoloop-harness", () => ({
   run: vi.fn(() => {
     runCallCount++;
     return {

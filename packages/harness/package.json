@@ -1,0 +1,115 @@
+{
+  "name": "@mobrienv/autoloop-harness",
+  "version": "0.6.0-sdk.0",
+  "description": "autoloop harness runtime (iteration loop, metareview, wave orchestration, backend drivers)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./backend": {
+      "types": "./dist/backend/index.d.ts",
+      "default": "./dist/backend/index.js"
+    },
+    "./backend/acp-client": {
+      "types": "./dist/backend/acp-client.d.ts",
+      "default": "./dist/backend/acp-client.js"
+    },
+    "./backend/kiro-bridge": {
+      "types": "./dist/backend/kiro-bridge.d.ts",
+      "default": "./dist/backend/kiro-bridge.js"
+    },
+    "./backend/run-command": {
+      "types": "./dist/backend/run-command.d.ts",
+      "default": "./dist/backend/run-command.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./emit": {
+      "types": "./dist/emit.d.ts",
+      "default": "./dist/emit.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "default": "./dist/events.js"
+    },
+    "./artifacts": {
+      "types": "./dist/artifacts.d.ts",
+      "default": "./dist/artifacts.js"
+    },
+    "./config-helpers": {
+      "types": "./dist/config-helpers.d.ts",
+      "default": "./dist/config-helpers.js"
+    },
+    "./coordination": {
+      "types": "./dist/coordination.d.ts",
+      "default": "./dist/coordination.js"
+    },
+    "./display": {
+      "types": "./dist/display.d.ts",
+      "default": "./dist/display.js"
+    },
+    "./metrics": {
+      "types": "./dist/metrics.d.ts",
+      "default": "./dist/metrics.js"
+    },
+    "./scratchpad": {
+      "types": "./dist/scratchpad.d.ts",
+      "default": "./dist/scratchpad.js"
+    },
+    "./metareview": {
+      "types": "./dist/metareview.d.ts",
+      "default": "./dist/metareview.js"
+    },
+    "./parallel": {
+      "types": "./dist/parallel.d.ts",
+      "default": "./dist/parallel.js"
+    },
+    "./iteration": {
+      "types": "./dist/iteration.d.ts",
+      "default": "./dist/iteration.js"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.ts",
+      "default": "./dist/tools.js"
+    },
+    "./prompt": {
+      "types": "./dist/prompt.d.ts",
+      "default": "./dist/prompt.js"
+    },
+    "./wave/parse-objectives": {
+      "types": "./dist/wave/parse-objectives.d.ts",
+      "default": "./dist/wave/parse-objectives.js"
+    },
+    "./pi-adapter": {
+      "types": "./dist/pi-adapter.d.ts",
+      "default": "./dist/pi-adapter.js"
+    },
+    "./registry-bridge": {
+      "types": "./dist/registry-bridge.d.ts",
+      "default": "./dist/registry-bridge.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.18.0",
+    "@iarna/toml": "^2.2.5",
+    "@mobrienv/autoloop-core": "*"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

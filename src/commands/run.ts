@@ -1,10 +1,10 @@
 import { basename, resolve } from "node:path";
 import { joinCsv } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
+import * as harness from "@mobrienv/autoloop-harness";
+import { claudeBackend } from "@mobrienv/autoloop-harness/config-helpers";
 import * as chains from "../chains.js";
 import { cliPrintEvent } from "../cli/event-printer.js";
-import { claudeBackend } from "../harness/config-helpers.js";
-import * as harness from "../harness/index.js";
 import {
   missingPresetError,
   printRunUsage,
