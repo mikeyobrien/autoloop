@@ -149,11 +149,11 @@ root `src/`.
 | 1.10 | ✅ | `ad82906` SDK embed smoke test |
 | — | ✅ | `9cafb25` autosde follow-up: `cliPrintEvent` coverage |
 | — | ✅ | version bump → `0.5.0-sdk.0` |
-| 2.1 | ⬜ | enable npm workspaces |
-| 2.2 | ⬜ | core: events/journal/markdown/json/utils/topology/config-schema |
-| 2.3 | ⬜ | core: domain models (agent-map, tasks, memory, profiles) |
-| 2.4 | ⬜ | core: registry + config-fs + isolation |
-| 2.5 | ⬜ | extract `packages/harness` |
+| 2.1 | ✅ | `2244a26` enable npm workspaces |
+| 2.2 | ✅ | `45bd208` core: events/journal/markdown/json/utils/topology/config-schema |
+| 2.3 | ✅ | `759b8f7` core: domain models (agent-map, tasks, memory, profiles) |
+| 2.4 | ✅ | `eaa1728` core: registry + config-fs + isolation |
+| 2.5 | ✅ | `6630bed` extract `packages/harness` |
 | 2.6 | ⬜ | extract `packages/cli` (keeps `@mobrienv/autoloop`) |
 | 2.7 | ⬜ | `resolveBundleRoot` via `require.resolve` |
 | 2.8 | ⬜ | per-package coverage gate (core/harness → 90/90) → publish `0.6.0` |

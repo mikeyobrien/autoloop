@@ -51,10 +51,16 @@ function expectNoLegacyName(output: string, surface: string): void {
 
 beforeAll(() => {
   if (!existsSync(ENTRY)) {
-    execFileSync("node", [resolve(ROOT, "node_modules/typescript/bin/tsc")], {
-      cwd: ROOT,
-      timeout: 30_000,
-    });
+    // typescript is hoisted to the workspace root
+    const REPO_ROOT = resolve(ROOT, "..", "..");
+    execFileSync(
+      "node",
+      [resolve(REPO_ROOT, "node_modules/typescript/bin/tsc")],
+      {
+        cwd: ROOT,
+        timeout: 30_000,
+      },
+    );
   }
 });
 

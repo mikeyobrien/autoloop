@@ -1,0 +1,60 @@
+{
+  "name": "@mobrienv/autoloop-cli",
+  "version": "0.6.0-sdk.0",
+  "description": "autoloop CLI (main entry, commands, dashboard, chains, loops inspector)",
+  "type": "module",
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "default": "./dist/main.js"
+    },
+    "./usage": {
+      "types": "./dist/usage.d.ts",
+      "default": "./dist/usage.js"
+    },
+    "./chains": {
+      "types": "./dist/chains.d.ts",
+      "default": "./dist/chains.js"
+    },
+    "./chains/run": {
+      "types": "./dist/chains/run.d.ts",
+      "default": "./dist/chains/run.js"
+    },
+    "./chains/types": {
+      "types": "./dist/chains/types.d.ts",
+      "default": "./dist/chains/types.js"
+    },
+    "./cli/event-printer": {
+      "types": "./dist/cli/event-printer.d.ts",
+      "default": "./dist/cli/event-printer.js"
+    },
+    "./cli/render": {
+      "types": "./dist/cli/render.d.ts",
+      "default": "./dist/cli/render.js"
+    },
+    "./dashboard/app": {
+      "types": "./dist/dashboard/app.d.ts",
+      "default": "./dist/dashboard/app.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@mobrienv/autoloop-core": "*",
+    "@mobrienv/autoloop-harness": "*",
+    "hono": "^4.6.14"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
