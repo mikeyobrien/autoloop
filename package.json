@@ -10,9 +10,7 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./cli": {
-      "default": "./dist/main.js"
-    }
+    "./package.json": "./package.json"
   },
   "bin": {
     "autoloop": "bin/autoloop"

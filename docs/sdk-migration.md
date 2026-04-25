@@ -154,8 +154,8 @@ root `src/`.
 | 2.3 | ✅ | `759b8f7` core: domain models (agent-map, tasks, memory, profiles) |
 | 2.4 | ✅ | `eaa1728` core: registry + config-fs + isolation |
 | 2.5 | ✅ | `6630bed` extract `packages/harness` |
-| 2.6 | ⬜ | extract `packages/cli` (keeps `@mobrienv/autoloop`) |
-| 2.7 | ⬜ | `resolveBundleRoot` via `require.resolve` |
+| 2.6 | ✅ | `c2f1a7a` extract `packages/cli` (keeps `@mobrienv/autoloop`) |
+| 2.7 | ✅ | `resolveBundleRoot` via `require.resolve` |
 | 2.8 | ⬜ | per-package coverage gate (core/harness → 90/90) → publish `0.6.0` |
 | 3.1 | ⬜ | `packages/presets` (data-only) |
 | 3.2 | ⬜ | `packages/backends` |

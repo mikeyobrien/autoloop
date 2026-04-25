@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
 import * as harness from "@mobrienv/autoloop-harness";
 import { cliPrintEvent } from "./cli/event-printer.js";
 import { dispatchChain } from "./commands/chain.js";
@@ -150,18 +150,25 @@ function selfCommand(argv: string[]): string {
 function resolveBundleRoot(argv: string[]): string {
   const envRoot = process.env.AUTOLOOPS_BUNDLE_ROOT;
   if (envRoot) return envRoot;
-  // Resolve relative to this file — works for both source and npm-installed binary
-  const thisFile = fileURLToPath(import.meta.url);
-  const candidate = resolve(thisFile, "../..");
-  if (existsSync(join(candidate, "presets"))) return candidate;
-  // Fallback: try argv[1] heuristic (works when running from source via bin/)
-  const scriptPath = argv[1] ?? "";
-  if (scriptPath) {
-    const scriptDir = resolve(scriptPath, "..");
-    const argvCandidate = resolve(scriptDir, "..");
-    if (existsSync(join(argvCandidate, "presets"))) return argvCandidate;
+  // Locate the @mobrienv/autoloop package root via node resolution. This
+  // works in every topology: source checkout (workspace symlink), published
+  // install under node_modules, global install, etc. The presets/ dir ships
+  // inside that package.
+  const require = createRequire(import.meta.url);
+  try {
+    const pkgPath = require.resolve("@mobrienv/autoloop/package.json");
+    return dirname(pkgPath);
+  } catch {
+    // Fallback: argv[1] heuristic for unusual invocations where package
+    // resolution fails (e.g. running dist directly out-of-tree).
+    const scriptPath = argv[1] ?? "";
+    if (scriptPath) {
+      const scriptDir = resolve(scriptPath, "..");
+      const argvCandidate = resolve(scriptDir, "..");
+      if (existsSync(join(argvCandidate, "presets"))) return argvCandidate;
+    }
+    return ".";
   }
-  return ".";
 }
 
 main().catch((err) => {
