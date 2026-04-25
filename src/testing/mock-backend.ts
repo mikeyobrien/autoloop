@@ -12,8 +12,7 @@
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 interface Fixture {
   output: string;
@@ -53,9 +52,8 @@ function loadFixture(): Fixture {
 }
 
 function emitEvent(event: string, payload: string): void {
-  const currentFile = fileURLToPath(import.meta.url);
-  const distDir = dirname(dirname(currentFile));
-  const mainEntry = resolve(distDir, "main.js");
+  const require = createRequire(import.meta.url);
+  const mainEntry = require.resolve("@mobrienv/autoloop-cli");
 
   try {
     execFileSync(process.execPath, [mainEntry, "emit", event, payload], {

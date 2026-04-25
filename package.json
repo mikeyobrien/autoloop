@@ -64,7 +64,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build -w @mobrienv/autoloop-core && npm run build -w @mobrienv/autoloop-harness && npm run build -w @mobrienv/autoloop-cli && tsc",
     "lint": "biome check src/ test/",
     "lint:fix": "biome check --write src/ test/",
     "format": "biome format src/ test/",
