@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 export const ROOT = resolve(import.meta.dirname, "../..");
-export const DIST_ENTRY = resolve(ROOT, "dist/main.js");
+export const DIST_ENTRY = resolve(ROOT, "packages/cli/dist/main.js");
 export const MOCK_BACKEND = resolve(ROOT, "dist/testing/mock-backend.js");
 export const FIXTURES_DIR = resolve(ROOT, "test/fixtures/backend");
 export const PRESET_FIXTURE_DIR = resolve(
