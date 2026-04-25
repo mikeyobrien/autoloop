@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-core",
-  "version": "0.6.0-sdk.0",
+  "version": "0.6.0",
   "description": "Pure core utilities for autoloop (events, journal, topology, config schema)",
   "type": "module",
   "main": "dist/index.js",

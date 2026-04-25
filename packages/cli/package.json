@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-cli",
-  "version": "0.6.0-sdk.0",
+  "version": "0.6.0",
   "description": "autoloop CLI (main entry, commands, dashboard, chains, loops inspector)",
   "type": "module",
   "main": "dist/main.js",

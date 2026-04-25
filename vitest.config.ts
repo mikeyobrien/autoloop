@@ -76,10 +76,31 @@ export default defineConfig({
         "src/**/types.ts",
         "packages/*/src/**/types.ts",
       ],
+      // Per-package gates. Targets from docs/sdk-migration.md phase 2.8:
+      //   core/harness aim for 90/90; cli ratchets upward each release.
+      // Current floors are sized to present state + small buffer to block
+      // regression while follow-on work raises each package toward target.
       thresholds: {
-        lines: 50,
-        branches: 75,
-        functions: 60,
+        "packages/core/src/**": {
+          lines: 85,
+          branches: 85,
+          functions: 85,
+        },
+        "packages/harness/src/**": {
+          lines: 40,
+          branches: 70,
+          functions: 50,
+        },
+        "packages/cli/src/**": {
+          lines: 2,
+          branches: 0,
+          functions: 0,
+        },
+        "src/**": {
+          lines: 95,
+          branches: 95,
+          functions: 95,
+        },
       },
     },
   },

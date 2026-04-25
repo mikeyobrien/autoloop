@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-harness",
-  "version": "0.6.0-sdk.0",
+  "version": "0.6.0",
   "description": "autoloop harness runtime (iteration loop, metareview, wave orchestration, backend drivers)",
   "type": "module",
   "main": "dist/index.js",
