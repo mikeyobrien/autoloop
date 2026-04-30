@@ -49,6 +49,7 @@
     "@hono/node-server": "^1.13.7",
     "@mobrienv/autoloop-core": "*",
     "@mobrienv/autoloop-harness": "*",
+    "@mobrienv/autoloop-presets": "*",
     "hono": "^4.6.14"
   },
   "scripts": {

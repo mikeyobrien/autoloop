@@ -6,6 +6,7 @@
  *   import * as journal from "@mobrienv/autoloop-core/journal";
  */
 
+export * from "./bundled-presets.js";
 export * from "./color.js";
 export * from "./events/decode.js";
 export * from "./events/encode.js";

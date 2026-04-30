@@ -5,6 +5,7 @@
 
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
+import { bundledPresetsRoot } from "./bundled-presets.js";
 import { userPresetsDir } from "./config.js";
 
 /** Normalize a backend command path to a short label (claude/pi/kiro/...). */
@@ -38,5 +39,10 @@ export function resolvePresetDir(name: string, projectDir: string): string {
   if (existsSync(cwdCandidate)) return cwdCandidate;
   const userCandidate = join(userPresetsDir(), name);
   if (existsSync(userCandidate)) return userCandidate;
+  const bundledRoot = bundledPresetsRoot();
+  if (bundledRoot) {
+    const bundledCandidate = join(bundledRoot, name);
+    if (existsSync(bundledCandidate)) return bundledCandidate;
+  }
   return name;
 }

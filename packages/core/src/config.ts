@@ -19,6 +19,7 @@ import {
   recordProvenance,
   stringifyValues,
 } from "@mobrienv/autoloop-core/config-schema";
+import { bundledPresetsRoot } from "./bundled-presets.js";
 
 export type {
   Config,
@@ -209,6 +210,11 @@ function resolveBundledPresetDir(name: string, bundleRoot: string): string {
   if (projectHasConfig(cwdCandidate)) return cwdCandidate;
   const userCandidate = join(userPresetsDir(), name);
   if (projectHasConfig(userCandidate)) return userCandidate;
+  const bundledRoot = bundledPresetsRoot();
+  if (bundledRoot) {
+    const bundledCandidate = join(bundledRoot, name);
+    if (projectHasConfig(bundledCandidate)) return bundledCandidate;
+  }
   return "";
 }
 

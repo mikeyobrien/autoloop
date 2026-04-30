@@ -150,24 +150,32 @@ function selfCommand(argv: string[]): string {
 function resolveBundleRoot(argv: string[]): string {
   const envRoot = process.env.AUTOLOOPS_BUNDLE_ROOT;
   if (envRoot) return envRoot;
-  // Locate the @mobrienv/autoloop package root via node resolution. This
-  // works in every topology: source checkout (workspace symlink), published
-  // install under node_modules, global install, etc. The presets/ dir ships
-  // inside that package.
+  // Locate the @mobrienv/autoloop-presets package root via node resolution.
+  // This works in every topology: source checkout (workspace symlink),
+  // published install under node_modules, global install, etc. The
+  // presets/ dir ships inside that package; bundleRoot is its parent so
+  // downstream `join(bundleRoot, "presets/<name>")` still resolves.
   const require = createRequire(import.meta.url);
   try {
-    const pkgPath = require.resolve("@mobrienv/autoloop/package.json");
+    const pkgPath = require.resolve("@mobrienv/autoloop-presets/package.json");
     return dirname(pkgPath);
   } catch {
-    // Fallback: argv[1] heuristic for unusual invocations where package
-    // resolution fails (e.g. running dist directly out-of-tree).
-    const scriptPath = argv[1] ?? "";
-    if (scriptPath) {
-      const scriptDir = resolve(scriptPath, "..");
-      const argvCandidate = resolve(scriptDir, "..");
-      if (existsSync(join(argvCandidate, "presets"))) return argvCandidate;
+    // Back-compat: older installs bundled presets directly inside the
+    // @mobrienv/autoloop package root.
+    try {
+      const pkgPath = require.resolve("@mobrienv/autoloop/package.json");
+      return dirname(pkgPath);
+    } catch {
+      // Last-resort argv[1] heuristic for unusual invocations where package
+      // resolution fails (e.g. running dist directly out-of-tree).
+      const scriptPath = argv[1] ?? "";
+      if (scriptPath) {
+        const scriptDir = resolve(scriptPath, "..");
+        const argvCandidate = resolve(scriptDir, "..");
+        if (existsSync(join(argvCandidate, "presets"))) return argvCandidate;
+      }
+      return ".";
     }
-    return ".";
   }
 }
 

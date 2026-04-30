@@ -180,7 +180,10 @@ describe("listKnownPresets — symlinks in user presets dir", () => {
     const tmp = mkdtempSync(join(tmpdir(), "autoloop-presets-"));
     const userPresets = join(tmp, "autoloop", "presets");
     mkdirSync(userPresets, { recursive: true });
-    const target = resolve(import.meta.dirname, "../../../../presets/autocode");
+    const target = resolve(
+      import.meta.dirname,
+      "../../../presets/presets/autocode",
+    );
     symlinkSync(target, join(userPresets, "linked-preset"), "dir");
 
     const prev = process.env.XDG_CONFIG_HOME;
