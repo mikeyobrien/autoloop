@@ -1,8 +1,8 @@
 import {
   buildBackendShellCommand,
   normalizeProviderKind,
-} from "@mobrienv/autoloop-harness/backend";
-import { runShellCommand } from "@mobrienv/autoloop-harness/backend/run-command";
+} from "@mobrienv/autoloop-backends";
+import { runShellCommand } from "@mobrienv/autoloop-backends/run-command";
 import { describe, expect, it } from "vitest";
 
 describe("backend runner", () => {
@@ -18,9 +18,7 @@ describe("backend runner", () => {
 
   it("builds command backend shell invocation", () => {
     const command = buildBackendShellCommand({
-      loop: {
-        paths: { stateDir: "/tmp/state", piAdapterPath: "/tmp/pi-adapter" },
-      } as any,
+      paths: { stateDir: "/tmp/state", piAdapterPath: "/tmp/pi-adapter" },
       spec: { kind: "command", command: "echo", args: [], promptMode: "arg" },
       prompt: "hello",
       runtimeEnv: "export X=1\n",

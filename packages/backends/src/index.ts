@@ -1,20 +1,34 @@
 import { join } from "node:path";
-import { normalizeBackendLabel, shellQuote } from "@mobrienv/autoloop-core";
+import {
+  normalizeBackendLabel,
+  shellQuote,
+  shellWords,
+} from "@mobrienv/autoloop-core";
 import { buildCommandInvocation, runShellCommand } from "./run-command.js";
-import { mockBackend } from "./run-mock.js";
-import { buildPiAdapterInvocation } from "./run-pi.js";
 import type { BackendCommandContext, BackendRunResult } from "./types.js";
 
 export type {
   BackendCommandContext,
+  BackendPaths,
   BackendRunResult,
   BackendSpec,
 } from "./types.js";
 
 export { normalizeBackendLabel };
 
+/**
+ * A "mock" backend is any invocation whose command or argv mentions
+ * `mock-backend` — used by tests to stub out real provider calls without
+ * gating on kind. Intentionally a loose string match so test fixtures
+ * can invoke `node path/to/mock-backend.js` directly.
+ */
+function isMockInvocation(command: string, args: string[]): boolean {
+  if (command.includes("mock-backend")) return true;
+  return args.some((arg) => arg.includes("mock-backend"));
+}
+
 export function buildBackendShellCommand(ctx: BackendCommandContext): string {
-  const promptPath = join(ctx.loop.paths.stateDir, "active-prompt.md");
+  const promptPath = join(ctx.paths.stateDir, "active-prompt.md");
   const envLines = promptRuntimeEnvLines(
     ctx.spec,
     ctx.prompt,
@@ -23,7 +37,11 @@ export function buildBackendShellCommand(ctx: BackendCommandContext): string {
   );
   const childCommand =
     ctx.spec.kind === "pi"
-      ? buildPiAdapterInvocation(ctx.loop, ctx.spec)
+      ? shellWords([
+          ctx.paths.piAdapterPath,
+          ctx.spec.command,
+          ...ctx.spec.args,
+        ])
       : buildCommandInvocation(ctx.spec, ctx.prompt);
   return envLines + wrapProcessInvocation(childCommand);
 }
@@ -43,7 +61,7 @@ export function normalizeProviderKind(spec: {
 }): string {
   if (spec.kind === "pi") return "pi";
   if (spec.kind === "kiro") return "kiro";
-  if (mockBackend(spec.command, spec.args)) return "mock";
+  if (isMockInvocation(spec.command, spec.args)) return "mock";
   return spec.kind || "command";
 }
 

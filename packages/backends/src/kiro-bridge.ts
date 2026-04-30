@@ -1,17 +1,26 @@
 /**
  * Synchronous bridge to the kiro ACP worker thread.
- * Uses SharedArrayBuffer + Atomics to block the main thread
- * while the worker processes async ACP operations.
+ * Uses SharedArrayBuffer + Atomics to block the main thread while the worker
+ * processes async ACP operations.
+ *
+ * Protocol + state constants live in kiro-ipc.ts.
  */
 
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import type { AcpClientOptions } from "./acp-client.js";
+import {
+  DATA_BUFFER_SIZE,
+  POLL_INTERVAL_MS,
+  readMessage,
+  STATE_CMD_PENDING,
+  STATE_IDLE,
+  STATE_RESULT_READY,
+  STATE_SHUTDOWN,
+  writeMessage,
+} from "./kiro-ipc.js";
 import type { BackendRunResult } from "./types.js";
-
-const DATA_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB for prompt/response data
-const POLL_INTERVAL_MS = 500;
 
 let interrupted = false;
 /** PID of the detached kiro-cli child process (set after init). */
@@ -37,42 +46,37 @@ export interface KiroSessionHandle {
   dataBuffer: SharedArrayBuffer;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: worker responses are narrow per command — checked by caller
 function sendCommand(handle: KiroSessionHandle, cmd: unknown): any {
   const control = new Int32Array(handle.controlBuffer);
-  const data = new Uint8Array(handle.dataBuffer);
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
 
-  // Write command
-  const json = encoder.encode(JSON.stringify(cmd));
-  new DataView(handle.dataBuffer).setUint32(0, json.length);
-  data.set(json, 4);
+  writeMessage(handle.dataBuffer, cmd);
 
-  // Signal worker
-  Atomics.store(control, 0, 1);
+  Atomics.store(control, 0, STATE_CMD_PENDING);
   Atomics.notify(control, 0);
 
-  // Block until worker signals result (control[0] = 2)
-  // Poll with timeout so SIGINT can interrupt the wait
-  while (Atomics.wait(control, 0, 1, POLL_INTERVAL_MS) === "timed-out") {
+  // Block until worker signals result. Poll with timeout so a signalInterrupt()
+  // call from another handler can unblock us.
+  while (
+    Atomics.wait(control, 0, STATE_CMD_PENDING, POLL_INTERVAL_MS) ===
+    "timed-out"
+  ) {
     if (interrupted) {
       throw new Error("kiro bridge interrupted by signal");
     }
   }
 
-  // Read result
-  const len = new DataView(handle.dataBuffer).getUint32(0);
-  const resultJson = decoder.decode(data.slice(4, 4 + len));
-  Atomics.store(control, 0, 0); // reset for next command
-  Atomics.notify(control, 0); // wake worker waiting on Atomics.wait(control, 0, 2)
-  return JSON.parse(resultJson);
+  const result = readMessage(handle.dataBuffer);
+  Atomics.store(control, 0, STATE_IDLE); // reset for next command
+  Atomics.notify(control, 0); // wake worker waiting on Atomics.wait(control, 0, STATE_RESULT_READY)
+  return result;
 }
 
 export function initKiroSession(opts: AcpClientOptions): KiroSessionHandle {
   const controlBuffer = new SharedArrayBuffer(4);
   const dataBuffer = new SharedArrayBuffer(DATA_BUFFER_SIZE);
   const control = new Int32Array(controlBuffer);
-  Atomics.store(control, 0, 0);
+  Atomics.store(control, 0, STATE_IDLE);
 
   const workerPath = join(
     fileURLToPath(import.meta.url),
@@ -135,14 +139,14 @@ export function setKiroSessionMode(
 export function terminateKiroSession(handle: KiroSessionHandle): void {
   sendCommand(handle, { type: "terminate" });
   acpChildPid = undefined;
-  // Drain stderr — worker thread process.stderr.write() calls may still be
-  // in-flight from sessionUpdate callbacks. A brief sync sleep lets them flush
-  // before we kill the worker.
+  // Drain stderr — worker thread process.stderr.write() calls from
+  // sessionUpdate callbacks may still be in-flight. A brief sync sleep
+  // lets them flush before we kill the worker.
   const drain = new Int32Array(new SharedArrayBuffer(4));
   Atomics.wait(drain, 0, 0, 50);
   // Signal shutdown
   const control = new Int32Array(handle.controlBuffer);
-  Atomics.store(control, 0, 3);
+  Atomics.store(control, 0, STATE_SHUTDOWN);
   Atomics.notify(control, 0);
   handle.worker.terminate();
 }

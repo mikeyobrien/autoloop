@@ -1,6 +1,11 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  buildBackendShellCommand,
+  normalizeBackendLabel,
+  runBackendCommand,
+} from "@mobrienv/autoloop-backends";
+import {
   joinCsv,
   jsonBool,
   jsonField,
@@ -15,11 +20,6 @@ import {
   extractField,
   readIfExists,
 } from "@mobrienv/autoloop-core/journal";
-import {
-  buildBackendShellCommand,
-  normalizeBackendLabel,
-  runBackendCommand,
-} from "./backend/index.js";
 import type { IterationContext } from "./prompt.js";
 import type { LoopContext } from "./types.js";
 
@@ -175,7 +175,10 @@ export function buildBackendCommand(
   iter: IterationContext,
 ): string {
   return buildBackendShellCommand({
-    loop,
+    paths: {
+      stateDir: loop.paths.stateDir,
+      piAdapterPath: loop.paths.piAdapterPath,
+    },
     spec: loop.backend,
     prompt: iter.prompt,
     runtimeEnv: runtimeEnvLines(
@@ -195,7 +198,10 @@ export function buildReviewCommand(
   reviewPrompt: string,
 ): string {
   return buildBackendShellCommand({
-    loop,
+    paths: {
+      stateDir: loop.paths.stateDir,
+      piAdapterPath: loop.paths.piAdapterPath,
+    },
     spec: loop.review,
     prompt: reviewPrompt,
     runtimeEnv: runtimeEnvLines(

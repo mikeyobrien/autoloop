@@ -1,5 +1,11 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { AcpClientOptions } from "@mobrienv/autoloop-backends/acp-client";
+import {
+  initKiroSession,
+  signalInterrupt,
+  terminateKiroSession,
+} from "@mobrienv/autoloop-backends/kiro-bridge";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readIfExists } from "@mobrienv/autoloop-core/journal";
 import {
@@ -8,12 +14,6 @@ import {
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "@mobrienv/autoloop-core/worktree";
-import type { AcpClientOptions } from "./backend/acp-client.js";
-import {
-  initKiroSession,
-  signalInterrupt,
-  terminateKiroSession,
-} from "./backend/kiro-bridge.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,

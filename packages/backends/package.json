@@ -1,0 +1,46 @@
+{
+  "name": "@mobrienv/autoloop-backends",
+  "version": "0.6.0",
+  "description": "autoloop backend drivers (ACP/kiro bridge, shell command runner)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./acp-client": {
+      "types": "./dist/acp-client.d.ts",
+      "default": "./dist/acp-client.js"
+    },
+    "./kiro-bridge": {
+      "types": "./dist/kiro-bridge.d.ts",
+      "default": "./dist/kiro-bridge.js"
+    },
+    "./run-command": {
+      "types": "./dist/run-command.d.ts",
+      "default": "./dist/run-command.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.18.0",
+    "@mobrienv/autoloop-core": "*"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

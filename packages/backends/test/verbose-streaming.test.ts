@@ -1,5 +1,5 @@
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
-import { formatStreamingUpdate } from "@mobrienv/autoloop-harness/backend/acp-client";
+import { formatStreamingUpdate } from "@mobrienv/autoloop-backends/acp-client";
 import { describe, expect, it } from "vitest";
 
 function chunk(sessionUpdate: string, text: string): SessionUpdate {

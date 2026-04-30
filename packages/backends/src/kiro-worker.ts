@@ -2,10 +2,13 @@
  * Worker thread that holds a persistent ACP session.
  * Communicates with the main thread via SharedArrayBuffer + Atomics.
  *
- * Protocol:
- *   Main → Worker: write JSON command to dataBuffer, signal controlBuffer[0] = 1
- *   Worker → Main: write JSON result to dataBuffer, signal controlBuffer[0] = 2
- *   Commands: { type: "init", opts } | { type: "prompt", prompt, timeoutMs } | { type: "terminate" }
+ * Protocol lives in kiro-ipc.ts (encode/decode + state constants).
+ *
+ * Commands:
+ *   { type: "init", opts }
+ *   { type: "prompt", prompt, timeoutMs }
+ *   { type: "set_mode", agentName }
+ *   { type: "terminate" }
  */
 import { workerData } from "node:worker_threads";
 import type { AcpSession } from "./acp-client.js";
@@ -14,6 +17,14 @@ import {
   sendAcpPrompt,
   terminateAcpSession,
 } from "./acp-client.js";
+import {
+  readMessage,
+  STATE_CMD_PENDING,
+  STATE_IDLE,
+  STATE_RESULT_READY,
+  STATE_SHUTDOWN,
+  writeMessage,
+} from "./kiro-ipc.js";
 
 const { controlBuffer, dataBuffer, verbose } = workerData as {
   controlBuffer: SharedArrayBuffer;
@@ -22,24 +33,10 @@ const { controlBuffer, dataBuffer, verbose } = workerData as {
 };
 
 const control = new Int32Array(controlBuffer);
-const data = new Uint8Array(dataBuffer);
-const decoder = new TextDecoder();
-const encoder = new TextEncoder();
 
 let session: AcpSession | null = null;
 
-function readCommand(): unknown {
-  const len = new DataView(dataBuffer).getUint32(0);
-  const json = decoder.decode(data.slice(4, 4 + len));
-  return JSON.parse(json);
-}
-
-function writeResult(result: unknown): void {
-  const json = encoder.encode(JSON.stringify(result));
-  new DataView(dataBuffer).setUint32(0, json.length);
-  data.set(json, 4);
-}
-
+// biome-ignore lint/suspicious/noExplicitAny: command payloads are narrow, checked per-type below
 async function handleCommand(cmd: any): Promise<unknown> {
   switch (cmd.type) {
     case "init": {
@@ -82,11 +79,11 @@ async function handleCommand(cmd: any): Promise<unknown> {
 
 (async () => {
   while (true) {
-    // Wait for main thread to signal a command (control[0] = 1)
-    Atomics.wait(control, 0, 0);
-    if (Atomics.load(control, 0) === 3) break; // shutdown signal
+    // Wait for main thread to signal a command (control[0] = STATE_CMD_PENDING)
+    Atomics.wait(control, 0, STATE_IDLE);
+    if (Atomics.load(control, 0) === STATE_SHUTDOWN) break;
 
-    const cmd = readCommand();
+    const cmd = readMessage(dataBuffer);
     let result: unknown;
     try {
       result = await handleCommand(cmd);
@@ -97,12 +94,14 @@ async function handleCommand(cmd: any): Promise<unknown> {
       };
     }
 
-    writeResult(result);
-    Atomics.store(control, 0, 2); // signal result ready
+    writeMessage(dataBuffer, result);
+    Atomics.store(control, 0, STATE_RESULT_READY);
     Atomics.notify(control, 0);
 
-    // Wait for main thread to acknowledge (reset to 0) before looping,
-    // otherwise we'd immediately re-enter and read stale data.
-    Atomics.wait(control, 0, 2);
+    // Wait for main thread to ack (reset to IDLE) before looping, else
+    // we'd immediately re-enter and read stale data.
+    Atomics.wait(control, 0, STATE_RESULT_READY);
+    // Bridge wakes us via notify after storing STATE_CMD_PENDING or
+    // STATE_SHUTDOWN; either way the loop-head guard handles it.
   }
 })();

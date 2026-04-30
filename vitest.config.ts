@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config";
 // and vi.mock("../src/foo.js") misses because the module id differs.
 const CORE = resolve(import.meta.dirname, "packages/core/src");
 const HARNESS = resolve(import.meta.dirname, "packages/harness/src");
+const BACKENDS = resolve(import.meta.dirname, "packages/backends/src");
 
 export default defineConfig({
   resolve: {
@@ -33,6 +34,11 @@ export default defineConfig({
       "@mobrienv/autoloop-core/isolation/run-scope": `${CORE}/isolation/run-scope.ts`,
       "@mobrienv/autoloop-core/isolation": `${CORE}/isolation/index.ts`,
       "@mobrienv/autoloop-core": `${CORE}/index.ts`,
+      "@mobrienv/autoloop-backends/acp-client": `${BACKENDS}/acp-client.ts`,
+      "@mobrienv/autoloop-backends/kiro-bridge": `${BACKENDS}/kiro-bridge.ts`,
+      "@mobrienv/autoloop-backends/run-command": `${BACKENDS}/run-command.ts`,
+      "@mobrienv/autoloop-backends/types": `${BACKENDS}/types.ts`,
+      "@mobrienv/autoloop-backends": `${BACKENDS}/index.ts`,
       "@mobrienv/autoloop-harness/backend/acp-client": `${HARNESS}/backend/acp-client.ts`,
       "@mobrienv/autoloop-harness/backend/kiro-bridge": `${HARNESS}/backend/kiro-bridge.ts`,
       "@mobrienv/autoloop-harness/backend/run-command": `${HARNESS}/backend/run-command.ts`,
@@ -90,6 +96,11 @@ export default defineConfig({
           lines: 40,
           branches: 70,
           functions: 50,
+        },
+        "packages/backends/src/**": {
+          lines: 35,
+          branches: 60,
+          functions: 40,
         },
         "packages/cli/src/**": {
           lines: 2,

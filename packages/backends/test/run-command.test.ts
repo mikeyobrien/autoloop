@@ -1,4 +1,4 @@
-import { buildCommandInvocation } from "@mobrienv/autoloop-harness/backend/run-command";
+import { buildCommandInvocation } from "@mobrienv/autoloop-backends/run-command";
 import { describe, expect, it } from "vitest";
 
 describe("buildCommandInvocation", () => {

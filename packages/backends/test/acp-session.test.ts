@@ -2,8 +2,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import {
   initAcpSession,
   terminateAcpSession,
-} from "@mobrienv/autoloop-harness/backend/acp-client";
-import { signalInterrupt } from "@mobrienv/autoloop-harness/backend/kiro-bridge";
+} from "@mobrienv/autoloop-backends/acp-client";
+import { signalInterrupt } from "@mobrienv/autoloop-backends/kiro-bridge";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:child_process", () => {

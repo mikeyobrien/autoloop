@@ -1,4 +1,4 @@
-import { normalizeBackendLabel } from "@mobrienv/autoloop-harness/backend";
+import { normalizeBackendLabel } from "@mobrienv/autoloop-backends";
 import { describe, expect, it } from "vitest";
 
 describe("normalizeBackendLabel", () => {

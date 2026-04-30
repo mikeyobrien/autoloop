@@ -1,3 +1,7 @@
+import {
+  runKiroIterationSync,
+  setKiroSessionMode,
+} from "@mobrienv/autoloop-backends/kiro-bridge";
 import { listText } from "@mobrienv/autoloop-core";
 import {
   extractField,
@@ -5,10 +9,6 @@ import {
   extractTopic,
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
-import {
-  runKiroIterationSync,
-  setKiroSessionMode,
-} from "./backend/kiro-bridge.js";
 import { log } from "./display.js";
 import {
   appendInvalidEvent,

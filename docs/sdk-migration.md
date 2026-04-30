@@ -158,7 +158,7 @@ root `src/`.
 | 2.7 | ✅ | `cf81dbc` `resolveBundleRoot` via `require.resolve` |
 | 2.8 | ✅ | per-package coverage gate (core/harness → 90/90) → publish `0.6.0` |
 | 3.1 | ✅ | extract `packages/presets` (data-only; resolved via `@mobrienv/autoloop-presets`) |
-| 3.2 | ⬜ | `packages/backends` |
+| 3.2 | ✅ | extract `packages/backends` (+ simplify: drop dead `run-kiro.ts`, inline `run-mock`/`run-pi`, shared `kiro-ipc.ts` helpers, decouple `BackendCommandContext` from `LoopContext`) |
 | 3.3 | ⬜ | `packages/dashboard` |
 | 3.4 | ⬜ | release script → publish `0.7.0` |
 | 4.1 | ⬜ | SDK docs |
