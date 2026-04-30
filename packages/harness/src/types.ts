@@ -1,4 +1,4 @@
-import type { KiroSessionHandle } from "@mobrienv/autoloop-backends/kiro-bridge";
+import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LoopEventEmitter } from "./events.js";
@@ -86,7 +86,7 @@ export interface LoopContext {
   launch: LaunchMetadata;
   store: Record<string, unknown>;
   agentMap: AgentMap | null;
-  kiroSession?: KiroSessionHandle;
+  kiroSession?: AcpSession;
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

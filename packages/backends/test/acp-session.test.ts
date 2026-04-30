@@ -3,7 +3,6 @@ import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
-import { signalInterrupt } from "@mobrienv/autoloop-backends/kiro-bridge";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:child_process", () => {

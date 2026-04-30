@@ -4,6 +4,7 @@ import {
   shellQuote,
   shellWords,
 } from "@mobrienv/autoloop-core";
+import { type AcpSession, sendAcpPrompt } from "./acp-client.js";
 import { buildCommandInvocation, runShellCommand } from "./run-command.js";
 import type { BackendCommandContext, BackendRunResult } from "./types.js";
 
@@ -15,6 +16,33 @@ export type {
 } from "./types.js";
 
 export { normalizeBackendLabel };
+
+/**
+ * Drive one iteration against a live ACP session and map the result into the
+ * uniform BackendRunResult shape the harness consumes for every backend kind.
+ *
+ * This is the async-native kiro path — it replaces the former sync bridge
+ * (worker thread + SharedArrayBuffer) now that the harness iteration loop
+ * itself is async.
+ */
+export async function runKiroIteration(
+  session: AcpSession,
+  prompt: string,
+  timeoutMs: number,
+): Promise<BackendRunResult> {
+  const result = await sendAcpPrompt(session, prompt, timeoutMs);
+  return {
+    output: result.output,
+    exitCode: result.error ? 1 : 0,
+    timedOut: result.timedOut,
+    providerKind: "kiro",
+    errorCategory: result.timedOut
+      ? "timeout"
+      : result.error
+        ? "non_zero_exit"
+        : "none",
+  };
+}
 
 /**
  * A "mock" backend is any invocation whose command or argv mentions

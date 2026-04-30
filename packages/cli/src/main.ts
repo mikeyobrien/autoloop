@@ -69,7 +69,12 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
       dispatchPiAdapter(args.slice(1));
       return;
     case "branch-run":
-      harness.runParallelBranchCli(args[1], args[2], selfCmd, cliPrintEvent);
+      await harness.runParallelBranchCli(
+        args[1],
+        args[2],
+        selfCmd,
+        cliPrintEvent,
+      );
       return;
     case "memory":
       dispatchMemory(args.slice(1));

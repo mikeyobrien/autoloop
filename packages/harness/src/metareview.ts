@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runKiroIterationSync } from "@mobrienv/autoloop-backends/kiro-bridge";
+import { runKiroIteration } from "@mobrienv/autoloop-backends";
 import { jsonBool, jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
 import { appendEvent, readRunLines } from "@mobrienv/autoloop-core/journal";
 import { reloadLoop } from "./config-helpers.js";
@@ -43,12 +43,12 @@ export function parseVerdict(output: string): Verdict {
   }
 }
 
-export function maybeRunMetareview(
+export async function maybeRunMetareview(
   loop: LoopContext,
   iteration: number,
-): LoopContext {
+): Promise<LoopContext> {
   if (shouldRunMetareview(loop, iteration)) {
-    const verdict = runMetareviewReview(loop, iteration);
+    const verdict = await runMetareviewReview(loop, iteration);
     const reloaded = reloadLoop(loop);
     reloaded.kiroSession = loop.kiroSession;
     reloaded.lastVerdict = verdict;
@@ -66,10 +66,10 @@ export function shouldRunMetareview(
   return iteration > 1 && (iteration - 1) % loop.review.every === 0;
 }
 
-export function runMetareviewReview(
+export async function runMetareviewReview(
   loop: LoopContext,
   iteration: number,
-): Verdict {
+): Promise<Verdict> {
   loop.onEvent?.({ type: "review.banner", iteration });
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
   const reviewPrompt = renderReviewPromptText(loop, iteration, runLines);
@@ -94,7 +94,7 @@ export function runMetareviewReview(
 
   const { output, exitCode, timedOut } =
     loop.review.kind === "kiro" && loop.kiroSession
-      ? runKiroIterationSync(
+      ? await runKiroIteration(
           loop.kiroSession,
           reviewPrompt,
           loop.review.timeoutMs,

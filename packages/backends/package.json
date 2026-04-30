@@ -14,10 +14,6 @@
       "types": "./dist/acp-client.d.ts",
       "default": "./dist/acp-client.js"
     },
-    "./kiro-bridge": {
-      "types": "./dist/kiro-bridge.d.ts",
-      "default": "./dist/kiro-bridge.js"
-    },
     "./run-command": {
       "types": "./dist/run-command.d.ts",
       "default": "./dist/run-command.js"

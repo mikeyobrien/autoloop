@@ -1,11 +1,13 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AcpClientOptions } from "@mobrienv/autoloop-backends/acp-client";
+import type {
+  AcpClientOptions,
+  AcpSession,
+} from "@mobrienv/autoloop-backends/acp-client";
 import {
-  initKiroSession,
-  signalInterrupt,
-  terminateKiroSession,
-} from "@mobrienv/autoloop-backends/kiro-bridge";
+  initAcpSession,
+  terminateAcpSession,
+} from "@mobrienv/autoloop-backends/acp-client";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readIfExists } from "@mobrienv/autoloop-core/journal";
 import {
@@ -68,14 +70,14 @@ export async function run(
   const teardown = () => {
     if (aborted) return;
     aborted = true;
-    signalInterrupt();
-    try {
-      if (loop.kiroSession) {
-        terminateKiroSession(loop.kiroSession);
-        loop.kiroSession = undefined;
-      }
-    } catch {
-      /* best-effort */
+    // Fire-and-forget ACP termination — abort handlers must stay sync.
+    // The finally block below awaits a final terminate as backstop.
+    if (loop.kiroSession) {
+      const session = loop.kiroSession;
+      loop.kiroSession = undefined;
+      terminateAcpSession(session).catch(() => {
+        /* best-effort */
+      });
     }
     try {
       registryStop(loop, currentIteration, "interrupted");
@@ -126,11 +128,14 @@ export async function run(
       modelId: (loop.store.kiro_model as string) || undefined,
       verbose: loop.runtime.logLevel === "debug",
     };
-    loop.kiroSession = initKiroSession(acpOpts);
+    loop.kiroSession = await initAcpSession(acpOpts);
   }
 
   let summary: RunSummary;
-  const trackedIterate = (ctx: LoopContext, iter: number): RunSummary => {
+  const trackedIterate = async (
+    ctx: LoopContext,
+    iter: number,
+  ): Promise<RunSummary> => {
     if (aborted)
       return {
         iterations: iter - 1,
@@ -147,10 +152,14 @@ export async function run(
     return iterateWith(ctx, iter, trackedIterate);
   };
   try {
-    summary = trackedIterate(loop, 1);
+    summary = await trackedIterate(loop, 1);
   } finally {
     if (loop.kiroSession) {
-      terminateKiroSession(loop.kiroSession);
+      try {
+        await terminateAcpSession(loop.kiroSession);
+      } catch {
+        /* best-effort */
+      }
     }
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
@@ -245,12 +254,12 @@ export async function run(
 
 export { emitCmd as emit };
 
-export function runParallelBranchCli(
+export async function runParallelBranchCli(
   projectDir: string,
   branchDir: string,
   selfCommand: string,
   onEvent?: (event: import("./events.js").LoopEvent) => void,
-): void {
+): Promise<void> {
   const launch = loadParallelBranchLaunch(branchDir);
   const branchPrompt = launch.prompt;
   const routingEvent = launch.routingEvent || "loop.start";
@@ -273,7 +282,7 @@ export function runParallelBranchCli(
 
   const seeded = seedBranchContext(branchLoop, routingEvent);
   const startMs = Date.now();
-  const summary = iterate(seeded, 1);
+  const summary = await iterate(seeded, 1);
   const finishedMs = Date.now();
   const elapsedMs = finishedMs - startMs;
   const output = iterationFieldForRun(
@@ -311,12 +320,20 @@ export function runParallelBranchCli(
 function iterateWith(
   loop: LoopContext,
   iteration: number,
-  recurse: (loop: LoopContext, iteration: number) => RunSummary,
-): RunSummary {
+  recurse: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+): Promise<RunSummary> {
   const liveLoop = reloadLoop(loop);
   liveLoop.kiroSession = loop.kiroSession;
   installRuntimeTools(liveLoop);
-  const reviewed = maybeRunMetareview(liveLoop, iteration);
+  return runReviewThenIterate(liveLoop, iteration, recurse);
+}
+
+async function runReviewThenIterate(
+  liveLoop: LoopContext,
+  iteration: number,
+  recurse: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+): Promise<RunSummary> {
+  const reviewed = await maybeRunMetareview(liveLoop, iteration);
   const verdict = reviewed.lastVerdict;
 
   if (verdict) {
@@ -343,6 +360,6 @@ function iterateWith(
   return runIteration(reviewed, iteration, recurse);
 }
 
-function iterate(loop: LoopContext, iteration: number): RunSummary {
+function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
   return iterateWith(loop, iteration, iterate);
 }

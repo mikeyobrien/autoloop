@@ -1,7 +1,4 @@
-import {
-  runKiroIterationSync,
-  setKiroSessionMode,
-} from "@mobrienv/autoloop-backends/kiro-bridge";
+import { runKiroIteration } from "@mobrienv/autoloop-backends";
 import { listText } from "@mobrienv/autoloop-core";
 import {
   extractField,
@@ -35,11 +32,11 @@ import {
   stopAfterParallelWave,
 } from "./wave.js";
 
-export function runIteration(
+export async function runIteration(
   loop: LoopContext,
   iteration: number,
-  iterate: (loop: LoopContext, iteration: number) => RunSummary,
-): RunSummary {
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+): Promise<RunSummary> {
   const iter = buildIterationContext(loop, iteration);
   loop.onEvent?.({
     type: "iteration.banner",
@@ -57,19 +54,29 @@ export function runIteration(
 
   const startEpoch = Math.floor(Date.now() / 1000);
 
-  // Switch Kiro session agent mode per-role if agents.toml provides a mapping
+  // Switch Kiro session agent mode per-role if agents.toml provides a mapping.
+  // Failure is non-fatal — the role just runs with the default agent.
   if (iter.roleAgent && loop.backend.kind === "kiro" && loop.kiroSession) {
     log(
       loop,
       "debug",
       `switching kiro agent to "${iter.roleAgent}" for role "${iter.allowedRoles[0]}"`,
     );
-    setKiroSessionMode(loop.kiroSession, iter.roleAgent);
+    try {
+      await loop.kiroSession.connection.setSessionMode({
+        sessionId: loop.kiroSession.sessionId,
+        modeId: iter.roleAgent,
+      });
+    } catch (err: unknown) {
+      process.stderr.write(
+        `[autoloop] warning: failed to set kiro agent mode "${iter.roleAgent}": ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
   }
 
   const { output, exitCode, timedOut } =
     loop.backend.kind === "kiro" && loop.kiroSession
-      ? runKiroIterationSync(
+      ? await runKiroIteration(
           loop.kiroSession,
           iter.prompt,
           loop.backend.timeoutMs,
@@ -97,12 +104,12 @@ export function runIteration(
   return finishIteration(loop, iter, output, iterate);
 }
 
-export function finishIteration(
+export async function finishIteration(
   loop: LoopContext,
   iter: IterationContext,
   output: string,
-  iterate: (loop: LoopContext, iteration: number) => RunSummary,
-): RunSummary {
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+): Promise<RunSummary> {
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
   const allTopics = runLines.map(extractTopic).filter((t) => t !== "");
   const turnLines = runLines.filter(
@@ -175,9 +182,9 @@ function rejectInvalidAndContinue(
   loop: LoopContext,
   iter: IterationContext,
   emittedTopic: string,
-  iterate: (loop: LoopContext, iteration: number) => RunSummary,
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
   progress: (topic: string, outcome: string) => void,
-): RunSummary {
+): Promise<RunSummary> {
   appendInvalidEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
@@ -201,9 +208,9 @@ function finishParallelIteration(
   iter: IterationContext,
   emittedTopic: string,
   emittedPayload: string,
-  iterate: (loop: LoopContext, iteration: number) => RunSummary,
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
   progress: (topic: string, outcome: string) => void,
-): RunSummary {
+): Promise<RunSummary> {
   const result = executeParallelWave(loop, iter, emittedTopic, emittedPayload);
 
   if (result.reason === "parallel_wave_complete") {
