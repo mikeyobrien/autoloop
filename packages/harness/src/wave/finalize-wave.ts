@@ -56,14 +56,14 @@ function branchSuccessStatus(status: string): boolean {
   );
 }
 
-export function continueAfterParallelJoin(
+export async function continueAfterParallelJoin(
   loop: LoopContext,
   iter: IterationContext,
   waveId: string,
   emittedTopic: string,
   totalElapsedMs: number,
   iterateFn: IterateFn,
-): RunSummary {
+): Promise<RunSummary> {
   const joinedTopic = parallelJoinedTopic(emittedTopic);
   appendWaveJoinFinish(
     loop,

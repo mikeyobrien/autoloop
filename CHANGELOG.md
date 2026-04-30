@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.7.0] - 2026-04-30
+### Phase 3 of the SDK migration: specialty packages
+- **New workspace packages** (alongside existing `core`, `harness`, `cli`):
+  - `@mobrienv/autoloop-presets` — data-only bundle of the 16 shipped preset definitions, resolved via `require.resolve`.
+  - `@mobrienv/autoloop-backends` — shell + ACP/kiro backend drivers, decoupled from harness via a minimal `BackendPaths` surface.
+  - `@mobrienv/autoloop-dashboard` — Hono-based read-only runs dashboard, consumed by the CLI via dependency injection (`listPresets`).
+- **Async-native kiro path**: the iteration loop became async end-to-end, replacing the sync bridge (Worker thread + SharedArrayBuffer + Atomics). Deleted `kiro-bridge.ts`, `kiro-worker.ts`, and `kiro-ipc.ts` from the backends package (-251 LOC). ACP sessions are now driven directly via `sendAcpPrompt`.
+- **Core additions**: `@mobrienv/autoloop-core/runs-health` (`categorizeRuns`, `policyForPreset`, `HealthResult`) and `bundled-presets.ts` (`bundledPresetsRoot`) moved in to keep the dashboard / CLI split clean.
+- **Release tooling**: new `bin/release <version>` script bumps all workspaces in one pass (versions + cross-workspace dep pins + plugin.json). `npm run build` now builds all workspaces, then root. `publish-npm.yml` publishes `packages/*` first, then the root package.
+
+### Breaking
+- `@mobrienv/autoloop-harness` no longer exposes `./backend/*` subpath exports. Import backend helpers from `@mobrienv/autoloop-backends` instead.
+- `KiroSessionHandle` (the worker-thread handle) is replaced by `AcpSession` on `LoopContext.kiroSession`.
+- `setKiroSessionMode` / `signalInterrupt` / `initKiroSession` / `terminateKiroSession` are removed — use `acp-client` primitives directly.
+
+## [0.6.0] - 2026-04-25
+### SDK migration — phase 2: npm workspaces + core/harness/cli split
+- Enabled npm workspaces; extracted `@mobrienv/autoloop-core`, `@mobrienv/autoloop-harness`, and `@mobrienv/autoloop-cli`.
+- Per-package coverage gates; per-package `tsc` builds; `resolveBundleRoot` now uses `require.resolve`.
+
+## [0.5.0] - 2026-04-18
+### SDK migration — phase 1: decouple in place
+- `run()` is now async and embed-able; SDK consumers get a `LoopEvent` stream via `onEvent` with zero stdio leakage.
+- `emit.ts` returns an `EmitResult` instead of mutating `process.exitCode`.
+- `RunOptions.signal` (`AbortSignal`) threaded through the loop; CLI owns SIGINT/SIGTERM handling.
+- Split `config.ts` into a pure schema + a filesystem/env layer.
+- Harness no longer writes to `console.*`; the CLI owns all terminal output.
+- Public entry at `src/index.ts` + `exports` map; published `0.5.0-sdk.0` during the checkpoint sequence.
+
 ## [0.4.0] - 2026-04-10
 ### Added
 - **Inspect explorer**: richer journal timeline, artifact summaries, and dashboard explorer views for digging into completed runs.

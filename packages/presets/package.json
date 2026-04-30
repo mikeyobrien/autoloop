@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-presets",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Bundled preset definitions (data-only) for autoloop",
   "type": "module",
   "exports": {
@@ -11,6 +11,9 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "scripts": {
+    "build": "echo 'autoloop-presets is data-only, nothing to build' >&2"
   },
   "publishConfig": {
     "access": "public"

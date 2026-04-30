@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+// bin/release — bump the workspace to a new version in one pass.
+//
+// For every package.json under the repo root + packages/*, set `version`
+// to the new value. Then, in every package, rewrite any dep that points
+// at a sibling workspace (by name) from its wildcard `*` or previous
+// version to the new version string.
+//
+// Also bumps plugins/autoloop/.claude-plugin/plugin.json so the Claude
+// plugin version stays in lock-step (matches the pre-existing root
+// `scripts.version` hook).
+//
+// Finally runs `npm install` to refresh lockfile, then `npm run check`
+// to catch any regressions before you tag/push.
+//
+// Usage:
+//   bin/release 0.7.0
+//
+// The script does NOT create a git commit, tag, or push. That is left to
+// the operator so release notes / CHANGELOG edits can be made in the
+// same commit.
+
+import { execFileSync, execSync } from "node:child_process";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(here, "..");
+
+function readJson(path) {
+  return JSON.parse(readFileSync(path, "utf-8"));
+}
+
+function writeJson(path, obj) {
+  writeFileSync(path, `${JSON.stringify(obj, null, 2)}\n`, "utf-8");
+}
+
+function isSemver(v) {
+  // Permissive semver check: MAJOR.MINOR.PATCH with optional -pre.n or +build
+  return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(v);
+}
+
+const newVersion = process.argv[2];
+if (!newVersion) {
+  console.error("usage: bin/release <version>");
+  process.exit(1);
+}
+if (!isSemver(newVersion)) {
+  console.error(`error: "${newVersion}" is not a valid semver string`);
+  process.exit(1);
+}
+
+// Collect all package.json paths: root + packages/*.
+const packagesDir = join(ROOT, "packages");
+const packagePaths = [join(ROOT, "package.json")];
+for (const entry of readdirSync(packagesDir)) {
+  const full = join(packagesDir, entry);
+  if (!statSync(full).isDirectory()) continue;
+  const pkg = join(full, "package.json");
+  try {
+    statSync(pkg);
+    packagePaths.push(pkg);
+  } catch {
+    /* no package.json in this dir — skip */
+  }
+}
+
+// Figure out which dep names are workspace-local (we own them).
+const workspaceNames = new Set();
+for (const path of packagePaths) {
+  const pkg = readJson(path);
+  if (pkg.name) workspaceNames.add(pkg.name);
+}
+
+// Bump versions and pin cross-workspace deps in one pass.
+for (const path of packagePaths) {
+  const pkg = readJson(path);
+  pkg.version = newVersion;
+  for (const depKind of [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+  ]) {
+    if (!pkg[depKind]) continue;
+    for (const name of Object.keys(pkg[depKind])) {
+      if (workspaceNames.has(name)) {
+        pkg[depKind][name] = newVersion;
+      }
+    }
+  }
+  writeJson(path, pkg);
+  console.log(`  ✓ ${path.slice(ROOT.length + 1)} → ${newVersion}`);
+}
+
+// Keep plugins/autoloop/.claude-plugin/plugin.json in sync (pre-existing
+// root `scripts.version` hook does this on `npm version`; we replicate
+// here so callers don't have to go through `npm version`).
+const pluginPath = join(
+  ROOT,
+  "plugins",
+  "autoloop",
+  ".claude-plugin",
+  "plugin.json",
+);
+try {
+  const plugin = readJson(pluginPath);
+  plugin.version = newVersion;
+  writeJson(pluginPath, plugin);
+  console.log(`  ✓ plugins/autoloop/.claude-plugin/plugin.json → ${newVersion}`);
+} catch {
+  /* plugin file missing — skip */
+}
+
+console.log("\nrefreshing lockfile via `npm install`...");
+execSync("npm install --no-audit --no-fund", { cwd: ROOT, stdio: "inherit" });
+
+console.log("\nrunning full check gate...");
+execSync("npm run check", { cwd: ROOT, stdio: "inherit" });
+
+console.log(`\n✓ workspace bumped to ${newVersion}. Next:`);
+console.log("  1. Update CHANGELOG.md with the new release section");
+console.log(`  2. git commit -am "release: v${newVersion}"`);
+console.log(`  3. git tag -a v${newVersion} -m "v${newVersion}"`);
+console.log("  4. git push origin main --follow-tags");

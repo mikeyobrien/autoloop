@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "autoloop CLI (main entry, commands, dashboard, chains, loops inspector)",
   "type": "module",
   "main": "dist/main.js",
@@ -43,10 +43,10 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
-    "@mobrienv/autoloop-core": "*",
-    "@mobrienv/autoloop-dashboard": "*",
-    "@mobrienv/autoloop-harness": "*",
-    "@mobrienv/autoloop-presets": "*"
+    "@mobrienv/autoloop-core": "0.7.0",
+    "@mobrienv/autoloop-dashboard": "0.7.0",
+    "@mobrienv/autoloop-harness": "0.7.0",
+    "@mobrienv/autoloop-presets": "0.7.0"
   },
   "scripts": {
     "build": "tsc"

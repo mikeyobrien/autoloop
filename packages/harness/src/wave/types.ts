@@ -45,4 +45,4 @@ export interface ParseResult {
   reason: string;
 }
 
-export type IterateFn = (loop: any, iteration: number) => RunSummary;
+export type IterateFn = (loop: any, iteration: number) => Promise<RunSummary>;

@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-backends",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "autoloop backend drivers (ACP/kiro bridge, shell command runner)",
   "type": "module",
   "main": "dist/index.js",
@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.0",
-    "@mobrienv/autoloop-core": "*"
+    "@mobrienv/autoloop-core": "0.7.0"
   },
   "scripts": {
     "build": "tsc"

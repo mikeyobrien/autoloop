@@ -178,7 +178,7 @@ export async function finishIteration(
   return iterate(loop, iter.iteration + 1);
 }
 
-function rejectInvalidAndContinue(
+async function rejectInvalidAndContinue(
   loop: LoopContext,
   iter: IterationContext,
   emittedTopic: string,
@@ -203,7 +203,7 @@ function rejectInvalidAndContinue(
   return iterate(loop, iter.iteration + 1);
 }
 
-function finishParallelIteration(
+async function finishParallelIteration(
   loop: LoopContext,
   iter: IterationContext,
   emittedTopic: string,

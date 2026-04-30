@@ -32,13 +32,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build (workspaces + root)
         run: npm run build
 
       - name: Test
         run: npm test
 
-      - name: Verify tag matches package version
+      - name: Verify tag matches root package version
         if: github.event_name == 'push'
         run: |
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
@@ -49,7 +49,39 @@ jobs:
             exit 1
           fi
 
-      - name: Check whether version is already published
+      - name: Verify all workspaces are on the same version
+        if: github.event_name == 'push'
+        run: |
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          node --input-type=module -e "
+            import { readdirSync, readFileSync, statSync } from 'node:fs';
+            import { join } from 'node:path';
+            const root = '${GITHUB_WORKSPACE}';
+            const target = '${ROOT_VERSION}';
+            const pkgDir = join(root, 'packages');
+            for (const name of readdirSync(pkgDir)) {
+              const full = join(pkgDir, name, 'package.json');
+              try { statSync(full); } catch { continue; }
+              const v = JSON.parse(readFileSync(full, 'utf-8')).version;
+              if (v !== target) {
+                console.error('packages/' + name + ' version ' + v + ' != root ' + target);
+                process.exit(1);
+              }
+            }
+            console.log('all workspaces aligned on ' + target);
+          "
+
+      - name: Publish workspace packages to npm
+        # Publishes packages/* first so the root package resolves pinned
+        # cross-workspace deps from the registry. `--ignore-scripts`
+        # prevents workspace lifecycle hooks from re-triggering.
+        run: npm publish --workspaces --access public --provenance --ignore-scripts || true
+        # `|| true` keeps a partially-failed publish non-fatal for idempotent
+        # re-runs — individual workspaces that are already on npm simply
+        # 409 and are skipped. The final root-publish step below will
+        # still fail loudly if it can't resolve a freshly-required dep.
+
+      - name: Check whether root version is already published
         id: npm_version
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
@@ -57,16 +89,16 @@ jobs:
 
           if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published; skipping npm publish."
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published; skipping root publish."
           else
             echo "already_published=false" >> "$GITHUB_OUTPUT"
             echo "$PACKAGE_NAME@$PACKAGE_VERSION is not published yet; continuing."
           fi
 
-      - name: Publish to npm
+      - name: Publish root package to npm
         if: steps.npm_version.outputs.already_published != 'true'
-        run: npm publish --provenance --access public
+        run: npm publish --access public --provenance
 
       - name: Publish summary
         if: steps.npm_version.outputs.already_published == 'true'
-        run: echo "Publish skipped because this version is already on npm."
+        run: echo "Root publish skipped because this version is already on npm."

@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Simpler, opinionated loop harness for inspectable long-running agent workflows",
   "type": "module",
   "main": "dist/index.js",
@@ -25,7 +25,12 @@
     "node": ">=18"
   },
   "workspaces": [
-    "packages/*"
+    "packages/core",
+    "packages/presets",
+    "packages/backends",
+    "packages/harness",
+    "packages/dashboard",
+    "packages/cli"
   ],
   "repository": {
     "type": "git",
@@ -48,7 +53,8 @@
     "provenance": true
   },
   "scripts": {
-    "build": "npm run build -w @mobrienv/autoloop-core && npm run build -w @mobrienv/autoloop-harness && npm run build -w @mobrienv/autoloop-cli && tsc",
+    "build": "npm run build --workspaces && tsc",
+    "build:root": "tsc",
     "lint": "biome check src/ test/",
     "lint:fix": "biome check --write src/ test/",
     "format": "biome format src/ test/",
@@ -57,6 +63,7 @@
     "test:coverage": "node --experimental-vm-modules node_modules/.bin/vitest run --coverage",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest",
     "check": "biome check src/ test/ && tsc --noEmit && npm run test:coverage",
+    "release": "node bin/release",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
@@ -81,9 +88,9 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "@mobrienv/autoloop-cli": "*",
-    "@mobrienv/autoloop-core": "*",
-    "@mobrienv/autoloop-harness": "*",
-    "@mobrienv/autoloop-presets": "*"
+    "@mobrienv/autoloop-cli": "0.7.0",
+    "@mobrienv/autoloop-core": "0.7.0",
+    "@mobrienv/autoloop-harness": "0.7.0",
+    "@mobrienv/autoloop-presets": "0.7.0"
   }
 }

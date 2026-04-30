@@ -24,9 +24,12 @@ export function ensureBuild(): void {
   if (buildEnsured && existsSync(DIST_ENTRY) && existsSync(MOCK_BACKEND))
     return;
   if (!existsSync(DIST_ENTRY) || !existsSync(MOCK_BACKEND)) {
-    execFileSync("node", [resolve(ROOT, "node_modules/typescript/bin/tsc")], {
+    // Build every workspace + root so packages/cli/dist/main.js and
+    // dist/testing/mock-backend.js both exist. A plain root `tsc` no
+    // longer suffices — phase 2.6 moved the CLI into its own workspace.
+    execFileSync("npm", ["run", "build"], {
       cwd: ROOT,
-      timeout: 30_000,
+      timeout: 120_000,
     });
   }
   buildEnsured = true;
