@@ -1,18 +1,16 @@
-import { isProcessAlive } from "@mobrienv/autoloop-core";
-import { readMergedRegistry } from "@mobrienv/autoloop-core/registry/discover";
-import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
-import { policyForPreset } from "./policy.js";
+import {
+  categorizeRuns,
+  type HealthResult,
+} from "@mobrienv/autoloop-core/runs-health";
 import { renderListHeader, renderRunLine } from "./render.js";
 
-const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-export interface HealthResult {
-  active: RunRecord[];
-  watching: RunRecord[];
-  stuck: RunRecord[];
-  recentFailed: RunRecord[];
-  recentCompleted: RunRecord[];
-}
+export {
+  categorizeRecords,
+  categorizeRuns,
+  type HealthResult,
+  policyForPreset,
+  type SupervisionPolicy,
+} from "@mobrienv/autoloop-core/runs-health";
 
 /**
  * Produce a health summary string from the registry.
@@ -22,72 +20,6 @@ export interface HealthResult {
 export function healthSummary(stateDir: string, verbose: boolean): string {
   const result = categorizeRuns(stateDir);
   return renderHealth(result, verbose);
-}
-
-export function categorizeRuns(stateDir: string): HealthResult {
-  const all = readMergedRegistry(stateDir);
-  return categorizeRecords(all);
-}
-
-export function categorizeRecords(
-  records: RunRecord[],
-  nowMs: number = Date.now(),
-): HealthResult {
-  const active: RunRecord[] = [];
-  const watching: RunRecord[] = [];
-  const stuck: RunRecord[] = [];
-  const recentFailed: RunRecord[] = [];
-  const recentCompleted: RunRecord[] = [];
-
-  for (const r of records) {
-    if (r.status === "running") {
-      // If PID is recorded and the process is dead, treat as stopped
-      if (r.pid != null && !isProcessAlive(r.pid)) {
-        r.status = "stopped";
-        r.stop_reason = r.stop_reason || "interrupted";
-        // Fall through to non-running classification
-      } else {
-        const elapsed = elapsedMs(r, nowMs);
-        if (elapsed === null) {
-          active.push(r);
-          continue;
-        }
-        const policy = policyForPreset(r.preset);
-        if (elapsed > policy.stuckAfterMs) {
-          stuck.push(r);
-        } else if (elapsed > policy.warningAfterMs) {
-          watching.push(r);
-        } else {
-          active.push(r);
-        }
-        continue;
-      }
-    }
-
-    if (!isRecent(r, nowMs)) continue;
-
-    if (r.status === "failed" || r.status === "timed_out") {
-      recentFailed.push(r);
-    } else if (r.status === "completed") {
-      recentCompleted.push(r);
-    }
-  }
-
-  return { active, watching, stuck, recentFailed, recentCompleted };
-}
-
-function elapsedMs(r: RunRecord, nowMs: number): number | null {
-  if (!r.updated_at) return null;
-  const updatedMs = new Date(r.updated_at).getTime();
-  if (Number.isNaN(updatedMs)) return null;
-  return nowMs - updatedMs;
-}
-
-function isRecent(r: RunRecord, nowMs: number): boolean {
-  if (!r.updated_at) return false;
-  const updatedMs = new Date(r.updated_at).getTime();
-  if (Number.isNaN(updatedMs)) return false;
-  return nowMs - updatedMs <= RECENT_WINDOW_MS;
 }
 
 function renderHealth(h: HealthResult, verbose: boolean): string {

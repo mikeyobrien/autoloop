@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createApp } from "@mobrienv/autoloop-dashboard";
 import { describe, expect, it } from "vitest";
-import { createApp } from "../../src/dashboard/app.js";
 
 function makeTempRegistry(): {
   registryPath: string;
@@ -54,6 +54,7 @@ describe("dashboard /api/runs", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs");
@@ -98,6 +99,7 @@ describe("dashboard /api/runs", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs");
@@ -142,6 +144,7 @@ describe("dashboard /api/runs max_iterations", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs");
@@ -221,6 +224,7 @@ describe("dashboard /api/runs worktree merge enrichment", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     // Test /api/runs enrichment
@@ -285,6 +289,7 @@ describe("dashboard /api/runs worktree merge enrichment", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const detailRes = await app.request(`/api/runs/${runId}`);
@@ -351,6 +356,7 @@ describe("dashboard /api/runs worktree merge enrichment", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const detailRes = await app.request(`/api/runs/${runId}`);
@@ -435,6 +441,7 @@ describe("dashboard /api/runs/:id/events", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/allied-engine/events");
@@ -463,6 +470,7 @@ describe("dashboard /api/runs/:id/events", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/run-shared-001/events");
@@ -502,6 +510,7 @@ describe("dashboard /api/runs/:id/events", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/run-scoped-001/events");
@@ -541,6 +550,7 @@ describe("dashboard /api/runs/:id/events", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/run-wt-001/events");
@@ -579,6 +589,7 @@ describe("dashboard /api/runs/:id/artifacts", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/run-art-001/artifacts");
@@ -603,6 +614,7 @@ describe("dashboard /api/runs/:id/artifact", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/run-001/artifact");
@@ -623,6 +635,7 @@ describe("dashboard /api/runs/:id/artifact", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request(
@@ -645,6 +658,7 @@ describe("dashboard /api/runs/:id/artifact", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request(
@@ -667,6 +681,7 @@ describe("dashboard /api/runs/:id/artifact", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request(
@@ -689,6 +704,7 @@ describe("dashboard /api/runs/:id/artifact", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request(
@@ -710,6 +726,7 @@ describe("dashboard /api/runs/:id/artifact", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/run-001/artifact?path=plan.md");
@@ -742,6 +759,7 @@ describe("dashboard /api/runs/:id/artifact", () => {
       bundleRoot: projectDir,
       projectDir,
       selfCmd: "autoloop",
+      listPresets: () => [],
     });
 
     const res = await app.request("/api/runs/run-001/artifact?path=escape.md");

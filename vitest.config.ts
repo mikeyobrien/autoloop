@@ -7,6 +7,7 @@ import { defineConfig } from "vitest/config";
 const CORE = resolve(import.meta.dirname, "packages/core/src");
 const HARNESS = resolve(import.meta.dirname, "packages/harness/src");
 const BACKENDS = resolve(import.meta.dirname, "packages/backends/src");
+const DASHBOARD = resolve(import.meta.dirname, "packages/dashboard/src");
 
 export default defineConfig({
   resolve: {
@@ -29,11 +30,13 @@ export default defineConfig({
       "@mobrienv/autoloop-core/registry/rebuild": `${CORE}/registry/rebuild.ts`,
       "@mobrienv/autoloop-core/registry/update": `${CORE}/registry/update.ts`,
       "@mobrienv/autoloop-core/registry": `${CORE}/registry/index.ts`,
+      "@mobrienv/autoloop-core/runs-health": `${CORE}/runs-health.ts`,
       "@mobrienv/autoloop-core/worktree": `${CORE}/worktree/index.ts`,
       "@mobrienv/autoloop-core/isolation/resolve": `${CORE}/isolation/resolve.ts`,
       "@mobrienv/autoloop-core/isolation/run-scope": `${CORE}/isolation/run-scope.ts`,
       "@mobrienv/autoloop-core/isolation": `${CORE}/isolation/index.ts`,
       "@mobrienv/autoloop-core": `${CORE}/index.ts`,
+      "@mobrienv/autoloop-dashboard": `${DASHBOARD}/app.ts`,
       "@mobrienv/autoloop-backends/acp-client": `${BACKENDS}/acp-client.ts`,
       "@mobrienv/autoloop-backends/run-command": `${BACKENDS}/run-command.ts`,
       "@mobrienv/autoloop-backends/types": `${BACKENDS}/types.ts`,
@@ -100,6 +103,11 @@ export default defineConfig({
           lines: 35,
           branches: 60,
           functions: 40,
+        },
+        "packages/dashboard/src/**": {
+          lines: 50,
+          branches: 70,
+          functions: 60,
         },
         "packages/cli/src/**": {
           lines: 2,

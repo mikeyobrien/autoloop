@@ -9,11 +9,10 @@ import {
 } from "@mobrienv/autoloop-core/journal";
 import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
+import { categorizeRuns } from "@mobrienv/autoloop-core/runs-health";
 import { metaDirForRun, readMeta } from "@mobrienv/autoloop-core/worktree";
 import { collectArtifacts } from "@mobrienv/autoloop-harness/artifacts";
 import { Hono } from "hono";
-import { listPresetsWithDescriptions } from "../../chains/load.js";
-import { categorizeRuns } from "../../loops/health.js";
 import type { DashboardContext } from "../app.js";
 
 function enrichWithWorktreeMeta(stateDir: string, record: RunRecord): void {
@@ -151,7 +150,7 @@ export function apiRoutes(ctx: DashboardContext): Hono {
   });
 
   api.get("/presets", (c) => {
-    const presets = listPresetsWithDescriptions(ctx.projectDir);
+    const presets = ctx.listPresets(ctx.projectDir);
     return c.json({ presets });
   });
 
@@ -203,7 +202,7 @@ export function apiRoutes(ctx: DashboardContext): Hono {
       return c.json({ error: "prompt required (max 10000 chars)" }, 400);
     }
     if (preset) {
-      const validPresets = listPresetsWithDescriptions(ctx.projectDir);
+      const validPresets = ctx.listPresets(ctx.projectDir);
       if (!validPresets.some((p) => p.name === preset)) {
         return c.json({ error: "unknown preset" }, 400);
       }

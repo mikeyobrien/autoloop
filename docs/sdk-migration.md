@@ -159,7 +159,8 @@ root `src/`.
 | 2.8 | ✅ | per-package coverage gate (core/harness → 90/90) → publish `0.6.0` |
 | 3.1 | ✅ | extract `packages/presets` (data-only; resolved via `@mobrienv/autoloop-presets`) |
 | 3.2 | ✅ | extract `packages/backends` (+ simplify: drop dead `run-kiro.ts`, inline `run-mock`/`run-pi`, shared `kiro-ipc.ts` helpers, decouple `BackendCommandContext` from `LoopContext`) |
-| 3.3 | ⬜ | `packages/dashboard` |
+| 3.2b | ✅ | async-native kiro path — iteration loop made async, `kiro-bridge.ts`/`kiro-worker.ts`/`kiro-ipc.ts` deleted (-251 LOC) |
+| 3.3 | ✅ | extract `packages/dashboard` (+ move `categorizeRuns`/`policyForPreset` → `@mobrienv/autoloop-core/runs-health`; inject `listPresets` via `DashboardContext`) |
 | 3.4 | ⬜ | release script → publish `0.7.0` |
 | 4.1 | ⬜ | SDK docs |
 | 4.2 | ⬜ | embed examples |

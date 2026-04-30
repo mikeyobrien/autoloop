@@ -1,5 +1,5 @@
+import { policyForPreset } from "@mobrienv/autoloop-core/runs-health";
 import { describe, expect, it } from "vitest";
-import { policyForPreset } from "../../src/loops/policy.js";
 
 describe("policyForPreset", () => {
   it("gives autospec a looser threshold than autosimplify", () => {

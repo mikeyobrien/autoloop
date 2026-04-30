@@ -82,6 +82,10 @@
       "types": "./dist/registry/update.d.ts",
       "default": "./dist/registry/update.js"
     },
+    "./runs-health": {
+      "types": "./dist/runs-health.d.ts",
+      "default": "./dist/runs-health.js"
+    },
     "./worktree": {
       "types": "./dist/worktree/index.d.ts",
       "default": "./dist/worktree/index.js"

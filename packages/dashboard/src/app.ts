@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import { apiRoutes } from "./routes/api.js";
 import { pageRoutes } from "./routes/pages.js";
 
+export interface PresetInfo {
+  name: string;
+  description: string;
+}
+
 export interface DashboardContext {
   registryPath: string;
   journalPath: string;
@@ -11,6 +16,11 @@ export interface DashboardContext {
   selfCmd: string;
   host?: string;
   port?: number;
+  /**
+   * Inject the preset list for this project. Dashboard itself doesn't know
+   * which presets ship — the CLI owns that list. Return `[]` if unavailable.
+   */
+  listPresets: (projectDir: string) => PresetInfo[];
 }
 
 export function createApp(ctx: DashboardContext): Hono {

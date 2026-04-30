@@ -1,7 +1,8 @@
 import { join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
-import type { DashboardContext } from "../dashboard/app.js";
-import { createApp } from "../dashboard/app.js";
+import type { DashboardContext } from "@mobrienv/autoloop-dashboard";
+import { createApp } from "@mobrienv/autoloop-dashboard";
+import { listPresetsWithDescriptions } from "../chains/load.js";
 
 export function dispatchDashboard(
   args: string[],
@@ -39,6 +40,7 @@ export function dispatchDashboard(
     bundleRoot,
     projectDir: resolved,
     selfCmd,
+    listPresets: (projectDir) => listPresetsWithDescriptions(projectDir),
   };
 
   const app = createApp({ ...ctx, host, port });

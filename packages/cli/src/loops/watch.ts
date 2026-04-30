@@ -1,6 +1,6 @@
 import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
-import { policyForPreset } from "./policy.js";
+import { policyForPreset } from "@mobrienv/autoloop-core/runs-health";
 import { renderListHeader, renderRunDetail, renderRunLine } from "./render.js";
 
 const DEFAULT_INTERVAL_MS = 2000;

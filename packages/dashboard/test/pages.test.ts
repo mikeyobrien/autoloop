@@ -1,9 +1,9 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createApp, type DashboardContext } from "@mobrienv/autoloop-dashboard";
 import { describe, expect, it, vi } from "vitest";
-import { createApp, type DashboardContext } from "../../src/dashboard/app.js";
-import { htmlShell } from "../../src/dashboard/views/shell.js";
+import { htmlShell } from "../src/views/shell.js";
 
 function makeCtx(overrides: Partial<DashboardContext> = {}): DashboardContext {
   const projectDir = mkdtempSync(join(tmpdir(), "dashboard-pages-test-"));
@@ -18,6 +18,7 @@ function makeCtx(overrides: Partial<DashboardContext> = {}): DashboardContext {
     bundleRoot: projectDir,
     projectDir,
     selfCmd: "autoloop",
+    listPresets: () => [],
     ...overrides,
   };
 }
