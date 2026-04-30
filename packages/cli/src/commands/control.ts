@@ -1,4 +1,7 @@
 import { join } from "node:path";
+import { appendOperatorEvent } from "@mobrienv/autoloop-core/journal";
+import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import {
   appendRequest,
   buildRequest,
@@ -8,12 +11,12 @@ import {
   renderCapabilities,
   renderShow,
   supportsInterrupt,
-} from "../control/index.js";
-import type { ControlSnapshot } from "../control/render.js";
-import type { ControlRequest, GuidePayload } from "../control/types.js";
-import { appendOperatorEvent } from "../harness/journal.js";
-import { mergedFindRunByPrefix } from "../registry/discover.js";
-import type { RunRecord } from "../registry/types.js";
+} from "@mobrienv/autoloop-harness/control";
+import type { ControlSnapshot } from "@mobrienv/autoloop-harness/control/render";
+import type {
+  ControlRequest,
+  GuidePayload,
+} from "@mobrienv/autoloop-harness/control/types";
 
 export function dispatchControl(args: string[]): void {
   const sub = args[0] ?? "";

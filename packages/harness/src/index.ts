@@ -13,20 +13,13 @@ import {
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "@mobrienv/autoloop-core/worktree";
+import { collectArtifacts, formatArtifacts } from "./artifacts.js";
 import type { AcpClientOptions } from "./backend/acp-client.js";
 import {
   initKiroSession,
   signalInterrupt,
   terminateKiroSession,
 } from "./backend/kiro-bridge.js";
-import type { LiveControlAdapter } from "../../../src/control/adapter.js";
-import {
-  drainControlRequests,
-  publishCapabilities,
-} from "../../../src/control/dispatch.js";
-import { kiroControlAdapter } from "../../../src/control/kiro-adapter.js";
-import { piControlAdapter } from "../../../src/control/pi-adapter.js";
-import { collectArtifacts, formatArtifacts } from "./artifacts.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
@@ -36,6 +29,13 @@ import {
   iterationFieldForRun,
   reloadLoop,
 } from "./config-helpers.js";
+import type { LiveControlAdapter } from "./control/adapter.js";
+import {
+  drainControlRequests,
+  publishCapabilities,
+} from "./control/dispatch.js";
+import { kiroControlAdapter } from "./control/kiro-adapter.js";
+import { piControlAdapter } from "./control/pi-adapter.js";
 import { log } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { runIteration } from "./iteration.js";

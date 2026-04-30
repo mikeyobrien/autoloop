@@ -77,6 +77,46 @@
     "./registry-bridge": {
       "types": "./dist/registry-bridge.d.ts",
       "default": "./dist/registry-bridge.js"
+    },
+    "./control": {
+      "types": "./dist/control/index.d.ts",
+      "default": "./dist/control/index.js"
+    },
+    "./control/render": {
+      "types": "./dist/control/render.d.ts",
+      "default": "./dist/control/render.js"
+    },
+    "./control/types": {
+      "types": "./dist/control/types.d.ts",
+      "default": "./dist/control/types.js"
+    },
+    "./control/queue": {
+      "types": "./dist/control/queue.d.ts",
+      "default": "./dist/control/queue.js"
+    },
+    "./control/capabilities": {
+      "types": "./dist/control/capabilities.d.ts",
+      "default": "./dist/control/capabilities.js"
+    },
+    "./control/dispatch": {
+      "types": "./dist/control/dispatch.d.ts",
+      "default": "./dist/control/dispatch.js"
+    },
+    "./control/paths": {
+      "types": "./dist/control/paths.d.ts",
+      "default": "./dist/control/paths.js"
+    },
+    "./control/adapter": {
+      "types": "./dist/control/adapter.d.ts",
+      "default": "./dist/control/adapter.js"
+    },
+    "./control/kiro-adapter": {
+      "types": "./dist/control/kiro-adapter.d.ts",
+      "default": "./dist/control/kiro-adapter.js"
+    },
+    "./control/pi-adapter": {
+      "types": "./dist/control/pi-adapter.d.ts",
+      "default": "./dist/control/pi-adapter.js"
     }
   },
   "files": [

@@ -1,8 +1,8 @@
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
 import type * as topo from "@mobrienv/autoloop-core/topology";
+import type { LiveControlAdapter } from "./control/adapter.js";
 import type { LoopEventEmitter } from "./events.js";
-import type { LiveControlAdapter } from "../../../src/control/adapter.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
 

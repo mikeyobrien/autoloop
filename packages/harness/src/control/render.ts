@@ -1,4 +1,4 @@
-import type { RunRecord } from "../registry/types.js";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { CAPABILITY_VERBS } from "./capabilities.js";
 import type {
   ControlCapabilities,
