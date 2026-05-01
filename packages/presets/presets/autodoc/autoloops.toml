@@ -11,6 +11,7 @@ backend.timeout_ms = 3000000
 # backend.command = "../../examples/mock-backend.sh"
 
 review.enabled = true
+review.adversarial_first = false
 review.timeout_ms = 300000
 
 memory.prompt_budget_chars = 8000
