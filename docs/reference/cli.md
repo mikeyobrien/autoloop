@@ -556,4 +556,4 @@ npm test -- --reporter=verbose
 
 The canonical binary and package name is **`autoloop`**. The repository directory is named `autoloop-ts` (without the trailing `s`) for historical reasons.
 
-Environment variables use the `AUTOLOOP_` prefix. Preset configuration files may be named either `autoloops.toml` or `miniloops.toml` — the config loader accepts both.
+Environment variables use the `AUTOLOOP_` prefix. Preset configuration files may be named either `autoloops.toml` or `autoloops.conf` — the config loader checks for `autoloops.toml` first and falls back to `autoloops.conf`.

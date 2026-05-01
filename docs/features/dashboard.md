@@ -106,10 +106,10 @@ Alpine.js is served as a vendored static file — no npm frontend dependency, no
 ### File layout
 
 ```
-src/
-  commands/
+packages/
+  cli/src/commands/
     dashboard.ts          # CLI dispatch, flag parsing, server bootstrap
-  dashboard/
+  dashboard/src/
     app.ts                # Hono app factory, route mounting, origin check
     routes/
       api.ts              # JSON API routes

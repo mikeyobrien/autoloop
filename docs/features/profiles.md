@@ -44,7 +44,7 @@ If a profile directory does not exist, the harness throws an error. If a profile
 ### CLI flags
 
 ```bash
-autoloops run --profile repo:strict-review --profile user:my-style <preset-dir>
+autoloop run --profile repo:strict-review --profile user:my-style <preset-dir>
 ```
 
 The `--profile` flag is repeatable. Profiles are applied in the order specified.
@@ -65,7 +65,7 @@ The value is a comma-separated list of profile specs. These are prepended to any
 To run without config-defined default profiles:
 
 ```bash
-autoloops run --no-default-profiles <preset-dir>
+autoloop run --no-default-profiles <preset-dir>
 ```
 
 This suppresses only the config defaults. Explicit `--profile` flags still apply.
@@ -73,7 +73,7 @@ This suppresses only the config defaults. Explicit `--profile` flags still apply
 ## Inspecting profiles
 
 ```bash
-autoloops inspect profiles
+autoloop inspect profiles
 ```
 
 This shows:

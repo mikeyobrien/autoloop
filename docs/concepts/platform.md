@@ -37,6 +37,22 @@ autoloop is the execution engine and state model for long-horizon autonomous wor
 
 External shells should get thinner over time as the control plane surface grows. If you find orchestration logic migrating into a shell, it belongs in a preset or in the harness instead.
 
+## Package layout
+
+autoloop ships as an npm workspaces monorepo. Six workspace packages live under `packages/` and the root `@mobrienv/autoloop` package re-exports the embeddable SDK surface.
+
+| Package | Path | Role |
+|---------|------|------|
+| `@mobrienv/autoloop-core` | `packages/core` | Pure utilities: events, journal, topology, config schema, agent-map, profiles, tasks, memory, registry, runs-health, worktree, isolation |
+| `@mobrienv/autoloop-presets` | `packages/presets` | Data-only preset definitions (no code) |
+| `@mobrienv/autoloop-backends` | `packages/backends` | Backend drivers: ACP/kiro client, shell command runner |
+| `@mobrienv/autoloop-harness` | `packages/harness` | Runtime: `run()`, `emit()`, iteration loop, metareview, parallel/wave orchestration, `runParallelBranchCli()` |
+| `@mobrienv/autoloop-dashboard` | `packages/dashboard` | Hono-based read-only dashboard (API + HTML) |
+| `@mobrienv/autoloop-cli` | `packages/cli` | CLI entry and commands (main, chains, loops inspector, dashboard dispatch) |
+| `@mobrienv/autoloop` | `src/` (root) | Meta-package that re-exports the SDK surface for library embedding |
+
+Users who only need the CLI install the root package — it still provides the `autoloop` bin. Library embedders import the same root package and get `run`, `emit`, `runParallelBranchCli`, and the event/config types. See [SDK embed guide](../guides/sdk-embed.md) for the embeddable API.
+
 ## When to use autoloop
 
 Use autoloop when the task is:
