@@ -30,6 +30,7 @@
     "packages/backends",
     "packages/harness",
     "packages/dashboard",
+    "packages/kanban",
     "packages/cli"
   ],
   "repository": {
