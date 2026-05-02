@@ -1,6 +1,24 @@
+export type { KanbanConfig, KanbanHooksConfig } from "./config.js";
+export {
+  DEFAULT_KANBAN_CONFIG,
+  kanbanConfigPath,
+  loadKanbanConfig,
+} from "./config.js";
+export type { HiddenSweepResult } from "./hidden_sweep.js";
+export {
+  isAutoloopOwnedPath,
+  sweepHiddenTaskSessions,
+} from "./hidden_sweep.js";
 export { autoloopHome } from "./paths.js";
 export type { IPtyLike } from "./pty_session.js";
 export { PtySession, RingBuffer, stripUnsupportedOsc } from "./pty_session.js";
+export type { SpawnAutoloopOptions, SpawnAutoloopResult } from "./spawn.js";
+export {
+  buildAutoloopCommand,
+  runHook,
+  spawnAutoloopForTask,
+  validateWorkspaceCwd,
+} from "./spawn.js";
 export type {
   ArchiveFilter,
   ArchiveResult,
