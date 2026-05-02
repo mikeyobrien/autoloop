@@ -49,6 +49,15 @@ vi.mock("@mobrienv/autoloop-harness/registry-bridge", () => ({
   registryProgress: vi.fn(),
 }));
 
+// activeRuns reads the real ~/.autoloop/registry.jsonl — if another run
+// (e.g. a concurrent autocode loop) is active, buildLoopContext writes a
+// warning to stderr. Stub it so the "zero stderr" assertion is hermetic.
+vi.mock("@mobrienv/autoloop-core/registry/read", () => ({
+  activeRuns: vi.fn(() => []),
+  listRuns: vi.fn(() => []),
+  readRegistry: vi.fn(() => []),
+}));
+
 // Import from the PUBLIC SDK entry, not harness/index.ts.
 import { type LoopEvent, type RunSummary, run } from "../../src/index.js";
 
