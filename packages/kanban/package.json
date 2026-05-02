@@ -19,11 +19,18 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@mobrienv/autoloop-core": "0.7.0",
-    "hono": "^4.6.14"
+    "hono": "^4.6.14",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.12"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "postbuild": "cp src/kanban-tmux.conf dist/kanban-tmux.conf",
+    "test": "vitest run"
   },
   "publishConfig": {
     "access": "public"
