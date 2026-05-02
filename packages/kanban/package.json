@@ -26,6 +26,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.13.7",
     "@types/ws": "^8.5.12"
   },
   "scripts": {
