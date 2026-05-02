@@ -163,11 +163,35 @@ export function createKanbanRuntime(
   const reclaim = (t: Task): ReclaimWorktreeResult =>
     reclaimWorktreeForTask(store, t);
 
+  const shutdown = (): void => {
+    for (const p of ptys.values()) {
+      try {
+        p.kill();
+      } catch {
+        /* already dead */
+      }
+    }
+    ptys.clear();
+    // Leave taskSessions populated — tmux sessions are intentionally NOT
+    // killed here; a later ensurePtyForTask can respawn a fresh PtySession
+    // inside the existing tmux session if it's still there.
+  };
+
+  const statsLivePtys = (): Array<{ taskId: string; lastDataMs: number }> => {
+    const out: Array<{ taskId: string; lastDataMs: number }> = [];
+    for (const [taskId, p] of ptys.entries()) {
+      if (p.isAlive()) out.push({ taskId, lastDataMs: p.lastDataMs });
+    }
+    return out;
+  };
+
   return {
     ensurePtyForTask,
     killAgent,
     tryAutoDispatch,
     reclaimWorktreeForTask: reclaim,
     hasLivePty,
+    shutdown,
+    statsLivePtys,
   };
 }

@@ -25,6 +25,14 @@ export interface KanbanRuntime {
   reclaimWorktreeForTask(task: Task): ReclaimWorktreeResult;
   /** Has a live PTY for this task id right now? */
   hasLivePty(taskId: string): boolean;
+  /** Shut the runtime down: kill every attached PTY and drop them from the
+   *  cache. tmux sessions are intentionally LEFT ALIVE so autoloop runs
+   *  keep going across dashboard restarts. Idempotent. */
+  shutdown(): void;
+  /** Snapshot of live PTYs for the stall sweeper. One entry per task with an
+   *  alive PtySession. `lastDataMs` is the ms-epoch of the most recent byte
+   *  read from the PTY. Empty array when no live PTYs. */
+  statsLivePtys(): Array<{ taskId: string; lastDataMs: number }>;
 }
 
 export function createStubRuntime(): KanbanRuntime {
@@ -45,6 +53,12 @@ export function createStubRuntime(): KanbanRuntime {
     },
     hasLivePty(): boolean {
       return false;
+    },
+    shutdown(): void {
+      /* stub */
+    },
+    statsLivePtys(): Array<{ taskId: string; lastDataMs: number }> {
+      return [];
     },
   };
 }

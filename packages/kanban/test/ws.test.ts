@@ -66,6 +66,8 @@ async function boot(opts: { throwOnEnsure?: boolean } = {}): Promise<Harness> {
     tryAutoDispatch: () => {},
     reclaimWorktreeForTask: () => ({ removed: 0, preserved: 0, errors: 0 }),
     hasLivePty: () => true,
+    shutdown: () => {},
+    statsLivePtys: () => [],
   };
   const server = createServer();
   const openSockets = new Set<import("node:net").Socket>();

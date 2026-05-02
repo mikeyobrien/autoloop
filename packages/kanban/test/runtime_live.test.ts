@@ -204,4 +204,39 @@ describe("createKanbanRuntime", () => {
       /task not found/,
     );
   });
+
+  it("shutdown kills all live PTYs and drops them from the cache", () => {
+    const store = freshStore();
+    const { spawn, ptys } = makeSpawnFn();
+    const runtime = createKanbanRuntime(baseCtx, store, { spawnFn: spawn });
+    const a = store.add({ title: "a" });
+    const b = store.add({ title: "b" });
+    runtime.ensurePtyForTask(a.id, 80, 24);
+    runtime.ensurePtyForTask(b.id, 80, 24);
+    expect(runtime.hasLivePty(a.id)).toBe(true);
+    expect(runtime.hasLivePty(b.id)).toBe(true);
+    runtime.shutdown();
+    expect(runtime.hasLivePty(a.id)).toBe(false);
+    expect(runtime.hasLivePty(b.id)).toBe(false);
+    expect(ptys.every((p) => p.killed)).toBe(true);
+  });
+
+  it("statsLivePtys returns a snapshot of live PTYs with lastDataMs", () => {
+    const store = freshStore();
+    const { spawn, ptys } = makeSpawnFn();
+    const runtime = createKanbanRuntime(baseCtx, store, { spawnFn: spawn });
+    expect(runtime.statsLivePtys()).toEqual([]);
+    const t = store.add({ title: "stats" });
+    runtime.ensurePtyForTask(t.id, 80, 24);
+    const first = runtime.statsLivePtys();
+    expect(first.length).toBe(1);
+    expect(first[0].taskId).toBe(t.id);
+    const firstMs = first[0].lastDataMs;
+    expect(typeof firstMs).toBe("number");
+    ptys[0].emitData("x");
+    const second = runtime.statsLivePtys();
+    expect(second[0].lastDataMs).toBeGreaterThanOrEqual(firstMs);
+    runtime.killAgent(t.id);
+    expect(runtime.statsLivePtys()).toEqual([]);
+  });
 });
