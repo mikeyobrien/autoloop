@@ -3,12 +3,12 @@
   "version": "0.7.0",
   "description": "tmux-backed kanban board that spawns autoloop runs per task",
   "type": "module",
-  "main": "dist/app.js",
-  "types": "dist/app.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/app.d.ts",
-      "default": "./dist/app.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "files": [
