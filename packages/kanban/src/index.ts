@@ -11,11 +11,20 @@ export {
   isAutoloopOwnedPath,
   sweepHiddenTaskSessions,
 } from "./hidden_sweep.js";
+export type { InstallKanbanResult } from "./install.js";
+export { installKanban } from "./install.js";
 export { autoloopHome } from "./paths.js";
-export type { IPtyLike } from "./pty_session.js";
+export type { IPtyLike, PtyExitInfo } from "./pty_session.js";
 export { PtySession, RingBuffer, stripUnsupportedOsc } from "./pty_session.js";
+export type { ReclaimCounts } from "./reclaim.js";
+export { reclaimWorktreeForTask } from "./reclaim.js";
 export type { KanbanRuntime, ReclaimWorktreeResult } from "./runtime.js";
 export { createStubRuntime } from "./runtime.js";
+export type {
+  CreateKanbanRuntimeOptions,
+  SpawnAutoloopFn,
+} from "./runtime_live.js";
+export { createKanbanRuntime } from "./runtime_live.js";
 export type { SpawnAutoloopOptions, SpawnAutoloopResult } from "./spawn.js";
 export {
   buildAutoloopCommand,
@@ -55,6 +64,8 @@ export type {
   CreateWorktreeOptions,
   CreateWorktreeResult,
   OrphanWorktree,
+  ReclaimWorktreeOptions,
+  ReclaimWorktreeOutcome,
   RemoveWorktreeOptions,
 } from "./worktree.js";
 export {
@@ -63,7 +74,10 @@ export {
   hasUnpushedCommits,
   isWorktreeDirty,
   listOrphanWorktrees,
+  reclaimTaskWorktree,
   removeTaskWorktree,
   resolveRepoRoot,
   WORKTREE_INCLUDE_FILE,
 } from "./worktree.js";
+export type { InstallWsResult } from "./ws.js";
+export { installKanbanWs } from "./ws.js";

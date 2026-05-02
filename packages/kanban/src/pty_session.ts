@@ -29,9 +29,16 @@ export class RingBuffer {
   }
 }
 
+export interface PtyExitInfo {
+  exitCode?: number;
+  signal?: number;
+}
+
 export interface IPtyLike {
   onData(cb: (data: string) => void): void;
-  onExit(cb: () => void): void;
+  /** node-pty emits `{exitCode, signal?}` on exit. Optional so synthetic
+   *  adapters (e.g. a tmux-gone detector) can call without info. */
+  onExit(cb: (e?: PtyExitInfo) => void): void;
   write(data: string): void;
   resize(cols: number, rows: number): void;
   kill(): void;
@@ -50,7 +57,11 @@ export class PtySession {
     return this.lastDataMsField;
   }
 
-  constructor(pty: IPtyLike, onExit: () => void, idleKillMs = 30_000) {
+  constructor(
+    pty: IPtyLike,
+    onExit: (e?: PtyExitInfo) => void,
+    idleKillMs = 30_000,
+  ) {
     this.pty = pty;
     this.idleKillMs = idleKillMs;
     this.pty.onData((raw) => {
@@ -68,7 +79,7 @@ export class PtySession {
         }
       }
     });
-    this.pty.onExit(() => {
+    this.pty.onExit((e) => {
       this.alive = false;
       if (this.idleKillTimer) clearTimeout(this.idleKillTimer);
       this.idleKillTimer = null;
@@ -79,7 +90,7 @@ export class PtySession {
           /* already closed */
         }
       }
-      onExit();
+      onExit(e);
     });
   }
 

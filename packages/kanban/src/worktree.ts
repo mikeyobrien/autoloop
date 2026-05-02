@@ -250,6 +250,63 @@ export function hasUnpushedCommits(worktreeDir: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Hidden-column reclamation — dirty/unpushed → preserve, clean → nuke
+// ---------------------------------------------------------------------------
+
+export interface ReclaimWorktreeOptions {
+  repoRoot: string;
+  worktreeDir: string;
+  /** Branch checked out in the worktree. Deleted via `git branch -D`
+   *  after a successful removal; skipped when undefined. */
+  branch?: string;
+}
+
+export type ReclaimWorktreeOutcome =
+  | { outcome: "removed" }
+  | { outcome: "preserved"; reason: "dirty" | "unpushed" }
+  | { outcome: "missing" }
+  | { outcome: "error"; message: string };
+
+/**
+ * Hidden-column worktree reclamation helper. Policy:
+ *   - worktreeDir doesn't exist     → outcome="missing" (prune registry, noop)
+ *   - worktree has uncommitted work → outcome="preserved", reason="dirty"
+ *   - worktree has unpushed commits → outcome="preserved", reason="unpushed"
+ *   - otherwise (clean)             → `git worktree remove --force` then
+ *                                     `git branch -D <branch>` → "removed"
+ *
+ *  Preservation is the safety default — a task moving to done/cancelled
+ *  should never silently discard the agent's work. Callers surface the
+ *  preserved_reason in UI so the user knows to reclaim manually.
+ */
+export function reclaimTaskWorktree(
+  opts: ReclaimWorktreeOptions,
+): ReclaimWorktreeOutcome {
+  const { repoRoot, worktreeDir, branch } = opts;
+  if (!existsSync(worktreeDir)) {
+    gitSoft(repoRoot, ["worktree", "prune"]);
+    if (branch) gitSoft(repoRoot, ["branch", "-D", branch]);
+    return { outcome: "missing" };
+  }
+  if (isWorktreeDirty(worktreeDir))
+    return { outcome: "preserved", reason: "dirty" };
+  if (hasUnpushedCommits(worktreeDir))
+    return { outcome: "preserved", reason: "unpushed" };
+  try {
+    removeTaskWorktree({ repoRoot, worktreeDir, force: true });
+    if (branch) {
+      gitSoft(repoRoot, ["branch", "-D", branch]);
+    }
+    return { outcome: "removed" };
+  } catch (err) {
+    return {
+      outcome: "error",
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // .autoloop-worktreeinclude — copy user-nominated files into a fresh worktree
 // ---------------------------------------------------------------------------
 
