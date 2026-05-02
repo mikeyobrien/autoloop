@@ -7,6 +7,13 @@ export function buildCommandInvocation(
   prompt: string,
 ): string {
   const argv = shellWords([spec.command, ...spec.args]);
+  // "file" mode: harness already writes the prompt to $AUTOLOOP_PROMPT_PATH
+  // (see promptRuntimeEnvLines in backends/src/index.ts). Pipe that file into
+  // the backend's stdin — avoids argv-size limits and shell re-quoting for
+  // large prompts (e.g. claude -p chokes on ~12KB argv-mode prompts).
+  if (spec.promptMode === "file") {
+    return `${argv} < "$AUTOLOOP_PROMPT_PATH"`;
+  }
   if (spec.promptMode === "stdin") {
     return `printf '%s' ${shellQuote(prompt)} | ${argv}`;
   }

@@ -115,7 +115,9 @@ function piBinary(command: string): boolean {
 }
 
 export function normalizePromptMode(value: string): string {
-  return value === "stdin" ? "stdin" : "arg";
+  if (value === "stdin") return "stdin";
+  if (value === "file") return "file";
+  return "arg";
 }
 
 export function configListWithFallback(
