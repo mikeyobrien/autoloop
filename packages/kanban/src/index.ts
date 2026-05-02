@@ -1,3 +1,5 @@
+export type { KanbanContext, PresetInfo } from "./app.js";
+export { createApp } from "./app.js";
 export type { KanbanConfig, KanbanHooksConfig } from "./config.js";
 export {
   DEFAULT_KANBAN_CONFIG,
