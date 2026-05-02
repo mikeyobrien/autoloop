@@ -14,6 +14,8 @@ export {
 export { autoloopHome } from "./paths.js";
 export type { IPtyLike } from "./pty_session.js";
 export { PtySession, RingBuffer, stripUnsupportedOsc } from "./pty_session.js";
+export type { KanbanRuntime, ReclaimWorktreeResult } from "./runtime.js";
+export { createStubRuntime } from "./runtime.js";
 export type { SpawnAutoloopOptions, SpawnAutoloopResult } from "./spawn.js";
 export {
   buildAutoloopCommand,
