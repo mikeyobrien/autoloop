@@ -23,6 +23,7 @@ export function printUsage(): void {
   console.log("  autoloop worktree <list|show|merge|clean> [args]");
   console.log("  autoloop config <show|set|unset|path> [args]");
   console.log("  autoloop dashboard [--port <port>]");
+  console.log("  autoloop kanban [--port <port>]");
   console.log("");
   console.log(
     "The preset argument is required for `run`. It must be a bundled preset",
