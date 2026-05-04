@@ -999,13 +999,23 @@ setInterval(() => {
   refreshSideToolbar();
 }, 15000);
 
+let __kbConnected = false;
+function __clearKbConnecting() {
+  if (__kbConnected) return;
+  __kbConnected = true;
+  const el = document.getElementById('kb-connecting');
+  if (el) el.classList.add('hidden');
+}
 try {
   const es = new EventSource("/kanban/events");
+  es.addEventListener("init", __clearKbConnecting);
   es.addEventListener("reload", () => {
+    __clearKbConnecting();
     reconcileBoard();
     if (panes && panes.size > 0) refreshSideToolbar();
   });
   es.addEventListener("preview", (e) => {
+    __clearKbConnecting();
     try {
       const { id, html } = JSON.parse(e.data);
       const card = document.querySelector('.card[data-id="' + id + '"]');
@@ -1019,10 +1029,12 @@ try {
       prev.innerHTML = html || '<div class="preview-empty"></div>';
     } catch(_){}
   });
-  es.onmessage = (e) => { if (e.data === "update") reconcileBoard(); };
+  es.onmessage = (e) => { __clearKbConnecting(); if (e.data === "update") reconcileBoard(); };
   es.onerror = () => {
     const live = document.getElementById("live");
     if (live) { live.classList.remove('pulse'); live.textContent = "\\u25cb offline"; live.style.color = '#d55'; }
+    const kb = document.getElementById('kb-connecting');
+    if (kb && !__kbConnected) { kb.textContent = 'event stream offline — reconnecting…'; kb.style.color = '#d55'; }
   };
 } catch(_){}
 `;

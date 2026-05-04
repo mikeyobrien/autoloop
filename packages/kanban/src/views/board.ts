@@ -277,6 +277,9 @@ export function renderPage(
   #kb-help-close{color:#888;font-size:10px;margin-top:10px;text-align:center}
   .ktoast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#d9a441;color:#000;padding:6px 14px;border-radius:6px;font:11px ui-monospace,Menlo,monospace;pointer-events:none;opacity:0;transition:opacity .15s,transform .15s;z-index:200;box-shadow:0 2px 10px rgba(0,0,0,.5)}
   .ktoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #kb-connecting{position:fixed;bottom:12px;right:12px;background:#161616;border:1px solid #333;border-radius:6px;padding:6px 12px;color:#888;font-size:11px;z-index:150;display:flex;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(0,0,0,.4);transition:opacity .15s}
+  #kb-connecting::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#d9a441;animation:pulse 1.4s ease-in-out infinite}
+  #kb-connecting.hidden{display:none}
 </style>
 </head><body>
 <header>
@@ -314,6 +317,7 @@ export function renderPage(
 <main>
   <div id="board">${totalCards === 0 ? emptyBanner : cols}</div>
 </main>
+<div id="kb-connecting" role="status" aria-live="polite">connecting to event stream…</div>
 <aside id="side">
   <div id="ov-handle" title="Drag to resize · or +/− keys"></div>
   <div id="side-head">

@@ -19,6 +19,17 @@ describe("renderPage", () => {
     expect(out).not.toContain("btn-menu");
     expect(out).not.toContain("drawer");
   });
+
+  it("ships an accessible connecting placeholder removed on first SSE message", () => {
+    const out = renderPage([], "test-scope", true);
+    expect(out).toContain('id="kb-connecting"');
+    expect(out).toContain('role="status"');
+    expect(out).toContain('aria-live="polite"');
+    expect(out).toContain("connecting to event stream");
+    // Client must clear the placeholder on init/reload/preview/message events.
+    expect(out).toContain("__clearKbConnecting");
+    expect(out).toMatch(/addEventListener\("init",\s*__clearKbConnecting\)/);
+  });
 });
 
 describe("renderCard", () => {
