@@ -1,6 +1,7 @@
 {
   "name": "@mobrienv/autoloop",
-  "version": "0.7.0",
+  "version": "0.7.1",
+  "license": "MIT",
   "description": "Simpler, opinionated loop harness for inspectable long-running agent workflows",
   "type": "module",
   "main": "dist/index.js",
@@ -89,9 +90,9 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "@mobrienv/autoloop-cli": "0.7.0",
-    "@mobrienv/autoloop-core": "0.7.0",
-    "@mobrienv/autoloop-harness": "0.7.0",
-    "@mobrienv/autoloop-presets": "0.7.0"
+    "@mobrienv/autoloop-cli": "0.7.1",
+    "@mobrienv/autoloop-core": "0.7.1",
+    "@mobrienv/autoloop-harness": "0.7.1",
+    "@mobrienv/autoloop-presets": "0.7.1"
   }
 }

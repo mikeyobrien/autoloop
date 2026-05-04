@@ -1,6 +1,7 @@
 {
   "name": "@mobrienv/autoloop-presets",
-  "version": "0.7.0",
+  "version": "0.7.1",
+  "license": "MIT",
   "description": "Bundled preset definitions (data-only) for autoloop",
   "type": "module",
   "exports": {

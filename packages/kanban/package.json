@@ -1,6 +1,7 @@
 {
   "name": "@mobrienv/autoloop-kanban",
-  "version": "0.7.0",
+  "version": "0.7.1",
+  "license": "MIT",
   "description": "tmux-backed kanban board that spawns autoloop runs per task",
   "type": "module",
   "main": "dist/index.js",
@@ -21,7 +22,7 @@
   "dependencies": {
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@iarna/toml": "^2.2.5",
-    "@mobrienv/autoloop-core": "0.7.0",
+    "@mobrienv/autoloop-core": "0.7.1",
     "hono": "^4.6.14",
     "ws": "^8.18.0"
   },
