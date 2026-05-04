@@ -2,7 +2,7 @@ import type { Task } from "../task_store.js";
 import { escapeHtml } from "./_shared.js";
 
 export function renderFullscreenTerm(task: Task): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(task.title)} — autoloop</title>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(task.title)} — autoloop</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐸</text></svg>">
 <style>
   html,body{margin:0;padding:0;height:100vh;background:#000;color:#eee;font:12px ui-monospace,Menlo,monospace;overflow:hidden}

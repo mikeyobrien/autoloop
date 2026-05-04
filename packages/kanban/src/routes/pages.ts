@@ -16,6 +16,8 @@ export function pageRoutes(
   store: TaskStore,
   _runtime: KanbanRuntime,
 ): void {
+  app.get("/", (c) => c.redirect("/kanban", 307));
+
   app.get("/kanban", (c) => {
     const scope = store.currentScope();
     const tasks = store.list({ includeDone: true });

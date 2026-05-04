@@ -30,7 +30,7 @@ export function renderArchivePage(tasks: Task[], scope: string): string {
         })
         .join("")
     : `<tr><td colspan="6" class="empty">Archive empty — press "↓ archive done" on the kanban board to move closed tasks here.</td></tr>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Autoloop — Archive</title>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Autoloop — Archive</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐸</text></svg>">
 <style>
   body{font:13px ui-monospace,Menlo,monospace;background:#1e1e1e;color:#eee;margin:0;padding:0}

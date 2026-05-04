@@ -36,6 +36,28 @@ describe("pageRoutes", () => {
     expect(body).toContain("hello");
   });
 
+  it("GET / redirects to /kanban (307)", async () => {
+    const app = createApp(baseCtx, freshStore());
+    const res = await app.request("/");
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("/kanban");
+  });
+
+  it("GET /kanban includes a viewport meta tag for mobile rendering", async () => {
+    const app = createApp(baseCtx, freshStore());
+    const res = await app.request("/kanban");
+    const body = await res.text();
+    expect(body).toContain('<meta name="viewport"');
+    expect(body).toContain("width=device-width");
+  });
+
+  it("GET /archive includes a viewport meta tag", async () => {
+    const app = createApp(baseCtx, freshStore());
+    const res = await app.request("/archive");
+    const body = await res.text();
+    expect(body).toContain('<meta name="viewport"');
+  });
+
   it("GET /kanban?hidden=0 returns 200", async () => {
     const app = createApp(baseCtx, freshStore());
     const res = await app.request("/kanban?hidden=0");
