@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-dashboard",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "license": "MIT",
   "description": "Hono-based read-only dashboard for autoloop runs (API + HTML)",
   "type": "module",
@@ -19,8 +19,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@mobrienv/autoloop-core": "0.7.1",
-    "@mobrienv/autoloop-harness": "0.7.1",
+    "@mobrienv/autoloop-core": "0.7.2",
+    "@mobrienv/autoloop-harness": "0.7.2",
     "hono": "^4.6.14"
   },
   "scripts": {

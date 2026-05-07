@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-backends",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "license": "MIT",
   "description": "autoloop backend drivers (ACP/kiro bridge, shell command runner)",
   "type": "module",
@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.0",
-    "@mobrienv/autoloop-core": "0.7.1"
+    "@mobrienv/autoloop-core": "0.7.2"
   },
   "scripts": {
     "build": "tsc"
