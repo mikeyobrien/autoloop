@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-dashboard",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "license": "MIT",
   "description": "Hono-based read-only dashboard for autoloop runs (API + HTML)",
   "type": "module",
@@ -18,9 +18,14 @@
   "engines": {
     "node": ">=18"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/autoloop.git",
+    "directory": "packages/dashboard"
+  },
   "dependencies": {
-    "@mobrienv/autoloop-core": "0.7.2",
-    "@mobrienv/autoloop-harness": "0.7.2",
+    "@mobrienv/autoloop-core": "0.7.3",
+    "@mobrienv/autoloop-harness": "0.7.3",
     "hono": "^4.6.14"
   },
   "scripts": {

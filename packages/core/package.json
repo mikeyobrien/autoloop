@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-core",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "license": "MIT",
   "description": "Pure core utilities for autoloop (events, journal, topology, config schema)",
   "type": "module",
@@ -117,6 +117,11 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/autoloop.git",
+    "directory": "packages/core"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5"
