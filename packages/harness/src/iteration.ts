@@ -1,4 +1,9 @@
 import { runKiroIteration } from "@mobrienv/autoloop-backends";
+import type { AcpClientOptions } from "@mobrienv/autoloop-backends/acp-client";
+import {
+  initAcpSession,
+  terminateAcpSession,
+} from "@mobrienv/autoloop-backends/acp-client";
 import { listText } from "@mobrienv/autoloop-core";
 import {
   extractField,
@@ -54,24 +59,33 @@ export async function runIteration(
 
   const startEpoch = Math.floor(Date.now() / 1000);
 
-  // Switch Kiro session agent mode per-role if agents.toml provides a mapping.
-  // Failure is non-fatal — the role just runs with the default agent.
-  if (iter.roleAgent && loop.backend.kind === "kiro" && loop.kiroSession) {
+  // Fresh ACP session per iteration — ensures each role (researcher, critic,
+  // etc.) starts with a clean context window for truly independent review.
+  if (loop.backend.kind === "kiro") {
+    if (loop.kiroSession) {
+      try {
+        await terminateAcpSession(loop.kiroSession);
+      } catch {
+        /* best-effort */
+      }
+      loop.kiroSession = undefined;
+    }
+    const acpOpts: AcpClientOptions = {
+      command: loop.backend.command,
+      args: loop.backend.args,
+      cwd: loop.paths.workDir,
+      trustAllTools: loop.store.kiro_trust_all_tools !== false,
+      agentName:
+        iter.roleAgent || (loop.store.kiro_agent as string) || undefined,
+      modelId: (loop.store.kiro_model as string) || undefined,
+      verbose: loop.runtime.logLevel === "debug",
+    };
+    loop.kiroSession = await initAcpSession(acpOpts);
     log(
       loop,
       "debug",
-      `switching kiro agent to "${iter.roleAgent}" for role "${iter.allowedRoles[0]}"`,
+      `new kiro session for iteration ${iteration} agent="${acpOpts.agentName ?? "default"}"`,
     );
-    try {
-      await loop.kiroSession.connection.setSessionMode({
-        sessionId: loop.kiroSession.sessionId,
-        modeId: iter.roleAgent,
-      });
-    } catch (err: unknown) {
-      process.stderr.write(
-        `[autoloop] warning: failed to set kiro agent mode "${iter.roleAgent}": ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
   }
 
   const { output, exitCode, timedOut } =
