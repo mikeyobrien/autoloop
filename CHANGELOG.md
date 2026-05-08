@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.4] - 2026-05-07
+### Fixed
+- **Harness: fresh ACP session per iteration.** Previously the kiro backend reused a single session across iterations and flipped modes via `setSessionMode()` — context from the finder role bled into the doer/checker/closer roles. The iteration loop now terminates and recreates the ACP session each pass, matching the AgentSpacesDesktop harness's per-iteration session lifecycle so every role gets an independent context window.
+
 ## [0.7.3] - 2026-05-07
 ### Publish pipeline hardening (no runtime changes)
 - Per-workspace `publish-npm.yml` loop: failures abort the job loudly instead of being swallowed by `|| true`. The previous behavior masked the v0.7.1 partial-publish where workspace packages 404'd on the OIDC PUT and only the meta package shipped.

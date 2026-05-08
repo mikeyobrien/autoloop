@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-harness",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "license": "MIT",
   "description": "autoloop harness runtime (iteration loop, metareview, wave orchestration, backend drivers)",
   "type": "module",
@@ -94,8 +94,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.0",
     "@iarna/toml": "^2.2.5",
-    "@mobrienv/autoloop-backends": "0.7.3",
-    "@mobrienv/autoloop-core": "0.7.3"
+    "@mobrienv/autoloop-backends": "0.7.4",
+    "@mobrienv/autoloop-core": "0.7.4"
   },
   "scripts": {
     "build": "tsc"
