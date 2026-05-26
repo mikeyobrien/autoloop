@@ -1,6 +1,9 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import type {
+  AcpClientOptions,
+  AcpSession,
+} from "@mobrienv/autoloop-backends/acp-client";
 import {
   initAcpSession,
   terminateAcpSession,
@@ -14,12 +17,6 @@ import {
   updateStatus as updateWorktreeStatus,
 } from "@mobrienv/autoloop-core/worktree";
 import { collectArtifacts, formatArtifacts } from "./artifacts.js";
-import type { AcpClientOptions } from "./backend/acp-client.js";
-import {
-  initKiroSession,
-  signalInterrupt,
-  terminateKiroSession,
-} from "./backend/kiro-bridge.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
@@ -406,7 +403,15 @@ function buildControlAdapter(
 ): LiveControlAdapter | undefined {
   if (loop.backend.kind === "kiro") {
     return kiroControlAdapter(loop.runtime.runId, {
-      triggerInterrupt: () => signalInterrupt(),
+      triggerInterrupt: () => {
+        if (loop.kiroSession?.process.pid) {
+          try {
+            process.kill(-loop.kiroSession.process.pid, "SIGINT");
+          } catch {
+            /* best-effort */
+          }
+        }
+      },
     });
   }
   if (loop.backend.kind === "pi") {

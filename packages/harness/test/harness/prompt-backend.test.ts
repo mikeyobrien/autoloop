@@ -1,12 +1,12 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
+import type { Role, Topology } from "@mobrienv/autoloop-core/topology";
 import { describe, expect, it } from "vitest";
-import type { AgentMap } from "../../src/agent-map.js";
 import { resolvedFromLoopBackend } from "../../src/backend/types.js";
-import { buildIterationContext } from "../../src/harness/prompt.js";
-import type { LoopContext } from "../../src/harness/types.js";
-import type { Role, Topology } from "../../src/topology.js";
+import { buildIterationContext } from "../../src/prompt.js";
+import type { LoopContext } from "../../src/types.js";
 
 interface BackendLoopOpts {
   roles?: Role[];

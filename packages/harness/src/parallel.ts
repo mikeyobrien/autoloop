@@ -179,7 +179,7 @@ export function buildBackendCommand(
       stateDir: loop.paths.stateDir,
       piAdapterPath: loop.paths.piAdapterPath,
     },
-    spec: loop.backend,
+    spec: iter.backend,
     prompt: iter.prompt,
     runtimeEnv: runtimeEnvLines(
       loop,
