@@ -9,6 +9,7 @@ import { dispatchControl } from "./commands/control.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
 import { dispatchGuide } from "./commands/guide.js";
 import { dispatchInspect } from "./commands/inspect.js";
+import { dispatchKanban } from "./commands/kanban.js";
 import { dispatchList } from "./commands/list.js";
 import { dispatchLoops } from "./commands/loops.js";
 import { dispatchMemory } from "./commands/memory.js";
@@ -104,6 +105,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "dashboard":
       dispatchDashboard(args.slice(1), bundleRoot, selfCmd);
       return;
+    case "kanban":
+      dispatchKanban(args.slice(1), bundleRoot, selfCmd);
+      return;
     default:
       await dispatchRun(args, argv, bundleRoot, selfCmd);
   }
@@ -147,6 +151,7 @@ function isCliCommand(value: string): boolean {
     "guide",
     "control",
     "dashboard",
+    "kanban",
     "--help",
     "-h",
   ].includes(value);

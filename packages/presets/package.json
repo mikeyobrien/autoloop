@@ -1,6 +1,7 @@
 {
   "name": "@mobrienv/autoloop-presets",
-  "version": "0.7.0",
+  "version": "0.7.4",
+  "license": "MIT",
   "description": "Bundled preset definitions (data-only) for autoloop",
   "type": "module",
   "exports": {
@@ -11,6 +12,11 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/autoloop.git",
+    "directory": "packages/presets"
   },
   "scripts": {
     "build": "echo 'autoloop-presets is data-only, nothing to build' >&2"

@@ -49,6 +49,7 @@ export default defineConfig({
             { text: "Creating Presets", link: "/guides/creating-presets" },
             { text: "Auto Workflows", link: "/guides/auto-workflows" },
             { text: "Operating Playbook", link: "/guides/operating-playbook" },
+            { text: "SDK Embed", link: "/guides/sdk-embed" },
           ],
         },
         {

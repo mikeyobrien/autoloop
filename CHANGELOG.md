@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.4] - 2026-05-07
+### Fixed
+- **Harness: fresh ACP session per iteration.** Previously the kiro backend reused a single session across iterations and flipped modes via `setSessionMode()` — context from the finder role bled into the doer/checker/closer roles. The iteration loop now terminates and recreates the ACP session each pass, matching the AgentSpacesDesktop harness's per-iteration session lifecycle so every role gets an independent context window.
+
+## [0.7.3] - 2026-05-07
+### Publish pipeline hardening (no runtime changes)
+- Per-workspace `publish-npm.yml` loop: failures abort the job loudly instead of being swallowed by `|| true`. The previous behavior masked the v0.7.1 partial-publish where workspace packages 404'd on the OIDC PUT and only the meta package shipped.
+- Workspace packages now publish with `--provenance` (trusted publishing configured on npmjs.org for each `@mobrienv/autoloop-*` package).
+- New "Verify workspace deps resolve" step runs before the root publish and fails the job if any cross-workspace dep the root pins isn't fetchable on the registry.
+- Each workspace `package.json` now declares `repository` (with `directory` pointing at the subpath) so npm's sigstore provenance verification can match the bundle's source claim.
+
+(0.7.2 was tagged but never published — the OIDC config for workspace packages still pointed at `mobrienv` instead of `mikeyobrien` at tag time, so CI failed safely without shipping anything.)
+
 ## [0.7.0] - 2026-04-30
 ### Phase 3 of the SDK migration: specialty packages
 - **New workspace packages** (alongside existing `core`, `harness`, `cli`):

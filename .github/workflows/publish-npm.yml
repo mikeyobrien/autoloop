@@ -73,13 +73,74 @@ jobs:
 
       - name: Publish workspace packages to npm
         # Publishes packages/* first so the root package resolves pinned
-        # cross-workspace deps from the registry. `--ignore-scripts`
+        # cross-workspace deps from the registry. We loop per-workspace so
+        # that "already published at this version" is a clean skip, while
+        # any other failure aborts the job loudly. `--ignore-scripts`
         # prevents workspace lifecycle hooks from re-triggering.
-        run: npm publish --workspaces --access public --provenance --ignore-scripts || true
-        # `|| true` keeps a partially-failed publish non-fatal for idempotent
-        # re-runs — individual workspaces that are already on npm simply
-        # 409 and are skipped. The final root-publish step below will
-        # still fail loudly if it can't resolve a freshly-required dep.
+        #
+        # `--provenance` requires trusted publishing to be configured on
+        # npmjs.org for every workspace package — see the README publish
+        # section for the per-package setup checklist. If you add a new
+        # workspace package, configure trusted publishing for it before
+        # the next tagged release or this step will 404.
+        run: |
+          set -euo pipefail
+          node --input-type=module -e "
+            import { readdirSync, readFileSync, statSync } from 'node:fs';
+            import { join } from 'node:path';
+            const root = process.cwd();
+            const pkgDir = join(root, 'packages');
+            const out = [];
+            for (const name of readdirSync(pkgDir)) {
+              const full = join(pkgDir, name, 'package.json');
+              try { statSync(full); } catch { continue; }
+              const pkg = JSON.parse(readFileSync(full, 'utf-8'));
+              if (pkg.private) continue;
+              out.push(JSON.stringify({ dir: join('packages', name), name: pkg.name, version: pkg.version }));
+            }
+            console.log(out.join('\n'));
+          " > /tmp/workspaces.jsonl
+
+          while IFS= read -r line; do
+            DIR=$(node -p "JSON.parse(process.argv[1]).dir" "$line")
+            NAME=$(node -p "JSON.parse(process.argv[1]).name" "$line")
+            VERSION=$(node -p "JSON.parse(process.argv[1]).version" "$line")
+
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "skip: $NAME@$VERSION already published"
+              continue
+            fi
+
+            echo "publish: $NAME@$VERSION"
+            npm publish --access public --provenance --ignore-scripts -w "$DIR"
+          done < /tmp/workspaces.jsonl
+
+      - name: Verify workspace deps resolve at the new version
+        # Belt-and-suspenders guard: before we publish the root package
+        # (which pins cross-workspace deps to this exact version), confirm
+        # every workspace dep the root depends on is actually fetchable at
+        # that version on the registry. Catches silent skips above.
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+            const deps = { ...(pkg.dependencies ?? {}) };
+            const target = '${ROOT_VERSION}';
+            const owned = Object.keys(deps).filter(n => n.startsWith('@mobrienv/autoloop'));
+            console.log(owned.join('\n'));
+          " > /tmp/workspace-deps.txt
+
+          while IFS= read -r dep; do
+            [ -z "$dep" ] && continue
+            if ! npm view "$dep@$ROOT_VERSION" version >/dev/null 2>&1; then
+              echo "::error::Workspace dep $dep@$ROOT_VERSION is not resolvable on the registry. Aborting before root publish."
+              exit 1
+            fi
+            echo "ok: $dep@$ROOT_VERSION resolvable"
+          done < /tmp/workspace-deps.txt
 
       - name: Check whether root version is already published
         id: npm_version

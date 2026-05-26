@@ -1,0 +1,46 @@
+{
+  "name": "@mobrienv/autoloop-kanban",
+  "version": "0.7.4",
+  "license": "MIT",
+  "description": "tmux-backed kanban board that spawns autoloop runs per task",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src/kanban-tmux.conf"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/autoloop.git",
+    "directory": "packages/kanban"
+  },
+  "dependencies": {
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
+    "@iarna/toml": "^2.2.5",
+    "@mobrienv/autoloop-core": "0.7.4",
+    "hono": "^4.6.14",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@types/ws": "^8.5.12"
+  },
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "cp src/kanban-tmux.conf dist/kanban-tmux.conf",
+    "test": "vitest run"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

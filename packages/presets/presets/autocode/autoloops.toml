@@ -6,6 +6,8 @@ event_loop.required_events = ["review.passed"]
 
 backend.kind = "command"
 backend.command = "claude"
+backend.args = ["-p", "--dangerously-skip-permissions"]
+backend.prompt_mode = "file"
 backend.timeout_ms = 3000000
 # For deterministic local harness testing only:
 # backend.kind = "command"

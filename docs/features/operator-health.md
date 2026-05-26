@@ -27,14 +27,14 @@ Unknown presets fall back to the default policy.
 
 ## Surfaces
 
-All operator surfaces share the same classification logic from `src/loops/health.ts`:
+All operator surfaces share the same classification logic from `packages/core/src/runs-health.ts`, which exports `categorizeRuns`, `categorizeRecords`, and `policyForPreset`:
 
-- **`autoloop loops health`** — prints a summary with stuck, watching, failed, and active sections.
-- **`autoloop loops watch <run-id>`** — prints a one-line advisory when a run transitions into the watching or stuck band.
-- **Dashboard `/api/runs`** — returns JSON with `active`, `watching`, `stuck`, `recentFailed`, and `recentCompleted` arrays.
+- **`autoloop loops health`** (`packages/cli/src/loops/health.ts`) — prints a summary with stuck, watching, failed, and active sections.
+- **`autoloop loops watch <run-id>`** (`packages/cli/src/loops/watch.ts`) — prints a one-line advisory when a run transitions into the watching or stuck band.
+- **Dashboard `/api/runs`** (`packages/dashboard/src/routes/api.ts`) — returns JSON with `active`, `watching`, `stuck`, `recentFailed`, and `recentCompleted` arrays.
 
 ## Design Notes
 
 - Thresholds are intentionally heuristic. They reflect typical iteration cadence per preset and may evolve as usage patterns become clearer.
 - Classification is computed from the `updated_at` field in the run registry. No additional metadata is required.
-- The policy module (`src/loops/policy.ts`) is the single source of truth for all thresholds.
+- The `POLICIES` map in `packages/core/src/runs-health.ts` is the single source of truth for all thresholds.
