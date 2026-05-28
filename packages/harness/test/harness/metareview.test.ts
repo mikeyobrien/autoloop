@@ -2,11 +2,16 @@ import { shouldRunMetareview } from "@mobrienv/autoloop-harness/metareview";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
 import { describe, expect, it } from "vitest";
 
-function makeLoop(enabled: boolean, every: number): LoopContext {
+function makeLoop(
+  enabled: boolean,
+  every: number,
+  adversarialFirst = false,
+): LoopContext {
   return {
     review: {
       enabled,
       every,
+      adversarialFirst,
       kind: "command",
       command: "echo",
       args: [],
@@ -24,6 +29,14 @@ describe("shouldRunMetareview", () => {
 
   it("returns false on iteration 1 even if enabled", () => {
     expect(shouldRunMetareview(makeLoop(true, 1), 1)).toBe(false);
+  });
+
+  it("returns false on iteration 1 even when adversarial first review is enabled", () => {
+    expect(shouldRunMetareview(makeLoop(true, 4, true), 1)).toBe(false);
+  });
+
+  it("runs adversarial first review before iteration 2 so iteration 1 output exists", () => {
+    expect(shouldRunMetareview(makeLoop(true, 4, true), 2)).toBe(true);
   });
 
   it("returns true on iteration 2 with every=1", () => {
