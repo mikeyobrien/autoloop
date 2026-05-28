@@ -23,8 +23,12 @@ function runExpectFail(args: string[]): { stderr: string; code: number } {
       env: { ...process.env },
     });
     throw new Error("expected non-zero exit");
-  } catch (err: any) {
-    return { stderr: err.stderr ?? "", code: err.status ?? 1 };
+  } catch (err: unknown) {
+    const execError = err as { stderr?: string | Buffer; status?: number };
+    return {
+      stderr: String(execError.stderr ?? ""),
+      code: execError.status ?? 1,
+    };
   }
 }
 

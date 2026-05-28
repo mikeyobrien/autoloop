@@ -27,9 +27,9 @@ describe("integration: launch metadata in loop.start journal event", () => {
       .split("\n")
       .find((line) => line.includes('"topic": "loop.start"'));
 
-    expect(loopStartLine).toBeTruthy();
+    if (!loopStartLine) throw new Error("missing loop.start journal event");
 
-    const parsed = JSON.parse(loopStartLine!) as Record<string, unknown>;
+    const parsed = JSON.parse(loopStartLine) as Record<string, unknown>;
     const fields = parsed.fields as Record<string, unknown>;
 
     // preset is basename of the temp project dir (e.g. autoloop-run-metadata-XXXX)
@@ -58,7 +58,9 @@ describe("integration: launch metadata in loop.start journal event", () => {
       .split("\n")
       .find((line) => line.includes('"topic": "loop.start"'));
 
-    const parsed = JSON.parse(loopStartLine!) as Record<string, unknown>;
+    if (!loopStartLine) throw new Error("missing loop.start journal event");
+
+    const parsed = JSON.parse(loopStartLine) as Record<string, unknown>;
     const fields = parsed.fields as Record<string, unknown>;
 
     expect(fields.max_iterations).toBe("5");

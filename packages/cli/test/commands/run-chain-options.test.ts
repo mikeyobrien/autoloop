@@ -72,6 +72,26 @@ describe("runInlineChain option propagation", () => {
     expect(runOptions.automerge).toBe(true);
   });
 
+  it("forwards -b backend override through to chains.runChain", () => {
+    dispatchRun(
+      ["--chain", "autocode,autoqa", "-b", "pi", "."],
+      [],
+      ".",
+      "autoloop",
+    );
+
+    expect(chains.runChain).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(chains.runChain).mock.calls[0];
+    const runOptions = callArgs[3];
+
+    expect(runOptions.backendOverride).toEqual({
+      kind: "pi",
+      command: "pi",
+      args: [],
+      prompt_mode: "arg",
+    });
+  });
+
   it("automerge sugar uses chain-compatible projectDir, not preset path", () => {
     // Simulate: autoloop run autocode --automerge --worktree
     // The bundleRoot is "." so defaultChainProjectDir should resolve to "."

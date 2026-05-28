@@ -62,7 +62,8 @@ export function shouldRunMetareview(
   iteration: number,
 ): boolean {
   if (!loop.review.enabled) return false;
-  if (iteration === 1 && loop.review.adversarialFirst) return true;
+  if (iteration <= 1) return false;
+  if (iteration === 2 && loop.review.adversarialFirst) return true;
   return iteration > 1 && (iteration - 1) % loop.review.every === 0;
 }
 

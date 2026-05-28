@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import type { Role } from "@mobrienv/autoloop-core/topology";
 import {
   appendBackendStart,
   type BranchLaunch,
@@ -14,7 +14,7 @@ import {
 } from "@mobrienv/autoloop-harness/parallel";
 import { buildIterationContext } from "@mobrienv/autoloop-harness/prompt";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
-import type { Role } from "@mobrienv/autoloop-core/topology";
+import { describe, expect, it } from "vitest";
 
 describe("csvFieldList", () => {
   it("extracts comma-separated values from a JSON field", () => {
@@ -416,11 +416,12 @@ describe("appendBackendStart honors iter.backend", () => {
     expect(startLine).toBeDefined();
     expect(startLine).toContain('"backend_kind": "command"');
     expect(startLine).toContain('"command": "claude"');
+    expect(startLine).toContain('"args": "--global-flag"');
     expect(startLine).toContain('"prompt_mode": "stdin"');
     expect(startLine).toContain('"timeout_ms": "2000"');
   });
 
-  it("writes iter.backend.* fields when role overrides kind/command/promptMode/timeoutMs", () => {
+  it("writes iter.backend.* fields when role overrides kind/command/args/promptMode/timeoutMs", () => {
     const loop = makeBackendExecLoop("append-role", {
       roles: [
         {
@@ -430,6 +431,7 @@ describe("appendBackendStart honors iter.backend", () => {
           emits: ["review.ready"],
           backendKind: "pi",
           backendCommand: "pi-runner",
+          backendArgs: ["--role-flag", "fast"],
           backendPromptMode: "arg",
           backendTimeoutMs: 9999,
         },
@@ -445,9 +447,11 @@ describe("appendBackendStart honors iter.backend", () => {
     expect(startLine).toBeDefined();
     expect(startLine).toContain('"backend_kind": "pi"');
     expect(startLine).toContain('"command": "pi-runner"');
+    expect(startLine).toContain('"args": "--role-flag,fast"');
     expect(startLine).toContain('"prompt_mode": "arg"');
     expect(startLine).toContain('"timeout_ms": "9999"');
     expect(startLine).not.toContain('"backend_kind": "command"');
+    expect(startLine).not.toContain('"args": "--global-flag"');
     expect(startLine).not.toContain('"timeout_ms": "2000"');
   });
 });

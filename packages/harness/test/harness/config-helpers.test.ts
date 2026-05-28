@@ -120,6 +120,85 @@ describe("injectClaudePermissions", () => {
 });
 
 describe("buildLoopContext", () => {
+  it("auto-discovers PROMPT.md from the work directory when no prompt is provided", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const workDir = mkdtempSync(join(tmpdir(), "autoloop-ts-prompt-work-"));
+    writeFileSync(join(workDir, "PROMPT.md"), "Implement the root task\n");
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir,
+    });
+
+    expect(loop.objective).toBe("Implement the root task\n");
+  });
+
+  it("prefers an explicit prompt over work directory PROMPT.md", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const workDir = mkdtempSync(join(tmpdir(), "autoloop-ts-prompt-work-"));
+    writeFileSync(join(workDir, "PROMPT.md"), "Root prompt\n");
+
+    const loop = buildLoopContext(
+      projectDir,
+      "Explicit prompt",
+      "node dist/main.js",
+      { workDir },
+    );
+
+    expect(loop.objective).toBe("Explicit prompt");
+  });
+
+  it("prefers configured inline prompt over work directory PROMPT.md", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.prompt = "Configured prompt"',
+      ].join("\n"),
+    );
+    const workDir = mkdtempSync(join(tmpdir(), "autoloop-ts-prompt-work-"));
+    writeFileSync(join(workDir, "PROMPT.md"), "Root prompt\n");
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir,
+    });
+
+    expect(loop.objective).toBe("Configured prompt");
+  });
+
+  it("prefers configured prompt_file over work directory PROMPT.md", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.prompt_file = "task.md"',
+      ].join("\n"),
+      { files: { "task.md": "Configured file prompt\n" } },
+    );
+    const workDir = mkdtempSync(join(tmpdir(), "autoloop-ts-prompt-work-"));
+    writeFileSync(join(workDir, "PROMPT.md"), "Root prompt\n");
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir,
+    });
+
+    expect(loop.objective).toBe("Configured file prompt\n");
+  });
+
+  it("does not replace an existing in-flight plan with work directory PROMPT.md", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const workDir = mkdtempSync(join(tmpdir(), "autoloop-ts-prompt-work-"));
+    const stateDir = join(workDir, ".autoloop");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, "plan.md"), "Existing plan\n");
+    writeFileSync(join(workDir, "PROMPT.md"), "Root prompt\n");
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir,
+    });
+
+    expect(loop.objective).toBe(
+      "Do the task and publish the completion event when finished.",
+    );
+  });
+
   it("injects Claude permissions for config-defined Claude backends", () => {
     const projectDir = makeProject(
       [

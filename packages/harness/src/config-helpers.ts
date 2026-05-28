@@ -41,10 +41,20 @@ import {
 import { emitToolScript, piAdapterScript } from "./tools.js";
 import type { LoopContext, RunOptions } from "./types.js";
 
+const DEFAULT_PROMPT =
+  "Do the task and publish the completion event when finished.";
+
+export interface ResolvePromptOptions {
+  workDir?: string;
+  stateDir?: string;
+  baseStateDir?: string;
+}
+
 export function resolvePrompt(
   projectDir: string,
   cfg: config.Config,
   override: string | null,
+  options: ResolvePromptOptions = {},
 ): string {
   if (override !== null) return override;
   const inlinePrompt = config.get(cfg, "event_loop.prompt", "");
@@ -54,7 +64,22 @@ export function resolvePrompt(
     const fullPath = join(projectDir, promptFile);
     if (existsSync(fullPath)) return readFileSync(fullPath, "utf-8");
   }
-  return "Do the task and publish the completion event when finished.";
+  if (!existingPlanFile(options)) {
+    const promptDir =
+      tryResolveGitRoot(options.workDir ?? projectDir) ??
+      options.workDir ??
+      projectDir;
+    const rootPrompt = join(promptDir, "PROMPT.md");
+    if (existsSync(rootPrompt)) return readFileSync(rootPrompt, "utf-8");
+  }
+  return DEFAULT_PROMPT;
+}
+
+function existingPlanFile(options: ResolvePromptOptions): boolean {
+  const dirs = [options.stateDir, options.baseStateDir].filter(
+    (dir): dir is string => Boolean(dir),
+  );
+  return dirs.some((dir) => existsSync(join(dir, "plan.md")));
 }
 
 export function resolveReviewPrompt(
@@ -458,7 +483,11 @@ export function reloadLoop(loop: LoopContext): LoopContext {
   };
 
   const updated: LoopContext = {
-    objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride),
+    objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride, {
+      workDir: wd,
+      stateDir: loop.paths.stateDir,
+      baseStateDir: loop.paths.baseStateDir,
+    }),
     topology: updatedTopology,
     limits: {
       maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3),
