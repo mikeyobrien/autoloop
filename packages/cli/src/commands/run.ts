@@ -15,6 +15,7 @@ interface RunOptions {
   projectDir: string;
   prompt: string | null;
   backendOverride: Record<string, unknown>;
+  configOverride: Record<string, unknown>;
   logLevel: string | null;
   chain: string | null;
   presetExplicit: boolean;
@@ -99,6 +100,7 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     projectDir: ".",
     prompt: null,
     backendOverride: {},
+    configOverride: {},
     logLevel: null,
     chain: null,
     presetExplicit: false,
@@ -129,6 +131,38 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
         return options;
       }
       options.backendOverride = backendOverrideSpec(backend);
+      i += 2;
+      continue;
+    }
+    if (
+      token === "--max-iterations" ||
+      token === "--iterations" ||
+      token === "-i"
+    ) {
+      const value = args[i + 1];
+      if (!value) {
+        console.log(`missing iteration count after ${token}`);
+        options.usageError = true;
+        return options;
+      }
+      setConfigOverride(options, "event_loop.max_iterations", value);
+      i += 2;
+      continue;
+    }
+    if (token === "--set") {
+      const assignment = args[i + 1];
+      if (!assignment) {
+        console.log("missing key=value after --set");
+        options.usageError = true;
+        return options;
+      }
+      const parsed = parseConfigAssignment(assignment);
+      if (!parsed) {
+        console.log(`invalid --set assignment: ${assignment}`);
+        options.usageError = true;
+        return options;
+      }
+      setConfigOverride(options, parsed.key, parsed.value);
       i += 2;
       continue;
     }
@@ -208,21 +242,31 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
       i++;
       continue;
     }
-    if (token === "-i" || token === "--iterations") {
-      console.log(
-        "unsupported flag `" +
-          token +
-          "`; set event_loop.max_iterations in the preset config",
-      );
-      options.usageError = true;
-      return options;
-    }
 
     options.positionals.push(token);
     i++;
   }
 
   return finalizeRunArgs(options, bundleRoot);
+}
+
+function setConfigOverride(
+  options: RunOptions,
+  key: string,
+  value: string,
+): void {
+  options.configOverride = config.put(options.configOverride, key, value);
+}
+
+function parseConfigAssignment(
+  assignment: string,
+): { key: string; value: string } | null {
+  const eq = assignment.indexOf("=");
+  if (eq <= 0) return null;
+  const key = assignment.slice(0, eq).trim();
+  const value = assignment.slice(eq + 1).trim();
+  if (!key || !value) return null;
+  return { key, value };
 }
 
 function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
@@ -366,6 +410,7 @@ function defaultChainProjectDir(bundleRoot: string): string {
 function chainableOptions(opts: RunOptions): Record<string, unknown> {
   return {
     backendOverride: opts.backendOverride,
+    configOverride: opts.configOverride,
     worktree: opts.worktree || undefined,
     noWorktree: opts.noWorktree || undefined,
     mergeStrategy: opts.mergeStrategy,

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { put } from "@mobrienv/autoloop-core/config";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import {
   buildLoopContext,
@@ -219,6 +220,24 @@ describe("buildLoopContext", () => {
     expect(loop.backend.command).toBe("claude");
     expect(loop.backend.args).toEqual(["-p", "--dangerously-skip-permissions"]);
     expect(loop.review.args).toEqual(["-p", "--dangerously-skip-permissions"]);
+  });
+
+  it("reapplies run-scoped config overrides across hot reload", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      configOverride: put({}, "event_loop.max_iterations", "42"),
+    });
+
+    expect(loop.limits.maxIterations).toBe(42);
+
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      "event_loop.max_iterations = 2\n",
+    );
+    const reloaded = reloadLoop(loop);
+
+    expect(reloaded.limits.maxIterations).toBe(42);
   });
 
   it("sets isolation mode to run-scoped by default for solo run", () => {

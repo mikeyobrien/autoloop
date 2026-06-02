@@ -14,6 +14,7 @@ import {
   projectHasConfig,
   put,
   userConfigPath,
+  userPresetOverridePath,
 } from "../src/config.js";
 
 const TMP_BASE = join(tmpdir(), `autoloop-ts-test-config-${process.pid}`);
@@ -222,9 +223,12 @@ describe("loadUserConfig", () => {
 
 describe("loadLayered", () => {
   const origEnv = process.env.AUTOLOOP_CONFIG;
+  const origXdg = process.env.XDG_CONFIG_HOME;
   afterEach(() => {
     if (origEnv === undefined) delete process.env.AUTOLOOP_CONFIG;
     else process.env.AUTOLOOP_CONFIG = origEnv;
+    if (origXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = origXdg;
   });
 
   it("returns defaults when no user or project config", () => {
@@ -268,6 +272,58 @@ describe("loadLayered", () => {
     const { config: cfg, provenance } = loadLayered(dir);
     expect(get(cfg, "backend.command", "")).toBe("custom-backend");
     expect(provenance["backend.command"]).toContain("project");
+  });
+
+  it("applies user and repo preset overrides after preset config", () => {
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "missing-user.toml");
+    process.env.XDG_CONFIG_HOME = join(TMP_BASE, "xdg");
+
+    const presetDir = tmpDir("autocode");
+    writeFileSync(
+      join(presetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 100\n",
+    );
+
+    const userOverride = userPresetOverridePath("autocode");
+    mkdirSync(join(userOverride, ".."), { recursive: true });
+    writeFileSync(userOverride, "[event_loop]\nmax_iterations = 200\n");
+
+    const repoDir = tmpDir("repo-with-override");
+    const repoOverride = join(
+      repoDir,
+      ".autoloop",
+      "overrides",
+      "autocode.toml",
+    );
+    mkdirSync(join(repoOverride, ".."), { recursive: true });
+    writeFileSync(repoOverride, "[event_loop]\nmax_iterations = 250\n");
+
+    const { config: cfg, provenance } = loadLayered(presetDir, {
+      presetName: "autocode",
+      workDir: repoDir,
+    });
+
+    expect(getInt(cfg, "event_loop.max_iterations", 0)).toBe(250);
+    expect(provenance["event_loop.max_iterations"]).toContain("repo override");
+  });
+
+  it("applies run-scoped config overrides last", () => {
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "missing-run-user.toml");
+    process.env.XDG_CONFIG_HOME = join(TMP_BASE, "xdg-run");
+
+    const presetDir = tmpDir("autocode-run");
+    writeFileSync(
+      join(presetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 100\n",
+    );
+
+    const { config: cfg, provenance } = loadLayered(presetDir, {
+      presetName: "autocode-run",
+      cliOverride: put({}, "event_loop.max_iterations", "300"),
+    });
+
+    expect(getInt(cfg, "event_loop.max_iterations", 0)).toBe(300);
+    expect(provenance["event_loop.max_iterations"]).toBe("CLI override");
   });
 
   it("non-overlapping sections preserve their sources", () => {

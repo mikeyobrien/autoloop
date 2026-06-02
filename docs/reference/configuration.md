@@ -29,7 +29,31 @@ Lines without `=` are skipped with a warning. Blank lines and comment lines are 
 
 `autoloops.toml` > `autoloops.conf` > built-in defaults.
 
+For preset runs, scalar/config overrides are layered on top of the selected preset:
+
+1. built-in defaults
+2. user config (`~/.config/autoloop/config.toml`, or `AUTOLOOP_CONFIG`)
+3. selected preset config (`autoloops.toml` / `autoloops.conf`)
+4. user preset override (`~/.config/autoloop/overrides/<preset>.toml`)
+5. repo preset override (`<repo>/.autoloop/overrides/<preset>.toml`)
+6. run-scoped CLI override (`--max-iterations`, `--iterations`, or `--set key=value`)
+
 The CLI `-b`/`--backend` flag overrides backend settings at runtime (kind, command, args, prompt_mode) without changing the file. Extra backend arguments can be passed after `--` on the command line (e.g. `autoloop run autocode -b pi -- --model anthropic/claude-sonnet-4`). These are appended to the backend's argument list.
+
+Run-scoped config overrides are also runtime-only and are reapplied after every hot reload:
+
+```bash
+autoloop run autocode --max-iterations 250 "Fix the bug"
+autoloop run autocode --set backend.timeout_ms=900000 "Fix the slow bug"
+```
+
+Persistent preset overrides can be written without forking the preset:
+
+```bash
+autoloop config set --user --preset autocode event_loop.max_iterations=250
+autoloop config set --repo --preset autocode event_loop.max_iterations=250
+autoloop config show --preset autocode --explain
+```
 
 ## Keys
 
