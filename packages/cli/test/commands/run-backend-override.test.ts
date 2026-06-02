@@ -48,6 +48,59 @@ afterEach(() => {
 });
 
 describe("applyGlobalBackendOverride", () => {
+  it("passes run-scoped max iteration overrides to the harness", async () => {
+    const targetDir = tmpDir("target-max-iterations");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 2\n",
+    );
+
+    await dispatchRun(
+      [targetDir, "--max-iterations", "250", "fix", "the", "bug"],
+      [],
+      targetDir,
+      "autoloop",
+    );
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    const opts = runSpy.mock.calls[0][3];
+    expect(opts.configOverride).toMatchObject({
+      event_loop: { max_iterations: "250" },
+    });
+    expect(runSpy.mock.calls[0][1]).toBe("fix the bug");
+  });
+
+  it("supports -i/--iterations and generic --set run overrides", async () => {
+    const targetDir = tmpDir("target-set-overrides");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 2\n",
+    );
+
+    await dispatchRun(
+      [
+        targetDir,
+        "-i",
+        "300",
+        "--set",
+        "backend.timeout_ms=900000",
+        "do",
+        "work",
+      ],
+      [],
+      targetDir,
+      "autoloop",
+    );
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    const opts = runSpy.mock.calls[0][3];
+    expect(opts.configOverride).toMatchObject({
+      event_loop: { max_iterations: "300" },
+      backend: { timeout_ms: "900000" },
+    });
+    expect(runSpy.mock.calls[0][1]).toBe("do work");
+  });
+
   it("applies cwd backend override when user config also exists", () => {
     // Set up cwd project with backend override
     const cwdDir = tmpDir("cwd-project");

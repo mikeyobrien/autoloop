@@ -284,19 +284,28 @@ export function buildLoopContext(
 ): LoopContext {
   const resolvedProjectDir = absolutePath(projectDir);
   const resolvedWorkDir = absolutePath(runOptions.workDir || ".");
-  const cfg = config.loadProject(resolvedProjectDir);
-  const stateDirAnchor = tryResolveGitRoot(resolvedWorkDir) ?? resolvedWorkDir;
+  const currentPresetName = basename(resolvedProjectDir);
+  const configWorkDir = tryResolveGitRoot(resolvedWorkDir) ?? resolvedWorkDir;
+  const configOverride = runOptions.configOverride || {};
+  const cfg = config.loadProject(resolvedProjectDir, {
+    presetName: currentPresetName,
+    workDir: configWorkDir,
+    cliOverride: configOverride,
+  });
+  const stateDirAnchor = configWorkDir;
   const stateDir = join(
     stateDirAnchor,
     config.get(cfg, "core.state_dir", ".autoloop"),
   );
-  const journalFile = config.resolveJournalFileIn(
-    resolvedProjectDir,
-    resolvedWorkDir,
+  const journalRelPath = config.get(
+    cfg,
+    "core.journal_file",
+    config.get(cfg, "core.events_file", ".autoloop/journal.jsonl"),
   );
-  const memoryFile = config.resolveMemoryFileIn(
-    resolvedProjectDir,
+  const journalFile = join(resolvedWorkDir, journalRelPath);
+  const memoryFile = join(
     resolvedWorkDir,
+    config.get(cfg, "core.memory_file", ".autoloop/memory.jsonl"),
   );
   // tasksFile is resolved later, after isolation mode determines effectiveStateDir
   const runId = nextRunId(journalFile, cfg);
@@ -310,7 +319,6 @@ export function buildLoopContext(
   const configIsolationEnabled =
     config.get(cfg, "worktree.enabled", "") === "true" ||
     config.get(cfg, "isolation.enabled", "false") === "true";
-  const currentPresetName = basename(resolvedProjectDir);
   const currentCat = presetCategory(currentPresetName, resolvedProjectDir);
   const isolation = resolveIsolationMode(
     {
@@ -402,12 +410,14 @@ export function buildLoopContext(
       worktreeBranch,
       worktreePath,
       worktreeMetaDir,
+      configWorkDir,
     },
     runtime: {
       runId,
       selfCommand,
       promptOverride: promptOverride ?? null,
       backendOverride,
+      configOverride,
       logLevel,
       branchMode: false,
       isolationMode: isolation.mode,
@@ -431,7 +441,11 @@ export function buildLoopContext(
 export function reloadLoop(loop: LoopContext): LoopContext {
   const pd = loop.paths.projectDir;
   const wd = loop.paths.workDir;
-  const cfg = config.loadProject(pd);
+  const cfg = config.loadProject(pd, {
+    presetName: loop.launch.preset,
+    workDir: loop.paths.configWorkDir || wd,
+    cliOverride: loop.runtime.configOverride,
+  });
   const topoData = topo.loadTopology(pd);
 
   const backend = readBackendConfig(cfg, loop.runtime.backendOverride);

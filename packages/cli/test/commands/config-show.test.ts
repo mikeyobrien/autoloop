@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -29,9 +29,14 @@ afterEach(() => rmSync(TMP_BASE, { recursive: true, force: true }));
 
 describe("dispatchConfig", () => {
   const origEnv = process.env.AUTOLOOP_CONFIG;
+  const origXdg = process.env.XDG_CONFIG_HOME;
+  const origCwd = process.cwd();
   afterEach(() => {
     if (origEnv === undefined) delete process.env.AUTOLOOP_CONFIG;
     else process.env.AUTOLOOP_CONFIG = origEnv;
+    if (origXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = origXdg;
+    process.chdir(origCwd);
   });
 
   it("show prints resolved config with per-key provenance", () => {
@@ -83,6 +88,88 @@ describe("dispatchConfig", () => {
     expect(parsed.config.backend.command).toBe("claude");
     expect(parsed.provenance["backend.command"]).toContain("project");
     expect(parsed.provenance["backend.kind"]).toBe("default");
+  });
+
+  it("config set writes user-scoped preset overrides", () => {
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "missing-user-config.toml");
+    process.env.XDG_CONFIG_HOME = join(TMP_BASE, "xdg-set-user");
+
+    const output = captureLogs(() =>
+      dispatchConfig([
+        "set",
+        "--user",
+        "--preset",
+        "autocode",
+        "event_loop.max_iterations=250",
+      ]),
+    );
+
+    const path = join(
+      process.env.XDG_CONFIG_HOME,
+      "autoloop",
+      "overrides",
+      "autocode.toml",
+    );
+    const content = readFileSync(path, "utf-8");
+    expect(content).toContain("[event_loop]");
+    expect(content).toContain('max_iterations = "250"');
+    expect(output).toContain(path);
+  });
+
+  it("config set writes repo-scoped preset overrides", () => {
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "missing-repo-config.toml");
+    const repoDir = tmpDir("repo-set");
+
+    const output = captureLogs(() =>
+      dispatchConfig([
+        "set",
+        "--repo",
+        "--project",
+        repoDir,
+        "--preset",
+        "autocode",
+        "event_loop.max_iterations=300",
+      ]),
+    );
+
+    const path = join(repoDir, ".autoloop", "overrides", "autocode.toml");
+    const content = readFileSync(path, "utf-8");
+    expect(content).toContain("[event_loop]");
+    expect(content).toContain('max_iterations = "300"');
+    expect(output).toContain(path);
+  });
+
+  it("show --preset includes preset override provenance", () => {
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "missing-show-preset.toml");
+    process.env.XDG_CONFIG_HOME = join(TMP_BASE, "xdg-show-preset");
+    const repoDir = tmpDir("repo-show-preset");
+    mkdirSync(join(repoDir, "presets", "autocode"), { recursive: true });
+    writeFileSync(
+      join(repoDir, "presets", "autocode", "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 100\n",
+    );
+    const overridePath = join(
+      repoDir,
+      ".autoloop",
+      "overrides",
+      "autocode.toml",
+    );
+    mkdirSync(join(overridePath, ".."), { recursive: true });
+    writeFileSync(overridePath, "[event_loop]\nmax_iterations = 400\n");
+
+    const output = captureLogs(() =>
+      dispatchConfig([
+        "show",
+        "--project",
+        repoDir,
+        "--preset",
+        "autocode",
+        "--explain",
+      ]),
+    );
+
+    expect(output).toContain('max_iterations = "400"');
+    expect(output).toContain("# repo override");
   });
 
   it("path prints user config path and existence", () => {

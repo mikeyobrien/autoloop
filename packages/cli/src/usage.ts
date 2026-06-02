@@ -41,6 +41,13 @@ export function printUsage(): void {
   console.log("  -v, --verbose    Set log level to debug");
   console.log("  -b, --backend    Override backend command");
   console.log(
+    "  --max-iterations <n>  Override event_loop.max_iterations for this run",
+  );
+  console.log("  -i, --iterations <n>  Alias for --max-iterations");
+  console.log(
+    "  --set key=value       Override any config key for this run; repeatable",
+  );
+  console.log(
     "  -p, --preset     Resolve a bundled preset name or custom preset dir",
   );
   console.log(
@@ -76,6 +83,13 @@ export function printRunUsage(): void {
   console.log("  -v, --verbose    Set log level to debug");
   console.log("  -b, --backend    Override backend command");
   console.log(
+    "  --max-iterations <n>  Override event_loop.max_iterations for this run",
+  );
+  console.log("  -i, --iterations <n>  Alias for --max-iterations");
+  console.log(
+    "  --set key=value       Override any config key for this run; repeatable",
+  );
+  console.log(
     "  -p, --preset     Resolve a bundled preset name or custom preset dir",
   );
   console.log(
@@ -102,6 +116,12 @@ export function printRunUsage(): void {
   console.log("Examples:");
   console.log("  autoloop run autocode");
   console.log('  autoloop run autocode "Fix the login bug"');
+  console.log(
+    '  autoloop run autocode --max-iterations 250 "Fix the login bug"',
+  );
+  console.log(
+    '  autoloop run autocode --set backend.timeout_ms=900000 "Fix slowly"',
+  );
   console.log('  autoloop run presets/autoqa "QA recent changes"');
   console.log('  autoloop run . "Run from current directory"');
   console.log("");
@@ -208,6 +228,12 @@ export function missingPresetError(): void {
   console.log("Examples:");
   console.log("  autoloop run autocode");
   console.log('  autoloop run autocode "Fix the login bug"');
+  console.log(
+    '  autoloop run autocode --max-iterations 250 "Fix the login bug"',
+  );
+  console.log(
+    '  autoloop run autocode --set backend.timeout_ms=900000 "Fix slowly"',
+  );
   console.log('  autoloop run presets/autoqa "QA recent changes"');
   console.log('  autoloop run . "Run from current directory"');
   console.log("");

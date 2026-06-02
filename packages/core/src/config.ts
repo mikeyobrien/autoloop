@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   type Config,
   deepMerge,
@@ -40,6 +40,12 @@ export {
   stringifyValues,
 } from "@mobrienv/autoloop-core/config-schema";
 
+export interface LoadLayeredOptions {
+  presetName?: string;
+  workDir?: string;
+  cliOverride?: Config;
+}
+
 export function userConfigPath(): string {
   const envPath = process.env.AUTOLOOP_CONFIG;
   if (envPath) return envPath;
@@ -58,6 +64,27 @@ export function userPresetsDir(): string {
   return join(xdgHome, "autoloop", "presets");
 }
 
+export function userOverridesDir(): string {
+  const xdgHome = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+  return join(xdgHome, "autoloop", "overrides");
+}
+
+export function userPresetOverridePath(presetName: string): string {
+  return join(userOverridesDir(), `${basename(presetName)}.toml`);
+}
+
+export function repoPresetOverridePath(
+  workDir: string,
+  presetName: string,
+): string {
+  return join(
+    workDir,
+    ".autoloop",
+    "overrides",
+    `${basename(presetName)}.toml`,
+  );
+}
+
 export function hasUserConfig(): boolean {
   return existsSync(userConfigPath());
 }
@@ -68,7 +95,10 @@ export function loadUserConfig(): Config {
   return stringifyValues(parseRawToml(readFileSync(path, "utf-8")));
 }
 
-export function loadLayered(projectDir: string): LayeredConfig {
+export function loadLayered(
+  projectDir: string,
+  options: LoadLayeredOptions = {},
+): LayeredConfig {
   const base = defaults();
   const provenance: Provenance = {};
   recordProvenance(base, "default", provenance, "");
@@ -86,11 +116,53 @@ export function loadLayered(projectDir: string): LayeredConfig {
     recordProvenance(projectCfg, `project (${projectPath})`, provenance, "");
   }
 
+  const presetName = options.presetName || basename(projectDir);
+  const userOverridePath = userPresetOverridePath(presetName);
+  if (existsSync(userOverridePath)) {
+    const userOverride = stringifyValues(
+      parseRawToml(readFileSync(userOverridePath, "utf-8")),
+    );
+    merged = deepMerge(merged, userOverride);
+    recordProvenance(
+      userOverride,
+      `user override (${userOverridePath})`,
+      provenance,
+      "",
+    );
+  }
+
+  if (options.workDir) {
+    const repoOverridePath = repoPresetOverridePath(
+      options.workDir,
+      presetName,
+    );
+    if (existsSync(repoOverridePath)) {
+      const repoOverride = stringifyValues(
+        parseRawToml(readFileSync(repoOverridePath, "utf-8")),
+      );
+      merged = deepMerge(merged, repoOverride);
+      recordProvenance(
+        repoOverride,
+        `repo override (${repoOverridePath})`,
+        provenance,
+        "",
+      );
+    }
+  }
+
+  if (options.cliOverride && Object.keys(options.cliOverride).length > 0) {
+    merged = deepMerge(merged, options.cliOverride);
+    recordProvenance(options.cliOverride, "CLI override", provenance, "");
+  }
+
   return { config: merged, provenance };
 }
 
-export function loadProject(projectDir: string): Config {
-  return loadLayered(projectDir).config;
+export function loadProject(
+  projectDir: string,
+  options: LoadLayeredOptions = {},
+): Config {
+  return loadLayered(projectDir, options).config;
 }
 
 export function load(path: string): Config {

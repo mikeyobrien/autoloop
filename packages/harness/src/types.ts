@@ -74,12 +74,14 @@ export interface LoopContext {
     worktreeBranch: string;
     worktreePath: string;
     worktreeMetaDir: string;
+    configWorkDir: string;
   };
   runtime: {
     runId: string;
     selfCommand: string;
     promptOverride: string | null;
     backendOverride: Record<string, unknown>;
+    configOverride: Record<string, unknown>;
     logLevel: string;
     branchMode: boolean;
     isolationMode: string;
@@ -97,6 +99,7 @@ export interface LoopContext {
 export interface RunOptions {
   workDir?: string;
   backendOverride?: Record<string, unknown>;
+  configOverride?: Record<string, unknown>;
   logLevel?: string | null;
   prompt?: string | null;
   chain?: string | null;
