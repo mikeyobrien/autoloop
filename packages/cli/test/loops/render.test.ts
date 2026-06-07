@@ -54,8 +54,16 @@ describe("renderListHeader", () => {
 
 describe("renderRunLine", () => {
   it("includes formatted created_at timestamp", () => {
-    const line = renderRunLine(makeRun());
-    expect(line).toContain("2026-04-05 ");
+    const run = makeRun();
+    const line = renderRunLine(run);
+    // Derive the expected local-time rendering so the assertion is
+    // timezone-independent (formatTime uses local-time getters).
+    const d = new Date(run.created_at);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const expectedDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+      d.getDate(),
+    )}`;
+    expect(line).toContain(`${expectedDate} `);
     const parts = line.split(/\s{2,}/);
     expect(parts.length).toBeGreaterThanOrEqual(8);
   });
