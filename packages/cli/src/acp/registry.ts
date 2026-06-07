@@ -16,6 +16,13 @@
 
 export type CommandMode = "stream" | "capture" | "control";
 
+/**
+ * Preset used when a prompt is a bare objective rather than an explicit command
+ * (e.g. the ACP client sends "build the login page"). Explicit verbs and
+ * /slash commands always take priority over this default.
+ */
+export const DEFAULT_PRESET = "autocode";
+
 export interface CommandSpec {
   /** Verb as typed on the prompt line and as the slash command name. */
   name: string;
@@ -146,6 +153,32 @@ export function parseCommandLine(line: string): ParsedCommand | null {
   const spec = COMMAND_BY_NAME.get(head);
   if (!spec) return null;
   return { spec, args: tokens.slice(1) };
+}
+
+/**
+ * Normalize raw prompt text before parsing. ACP clients (especially when driven
+ * by a model) sometimes wrap the prompt in an XML-like envelope such as
+ * `<user_message>…</user_message>`. Strip a single outer wrapper of a few known
+ * tag names so the inner command/objective is what we parse. Unrecognized tags
+ * are left untouched.
+ */
+export function normalizePromptText(raw: string): string {
+  let text = raw.trim();
+  const wrappers = ["user_message", "user", "message", "query", "prompt"];
+  for (const tag of wrappers) {
+    const open = new RegExp(`^<${tag}(?:\\s[^>]*)?>`, "i");
+    const close = new RegExp(`</${tag}>$`, "i");
+    if (open.test(text) && close.test(text)) {
+      text = text.replace(open, "").replace(close, "").trim();
+      break;
+    }
+  }
+  return text;
+}
+
+/** True when the leading token of `line` is a known verb or `/verb`. */
+export function looksLikeCommand(line: string): boolean {
+  return parseCommandLine(line) !== null;
 }
 
 /**

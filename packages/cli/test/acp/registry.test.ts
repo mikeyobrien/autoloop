@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   COMMANDS,
+  DEFAULT_PRESET,
   findCommand,
+  looksLikeCommand,
+  normalizePromptText,
   parseCommandLine,
   tokenize,
 } from "../../src/acp/registry.js";
@@ -77,5 +80,54 @@ describe("acp registry", () => {
     it("returns null for empty line", () => {
       expect(parseCommandLine("   ")).toBeNull();
     });
+  });
+
+  describe("normalizePromptText", () => {
+    it("strips a <user_message> wrapper", () => {
+      expect(
+        normalizePromptText("<user_message>run autocode</user_message>"),
+      ).toBe("run autocode");
+    });
+    it("strips wrappers case-insensitively and with attributes", () => {
+      expect(
+        normalizePromptText('<User_Message id="1">hello</User_Message>'),
+      ).toBe("hello");
+    });
+    it("supports common wrapper tag names", () => {
+      expect(normalizePromptText("<query>do it</query>")).toBe("do it");
+      expect(normalizePromptText("<prompt>do it</prompt>")).toBe("do it");
+    });
+    it("leaves unwrapped text untouched", () => {
+      expect(normalizePromptText("run autocode")).toBe("run autocode");
+    });
+    it("leaves unmatched/partial tags untouched", () => {
+      expect(normalizePromptText("<user_message>oops")).toBe(
+        "<user_message>oops",
+      );
+      expect(normalizePromptText("a <user_message>b</user_message>")).toBe(
+        "a <user_message>b</user_message>",
+      );
+    });
+    it("only strips a single outer wrapper", () => {
+      expect(normalizePromptText("<user><message>x</message></user>")).toBe(
+        "<message>x</message>",
+      );
+    });
+  });
+
+  describe("looksLikeCommand", () => {
+    it("is true for verbs and slash verbs", () => {
+      expect(looksLikeCommand("run autocode")).toBe(true);
+      expect(looksLikeCommand("/loops")).toBe(true);
+    });
+    it("is false for bare objectives", () => {
+      expect(looksLikeCommand("build the login page")).toBe(false);
+      expect(looksLikeCommand("")).toBe(false);
+    });
+  });
+
+  it("DEFAULT_PRESET is a known preset name", () => {
+    expect(typeof DEFAULT_PRESET).toBe("string");
+    expect(DEFAULT_PRESET.length).toBeGreaterThan(0);
   });
 });

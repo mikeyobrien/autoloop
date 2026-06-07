@@ -17,7 +17,12 @@ import * as acp from "@agentclientprotocol/sdk";
 import { DashboardControl } from "./dashboard-control.js";
 import type { SessionUpdateSink } from "./event-bridge.js";
 import { runQuickCommand } from "./quick.js";
-import { COMMANDS, parseCommandLine } from "./registry.js";
+import {
+  COMMANDS,
+  DEFAULT_PRESET,
+  normalizePromptText,
+  parseCommandLine,
+} from "./registry.js";
 import { executeRun } from "./run-exec.js";
 
 export interface AgentDeps {
@@ -105,11 +110,21 @@ export class AutoloopAgent implements acp.Agent {
       return { stopReason: "refusal" };
     }
 
-    const text = extractText(params.prompt).trim();
+    const text = normalizePromptText(extractText(params.prompt));
+    if (!text) {
+      await this.sendMessage(params.sessionId, helpText(""));
+      return { stopReason: "end_turn" };
+    }
+
     const parsed = parseCommandLine(text);
     if (!parsed) {
-      await this.sendMessage(params.sessionId, helpText(text));
-      return { stopReason: "end_turn" };
+      // Not an explicit command — treat the whole prompt as an objective for
+      // the default preset. This is the natural ACP UX: a bare prompt starts a
+      // run, while explicit verbs and /slash commands override it.
+      return this.handleStream(params.sessionId, session, "run", [
+        DEFAULT_PRESET,
+        text,
+      ]);
     }
 
     const { spec, args } = parsed;

@@ -102,23 +102,6 @@ describe("AutoloopAgent", () => {
     expect(res.stopReason).toBe("refusal");
   });
 
-  it("returns help for an unknown command", async () => {
-    let rec: Recorded;
-    ({ agent, rec } = makeAgent());
-    const { sessionId } = await agent.newSession({
-      cwd: process.cwd(),
-      mcpServers: [],
-    } as acp.NewSessionRequest);
-    rec.updates.length = 0;
-    const res = await agent.prompt({
-      sessionId,
-      prompt: [{ type: "text", text: "definitely-not-a-command" }],
-    } as acp.PromptRequest);
-    expect(res.stopReason).toBe("end_turn");
-    expect(textOf(rec)).toContain("Unknown command");
-    expect(textOf(rec)).toContain("run");
-  });
-
   it("returns help for an empty prompt", async () => {
     let rec: Recorded;
     ({ agent, rec } = makeAgent());

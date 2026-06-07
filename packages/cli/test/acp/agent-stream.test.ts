@@ -234,4 +234,72 @@ describe("AutoloopAgent stream path", () => {
       .join("");
     expect(text).toContain("Run error: kaboom");
   });
+
+  it("treats a bare objective as a default-preset run", async () => {
+    let seenVerb: string | undefined;
+    let seenArgs: string[] | undefined;
+    executeRunMock.mockImplementation(async (verb: string, args: string[]) => {
+      seenVerb = verb;
+      seenArgs = args;
+      return { stopReason: "end_turn", summary: "ok" };
+    });
+    const { agent } = makeAgent();
+    const { sessionId } = await agent.newSession({
+      cwd: process.cwd(),
+      mcpServers: [],
+    } as acp.NewSessionRequest);
+    const res = await agent.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: "build the login page" }],
+    } as acp.PromptRequest);
+    expect(res.stopReason).toBe("end_turn");
+    expect(seenVerb).toBe("run");
+    expect(seenArgs).toEqual(["autocode", "build the login page"]);
+  });
+
+  it("strips a <user_message> wrapper before dispatching", async () => {
+    let seenArgs: string[] | undefined;
+    executeRunMock.mockImplementation(async (_verb: string, args: string[]) => {
+      seenArgs = args;
+      return { stopReason: "end_turn", summary: "ok" };
+    });
+    const { agent } = makeAgent();
+    const { sessionId } = await agent.newSession({
+      cwd: process.cwd(),
+      mcpServers: [],
+    } as acp.NewSessionRequest);
+    await agent.prompt({
+      sessionId,
+      prompt: [
+        { type: "text", text: "<user_message>ship the feature</user_message>" },
+      ],
+    } as acp.PromptRequest);
+    expect(seenArgs).toEqual(["autocode", "ship the feature"]);
+  });
+
+  it("strips a wrapper around an explicit command", async () => {
+    let seenVerb: string | undefined;
+    let seenArgs: string[] | undefined;
+    executeRunMock.mockImplementation(async (verb: string, args: string[]) => {
+      seenVerb = verb;
+      seenArgs = args;
+      return { stopReason: "end_turn", summary: "ok" };
+    });
+    const { agent } = makeAgent();
+    const { sessionId } = await agent.newSession({
+      cwd: process.cwd(),
+      mcpServers: [],
+    } as acp.NewSessionRequest);
+    await agent.prompt({
+      sessionId,
+      prompt: [
+        {
+          type: "text",
+          text: '<user_message>run autoqa "exercise onboarding"</user_message>',
+        },
+      ],
+    } as acp.PromptRequest);
+    expect(seenVerb).toBe("run");
+    expect(seenArgs).toEqual(["autoqa", "exercise onboarding"]);
+  });
 });
