@@ -154,7 +154,7 @@ describe("EventBridge", () => {
     expect(titled).toBeTruthy();
   });
 
-  it("streams progress as tool content", async () => {
+  it("streams progress as an assistant message", async () => {
     const { sink, updates } = makeSink();
     const bridge = new EventBridge(sink, "tc");
     await feed(bridge, [
@@ -169,12 +169,26 @@ describe("EventBridge", () => {
         outcome: "continue",
       },
     ]);
-    const content = updates.find(
+    // The iteration update is a top-level assistant message (priority message),
+    // not collapsed tool-call content and not an agent thought.
+    const msg = updates.find(
+      (u) =>
+        u.sessionUpdate === "agent_message_chunk" &&
+        u.content.text.includes("plan.created"),
+    );
+    expect(msg).toBeTruthy();
+    const text =
+      msg?.sessionUpdate === "agent_message_chunk" ? msg.content.text : "";
+    expect(text).toContain("iteration 1");
+    expect(text).toContain("event: plan.created");
+    expect(text).toContain("outcome: continue");
+    expect(text).toContain("emitted: plan.created");
+    // It must NOT be routed as tool-call content.
+    const toolContent = updates.find(
       (u) =>
         u.sessionUpdate === "tool_call_update" && "content" in u && u.content,
     );
-    expect(JSON.stringify(content)).toContain("plan.created");
-    expect(JSON.stringify(content)).toContain("emitted: plan.created");
+    expect(toolContent).toBeUndefined();
   });
 
   it("emits backend output as agent message chunks", async () => {
@@ -194,12 +208,13 @@ describe("EventBridge", () => {
     expect(updates).toHaveLength(0);
   });
 
-  it("emits a status chunk for a silent iteration on the next iteration", async () => {
+  it("surfaces a progress-only iteration as an assistant message (no silent note)", async () => {
     const { sink, updates } = makeSink();
     const bridge = new EventBridge(sink, "tc");
     await feed(bridge, [
       { type: "iteration.start", iteration: 1, maxIterations: 5, runId: "r" },
-      // iteration 1 emits a routing event but no message output
+      // iteration 1 emits a routing event but no backend output — the progress
+      // update itself is now the assistant message for the iteration.
       {
         type: "progress",
         runId: "r",
@@ -211,17 +226,27 @@ describe("EventBridge", () => {
       },
       { type: "iteration.start", iteration: 2, maxIterations: 5, runId: "r" },
     ]);
+    // The progress line is surfaced as a priority assistant message.
+    const progressMsg = updates.find(
+      (u) =>
+        u.sessionUpdate === "agent_message_chunk" &&
+        u.content.text.includes("tasks.ready"),
+    );
+    expect(progressMsg).toBeTruthy();
+    const text =
+      progressMsg?.sessionUpdate === "agent_message_chunk"
+        ? progressMsg.content.text
+        : "";
+    expect(text).toContain("iteration 1");
+    expect(text).toContain("continue:routed_event");
+    // Because the iteration produced a real message, the "no message output"
+    // fallback note must NOT fire.
     const note = updates.find(
       (u) =>
         u.sessionUpdate === "agent_message_chunk" &&
         u.content.text.includes("produced no message output"),
     );
-    expect(note).toBeTruthy();
-    const text =
-      note?.sessionUpdate === "agent_message_chunk" ? note.content.text : "";
-    expect(text).toContain("Iteration 1");
-    expect(text).toContain("tasks.ready");
-    expect(text).toContain("continue:routed_event");
+    expect(note).toBeUndefined();
   });
 
   it("emits a status chunk for a silent final iteration on loop.finish", async () => {

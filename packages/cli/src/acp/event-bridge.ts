@@ -5,7 +5,8 @@
 // Mapping:
 //   iteration.start    -> tool_call (kind execute, in_progress) on first
 //                         iteration; tool_call_update (title) thereafter
-//   progress           -> tool_call_update content + agent_message_chunk
+//   progress           -> agent_message_chunk (the per-iteration update,
+//                         surfaced as a priority assistant message)
 //   backend.output     -> agent_message_chunk (the model/tool text)
 //   log                -> agent_thought_chunk (debug/info narration)
 //   failure.diagnostic -> tool_call_update status=failed + message chunk
@@ -263,7 +264,12 @@ export class EventBridge {
       `outcome: ${event.outcome}`,
     ];
     if (event.emittedTopic) parts.push(`emitted: ${event.emittedTopic}`);
-    await this.toolContent(parts.join(" | "));
+    // The per-iteration update is a priority message for the end-user, mirroring
+    // the dashboard's run detail view — emit it as a top-level assistant message
+    // rather than burying it as collapsed tool-call content. It also counts as
+    // real output, so the "produced no message output" fallback does not fire.
+    this.sawOutputThisIteration = true;
+    await this.message(parts.join(" | "));
   }
 
   /**
@@ -320,14 +326,6 @@ export class EventBridge {
     await this.sink.update({
       sessionUpdate: "agent_thought_chunk",
       content: { type: "text", text },
-    });
-  }
-
-  private async toolContent(text: string): Promise<void> {
-    await this.sink.update({
-      sessionUpdate: "tool_call_update",
-      toolCallId: this.toolCallId,
-      content: [{ type: "content", content: { type: "text", text } }],
     });
   }
 }
