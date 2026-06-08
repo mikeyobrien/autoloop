@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   COMMANDS,
   DEFAULT_PRESET,
-  findCommand,
-  looksLikeCommand,
   normalizePromptText,
   parseCommandLine,
   tokenize,
@@ -21,13 +19,6 @@ describe("acp registry", () => {
       expect(typeof c.hint).toBe("string");
       expect(["stream", "capture", "control"]).toContain(c.mode);
     }
-  });
-
-  it("findCommand resolves known and rejects unknown", () => {
-    expect(findCommand("run")?.mode).toBe("stream");
-    expect(findCommand("dashboard")?.mode).toBe("control");
-    expect(findCommand("loops")?.mode).toBe("capture");
-    expect(findCommand("nope")).toBeUndefined();
   });
 
   describe("tokenize", () => {
@@ -112,17 +103,6 @@ describe("acp registry", () => {
       expect(normalizePromptText("<user><message>x</message></user>")).toBe(
         "<message>x</message>",
       );
-    });
-  });
-
-  describe("looksLikeCommand", () => {
-    it("is true for verbs and slash verbs", () => {
-      expect(looksLikeCommand("run autocode")).toBe(true);
-      expect(looksLikeCommand("/loops")).toBe(true);
-    });
-    it("is false for bare objectives", () => {
-      expect(looksLikeCommand("build the login page")).toBe(false);
-      expect(looksLikeCommand("")).toBe(false);
     });
   });
 

@@ -129,11 +129,6 @@ const COMMAND_BY_NAME = new Map<string, CommandSpec>(
   COMMANDS.map((c) => [c.name, c]),
 );
 
-/** Look up a command spec by verb name. Returns undefined if unknown. */
-export function findCommand(name: string): CommandSpec | undefined {
-  return COMMAND_BY_NAME.get(name);
-}
-
 export interface ParsedCommand {
   spec: CommandSpec;
   /** Argument tokens after the verb. */
@@ -174,11 +169,6 @@ export function normalizePromptText(raw: string): string {
     }
   }
   return text;
-}
-
-/** True when the leading token of `line` is a known verb or `/verb`. */
-export function looksLikeCommand(line: string): boolean {
-  return parseCommandLine(line) !== null;
 }
 
 /**
