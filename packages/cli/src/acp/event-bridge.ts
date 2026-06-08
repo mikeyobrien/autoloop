@@ -67,9 +67,17 @@ export class EventBridge {
   private failed = false;
   private cancelled = false;
   private iterations = 0;
+  private iteration = 0;
+  private maxIterations = 0;
   private runId: string | undefined;
+  private preset = "";
+  private workDir = "";
   private stopReason = "";
   private verbose: boolean;
+  /** Whether the in-flight iteration has emitted any backend output yet. */
+  private sawOutputThisIteration = false;
+  /** The most recent progress event, used to explain a silent iteration. */
+  private lastProgress: Extract<LoopEvent, { type: "progress" }> | undefined;
 
   constructor(
     sink: SessionUpdateSink,
@@ -84,6 +92,9 @@ export class EventBridge {
   /** Translate one LoopEvent into zero or more session updates. */
   async handle(event: LoopEvent): Promise<void> {
     switch (event.type) {
+      case "loop.start":
+        await this.onLoopStart(event);
+        return;
       case "iteration.start":
         await this.onIterationStart(event);
         return;
@@ -92,13 +103,12 @@ export class EventBridge {
         return;
       case "backend.output":
         if (event.output.trim()) {
+          this.sawOutputThisIteration = true;
           await this.message(event.output);
         }
         return;
       case "log":
-        if (this.verbose && event.message.trim()) {
-          await this.thought(`[${event.level}] ${event.message}`);
-        }
+        await this.onLog(event);
         return;
       case "failure.diagnostic":
         this.failed = true;
@@ -106,6 +116,7 @@ export class EventBridge {
         await this.message(`Failure: ${event.output}`);
         return;
       case "loop.finish":
+        await this.flushSilentIteration();
         this.iterations = event.iterations;
         this.runId = event.runId;
         this.stopReason = event.stopReason;
@@ -141,17 +152,20 @@ export class EventBridge {
     };
   }
 
-  private async onIterationStart(
-    event: Extract<LoopEvent, { type: "iteration.start" }>,
+  private async onLoopStart(
+    event: Extract<LoopEvent, { type: "loop.start" }>,
   ): Promise<void> {
     this.runId = event.runId;
-    const title = `Iteration ${event.iteration}/${event.maxIterations}`;
+    this.preset = event.preset;
+    this.workDir = event.workDir;
+    // Open the tool call named after the run id so the ACP client identifies
+    // this session by its run, not an anonymous iteration counter.
     if (!this.toolStarted) {
       this.toolStarted = true;
       await this.sink.update({
         sessionUpdate: "tool_call",
         toolCallId: this.toolCallId,
-        title,
+        title: this.title(),
         kind: "execute",
         status: "in_progress",
       });
@@ -159,14 +173,90 @@ export class EventBridge {
       await this.sink.update({
         sessionUpdate: "tool_call_update",
         toolCallId: this.toolCallId,
-        title,
+        title: this.title(),
       });
     }
+    // Emit a "this is what we're doing" header describing the run.
+    await this.message(renderRunHeader(event));
+  }
+
+  private async onIterationStart(
+    event: Extract<LoopEvent, { type: "iteration.start" }>,
+  ): Promise<void> {
+    // A new iteration is starting — if the previous one produced no output,
+    // explain why instead of leaving the ACP client showing nothing.
+    await this.flushSilentIteration();
+    this.runId = event.runId;
+    this.iteration = event.iteration;
+    this.maxIterations = event.maxIterations;
+    this.sawOutputThisIteration = false;
+    this.lastProgress = undefined;
+    if (!this.toolStarted) {
+      // No loop.start was observed (older harness or branch run) — open the
+      // tool call here as a fallback.
+      this.toolStarted = true;
+      await this.sink.update({
+        sessionUpdate: "tool_call",
+        toolCallId: this.toolCallId,
+        title: this.title(),
+        kind: "execute",
+        status: "in_progress",
+      });
+    } else {
+      await this.sink.update({
+        sessionUpdate: "tool_call_update",
+        toolCallId: this.toolCallId,
+        title: this.title(),
+      });
+    }
+  }
+
+  /**
+   * Build the tool-call title. The run id is the session's stable identity;
+   * the preset prefixes it and the iteration counter is appended once
+   * iterations begin: `{preset} · run {runId} · iter N/M`.
+   */
+  private title(): string {
+    const id = this.runId ? `run ${this.runId}` : "autoloop";
+    const presetPart = this.preset ? `${this.preset} · ` : "";
+    if (this.iteration > 0) {
+      return `${presetPart}${id} · iter ${this.iteration}/${this.maxIterations}`;
+    }
+    return `${presetPart}${id}`;
+  }
+
+  /**
+   * Route harness log events to the ACP client. autoloop's own narration
+   * (info / warn / error) is surfaced as assistant messages so the operator
+   * sees what the loop is doing and any warnings it raises. debug logs are
+   * lower-signal and only surface as agent thoughts when verbose is enabled.
+   */
+  private async onLog(
+    event: Extract<LoopEvent, { type: "log" }>,
+  ): Promise<void> {
+    const message = event.message.trim();
+    if (!message) return;
+    if (event.level === "debug") {
+      if (this.verbose) await this.thought(`[debug] ${message}`);
+      return;
+    }
+    // The "loop start run_id=…" info log is internal bookkeeping that the
+    // richer loop.start header already conveys — skip it to avoid a redundant
+    // assistant message.
+    if (event.level === "info" && message.startsWith("loop start run_id=")) {
+      return;
+    }
+    // info / warn / error → assistant message. Prefix non-info levels so the
+    // severity is visible in the client.
+    const text =
+      event.level === "info" ? message : `[${event.level}] ${message}`;
+    await this.message(text);
   }
 
   private async onProgress(
     event: Extract<LoopEvent, { type: "progress" }>,
   ): Promise<void> {
+    this.lastProgress = event;
     const parts = [
       `iteration ${event.iteration}`,
       `event: ${event.recentEvent}`,
@@ -176,13 +266,37 @@ export class EventBridge {
     await this.toolContent(parts.join(" | "));
   }
 
+  /**
+   * If the iteration that just ended produced no agent message output, emit a
+   * short status chunk explaining what happened (emitted event / outcome).
+   * This replaces the previous behavior of staying completely silent, which an
+   * ACP client renders as an unhelpful "[no output]" placeholder.
+   */
+  private async flushSilentIteration(): Promise<void> {
+    if (this.iteration === 0) return;
+    if (this.sawOutputThisIteration) return;
+    const p = this.lastProgress;
+    const detail = p
+      ? [
+          p.emittedTopic ? `emitted \`${p.emittedTopic}\`` : "no event emitted",
+          `outcome: ${p.outcome}`,
+        ].join(", ")
+      : "no event emitted";
+    await this.message(
+      `Iteration ${this.iteration} produced no message output (${detail}).`,
+    );
+    // Avoid emitting the same note twice if both iteration.start and
+    // loop.finish call this for the same iteration.
+    this.sawOutputThisIteration = true;
+  }
+
   private async onFinish(): Promise<void> {
     if (!this.toolStarted) {
       // Loop finished before any iteration banner (e.g. immediate exit).
       await this.sink.update({
         sessionUpdate: "tool_call",
         toolCallId: this.toolCallId,
-        title: "Loop",
+        title: this.title(),
         kind: "execute",
         status: "in_progress",
       });
@@ -221,4 +335,35 @@ export class EventBridge {
 function isCancelled(stopReason: string): boolean {
   const r = stopReason.toLowerCase();
   return r.includes("cancel") || r.includes("abort") || r.includes("signal");
+}
+
+/**
+ * Render the "this is what we're doing" header emitted at loop start. It gives
+ * the ACP client an at-a-glance summary of the run's identity and parameters
+ * before any iteration output streams in.
+ */
+export function renderRunHeader(
+  event: Extract<LoopEvent, { type: "loop.start" }>,
+): string {
+  const lines = [
+    `autoloop run \`${event.runId}\``,
+    "",
+    `preset:     ${event.preset}`,
+    `backend:    ${event.backend}`,
+    `directory:  ${event.workDir}`,
+    `iterations: max ${event.maxIterations}`,
+  ];
+  const completion: string[] = [];
+  if (event.completionEvent)
+    completion.push(`event \`${event.completionEvent}\``);
+  if (event.completionPromise)
+    completion.push(`promise \`${event.completionPromise}\``);
+  if (completion.length > 0) {
+    lines.push(`completion: ${completion.join(" or ")}`);
+  }
+  const prompt = event.prompt.trim();
+  if (prompt) {
+    lines.push("", "objective:", prompt);
+  }
+  return lines.join("\n");
 }

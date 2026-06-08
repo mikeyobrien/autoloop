@@ -55,6 +55,19 @@ export async function executeRun(
   args: string[],
   ctx: RunExecContext,
 ): Promise<RunExecResult> {
+  // The session's project directory anchors all run state (journal, registry,
+  // runs/). It is established (and required) at session/new; guard here so a
+  // misconfigured session fails loudly instead of silently misrouting the run.
+  if (!ctx.projectDir || !ctx.projectDir.trim()) {
+    return {
+      stopReason: "end_turn",
+      summary:
+        "Cannot start run: the session has no project directory. Provide a " +
+        "`cwd` when creating the ACP session.",
+      usageError: true,
+    };
+  }
+
   if (verb === "chain") {
     return executeChain(args, ctx);
   }
@@ -97,6 +110,10 @@ export async function executeRun(
     ctx.selfCmd,
     {
       ...options,
+      // workDir is the *target project* (the session cwd), distinct from
+      // options.projectDir which is the *preset* directory. The harness anchors
+      // run state on workDir, so passing the session cwd here is what routes the
+      // run to the intended project.
       workDir: ctx.projectDir,
       profiles: options.profiles.length > 0 ? options.profiles : undefined,
       noDefaultProfiles: options.noDefaultProfiles || undefined,

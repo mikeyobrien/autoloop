@@ -16,9 +16,6 @@ argument-hint: [connect|run|<slash-command>] [args...]
 # Start the ACP agent on stdio (the client spawns this as a subprocess)
 autoloop acp
 
-# Provide a fallback project directory (used only if the client omits cwd)
-autoloop acp --project-dir /path/to/repo
-
 # Surface debug logs as agent thoughts
 autoloop acp --verbose      # or -v
 
@@ -30,7 +27,7 @@ autoloop acp --help         # or -h
 - Frames are **NDJSON over stdio**. **Stdout is the protocol channel** — nothing else may write to it. All logs go to **stderr**.
 - The client therefore launches `autoloop acp` as a subprocess and speaks ACP on stdin/stdout. Don't pipe other output into stdout.
 
-**Working directory:** per session. The ACP client sets it via the `session/new` `cwd` field. `--project-dir` (or the `AUTOLOOP_PROJECT_DIR` env var) only supplies the fallback default when the client omits `cwd`.
+**Working directory (REQUIRED):** per session. The ACP client **must** set it via the `session/new` `cwd` field, as the absolute path of the target project directory. autoloop anchors **all run state** (journal, registry, `runs/`) on `cwd`. If `cwd` is missing or blank, `session/new` is **rejected** with a JSON-RPC `invalid params` error — autoloop does **not** silently fall back to its own launch directory, because doing so would misroute the entire run into the wrong project. `--project-dir` / `AUTOLOOP_PROJECT_DIR` only affect dashboard control; they are not a fallback for the session working directory.
 
 ### Representative client config
 
@@ -43,7 +40,7 @@ ACP clients differ, but they spawn the agent as a command + args. A generic entr
 }
 ```
 
-Add `"--project-dir", "/path/to/repo"` or `"--verbose"` to `args` if needed. No authentication step is required — `authenticate` is a no-op because autoloop runs locally under the caller's own credentials.
+Add `"--verbose"` to `args` if needed. The client **must** send a valid `cwd` on `session/new` (see Working directory above). No authentication step is required — `authenticate` is a no-op because autoloop runs locally under the caller's own credentials.
 
 ## What the client sees
 
@@ -51,7 +48,7 @@ On `initialize`, autoloop reports:
 - `agentInfo`: `{ name: "autoloop", version: "0.1.0" }`
 - `agentCapabilities`: `{ loadSession: false }` — sessions are not resumable; one session lives for the life of the connection and can launch many runs and quick commands over successive prompt turns.
 
-On `session/new`, autoloop advertises its verbs as **slash commands** (`available_commands_update`), each with a description and an input hint.
+On `session/new`, autoloop **requires** a valid `cwd` (rejecting the session otherwise) and advertises its verbs as **slash commands** (`available_commands_update`), each with a description and an input hint.
 
 ## Prompt behaviour
 

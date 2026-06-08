@@ -31,13 +31,127 @@ describe("EventBridge", () => {
       toolCallId: "tc-1",
       kind: "execute",
       status: "in_progress",
-      title: "Iteration 1/5",
+      title: "run r1 · iter 1/5",
     });
-    expect(updates[1]).toMatchObject({
+    // iteration 1 was silent, so a status note precedes the iter 2 title update.
+    const titleUpdate = updates.find(
+      (u) =>
+        u.sessionUpdate === "tool_call_update" &&
+        "title" in u &&
+        u.title === "run r1 · iter 2/5",
+    );
+    expect(titleUpdate).toBeTruthy();
+  });
+
+  it("opens the tool call named after the run id and emits a header on loop.start", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc-h");
+    await feed(bridge, [
+      {
+        type: "loop.start",
+        runId: "brave-otter",
+        prompt: "Fix the login bug",
+        workDir: "/home/me/project",
+        projectDir: "/presets/autocode",
+        preset: "autocode",
+        backend: "kiro",
+        maxIterations: 100,
+        completionEvent: "task.complete",
+        completionPromise: "LOOP_COMPLETE",
+      },
+      {
+        type: "iteration.start",
+        iteration: 1,
+        maxIterations: 100,
+        runId: "brave-otter",
+      },
+    ]);
+    // First update opens the tool call titled by preset + run id (no iter yet).
+    expect(updates[0]).toMatchObject({
+      sessionUpdate: "tool_call",
+      toolCallId: "tc-h",
+      kind: "execute",
+      status: "in_progress",
+      title: "autocode · run brave-otter",
+    });
+    // Header message carries the key parameters.
+    const header = updates[1];
+    expect(header).toMatchObject({ sessionUpdate: "agent_message_chunk" });
+    const text =
+      header.sessionUpdate === "agent_message_chunk" ? header.content.text : "";
+    expect(text).toContain("brave-otter");
+    expect(text).toContain("autocode");
+    expect(text).toContain("kiro");
+    expect(text).toContain("/home/me/project");
+    expect(text).toContain("max 100");
+    expect(text).toContain("task.complete");
+    expect(text).toContain("LOOP_COMPLETE");
+    expect(text).toContain("Fix the login bug");
+    // iteration.start then updates the title to include the counter.
+    expect(updates[2]).toMatchObject({
       sessionUpdate: "tool_call_update",
-      toolCallId: "tc-1",
-      title: "Iteration 2/5",
+      title: "autocode · run brave-otter · iter 1/100",
     });
+  });
+
+  it("omits optional completion/objective lines when absent", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc-min");
+    await bridge.handle({
+      type: "loop.start",
+      runId: "calm-finch",
+      prompt: "   ",
+      workDir: "/w",
+      projectDir: "/p",
+      preset: "autoqa",
+      backend: "claude",
+      maxIterations: 10,
+      completionEvent: "",
+      completionPromise: "",
+    });
+    const header = updates[1];
+    const text =
+      header.sessionUpdate === "agent_message_chunk" ? header.content.text : "";
+    expect(text).toContain("calm-finch");
+    expect(text).not.toContain("completion:");
+    expect(text).not.toContain("objective:");
+  });
+
+  it("updates the title when loop.start arrives after the tool call opened", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc-late");
+    // iteration.start opens the tool call first, then a loop.start updates the
+    // title rather than re-opening.
+    await feed(bridge, [
+      { type: "iteration.start", iteration: 1, maxIterations: 3, runId: "r2" },
+      {
+        type: "loop.start",
+        runId: "r2",
+        prompt: "x",
+        workDir: "/w",
+        projectDir: "/p",
+        preset: "autocode",
+        backend: "kiro",
+        maxIterations: 3,
+        completionEvent: "task.complete",
+        completionPromise: "",
+      },
+    ]);
+    const titleUpdate = updates.find(
+      (u) =>
+        u.sessionUpdate === "tool_call_update" &&
+        "title" in u &&
+        u.title?.includes("run r2"),
+    );
+    expect(titleUpdate).toBeTruthy();
+    // After loop.start the preset prefixes the title.
+    const titled = updates.find(
+      (u) =>
+        u.sessionUpdate === "tool_call_update" &&
+        "title" in u &&
+        u.title?.startsWith("autocode · run r2"),
+    );
+    expect(titled).toBeTruthy();
   });
 
   it("streams progress as tool content", async () => {
@@ -80,7 +194,72 @@ describe("EventBridge", () => {
     expect(updates).toHaveLength(0);
   });
 
-  it("surfaces logs as thoughts only when verbose", async () => {
+  it("emits a status chunk for a silent iteration on the next iteration", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc");
+    await feed(bridge, [
+      { type: "iteration.start", iteration: 1, maxIterations: 5, runId: "r" },
+      // iteration 1 emits a routing event but no message output
+      {
+        type: "progress",
+        runId: "r",
+        iteration: 1,
+        recentEvent: "loop.start",
+        allowedRoles: ["planner"],
+        emittedTopic: "tasks.ready",
+        outcome: "continue:routed_event",
+      },
+      { type: "iteration.start", iteration: 2, maxIterations: 5, runId: "r" },
+    ]);
+    const note = updates.find(
+      (u) =>
+        u.sessionUpdate === "agent_message_chunk" &&
+        u.content.text.includes("produced no message output"),
+    );
+    expect(note).toBeTruthy();
+    const text =
+      note?.sessionUpdate === "agent_message_chunk" ? note.content.text : "";
+    expect(text).toContain("Iteration 1");
+    expect(text).toContain("tasks.ready");
+    expect(text).toContain("continue:routed_event");
+  });
+
+  it("emits a status chunk for a silent final iteration on loop.finish", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc");
+    await feed(bridge, [
+      { type: "iteration.start", iteration: 1, maxIterations: 1, runId: "r" },
+      { type: "loop.finish", iterations: 1, stopReason: "done", runId: "r" },
+    ]);
+    const note = updates.find(
+      (u) =>
+        u.sessionUpdate === "agent_message_chunk" &&
+        u.content.text.includes("produced no message output"),
+    );
+    expect(note).toBeTruthy();
+    const text =
+      note?.sessionUpdate === "agent_message_chunk" ? note.content.text : "";
+    // No progress was recorded, so the note falls back to "no event emitted".
+    expect(text).toContain("no event emitted");
+  });
+
+  it("does not emit a status chunk when the iteration produced output", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc");
+    await feed(bridge, [
+      { type: "iteration.start", iteration: 1, maxIterations: 2, runId: "r" },
+      { type: "backend.output", output: "did real work" },
+      { type: "iteration.start", iteration: 2, maxIterations: 2, runId: "r" },
+    ]);
+    const note = updates.find(
+      (u) =>
+        u.sessionUpdate === "agent_message_chunk" &&
+        u.content.text.includes("produced no message output"),
+    );
+    expect(note).toBeUndefined();
+  });
+
+  it("surfaces debug logs as thoughts only when verbose", async () => {
     const quiet = makeSink();
     const qb = new EventBridge(quiet.sink, "tc");
     await qb.handle({ type: "log", level: "debug", message: "noise" });
@@ -92,6 +271,66 @@ describe("EventBridge", () => {
     expect(loud.updates[0]).toMatchObject({
       sessionUpdate: "agent_thought_chunk",
     });
+  });
+
+  it("surfaces info logs as assistant messages regardless of verbose", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc");
+    await bridge.handle({
+      type: "log",
+      level: "info",
+      message: "worktree cleaned for run r1",
+    });
+    expect(updates[0]).toMatchObject({
+      sessionUpdate: "agent_message_chunk",
+      content: { type: "text", text: "worktree cleaned for run r1" },
+    });
+  });
+
+  it("prefixes warn and error logs with their level", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc");
+    await feed(bridge, [
+      {
+        type: "log",
+        level: "warn",
+        message: "worktree merge failed: conflict",
+      },
+      {
+        type: "log",
+        level: "error",
+        message: "loop stop reason=backend_failed",
+      },
+    ]);
+    expect(updates[0]).toMatchObject({
+      sessionUpdate: "agent_message_chunk",
+      content: { type: "text", text: "[warn] worktree merge failed: conflict" },
+    });
+    expect(updates[1]).toMatchObject({
+      sessionUpdate: "agent_message_chunk",
+      content: {
+        type: "text",
+        text: "[error] loop stop reason=backend_failed",
+      },
+    });
+  });
+
+  it("suppresses the internal loop-start info log (header replaces it)", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc");
+    await bridge.handle({
+      type: "log",
+      level: "info",
+      message: "loop start run_id=brave-otter max_iterations=100",
+    });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("ignores blank log messages", async () => {
+    const { sink, updates } = makeSink();
+    const bridge = new EventBridge(sink, "tc", { verbose: true });
+    await bridge.handle({ type: "log", level: "info", message: "   " });
+    expect(updates).toHaveLength(0);
   });
 
   it("marks failure and completes the tool call as failed", async () => {

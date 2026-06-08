@@ -80,17 +80,23 @@ describe("AutoloopAgent", () => {
     }
   });
 
-  it("newSession falls back to the launch project dir when cwd is omitted", async () => {
-    let rec: Recorded;
-    ({ agent, rec } = makeAgent());
-    const res = await agent.newSession({
-      mcpServers: [],
-    } as acp.NewSessionRequest);
-    expect(res.sessionId).toMatch(/^autoloop-/);
-    // Still advertises commands; the session is usable without a client cwd.
-    expect(rec.updates[0].update.sessionUpdate).toBe(
-      "available_commands_update",
-    );
+  it("newSession rejects when cwd is omitted", async () => {
+    ({ agent } = makeAgent());
+    await expect(
+      agent.newSession({
+        mcpServers: [],
+      } as acp.NewSessionRequest),
+    ).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it("newSession rejects when cwd is blank", async () => {
+    ({ agent } = makeAgent());
+    await expect(
+      agent.newSession({
+        cwd: "   ",
+        mcpServers: [],
+      } as acp.NewSessionRequest),
+    ).rejects.toThrow(/cwd/);
   });
 
   it("refuses prompts for unknown sessions", async () => {

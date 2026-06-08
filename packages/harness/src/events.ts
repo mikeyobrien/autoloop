@@ -10,6 +10,22 @@ export type LoopEvent =
   // Structural — SDK consumers care about these.
   | { type: "log"; level: string; message: string }
   | {
+      // Emitted once, before the first iteration, carrying the resolved run
+      // identity and launch parameters. SDK consumers (e.g. the ACP bridge)
+      // use it to render a "this is what we're doing" header and to name the
+      // session/tool call after the run id.
+      type: "loop.start";
+      runId: string;
+      prompt: string;
+      workDir: string;
+      projectDir: string;
+      preset: string;
+      backend: string;
+      maxIterations: number;
+      completionEvent: string;
+      completionPromise: string;
+    }
+  | {
       type: "iteration.start";
       iteration: number;
       maxIterations: number;

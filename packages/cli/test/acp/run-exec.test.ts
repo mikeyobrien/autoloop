@@ -88,6 +88,21 @@ describe("executeRun", () => {
     );
   });
 
+  it("fails loudly when the session has no project directory", async () => {
+    const { sink } = makeSink();
+    const result = await executeRun("run", ["autocode", "go"], {
+      bundleRoot,
+      selfCmd: "autoloop",
+      projectDir: "",
+      signal: new AbortController().signal,
+      sink,
+      toolCallId: "tc",
+    });
+    expect(result.usageError).toBe(true);
+    expect(result.summary).toContain("no project directory");
+    expect(runMock).not.toHaveBeenCalled();
+  });
+
   it("returns a usage error for invalid run args", async () => {
     const { sink } = makeSink();
     const result = await executeRun("run", ["does-not-exist-preset-xyz"], {

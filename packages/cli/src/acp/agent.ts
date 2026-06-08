@@ -80,13 +80,21 @@ export class AutoloopAgent implements acp.Agent {
   async newSession(
     params: acp.NewSessionRequest,
   ): Promise<acp.NewSessionResponse> {
+    // The working directory is required: it determines which project the loop
+    // operates on and where all run state (journal, registry, runs/) is
+    // written. Without it we would silently fall back to autoloop's own launch
+    // directory and misroute the entire run, so reject the session instead.
+    if (!params.cwd || !params.cwd.trim()) {
+      throw acp.RequestError.invalidParams(
+        { field: "cwd" },
+        "session/new requires a `cwd` (the absolute path of the target project " +
+          "directory). autoloop anchors all run state on cwd; without it the " +
+          "run cannot be routed to the intended project.",
+      );
+    }
     const sessionId = `autoloop-${randomUUID()}`;
     this.sessions.set(sessionId, {
-      // The ACP client sets the working directory via session/new `cwd`;
-      // fall back to the launch-time --project-dir default.
-      projectDir: params.cwd
-        ? resolve(params.cwd)
-        : resolve(this.deps.projectDir),
+      projectDir: resolve(params.cwd),
       activeTurn: null,
     });
     // Advertise the available commands as slash commands.
