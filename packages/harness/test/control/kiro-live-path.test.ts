@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { acpControlAdapter } from "../../src/control/acp-adapter.js";
 import {
   drainControlRequests,
   publishCapabilities,
 } from "../../src/control/dispatch.js";
-import { kiroControlAdapter } from "../../src/control/kiro-adapter.js";
 import {
   appendRequest,
   buildRequest,
@@ -25,10 +25,10 @@ afterEach(() => {
   rmSync(runStateDir, { recursive: true, force: true });
 });
 
-describe("kiro live-interrupt flow (file → drain → hook)", () => {
+describe("ACP live-interrupt flow (file → drain → hook)", () => {
   it("interrupt request triggers signalInterrupt hook and records applied", () => {
     const signalInterrupt = vi.fn();
-    const adapter = kiroControlAdapter("run-k", {
+    const adapter = acpControlAdapter("run-k", "claude-agent-acp", {
       triggerInterrupt: signalInterrupt,
     });
     publishCapabilities(runStateDir, adapter);
@@ -49,7 +49,7 @@ describe("kiro live-interrupt flow (file → drain → hook)", () => {
     expect(statuses).toHaveLength(1);
     expect(statuses[0].state).toBe("applied");
     expect(statuses[0].verb).toBe("interrupt");
-    expect(statuses[0].detail).toContain("signalled kiro");
+    expect(statuses[0].detail).toContain("signalled ACP");
 
     const caps = readCapabilities(runStateDir);
     expect(caps?.interrupt.supported).toBe(true);
@@ -57,7 +57,7 @@ describe("kiro live-interrupt flow (file → drain → hook)", () => {
 
   it("guide + interrupt=true also triggers the interrupt hook in one request", () => {
     const signalInterrupt = vi.fn();
-    const adapter = kiroControlAdapter("run-k", {
+    const adapter = acpControlAdapter("run-k", "claude-agent-acp", {
       triggerInterrupt: signalInterrupt,
     });
 
@@ -83,7 +83,7 @@ describe("kiro live-interrupt flow (file → drain → hook)", () => {
 
   it("guide with interrupt=false does not fire the interrupt hook", () => {
     const signalInterrupt = vi.fn();
-    const adapter = kiroControlAdapter("run-k", {
+    const adapter = acpControlAdapter("run-k", "claude-agent-acp", {
       triggerInterrupt: signalInterrupt,
     });
 
@@ -101,7 +101,7 @@ describe("kiro live-interrupt flow (file → drain → hook)", () => {
   });
 
   it("a thrown signalInterrupt surfaces as rejected, not uncaught", () => {
-    const adapter = kiroControlAdapter("run-k", {
+    const adapter = acpControlAdapter("run-k", "claude-agent-acp", {
       triggerInterrupt: () => {
         throw new Error("child already dead");
       },

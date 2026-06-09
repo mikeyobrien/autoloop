@@ -1,13 +1,7 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type {
-  AcpClientOptions,
-  AcpSession,
-} from "@mobrienv/autoloop-backends/acp-client";
-import {
-  initAcpSession,
-  terminateAcpSession,
-} from "@mobrienv/autoloop-backends/acp-client";
+import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readIfExists } from "@mobrienv/autoloop-core/journal";
 import {
@@ -26,12 +20,12 @@ import {
   iterationFieldForRun,
   reloadLoop,
 } from "./config-helpers.js";
+import { acpControlAdapter } from "./control/acp-adapter.js";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import {
   drainControlRequests,
   publishCapabilities,
 } from "./control/dispatch.js";
-import { kiroControlAdapter } from "./control/kiro-adapter.js";
 import { piControlAdapter } from "./control/pi-adapter.js";
 import { log } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
@@ -138,20 +132,6 @@ export async function run(
     "info",
     `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`,
   );
-
-  // Initialize kiro ACP session if backend is kiro
-  if (loop.backend.kind === "kiro") {
-    const acpOpts: AcpClientOptions = {
-      command: loop.backend.command,
-      args: loop.backend.args,
-      cwd: loop.paths.workDir,
-      trustAllTools: loop.store.kiro_trust_all_tools !== false,
-      agentName: (loop.store.kiro_agent as string) || undefined,
-      modelId: (loop.store.kiro_model as string) || undefined,
-      verbose: loop.runtime.logLevel === "debug",
-    };
-    loop.kiroSession = await initAcpSession(acpOpts);
-  }
 
   let summary: RunSummary;
   const trackedIterate = async (
@@ -401,8 +381,8 @@ function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
 function buildControlAdapter(
   loop: LoopContext,
 ): LiveControlAdapter | undefined {
-  if (loop.backend.kind === "kiro") {
-    return kiroControlAdapter(loop.runtime.runId, {
+  if (loop.backend.kind === "acp") {
+    return acpControlAdapter(loop.runtime.runId, loop.backend.provider, {
       triggerInterrupt: () => {
         if (loop.kiroSession?.process.pid) {
           try {
