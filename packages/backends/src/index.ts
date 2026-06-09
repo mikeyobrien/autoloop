@@ -9,12 +9,21 @@ import { buildCommandInvocation, runShellCommand } from "./run-command.js";
 import type { BackendCommandContext, BackendRunResult } from "./types.js";
 
 export type {
+  AcpProvider,
+  AcpProviderId,
+  ResolveAcpProviderInput,
+} from "./acp-providers.js";
+export {
+  ACP_PROVIDERS,
+  isAcpBackendKind,
+  resolveAcpProvider,
+} from "./acp-providers.js";
+export type {
   BackendCommandContext,
   BackendPaths,
   BackendRunResult,
   BackendSpec,
 } from "./types.js";
-
 export { normalizeBackendLabel };
 
 /**
