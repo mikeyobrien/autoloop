@@ -34,7 +34,7 @@ export { normalizeBackendLabel };
  * (worker thread + SharedArrayBuffer) now that the harness iteration loop
  * itself is async.
  */
-export async function runKiroIteration(
+export async function runAcpIteration(
   session: AcpSession,
   prompt: string,
   timeoutMs: number,
@@ -44,7 +44,7 @@ export async function runKiroIteration(
     output: result.output,
     exitCode: result.error ? 1 : 0,
     timedOut: result.timedOut,
-    providerKind: "kiro",
+    providerKind: session.provider.id,
     errorCategory: result.timedOut
       ? "timeout"
       : result.error
@@ -52,6 +52,8 @@ export async function runKiroIteration(
         : "none",
   };
 }
+
+export const runKiroIteration = runAcpIteration;
 
 /**
  * A "mock" backend is any invocation whose command or argv mentions
