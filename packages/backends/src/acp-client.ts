@@ -1,7 +1,10 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import * as acp from "@agentclientprotocol/sdk";
+import type { AcpProvider } from "./acp-providers.js";
+import { resolveAcpProvider } from "./acp-providers.js";
 
 export interface AcpClientOptions {
+  provider?: string;
   command: string;
   args: string[];
   cwd: string;
@@ -12,6 +15,7 @@ export interface AcpClientOptions {
 }
 
 export interface AcpSession {
+  provider: AcpProvider;
   sessionId: string;
   connection: acp.ClientSideConnection;
   process: ChildProcess;
@@ -58,6 +62,11 @@ export function formatStreamingUpdate(
 export async function initAcpSession(
   opts: AcpClientOptions,
 ): Promise<AcpSession> {
+  const provider = resolveAcpProvider({
+    kind: "acp",
+    provider: opts.provider,
+    command: opts.command,
+  });
   const child = spawn(opts.command, opts.args, {
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
@@ -70,6 +79,7 @@ export async function initAcpSession(
   }
 
   const session: AcpSession = {
+    provider,
     sessionId: "",
     connection: null as unknown as acp.ClientSideConnection,
     process: child,
@@ -136,13 +146,11 @@ export async function initAcpSession(
       if (trimmed) {
         try {
           const msg = JSON.parse(trimmed);
-          // Filter kiro-cli private notifications — the ACP SDK doesn't know about
-          // _kiro.dev/* methods and responds with -32601 "Method not found".
-          // These are private kiro-cli extensions the ACP SDK does not handle.
+          // Filter provider-private notifications that the ACP SDK does not handle.
           if (
             msg.method &&
             typeof msg.method === "string" &&
-            msg.method.startsWith("_kiro.dev/")
+            provider.ignoreNotification?.(msg.method)
           ) {
             continue;
           }
@@ -221,13 +229,13 @@ export async function initAcpSession(
   session.sessionId = result.sessionId;
 
   // Optionally set mode/model
-  if (opts.agentName) {
+  if (opts.agentName && provider.supportsSessionMode) {
     await session.connection.setSessionMode({
       sessionId: session.sessionId,
       modeId: opts.agentName,
     });
   }
-  if (opts.modelId) {
+  if (opts.modelId && provider.supportsSessionModel) {
     await session.connection.unstable_setSessionModel({
       sessionId: session.sessionId,
       modelId: opts.modelId,
@@ -289,7 +297,7 @@ async function sendAcpPromptOnce(
     const stderr = session.stderrBuffer.trim();
     const detail = stderr ? `\n${stderr}` : "";
     throw new Error(
-      `kiro-cli exited unexpectedly: code=${code} signal=${signal}${detail}`,
+      `${session.provider.crashLabel} exited unexpectedly: code=${code} signal=${signal}${detail}`,
     );
   });
 
