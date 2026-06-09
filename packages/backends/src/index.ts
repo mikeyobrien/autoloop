@@ -95,11 +95,13 @@ export function runBackendCommand(
 
 export function normalizeProviderKind(spec: {
   kind: string;
+  provider?: string;
   command: string;
   args: string[];
 }): string {
   if (spec.kind === "pi") return "pi";
-  if (spec.kind === "kiro") return "kiro";
+  if (spec.kind === "acp") return `acp:${spec.provider || "generic"}`;
+  if (spec.kind === "kiro") return "acp:kiro";
   if (isMockInvocation(spec.command, spec.args)) return "mock";
   return spec.kind || "command";
 }

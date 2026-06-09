@@ -13,6 +13,17 @@ describe("backend runner", () => {
     expect(runKiroIteration).toBe(runAcpIteration);
   });
 
+  it("normalizes ACP provider kind with provider label", () => {
+    expect(
+      normalizeProviderKind({
+        kind: "acp",
+        provider: "claude-agent-acp",
+        command: "npx",
+        args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      }),
+    ).toBe("acp:claude-agent-acp");
+  });
+
   it("normalizes mock provider kind", () => {
     expect(
       normalizeProviderKind({

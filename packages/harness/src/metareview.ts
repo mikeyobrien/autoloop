@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runKiroIteration } from "@mobrienv/autoloop-backends";
+import { runAcpIteration } from "@mobrienv/autoloop-backends";
 import { jsonBool, jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
 import { appendEvent, readRunLines } from "@mobrienv/autoloop-core/journal";
 import { reloadLoop } from "./config-helpers.js";
@@ -84,6 +84,8 @@ export async function runMetareviewReview(
       ", " +
       jsonField("backend_kind", loop.review.kind) +
       ", " +
+      jsonField("backend_provider", loop.review.provider) +
+      ", " +
       jsonField("command", loop.review.command) +
       ", " +
       jsonField("prompt_mode", loop.review.promptMode) +
@@ -94,8 +96,8 @@ export async function runMetareviewReview(
   );
 
   const { output, exitCode, timedOut } =
-    loop.review.kind === "kiro" && loop.kiroSession
-      ? await runKiroIteration(
+    loop.review.kind === "acp" && loop.kiroSession
+      ? await runAcpIteration(
           loop.kiroSession,
           reviewPrompt,
           loop.review.timeoutMs,
