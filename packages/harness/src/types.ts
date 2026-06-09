@@ -37,21 +37,29 @@ export interface LoopContext {
   completion: { promise: string; event: string; requiredEvents: string[] };
   backend: {
     kind: string;
+    provider: string;
     command: string;
     args: string[];
     promptMode: string;
     timeoutMs: number;
+    trustAllTools: boolean;
+    agent: string;
+    model: string;
   };
   review: {
     enabled: boolean;
     every: number;
     adversarialFirst: boolean;
     kind: string;
+    provider: string;
     command: string;
     args: string[];
     promptMode: string;
     prompt: string;
     timeoutMs: number;
+    trustAllTools: boolean;
+    agent: string;
+    model: string;
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
   memory: { budgetChars: number };

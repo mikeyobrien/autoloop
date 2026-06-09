@@ -170,6 +170,8 @@ function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
     ", " +
     jsonField("backend_kind", loop.backend.kind) +
     ", " +
+    jsonField("backend_provider", loop.backend.provider) +
+    ", " +
     jsonField("backend_command", loop.backend.command) +
     ", " +
     jsonField("backend_args", joinCsv(loop.backend.args)) +

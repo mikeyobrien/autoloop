@@ -54,20 +54,29 @@ function makeBackendLoop(
     },
     backend: {
       kind: "command",
+      provider: "",
       command: "claude",
       args: ["--flag", "value"],
       promptMode: "stdin",
       timeoutMs: 2000,
+      trustAllTools: true,
+      agent: "",
+      model: "",
     },
     review: {
       enabled: false,
       every: 4,
+      adversarialFirst: true,
       kind: "command",
+      provider: "",
       command: "claude",
       args: [],
       promptMode: "stdin",
       prompt: "",
       timeoutMs: 1000,
+      trustAllTools: true,
+      agent: "",
+      model: "",
     },
     parallel: { enabled: false, maxBranches: 0, branchTimeoutMs: 0 },
     memory: { budgetChars: 1000 },
@@ -80,6 +89,7 @@ function makeBackendLoop(
       stateDir,
       journalFile: join(stateDir, "journal.jsonl"),
       memoryFile: join(stateDir, "memory.jsonl"),
+      runMemoryFile: join(stateDir, "run-memory.jsonl"),
       tasksFile: join(stateDir, "tasks.jsonl"),
       registryFile: join(stateDir, "registry.jsonl"),
       toolPath: "/usr/bin/autoloop",
@@ -89,12 +99,14 @@ function makeBackendLoop(
       worktreeBranch: "",
       worktreePath: workDir,
       worktreeMetaDir: join(stateDir, "worktree-meta"),
+      configWorkDir: workDir,
     },
     runtime: {
       runId: "run-b",
       selfCommand: "autoloop",
       promptOverride: null,
       backendOverride: {},
+      configOverride: {},
       logLevel: "info",
       branchMode: false,
       isolationMode: "shared",
@@ -118,10 +130,12 @@ describe("buildIterationContext backend resolution (slice 2)", () => {
 
     expect(iter.backend).toEqual({
       kind: loop.backend.kind,
+      provider: loop.backend.provider,
       command: loop.backend.command,
       args: loop.backend.args,
       promptMode: loop.backend.promptMode,
       timeoutMs: loop.backend.timeoutMs,
+      trustAllTools: loop.backend.trustAllTools,
       agent: "",
       model: "",
     });
@@ -143,21 +157,27 @@ describe("resolvedFromLoopBackend", () => {
   it("round-trips a representative loop.backend and emits empty agent/model", () => {
     const loop = makeBackendLoop("round-trip");
     loop.backend = {
-      kind: "kiro",
+      kind: "acp",
+      provider: "kiro",
       command: "kiro",
       args: ["--session", "main"],
       promptMode: "stdin",
       timeoutMs: 5000,
+      trustAllTools: true,
+      agent: "",
+      model: "",
     };
 
     const resolved = resolvedFromLoopBackend(loop);
 
     expect(resolved).toEqual({
-      kind: "kiro",
+      kind: "acp",
+      provider: "kiro",
       command: "kiro",
       args: ["--session", "main"],
       promptMode: "stdin",
       timeoutMs: 5000,
+      trustAllTools: true,
       agent: "",
       model: "",
     });
@@ -190,6 +210,41 @@ describe("buildIterationContext role-level override resolution (slice 3)", () =>
     expect(iter.backend.kind).toBe(loop.backend.kind);
     expect(iter.backend.promptMode).toBe(loop.backend.promptMode);
     expect(iter.backend.timeoutMs).toBe(loop.backend.timeoutMs);
+  });
+
+  it("role-level ACP provider, agent, and model overrides flow into iteration backend", () => {
+    const loop = makeBackendLoop("role-provider", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendKind: "acp",
+          backendProvider: "claude-agent-acp",
+          backendCommand: "npx",
+          backendArgs: ["-y", "@agentclientprotocol/claude-agent-acp"],
+          backendPromptMode: "acp",
+          backendAgent: "reviewer",
+          backendModel: "opus",
+        },
+      ],
+    });
+
+    const iter = buildIterationContext(loop, 1);
+
+    expect(iter.backend).toMatchObject({
+      kind: "acp",
+      provider: "claude-agent-acp",
+      command: "npx",
+      args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      promptMode: "acp",
+      agent: "reviewer",
+      model: "opus",
+      trustAllTools: true,
+    });
+    expect(iter.backendAgent).toBe("reviewer");
+    expect(iter.backendModel).toBe("opus");
   });
 
   it("agents.toml wins over role.backendAgent when resolveRoleAgent returns non-empty", () => {

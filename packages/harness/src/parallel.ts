@@ -32,6 +32,7 @@ export interface BranchLaunch {
   allowedEvents: string[];
   prompt: string;
   backendKind: string;
+  backendProvider: string;
   backendCommand: string;
   backendArgs: string[];
   backendPromptMode: string;
@@ -49,6 +50,7 @@ export function loadParallelBranchLaunch(branchDir: string): BranchLaunch {
     allowedEvents: csvFieldList(line, "allowed_events"),
     prompt: extractField(line, "prompt"),
     backendKind: extractField(line, "backend_kind"),
+    backendProvider: extractField(line, "backend_provider"),
     backendCommand: extractField(line, "backend_command"),
     backendArgs: csvFieldList(line, "backend_args"),
     backendPromptMode: extractField(line, "backend_prompt_mode"),
@@ -67,6 +69,7 @@ export function parallelBranchBackendOverride(
 ): Record<string, unknown> {
   const override: Record<string, unknown> = {};
   if (launch.backendKind) override.kind = launch.backendKind;
+  if (launch.backendProvider) override.provider = launch.backendProvider;
   if (launch.backendCommand) override.command = launch.backendCommand;
   if (launch.backendArgs.length > 0) override.args = launch.backendArgs;
   if (launch.backendPromptMode) override.prompt_mode = launch.backendPromptMode;
