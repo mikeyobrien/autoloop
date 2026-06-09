@@ -146,6 +146,42 @@ describe("parseChainsFromToml — per-step backend override", () => {
     });
   });
 
+  it("accepts ACP provider fields as backend override keys", () => {
+    const parsed = {
+      chain: [
+        {
+          name: "acp-chain",
+          step: [
+            {
+              preset: "autocode",
+              backend: {
+                kind: "acp",
+                provider: "claude-agent-acp",
+                command: "npx",
+                args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+                prompt_mode: "acp",
+                trust_all_tools: true,
+                agent: "reviewer",
+                model: "sonnet",
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const cfg = parseChainsFromToml(parsed, bundleRoot);
+    expect(cfg.chains[0].steps[0].backendOverride).toEqual({
+      kind: "acp",
+      provider: "claude-agent-acp",
+      command: "npx",
+      args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      prompt_mode: "acp",
+      trust_all_tools: true,
+      agent: "reviewer",
+      model: "sonnet",
+    });
+  });
+
   it("rejects a chain that mixes 'steps' and '[[chain.step]]'", () => {
     const parsed = {
       chain: [

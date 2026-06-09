@@ -48,6 +48,81 @@ afterEach(() => {
 });
 
 describe("applyGlobalBackendOverride", () => {
+  it("maps -b kiro to the legacy-compatible ACP Kiro provider", async () => {
+    const targetDir = tmpDir("target-kiro-backend");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 1\n",
+    );
+
+    await dispatchRun(
+      [targetDir, "-b", "kiro", "fix"],
+      [],
+      targetDir,
+      "autoloop",
+    );
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    const opts = runSpy.mock.calls[0][3];
+    expect(opts.backendOverride).toMatchObject({
+      kind: "acp",
+      provider: "kiro",
+      command: "kiro-cli",
+      args: ["acp"],
+      prompt_mode: "acp",
+    });
+  });
+
+  it("maps -b claude-agent-acp to the npm ACP adapter", async () => {
+    const targetDir = tmpDir("target-claude-agent-acp");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 1\n",
+    );
+
+    await dispatchRun(
+      [targetDir, "--backend", "claude-agent-acp", "fix"],
+      [],
+      targetDir,
+      "autoloop",
+    );
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    const opts = runSpy.mock.calls[0][3];
+    expect(opts.backendOverride).toMatchObject({
+      kind: "acp",
+      provider: "claude-agent-acp",
+      command: "npx",
+      args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      prompt_mode: "acp",
+    });
+  });
+
+  it("maps -b acp:<provider>:<command> to a generic ACP provider override", async () => {
+    const targetDir = tmpDir("target-generic-acp");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 1\n",
+    );
+
+    await dispatchRun(
+      [targetDir, "--backend", "acp:my-provider:/opt/bin/agent-acp", "fix"],
+      [],
+      targetDir,
+      "autoloop",
+    );
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    const opts = runSpy.mock.calls[0][3];
+    expect(opts.backendOverride).toMatchObject({
+      kind: "acp",
+      provider: "my-provider",
+      command: "/opt/bin/agent-acp",
+      args: [],
+      prompt_mode: "acp",
+    });
+  });
+
   it("passes run-scoped max iteration overrides to the harness", async () => {
     const targetDir = tmpDir("target-max-iterations");
     writeFileSync(

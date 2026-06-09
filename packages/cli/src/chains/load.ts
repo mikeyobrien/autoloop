@@ -17,10 +17,14 @@ import type {
 // overrides.
 const ALLOWED_BACKEND_OVERRIDE_KEYS = new Set([
   "kind",
+  "provider",
   "command",
   "args",
   "prompt_mode",
   "timeout_ms",
+  "trust_all_tools",
+  "agent",
+  "model",
 ]);
 
 export function load(projectDir: string): ChainsConfig {
