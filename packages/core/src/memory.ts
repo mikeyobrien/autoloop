@@ -136,6 +136,64 @@ export function addMeta(projectDir: string, key: string, value: string): void {
   printBudgetWarning(projectDir);
 }
 
+export interface CompactSummary {
+  scanned: number;
+  duplicatesRemoved: number;
+  ids: string[];
+}
+
+export interface PruneSummary {
+  scanned: number;
+  pruned: number;
+  ids: string[];
+}
+
+export function compactMemory(projectDir: string): CompactSummary {
+  const path = resolveFile(projectDir);
+  const memory = materialize(readLines(path));
+  const seenTexts: string[] = [];
+  const ids: string[] = [];
+  for (const entry of memory.learnings) {
+    const normalized = normalizeLearningText(extractField(entry, "text"));
+    if (seenTexts.includes(normalized)) {
+      ids.push(extractField(entry, "id"));
+    } else {
+      seenTexts.push(normalized);
+    }
+  }
+  for (const id of ids) {
+    appendTombstone(path, id, "compact: duplicate learning");
+  }
+  return {
+    scanned: memory.learnings.length,
+    duplicatesRemoved: ids.length,
+    ids,
+  };
+}
+
+export function pruneMemory(
+  projectDir: string,
+  maxAgeDays: number,
+): PruneSummary {
+  const path = resolveFile(projectDir);
+  const memory = materialize(readLines(path));
+  const cutoffMs = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  const ids: string[] = [];
+  for (const entry of memory.learnings) {
+    const createdMs = Date.parse(extractField(entry, "created"));
+    if (Number.isNaN(createdMs)) continue;
+    if (createdMs < cutoffMs) ids.push(extractField(entry, "id"));
+  }
+  for (const id of ids) {
+    appendTombstone(path, id, `prune: older than ${maxAgeDays} days`);
+  }
+  return { scanned: memory.learnings.length, pruned: ids.length, ids };
+}
+
+function normalizeLearningText(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}
+
 export function remove(projectDir: string, id: string, reason: string): void {
   const path = resolveFile(projectDir);
   const memory = materialize(readLines(path));
@@ -554,11 +612,15 @@ function nextId(path: string, prefix: string): string {
 }
 
 function removeExistingEntry(path: string, id: string, reason: string): void {
+  appendTombstone(path, id, reason);
+  console.log(`removed ${id}`);
+}
+
+function appendTombstone(path: string, id: string, reason: string): void {
   appendMemoryEntry(
     path,
     memoryLine(nextId(path, "ts"), "tombstone", tombstoneFields(id, reason)),
   );
-  console.log(`removed ${id}`);
 }
 
 function currentTime(): string {

@@ -94,4 +94,56 @@ describe("task completion gate", () => {
 
     expect(result.ok).toBe(true);
   });
+
+  it("allows completion when only soft tasks remain open", () => {
+    addTask(dir, "advisory cleanup", "manual", { soft: true });
+    addTask(dir, "advisory docs", "manual", { soft: true, priority: "low" });
+
+    const result = emit(dir, "task.complete", "done");
+
+    expect(result.ok).toBe(true);
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).not.toContain("task.gate");
+  });
+
+  it("blocks on mixed soft and blocking tasks, listing only blocking ids", () => {
+    addTask(dir, "soft advisory", "manual", { soft: true });
+    addTask(dir, "must finish", "manual");
+    addTask(dir, "urgent must finish", "manual", { priority: "high" });
+
+    const result = emit(dir, "task.complete", "done");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("Cannot complete: 2 open tasks remain");
+    expect(result.error).toContain("task-2");
+    expect(result.error).toContain("task-3");
+    expect(result.error).not.toContain("task-1");
+
+    // task.gate event lists only blocking ids
+    const journal = readFileSync(journalFile, "utf-8");
+    const gateLine = journal.split("\n").find((l) => l.includes("task.gate"));
+    expect(gateLine).toBeDefined();
+    expect(gateLine).toContain("task-2");
+    expect(gateLine).toContain("task-3");
+    expect(gateLine).not.toMatch(/task-1/);
+  });
+
+  it("blocks on default (non-soft) tasks exactly as before", () => {
+    addTask(dir, "legacy default task", "manual");
+
+    const result = emit(dir, "task.complete", "done");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("task-1");
+  });
+
+  it("allows completion after blocking tasks are done and only soft remain", () => {
+    addTask(dir, "blocking", "manual");
+    addTask(dir, "soft leftover", "manual", { soft: true });
+    completeTask(dir, "task-1");
+
+    const result = emit(dir, "task.complete", "done");
+
+    expect(result.ok).toBe(true);
+  });
 });

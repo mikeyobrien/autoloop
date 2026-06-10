@@ -62,6 +62,7 @@ export default defineConfig({
             { text: "Tasks", link: "/features/tasks" },
             { text: "LLM Judge", link: "/features/llm-judge" },
             { text: "Operator Health", link: "/features/operator-health" },
+            { text: "Cost, Stalls & Doctor", link: "/features/operability" },
           ],
         },
         {

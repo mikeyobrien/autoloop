@@ -5,6 +5,7 @@
 // stdout. They are NOT part of the embedded SDK surface: SDK consumers read
 // journals directly or via packages/core readers in Phase 2.
 
+import { collectUsage, formatUsage } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import {
   readAllJournals,
@@ -138,6 +139,20 @@ export function renderMetrics(
   const lines = readRunLines(journalFile, runId);
   const rows = collectMetricsRows(lines);
   printProjectedText(formatMetrics(rows, format), format);
+}
+
+export function renderUsage(
+  projectDir: string,
+  format: string,
+  runIdOverride?: string,
+): void {
+  const { journalFile, runId } = resolveJournalAndRun(
+    projectDir,
+    runIdOverride,
+  );
+  const lines = readRunLines(journalFile, runId);
+  const usage = collectUsage(lines);
+  printProjectedText(formatUsage(usage, format), format);
 }
 
 export function renderJournalTimeline(

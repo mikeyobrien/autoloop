@@ -58,6 +58,7 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/coordination": `${HARNESS}/coordination.ts`,
       "@mobrienv/autoloop-harness/display": `${HARNESS}/display.ts`,
       "@mobrienv/autoloop-harness/metrics": `${HARNESS}/metrics.ts`,
+      "@mobrienv/autoloop-harness/guards": `${HARNESS}/guards.ts`,
       "@mobrienv/autoloop-harness/scratchpad": `${HARNESS}/scratchpad.ts`,
       "@mobrienv/autoloop-harness/metareview": `${HARNESS}/metareview.ts`,
       "@mobrienv/autoloop-harness/parallel": `${HARNESS}/parallel.ts`,

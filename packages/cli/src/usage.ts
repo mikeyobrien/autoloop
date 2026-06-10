@@ -1,29 +1,38 @@
 import { joinCsv } from "@mobrienv/autoloop-core";
 import * as chains from "./chains.js";
+import { didYouMean } from "./cli/suggest.js";
 
 export function printUsage(): void {
   console.log("autoloop — autonomous LLM loop harness");
   console.log("");
   console.log("Usage:");
   console.log("  autoloop run <preset-name|preset-dir> [prompt...] [flags]");
+  console.log("  autoloop init [--preset <name>] [dir]");
   console.log("  autoloop emit <topic> [summary]");
   console.log(
     "  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]",
   );
-  console.log("  autoloop memory <list|status|find|add|remove> [args]");
+  console.log(
+    "  autoloop memory <list|status|find|add|remove|compact|prune> [args]",
+  );
   console.log("  autoloop task <add|complete|update|remove|list> [args]");
-  console.log("  autoloop list");
-  console.log("  autoloop loops [--all]");
+  console.log("  autoloop list [--json]");
+  console.log("  autoloop loops [--all] [--json]");
   console.log("  autoloop loops show <run-id>");
   console.log("  autoloop loops artifacts <run-id>");
   console.log("  autoloop loops watch <run-id>");
-  console.log("  autoloop loops health [--verbose]");
+  console.log("  autoloop loops health [--verbose] [--json]");
   console.log(
     "  autoloop control <show|capabilities|interrupt|guide> <run-id>",
   );
-  console.log("  autoloop chain <list|run> [args]");
+  console.log("  autoloop chain list [project-dir]");
+  console.log(
+    "  autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]",
+  );
   console.log("  autoloop runs clean [--max-age <days>]");
-  console.log("  autoloop worktree <list|show|merge|clean> [args]");
+  console.log("  autoloop stats [project-dir] [--json]");
+  console.log("  autoloop doctor [project-dir] [--json]");
+  console.log("  autoloop worktree <list|show|diff|merge|clean> [args]");
   console.log("  autoloop config <show|set|unset|path> [args]");
   console.log("  autoloop dashboard [--port <port>]");
   console.log("  autoloop kanban [--port <port>]");
@@ -172,6 +181,9 @@ export function printInspectUsage(): void {
     "  metrics        [run_id]      md, terminal, csv, json terminal",
   );
   console.log(
+    "  usage          [--run]       terminal, json          terminal",
+  );
+  console.log(
     "  profiles       —             terminal                terminal",
   );
   console.log(
@@ -195,11 +207,15 @@ export function printMemoryUsage(): void {
   console.log("  autoloop memory add preference <category> <text...>");
   console.log("  autoloop memory add meta <key> <value...>");
   console.log("  autoloop memory remove <id> [reason...]");
+  console.log("  autoloop memory compact [project-dir]");
+  console.log("  autoloop memory prune --max-age <days> [project-dir]");
 }
 
 export function printTaskUsage(): void {
   console.log("Usage:");
-  console.log("  autoloop task add <text...>");
+  console.log(
+    "  autoloop task add [--priority|-p <high|normal|low>] [--soft] <text...>",
+  );
   console.log("  autoloop task complete <id>");
   console.log("  autoloop task update <id> <text...>");
   console.log("  autoloop task remove <id> [reason...]");
@@ -242,6 +258,8 @@ export function missingPresetError(): void {
 
 export function unknownPresetError(name: string): void {
   console.log(`error: preset \`${name}\` not found`);
+  const hint = didYouMean(name, chains.listKnownPresets());
+  if (hint) console.log(hint);
   console.log("");
   console.log(
     `The argument \`${name}\` is not a valid preset name or directory.`,

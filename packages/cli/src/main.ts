@@ -7,7 +7,9 @@ import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
 import { dispatchControl } from "./commands/control.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
+import { dispatchDoctor } from "./commands/doctor.js";
 import { dispatchGuide } from "./commands/guide.js";
+import { dispatchInit } from "./commands/init.js";
 import { dispatchInspect } from "./commands/inspect.js";
 import { dispatchKanban } from "./commands/kanban.js";
 import { dispatchList } from "./commands/list.js";
@@ -16,6 +18,7 @@ import { dispatchMemory } from "./commands/memory.js";
 import { dispatchPiAdapter } from "./commands/pi-adapter.js";
 import { dispatchRun } from "./commands/run.js";
 import { dispatchRuns } from "./commands/runs.js";
+import { dispatchStats } from "./commands/stats.js";
 import { dispatchTask } from "./commands/task.js";
 import { dispatchWorktree } from "./commands/worktree.js";
 import { printEmitUsage, printUsage } from "./usage.js";
@@ -90,6 +93,15 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "runs":
       dispatchRuns(args.slice(1));
       return;
+    case "stats":
+      dispatchStats(args.slice(1));
+      return;
+    case "doctor":
+      dispatchDoctor(args.slice(1));
+      return;
+    case "init":
+      dispatchInit(args.slice(1));
+      return;
     case "chain":
       await dispatchChain(args.slice(1), selfCmd);
       return;
@@ -143,6 +155,9 @@ function isCliCommand(value: string): boolean {
     "list",
     "loops",
     "runs",
+    "stats",
+    "doctor",
+    "init",
     "chain",
     "pi-adapter",
     "branch-run",

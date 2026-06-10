@@ -4,6 +4,8 @@ import { extractField, jsonField } from "@mobrienv/autoloop-core";
 import { readLines } from "@mobrienv/autoloop-core/journal";
 import * as config from "./config.js";
 
+export type TaskPriority = "high" | "normal" | "low";
+
 export interface TaskEntry {
   id: string;
   type: "task" | "task-tombstone";
@@ -12,6 +14,28 @@ export interface TaskEntry {
   source: string;
   created: string;
   completed?: string;
+  priority?: TaskPriority;
+  soft?: boolean;
+}
+
+export interface AddTaskOpts {
+  priority?: TaskPriority;
+  soft?: boolean;
+}
+
+export function parsePriority(value: string): TaskPriority | undefined {
+  if (value === "high" || value === "normal" || value === "low") return value;
+  return undefined;
+}
+
+const PRIORITY_RANK: Record<TaskPriority, number> = {
+  high: 0,
+  normal: 1,
+  low: 2,
+};
+
+export function priorityRank(priority: TaskPriority | undefined): number {
+  return PRIORITY_RANK[priority ?? "normal"];
 }
 
 export interface MaterializedTasks {
@@ -61,9 +85,13 @@ export function materialize(lines: string[]): MaterializedTasks {
     }
   }
 
-  // Open: oldest first (by creation). Done: most recent completion first.
+  // Open: high → normal → low, oldest first (by creation) within a priority.
+  // Done: most recent completion first.
+  const openOldestFirst = open.reverse();
   return {
-    open: open.reverse(),
+    open: openOldestFirst.sort(
+      (a, b) => priorityRank(a.priority) - priorityRank(b.priority),
+    ),
     done: done.reverse(),
   };
 }
@@ -77,7 +105,25 @@ function parseEntry(line: string): TaskEntry {
     source: extractField(line, "source") || "manual",
     created: extractField(line, "created"),
     completed: extractField(line, "completed") || undefined,
+    priority: parsePriority(extractField(line, "priority")),
+    soft: extractField(line, "soft") === "true" ? true : undefined,
   };
+}
+
+// Serialize non-default priority/soft as a trailing field suffix so lines for
+// default tasks stay byte-identical to the pre-priority format.
+function priorityFields(
+  priority: TaskPriority | undefined,
+  soft: boolean | undefined,
+): string {
+  let suffix = "";
+  if (priority && priority !== "normal") {
+    suffix += `, ${jsonField("priority", priority)}`;
+  }
+  if (soft === true) {
+    suffix += `, ${jsonField("soft", "true")}`;
+  }
+  return suffix;
 }
 
 export function materializeOpen(projectDir: string): TaskEntry[] {
@@ -97,6 +143,7 @@ export function addTask(
   projectDir: string,
   text: string,
   source: string,
+  opts: AddTaskOpts = {},
 ): string {
   const path = resolveFile(projectDir);
   const id = nextId(path);
@@ -111,7 +158,8 @@ export function addTask(
         ", " +
         jsonField("source", source) +
         ", " +
-        jsonField("created", currentTime()),
+        jsonField("created", currentTime()) +
+        priorityFields(opts.priority, opts.soft),
     ),
   );
   return id;
@@ -136,7 +184,8 @@ export function completeTask(projectDir: string, id: string): boolean {
         ", " +
         jsonField("created", entry.created) +
         ", " +
-        jsonField("completed", currentTime()),
+        jsonField("completed", currentTime()) +
+        priorityFields(entry.priority, entry.soft),
     ),
   );
   return true;
@@ -163,7 +212,10 @@ export function updateTask(
         jsonField("source", entry.source) +
         ", " +
         jsonField("created", entry.created) +
-        (entry.completed ? `, ${jsonField("completed", entry.completed)}` : ""),
+        (entry.completed
+          ? `, ${jsonField("completed", entry.completed)}`
+          : "") +
+        priorityFields(entry.priority, entry.soft),
     ),
   );
   return true;
@@ -199,6 +251,14 @@ export function listTasks(projectDir: string): string {
   return renderTaskList(tasks);
 }
 
+// "[high] text (soft)" — priority marker for non-normal priorities, plus a
+// soft marker; plain text for default tasks (back-compat).
+export function formatTaskText(t: TaskEntry): string {
+  const prio = t.priority && t.priority !== "normal" ? `[${t.priority}] ` : "";
+  const soft = t.soft === true ? " (soft)" : "";
+  return `${prio}${t.text}${soft}`;
+}
+
 export function renderTaskList(tasks: MaterializedTasks): string {
   if (tasks.open.length === 0 && tasks.done.length === 0) {
     return "No tasks.";
@@ -207,14 +267,14 @@ export function renderTaskList(tasks: MaterializedTasks): string {
   if (tasks.open.length > 0) {
     lines.push("Open:");
     for (const t of tasks.open) {
-      lines.push(`- [ ] [${t.id}] ${t.text}`);
+      lines.push(`- [ ] [${t.id}] ${formatTaskText(t)}`);
     }
   }
   if (tasks.done.length > 0) {
     if (lines.length > 0) lines.push("");
     lines.push("Done:");
     for (const t of tasks.done) {
-      lines.push(`- [x] [${t.id}] ${t.text}`);
+      lines.push(`- [x] [${t.id}] ${formatTaskText(t)}`);
     }
   }
   return lines.join("\n");

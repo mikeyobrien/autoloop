@@ -23,6 +23,10 @@ export function defaults(): Config {
       completion_promise: "LOOP_COMPLETE",
       completion_event: "task.complete",
       required_events: "",
+      // Stop after N consecutive identical backend outputs (0 = disabled).
+      stall_iterations: "0",
+      // Stop once journaled run cost reaches this USD budget (0 = disabled).
+      max_cost_usd: "0",
     },
     backend: { kind: "", command: "claude", timeout_ms: "300000" },
     parallel: {
@@ -50,6 +54,17 @@ export function getInt(config: Config, key: string, fallback: number): number {
   const raw = get(config, key, "");
   if (raw === "") return fallback;
   const parsed = parseInt(raw, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+export function getFloat(
+  config: Config,
+  key: string,
+  fallback: number,
+): number {
+  const raw = get(config, key, "");
+  if (raw === "") return fallback;
+  const parsed = Number.parseFloat(raw);
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 

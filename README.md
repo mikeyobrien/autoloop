@@ -59,6 +59,8 @@ If Ralph is the broader experimentation surface, autoloop is the cleaner runtime
 - **Designed for agents too** -- autoloop is intentionally shaped as a surface that agents can use directly, not just a human operator CLI
 - **Dynamic chains** -- compose presets into multi-stage pipelines
 - **Persistent memory + profiles** -- loops accumulate learnings across runs and can load repo/user tuning profiles
+- **Cost budgets + stall protection** -- stop runaway loops automatically with `event_loop.max_cost_usd` (journaled token cost) and `event_loop.stall_iterations` (repeated identical outputs)
+- **Finish notifications** -- run any command when a loop ends (`[notify] command = "..."`) with run metadata in env vars and a JSON payload on stdin
 
 ## What autoloop is
 
@@ -140,23 +142,28 @@ The main commands are:
 
 ```
 autoloop run <preset-name|preset-dir> [prompt...] [flags]
-autoloop list
-autoloop loops [--all]
-autoloop loops show <run-id>
-autoloop loops artifacts <run-id>
+autoloop init [--preset <name>] [dir]
+autoloop list [--json]
+autoloop loops [--all] [--json]
+autoloop loops show <run-id> [--json]
+autoloop loops artifacts <run-id> [--json]
 autoloop loops watch <run-id>
+autoloop loops health [--verbose] [--json]
 autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]
 autoloop dashboard [--port <port>]
-autoloop worktree <list|show|merge|clean> [args]
-autoloop chain <list|run> [args]
+autoloop worktree <list|show|diff|merge|clean> [args]
+autoloop chain list [project-dir]
+autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]
 autoloop emit <topic> [summary]
-autoloop memory <list|status|find|add|remove> [args]
+autoloop memory <list|status|find|add|remove|compact|prune> [args]
 autoloop task <add|complete|update|remove|list> [args]
 autoloop runs clean [--max-age <days>]
+autoloop stats [project-dir] [--json]
+autoloop doctor [project-dir] [--json]
 autoloop config <show|set|unset|path> [args]
 ```
 
-Use `run` to start work, `loops` and `inspect` to understand what happened, and `dashboard` when you want a local operator surface.
+Use `run` to start work, `loops` and `inspect` to understand what happened, and `dashboard` when you want a local operator surface. `stats` summarizes success rates and cost per preset; `doctor` diagnoses the environment and `.autoloop` state.
 
 ### Flags
 

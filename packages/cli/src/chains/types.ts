@@ -47,6 +47,20 @@ export interface StepRecord {
   runId?: string;
 }
 
+export interface ChainPlanStep {
+  index: number;
+  name: string;
+  presetDir: string;
+  backendOverride?: StepBackendOverride;
+}
+
+export interface ChainPlan {
+  chain: string;
+  steps: ChainPlanStep[];
+  budget: Budget;
+  validation: { ok: boolean; reason?: string };
+}
+
 export interface ChainTracker {
   depth: number;
   totalSteps: number;

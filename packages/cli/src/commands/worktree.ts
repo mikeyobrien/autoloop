@@ -1,8 +1,12 @@
 import { join } from "node:path";
 import { parseFlag } from "@mobrienv/autoloop-core";
-import type { MergeOpts } from "@mobrienv/autoloop-core/worktree";
+import type {
+  DiffWorktreeResult,
+  MergeOpts,
+} from "@mobrienv/autoloop-core/worktree";
 import {
   cleanWorktrees,
+  diffWorktree,
   isOrphanWorktree,
   listWorktreeMetas,
   mergeWorktree,
@@ -33,6 +37,18 @@ export function dispatchWorktree(args: string[]): void {
       return;
     }
     showWorktree(stateDir, runId);
+    return;
+  }
+
+  if (sub === "diff") {
+    const runId = args[1];
+    if (!runId || runId.startsWith("--")) {
+      console.log("Usage: autoloop worktree diff <run-id> [--patch] [--json]");
+      return;
+    }
+    const patch = args.includes("--patch");
+    const json = args.includes("--json");
+    doDiff(projectDir, stateDir, runId, { patch, json });
     return;
   }
 
@@ -119,6 +135,62 @@ function showWorktree(stateDir: string, runId: string): void {
   console.log(lines.join("\n"));
 }
 
+function doDiff(
+  projectDir: string,
+  stateDir: string,
+  runId: string,
+  opts: { patch: boolean; json: boolean },
+): void {
+  const metaDir = join(stateDir, "worktrees", runId);
+  if (!readMeta(metaDir)) {
+    console.log(`No worktree found for run ${runId}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  let result: DiffWorktreeResult;
+  try {
+    result = diffWorktree({
+      metaDir,
+      workDir: projectDir,
+      patch: opts.patch,
+    });
+  } catch (err: unknown) {
+    console.log(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (opts.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(field("Branch", result.branch));
+  console.log(field("Base", result.base));
+  console.log(
+    field(
+      "Changed",
+      `${result.filesChanged} file(s), +${result.insertions} -${result.deletions}`,
+    ),
+  );
+
+  if (result.files.length === 0) {
+    console.log("No changes between base and branch.");
+  } else {
+    console.log("");
+    console.log(`${"STATUS".padEnd(14)}PATH`);
+    for (const f of result.files) {
+      console.log(`${f.status.padEnd(14)}${f.path}`);
+    }
+  }
+
+  if (opts.patch && result.patch !== undefined) {
+    console.log("");
+    console.log(result.patch.replace(/\n$/, ""));
+  }
+}
+
 function doMerge(
   projectDir: string,
   stateDir: string,
@@ -178,6 +250,9 @@ function printWorktreeUsage(): void {
   console.log("  autoloop worktree list                    List worktrees");
   console.log(
     "  autoloop worktree show <run-id>           Show worktree details",
+  );
+  console.log(
+    "  autoloop worktree diff <run-id> [--patch] [--json]   Preview changes vs base",
   );
   console.log(
     "  autoloop worktree merge <run-id> [--strategy <squash|merge|rebase>]",

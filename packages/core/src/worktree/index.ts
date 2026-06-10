@@ -6,6 +6,13 @@ export {
   resolveGitRoot,
   tryResolveGitRoot,
 } from "./create.js";
+export type {
+  DiffFileEntry,
+  DiffFileStatus,
+  DiffWorktreeOpts,
+  DiffWorktreeResult,
+} from "./diff.js";
+export { diffWorktree } from "./diff.js";
 export type { WorktreeListEntry } from "./list.js";
 export { listWorktreeMetas } from "./list.js";
 export type { MergeOpts, MergeResult } from "./merge.js";

@@ -43,6 +43,10 @@
       "types": "./dist/metrics.d.ts",
       "default": "./dist/metrics.js"
     },
+    "./guards": {
+      "types": "./dist/guards.d.ts",
+      "default": "./dist/guards.js"
+    },
     "./scratchpad": {
       "types": "./dist/scratchpad.d.ts",
       "default": "./dist/scratchpad.js"

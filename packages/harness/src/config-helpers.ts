@@ -522,6 +522,8 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     topology: updatedTopology,
     limits: {
       maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3),
+      stallIterations: config.getInt(cfg, "event_loop.stall_iterations", 0),
+      maxCostUsd: config.getFloat(cfg, "event_loop.max_cost_usd", 0),
     },
     completion: {
       promise: config.get(

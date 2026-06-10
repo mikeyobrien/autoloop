@@ -50,6 +50,27 @@ describe("dispatchList", () => {
     }
   });
 
+  it("prints a JSON array of {name, description} with --json", () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      lines.push(args.join(" "));
+    });
+    dispatchList(["--json"], bundleRoot);
+    vi.restoreAllMocks();
+
+    const parsed = JSON.parse(lines.join("\n"));
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed.length).toBeGreaterThan(0);
+    for (const entry of parsed) {
+      expect(Object.keys(entry).sort()).toEqual(["description", "name"]);
+      expect(typeof entry.name).toBe("string");
+      expect(typeof entry.description).toBe("string");
+    }
+    expect(parsed.some((e: { name: string }) => e.name === "autocode")).toBe(
+      true,
+    );
+  });
+
   it("prints help with --help", () => {
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args) => {
