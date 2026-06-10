@@ -54,7 +54,7 @@ export async function maybeRunMetareview(
   if (shouldRunMetareview(loop, iteration)) {
     const verdict = await runMetareviewReview(loop, iteration);
     const reloaded = reloadLoop(loop);
-    reloaded.kiroSession = loop.kiroSession;
+    reloaded.acpSession = loop.acpSession;
     reloaded.lastVerdict = verdict;
     return reloaded;
   }

@@ -97,7 +97,7 @@ export interface LoopContext {
   launch: LaunchMetadata;
   store: Record<string, unknown>;
   agentMap: AgentMap | null;
-  kiroSession?: AcpSession;
+  acpSession?: AcpSession;
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

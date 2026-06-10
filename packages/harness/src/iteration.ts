@@ -62,13 +62,13 @@ export async function runIteration(
   // Fresh ACP session per iteration — ensures each role (researcher, critic,
   // etc.) starts with a clean context window for truly independent review.
   if (iter.backend.kind === "acp") {
-    if (loop.kiroSession) {
+    if (loop.acpSession) {
       try {
-        await terminateAcpSession(loop.kiroSession);
+        await terminateAcpSession(loop.acpSession);
       } catch {
         /* best-effort */
       }
-      loop.kiroSession = undefined;
+      loop.acpSession = undefined;
     }
     const acpOpts: AcpClientOptions = {
       provider: iter.backend.provider,
@@ -80,7 +80,7 @@ export async function runIteration(
       modelId: iter.backend.model || undefined,
       verbose: loop.runtime.logLevel === "debug",
     };
-    loop.kiroSession = await initAcpSession(acpOpts);
+    loop.acpSession = await initAcpSession(acpOpts);
     log(
       loop,
       "debug",
@@ -89,9 +89,9 @@ export async function runIteration(
   }
 
   const { output, exitCode, timedOut } =
-    iter.backend.kind === "acp" && loop.kiroSession
+    iter.backend.kind === "acp" && loop.acpSession
       ? await runAcpIteration(
-          loop.kiroSession,
+          loop.acpSession,
           iter.prompt,
           iter.backend.timeoutMs,
         )

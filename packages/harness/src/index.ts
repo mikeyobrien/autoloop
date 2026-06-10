@@ -78,9 +78,9 @@ export async function run(
     aborted = true;
     // Fire-and-forget ACP termination — abort handlers must stay sync.
     // The finally block below awaits a final terminate as backstop.
-    if (loop.kiroSession) {
-      const session = loop.kiroSession;
-      loop.kiroSession = undefined;
+    if (loop.acpSession) {
+      const session = loop.acpSession;
+      loop.acpSession = undefined;
       terminateAcpSession(session).catch(() => {
         /* best-effort */
       });
@@ -156,9 +156,9 @@ export async function run(
   try {
     summary = await trackedIterate(loop, 1);
   } finally {
-    if (loop.kiroSession) {
+    if (loop.acpSession) {
       try {
-        await terminateAcpSession(loop.kiroSession);
+        await terminateAcpSession(loop.acpSession);
       } catch {
         /* best-effort */
       }
@@ -329,7 +329,7 @@ function iterateWith(
   recurse: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
 ): Promise<RunSummary> {
   const liveLoop = reloadLoop(loop);
-  liveLoop.kiroSession = loop.kiroSession;
+  liveLoop.acpSession = loop.acpSession;
   liveLoop.controlAdapter = loop.controlAdapter;
   installRuntimeTools(liveLoop);
   return runReviewThenIterate(liveLoop, iteration, recurse);
@@ -384,9 +384,9 @@ function buildControlAdapter(
   if (loop.backend.kind === "acp") {
     return acpControlAdapter(loop.runtime.runId, loop.backend.provider, {
       triggerInterrupt: () => {
-        if (loop.kiroSession?.process.pid) {
+        if (loop.acpSession?.process.pid) {
           try {
-            process.kill(-loop.kiroSession.process.pid, "SIGINT");
+            process.kill(-loop.acpSession.process.pid, "SIGINT");
           } catch {
             /* best-effort */
           }
