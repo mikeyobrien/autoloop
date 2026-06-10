@@ -50,6 +50,7 @@ const CORE_SYSTEM_TOPICS = new Set([
   "review.finish",
   "backend.start",
   "backend.finish",
+  "backend.usage",
   "event.invalid",
 ]);
 

@@ -443,6 +443,8 @@ Run the Pi backend adapter directly. This is normally called by the harness, not
 autoloop pi-adapter [pi-command] [extra-args...]
 ```
 
+The main iteration loop and metareview no longer use this adapter — they drive a persistent `pi --mode rpc` session directly (see the configuration reference). The adapter remains the process-per-task path for parallel waves.
+
 The adapter resolves the prompt from `AUTOLOOP_PROMPT`, then falls back to projecting it via `autoloop inspect prompt`, then falls back to reading `AUTOLOOP_PROMPT_PATH`. It invokes Pi with `-p --mode json --no-session` plus any extra arguments, parses the NDJSON stream, and writes the raw stream to `.autoloop/pi-stream.<iteration>.jsonl` (or `pi-review.<iteration>.jsonl` in review mode).
 
 ## Testing

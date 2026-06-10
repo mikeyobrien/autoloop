@@ -239,6 +239,23 @@ backend.args = ["dist/testing/mock-backend.js"]
 
 Command mode invokes the executable directly and captures stdout. It is not a supported production adapter — use Pi for real loops.
 
+## Pi backend (RPC sessions)
+
+The pi backend drives a persistent `pi --mode rpc --no-session` process over pi's JSONL RPC protocol. The harness spawns one pi process and reuses it across iterations; each iteration issues a `new_session` command so every role starts with a clean context window (the process is respawned automatically if it dies or refuses the reset). Metareview runs in its own dedicated pi RPC session. Spawn and reset round trips carry hard deadlines, so a wedged pi binary fails the iteration instead of hanging the loop.
+
+```toml
+backend.kind = "pi"
+backend.command = "pi"
+# backend.model = "anthropic/claude-sonnet-4"   # passed as --model
+# backend.args = ["--thinking", "high"]          # appended verbatim
+```
+
+Live control: `interrupt` requests map to pi's `abort` command, cancelling the in-flight turn without killing the process, and `guide` requests are additionally steered into the live turn via pi's `steer` command — delivered before the agent's next LLM call, on top of the journal-durable copy that reaches the next iteration prompt.
+
+Observability: the raw RPC event stream of every iteration is persisted to `.autoloop/runs/<run_id>/pi-stream.<iteration>.jsonl` (metareviews to `pi-review.<iteration>.jsonl`), preserving full tool-call and thinking fidelity. After each iteration the harness journals a `backend.usage` event with token counts, cost, and context-window usage from pi's `get_session_stats`.
+
+Parallel waves still run pi process-per-task through the `pi-adapter` shim (`pi -p --mode json`), since wave branches execute as independent shell commands.
+
 ## ACP backend providers
 
 ACP backends communicate with an Agent Client Protocol (ACP) stdio server over JSON-RPC 2.0. Use `backend.kind = "acp"` and select provider-specific defaults with `backend.provider`. Legacy `backend.kind = "kiro"` still works and normalizes to `kind = "acp"` plus `provider = "kiro"`.
@@ -286,7 +303,7 @@ The `trust_all_tools` key (default `true`) auto-approves ACP tool permission req
 
 ### Session lifecycle
 
-Unlike `pi` and `command` backends which spawn a process for a single invocation, ACP backends keep one stdio child process per active iteration session. The harness uses a fresh ACP session for each iteration so role-specific prompts, agent names, and model settings do not leak conversation history across planner/builder/critic roles.
+Like the pi RPC backend, ACP backends keep a stdio child process per active iteration session rather than spawning one process per invocation (only `command` backends do that). The harness uses a fresh ACP session for each iteration so role-specific prompts, agent names, and model settings do not leak conversation history across planner/builder/critic roles.
 
 Sequence: spawn provider command → `initialize` handshake → `session/new` → optional `setSessionMode` / `unstable_setSessionModel` → iteration prompt via ACP `prompt` request → `terminate` on iteration or loop exit.
 

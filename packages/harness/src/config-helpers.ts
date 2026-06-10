@@ -570,6 +570,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     agentMap: loadAgentMap(pd),
     // Alias, never copy: all reloaded contexts must share one session holder.
     acpSession: loop.acpSession ?? { current: undefined },
+    piSession: loop.piSession ?? { current: undefined },
     onEvent: loop.onEvent,
   };
   return applyRuntimeModeOverrides(updated);

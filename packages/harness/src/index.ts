@@ -2,6 +2,11 @@ import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import {
+  abortPiTurn,
+  steerPiTurn,
+  terminatePiSession,
+} from "@mobrienv/autoloop-backends/pi-rpc-client";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readIfExists } from "@mobrienv/autoloop-core/journal";
 import {
@@ -76,12 +81,19 @@ export async function run(
   const teardown = () => {
     if (aborted) return;
     aborted = true;
-    // Fire-and-forget ACP termination — abort handlers must stay sync.
+    // Fire-and-forget session termination — abort handlers must stay sync.
     // The finally block below awaits a final terminate as backstop.
     if (loop.acpSession.current) {
       const session = loop.acpSession.current;
       loop.acpSession.current = undefined;
       terminateAcpSession(session).catch(() => {
+        /* best-effort */
+      });
+    }
+    if (loop.piSession.current) {
+      const session = loop.piSession.current;
+      loop.piSession.current = undefined;
+      terminatePiSession(session).catch(() => {
         /* best-effort */
       });
     }
@@ -163,6 +175,14 @@ export async function run(
         /* best-effort */
       }
       loop.acpSession.current = undefined;
+    }
+    if (loop.piSession.current) {
+      try {
+        await terminatePiSession(loop.piSession.current);
+      } catch {
+        /* best-effort */
+      }
+      loop.piSession.current = undefined;
     }
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
@@ -301,6 +321,14 @@ export async function runParallelBranchCli(
       }
       seeded.acpSession.current = undefined;
     }
+    if (seeded.piSession.current) {
+      try {
+        await terminatePiSession(seeded.piSession.current);
+      } catch {
+        /* best-effort */
+      }
+      seeded.piSession.current = undefined;
+    }
   }
   const finishedMs = Date.now();
   const elapsedMs = finishedMs - startMs;
@@ -407,7 +435,18 @@ function buildControlAdapter(
     });
   }
   if (loop.backend.kind === "pi") {
-    return piControlAdapter(loop.runtime.runId);
+    return piControlAdapter(loop.runtime.runId, {
+      triggerInterrupt: () => {
+        if (loop.piSession.current) {
+          abortPiTurn(loop.piSession.current);
+        }
+      },
+      triggerSteer: (message) => {
+        if (loop.piSession.current) {
+          steerPiTurn(loop.piSession.current, message);
+        }
+      },
+    });
   }
   return undefined;
 }
