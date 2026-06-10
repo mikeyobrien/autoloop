@@ -25,10 +25,16 @@ core.state_dir = ".autoloop"
 core.journal_file = ".autoloop/journal.jsonl"
 core.memory_file = ".autoloop/memory.jsonl"
 
-# Kiro backend (persistent ACP session):
-# backend.kind = "kiro"
+# ACP providers:
+# backend.kind = "acp"
+# backend.provider = "kiro"
 # backend.command = "kiro-cli"
 # backend.args = ["acp"]
 # backend.trust_all_tools = true
 # backend.agent = ""
 # backend.model = ""
+#
+# Claude Agent ACP alternative:
+# backend.provider = "claude-agent-acp"
+# backend.command = "npx"
+# backend.args = ["-y", "@agentclientprotocol/claude-agent-acp"]
