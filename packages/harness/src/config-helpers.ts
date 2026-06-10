@@ -7,6 +7,10 @@ import {
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import {
+  isAcpBackendKind,
+  resolveAcpProvider,
+} from "@mobrienv/autoloop-backends/acp-providers";
+import {
   assertNoRawAutoloopPaths,
   expandTemplatePlaceholders,
   generateCompactId,
@@ -131,7 +135,7 @@ export function installRuntimeTools(loop: LoopContext): void {
 
 export function resolveProcessKind(kind: string, command: string): string {
   if (kind === "pi" || piBinary(command)) return "pi";
-  if (kind === "kiro") return "kiro";
+  if (isAcpBackendKind(kind)) return "acp";
   return "command";
 }
 
@@ -142,6 +146,7 @@ function piBinary(command: string): boolean {
 export function normalizePromptMode(value: string): string {
   if (value === "stdin") return "stdin";
   if (value === "file") return "file";
+  if (value === "acp") return "acp";
   return "arg";
 }
 
@@ -203,6 +208,18 @@ export function processIntOverride(
     }
     return val;
   }
+  return fallback;
+}
+
+export function processBoolOverride(
+  override: Record<string, unknown>,
+  key: string,
+  fallback: boolean,
+): boolean {
+  const val = override[key];
+  if (val === undefined) return fallback;
+  if (typeof val === "boolean") return val;
+  if (typeof val === "string") return val !== "false";
   return fallback;
 }
 
@@ -549,18 +566,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     paths: loop.paths,
     runtime: loop.runtime,
     launch: loop.launch,
-    store: {
-      ...loop.store,
-      ...(backend.kind === "kiro"
-        ? {
-            kiro_trust_all_tools:
-              config.get(cfg, "backend.trust_all_tools", "true") !== "false",
-            kiro_agent: config.get(cfg, "backend.agent", ""),
-            kiro_model: config.get(cfg, "backend.model", ""),
-          }
-        : {}),
-    },
+    store: loop.store,
     agentMap: loadAgentMap(pd),
+    // Alias, never copy: all reloaded contexts must share one session holder.
+    acpSession: loop.acpSession ?? { current: undefined },
     onEvent: loop.onEvent,
   };
   return applyRuntimeModeOverrides(updated);
@@ -570,36 +579,96 @@ function readBackendConfig(
   cfg: config.Config,
   bo: Record<string, unknown>,
 ): LoopContext["backend"] {
+  const rawKind = processStringOverride(
+    bo,
+    "kind",
+    config.get(cfg, "backend.kind", ""),
+  );
+  const cfgCommandMarker = "__missing_command__";
+  const cfgCommand = config.get(cfg, "backend.command", cfgCommandMarker);
+  const explicitCommand =
+    typeof bo.command === "string"
+      ? bo.command
+      : cfgCommand !== cfgCommandMarker
+        ? cfgCommand
+        : "";
+  const rawProvider = processStringOverride(
+    bo,
+    "provider",
+    config.get(cfg, "backend.provider", ""),
+  );
+  const acpProvider = resolveAcpProvider({
+    kind: rawKind,
+    provider: rawProvider,
+    command: explicitCommand,
+  });
+  const commandFallback = isAcpBackendKind(rawKind)
+    ? acpProvider.defaultCommand
+    : "claude";
   const command = processStringOverride(
     bo,
     "command",
-    config.get(cfg, "backend.command", "claude"),
+    cfgCommand !== cfgCommandMarker ? cfgCommand : commandFallback,
   );
-  const kind = resolveProcessKind(
-    processStringOverride(bo, "kind", config.get(cfg, "backend.kind", "")),
-    command,
+  const kind = resolveProcessKind(rawKind, command);
+  const provider = kind === "acp" ? acpProvider.id : "";
+  const cfgArgsMarker = "__missing_args__";
+  const rawCfgArgs = config.get(cfg, "backend.args", cfgArgsMarker);
+  const argsFallback =
+    rawCfgArgs === cfgArgsMarker
+      ? kind === "acp"
+        ? acpProvider.defaultArgs
+        : []
+      : configListWithFallback(cfg, "backend.args", []);
+  const rawArgs = processListOverride(bo, "args", argsFallback);
+  const args =
+    kind === "command" ? injectClaudePermissions(command, rawArgs) : rawArgs;
+  const cfgPromptMarker = "__missing_prompt_mode__";
+  const rawCfgPromptMode = config.get(
+    cfg,
+    "backend.prompt_mode",
+    cfgPromptMarker,
   );
-  const args = injectClaudePermissions(
-    command,
-    processListOverride(
-      bo,
-      "args",
-      configListWithFallback(cfg, "backend.args", []),
-    ),
-  );
+  const promptModeFallback =
+    rawCfgPromptMode === cfgPromptMarker
+      ? kind === "acp"
+        ? acpProvider.defaultPromptMode
+        : "arg"
+      : rawCfgPromptMode;
   const promptMode = normalizePromptMode(
-    processStringOverride(
-      bo,
-      "prompt_mode",
-      config.get(cfg, "backend.prompt_mode", "arg"),
-    ),
+    processStringOverride(bo, "prompt_mode", promptModeFallback),
   );
   const timeoutMs = processIntOverride(
     bo,
     "timeout_ms",
     config.getInt(cfg, "backend.timeout_ms", 300000),
   );
-  return { kind, command, args, promptMode, timeoutMs };
+  const trustAllTools = processBoolOverride(
+    bo,
+    "trust_all_tools",
+    config.get(cfg, "backend.trust_all_tools", "true") !== "false",
+  );
+  const agent = processStringOverride(
+    bo,
+    "agent",
+    config.get(cfg, "backend.agent", ""),
+  );
+  const model = processStringOverride(
+    bo,
+    "model",
+    config.get(cfg, "backend.model", ""),
+  );
+  return {
+    kind,
+    provider,
+    command,
+    args,
+    promptMode,
+    timeoutMs,
+    trustAllTools,
+    agent,
+    model,
+  };
 }
 
 function readReviewConfig(
@@ -613,6 +682,7 @@ function readReviewConfig(
     config.get(cfg, "review.kind", backend.kind),
     command,
   );
+  const provider = config.get(cfg, "review.provider", backend.provider);
   return {
     enabled: truthySetting(config.get(cfg, "review.enabled", "true")),
     every: resolveReviewEvery(cfg, topoData),
@@ -620,6 +690,7 @@ function readReviewConfig(
       config.get(cfg, "review.adversarial_first", "true"),
     ),
     kind,
+    provider: kind === "acp" ? provider || backend.provider || "generic" : "",
     command,
     args: configListWithFallback(cfg, "review.args", backend.args),
     promptMode: normalizePromptMode(
@@ -627,6 +698,14 @@ function readReviewConfig(
     ),
     prompt: resolveReviewPrompt(projectDir, cfg),
     timeoutMs: config.getInt(cfg, "review.timeout_ms", 300000),
+    trustAllTools:
+      config.get(
+        cfg,
+        "review.trust_all_tools",
+        String(backend.trustAllTools),
+      ) !== "false",
+    agent: config.get(cfg, "review.agent", backend.agent),
+    model: config.get(cfg, "review.model", backend.model),
   };
 }
 

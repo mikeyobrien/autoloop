@@ -47,7 +47,7 @@ If the preset argument is missing, the CLI exits with a usage error. If the argu
 
 | Flag | Description |
 |------|-------------|
-| `-b <backend>`, `--backend <backend>` | Override the backend. `pi` selects the built-in Pi adapter. `kiro` selects the Kiro ACP backend (persistent session via `kiro-cli acp`). `claude` (or a path ending in `/claude`) adds `-p --dangerously-skip-permissions`. Config-based Claude command backends receive the same injection automatically. Any other value is treated as a shell command. |
+| `-b <backend>`, `--backend <backend>` | Override the backend. `pi` selects the built-in Pi adapter. `kiro` selects the Kiro ACP provider (`kiro-cli acp`). `claude-agent-acp` selects the published Claude ACP adapter via `npx -y @agentclientprotocol/claude-agent-acp`. `acp:<provider>:<command>` selects a generic ACP stdio provider with a custom command. `claude` (or a path ending in `/claude`) adds `-p --dangerously-skip-permissions`. Config-based Claude command backends receive the same injection automatically. Any other value is treated as a shell command. |
 | `--max-iterations <n>` | Override `event_loop.max_iterations` for this run only. Reapplied on hot reload. |
 | `-i <n>`, `--iterations <n>` | Alias for `--max-iterations <n>`. |
 | `--set <key=value>` | Override any config key for this run only, after all file layers. Repeatable, e.g. `--set backend.timeout_ms=900000`. |
@@ -64,6 +64,8 @@ autoloop run autocode "Fix the login bug"
 autoloop run autocode --max-iterations 250 "Fix the login bug"
 autoloop run autocode --set backend.timeout_ms=900000 "Fix slowly"
 autoloop run autocode -b kiro "Fix the login bug"
+autoloop run autocode -b claude-agent-acp "Fix the login bug"
+autoloop run autocode -b acp:custom:/path/to/agent-acp "Fix the login bug"
 autoloop run --preset autocode "Fix the login bug"
 autoloop run . "Fix the login bug" -b pi
 autoloop run . --chain autocode,autoqa "Implement the approved change and validate it"

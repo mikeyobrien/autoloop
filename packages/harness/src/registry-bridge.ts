@@ -12,6 +12,13 @@ function registryPath(loop: LoopContext): string {
   return loop.paths.registryFile;
 }
 
+function registryBackendLabel(loop: LoopContext): string {
+  if (loop.backend.kind === "acp") {
+    return `acp:${loop.backend.provider || "generic"}`;
+  }
+  return normalizeBackendLabel(loop.backend.command);
+}
+
 function baseRecord(loop: LoopContext): RunRecord {
   return {
     run_id: loop.runtime.runId,
@@ -24,7 +31,7 @@ function baseRecord(loop: LoopContext): RunRecord {
     state_dir: loop.paths.stateDir,
     journal_file: loop.paths.journalFile,
     parent_run_id: loop.launch.parentRunId,
-    backend: normalizeBackendLabel(loop.backend.command),
+    backend: registryBackendLabel(loop),
     backend_args: loop.backend.args,
     created_at: loop.launch.createdAt,
     updated_at: new Date().toISOString(),

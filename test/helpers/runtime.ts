@@ -12,6 +12,7 @@ import { join, resolve } from "node:path";
 export const ROOT = resolve(import.meta.dirname, "../..");
 export const DIST_ENTRY = resolve(ROOT, "packages/cli/dist/main.js");
 export const MOCK_BACKEND = resolve(ROOT, "dist/testing/mock-backend.js");
+export const MOCK_ACP_SERVER = resolve(ROOT, "dist/testing/mock-acp-server.js");
 export const FIXTURES_DIR = resolve(ROOT, "test/fixtures/backend");
 export const PRESET_FIXTURE_DIR = resolve(
   ROOT,
@@ -21,9 +22,18 @@ export const PRESET_FIXTURE_DIR = resolve(
 let buildEnsured = false;
 
 export function ensureBuild(): void {
-  if (buildEnsured && existsSync(DIST_ENTRY) && existsSync(MOCK_BACKEND))
+  if (
+    buildEnsured &&
+    existsSync(DIST_ENTRY) &&
+    existsSync(MOCK_BACKEND) &&
+    existsSync(MOCK_ACP_SERVER)
+  )
     return;
-  if (!existsSync(DIST_ENTRY) || !existsSync(MOCK_BACKEND)) {
+  if (
+    !existsSync(DIST_ENTRY) ||
+    !existsSync(MOCK_BACKEND) ||
+    !existsSync(MOCK_ACP_SERVER)
+  ) {
     // Build every workspace + root so packages/cli/dist/main.js and
     // dist/testing/mock-backend.js both exist. A plain root `tsc` no
     // longer suffices — phase 2.6 moved the CLI into its own workspace.

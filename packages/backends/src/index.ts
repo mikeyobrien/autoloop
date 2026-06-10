@@ -9,12 +9,21 @@ import { buildCommandInvocation, runShellCommand } from "./run-command.js";
 import type { BackendCommandContext, BackendRunResult } from "./types.js";
 
 export type {
+  AcpProvider,
+  AcpProviderId,
+  ResolveAcpProviderInput,
+} from "./acp-providers.js";
+export {
+  ACP_PROVIDERS,
+  isAcpBackendKind,
+  resolveAcpProvider,
+} from "./acp-providers.js";
+export type {
   BackendCommandContext,
   BackendPaths,
   BackendRunResult,
   BackendSpec,
 } from "./types.js";
-
 export { normalizeBackendLabel };
 
 /**
@@ -25,7 +34,7 @@ export { normalizeBackendLabel };
  * (worker thread + SharedArrayBuffer) now that the harness iteration loop
  * itself is async.
  */
-export async function runKiroIteration(
+export async function runAcpIteration(
   session: AcpSession,
   prompt: string,
   timeoutMs: number,
@@ -35,7 +44,7 @@ export async function runKiroIteration(
     output: result.output,
     exitCode: result.error ? 1 : 0,
     timedOut: result.timedOut,
-    providerKind: "kiro",
+    providerKind: session.provider.id,
     errorCategory: result.timedOut
       ? "timeout"
       : result.error
@@ -43,6 +52,8 @@ export async function runKiroIteration(
         : "none",
   };
 }
+
+export const runKiroIteration = runAcpIteration;
 
 /**
  * A "mock" backend is any invocation whose command or argv mentions
@@ -84,11 +95,13 @@ export function runBackendCommand(
 
 export function normalizeProviderKind(spec: {
   kind: string;
+  provider?: string;
   command: string;
   args: string[];
 }): string {
   if (spec.kind === "pi") return "pi";
-  if (spec.kind === "kiro") return "kiro";
+  if (spec.kind === "acp") return `acp:${spec.provider || "generic"}`;
+  if (spec.kind === "kiro") return "acp:kiro";
   if (isMockInvocation(spec.command, spec.args)) return "mock";
   return spec.kind || "command";
 }

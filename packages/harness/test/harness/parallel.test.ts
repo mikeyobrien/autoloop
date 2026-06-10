@@ -52,6 +52,7 @@ describe("parallelBranchBackendOverride", () => {
     allowedEvents: [],
     prompt: "do stuff",
     backendKind: "",
+    backendProvider: "",
     backendCommand: "",
     backendArgs: [],
     backendPromptMode: "",
@@ -65,6 +66,13 @@ describe("parallelBranchBackendOverride", () => {
   it("includes kind when set", () => {
     const launch = { ...baseLaunch, backendKind: "mock" };
     expect(parallelBranchBackendOverride(launch)).toEqual({ kind: "mock" });
+  });
+
+  it("includes ACP provider when set", () => {
+    const launch = { ...baseLaunch, backendProvider: "claude-agent-acp" };
+    expect(parallelBranchBackendOverride(launch)).toEqual({
+      provider: "claude-agent-acp",
+    });
   });
 
   it("includes command when set", () => {
@@ -92,12 +100,14 @@ describe("parallelBranchBackendOverride", () => {
     const launch: BranchLaunch = {
       ...baseLaunch,
       backendKind: "command",
+      backendProvider: "generic",
       backendCommand: "claude",
       backendArgs: ["--fast"],
       backendPromptMode: "pipe",
     };
     expect(parallelBranchBackendOverride(launch)).toEqual({
       kind: "command",
+      provider: "generic",
       command: "claude",
       args: ["--fast"],
       prompt_mode: "pipe",

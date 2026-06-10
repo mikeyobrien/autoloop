@@ -37,21 +37,29 @@ export interface LoopContext {
   completion: { promise: string; event: string; requiredEvents: string[] };
   backend: {
     kind: string;
+    provider: string;
     command: string;
     args: string[];
     promptMode: string;
     timeoutMs: number;
+    trustAllTools: boolean;
+    agent: string;
+    model: string;
   };
   review: {
     enabled: boolean;
     every: number;
     adversarialFirst: boolean;
     kind: string;
+    provider: string;
     command: string;
     args: string[];
     promptMode: string;
     prompt: string;
     timeoutMs: number;
+    trustAllTools: boolean;
+    agent: string;
+    model: string;
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
   memory: { budgetChars: number };
@@ -89,7 +97,12 @@ export interface LoopContext {
   launch: LaunchMetadata;
   store: Record<string, unknown>;
   agentMap: AgentMap | null;
-  kiroSession?: AcpSession;
+  /**
+   * Live ACP session holder. Aliased (not copied) across context reloads so
+   * loop-exit, abort, and interrupt handlers always see the current session
+   * even though iterations run on reloaded context clones.
+   */
+  acpSession: { current: AcpSession | undefined };
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

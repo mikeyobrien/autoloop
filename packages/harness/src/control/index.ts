@@ -1,3 +1,4 @@
+export { acpControlAdapter, kiroControlAdapter } from "./acp-adapter.js";
 export type { LiveControlAdapter } from "./adapter.js";
 export {
   CAPABILITY_VERBS,
@@ -5,7 +6,6 @@ export {
   supportsInterrupt,
 } from "./capabilities.js";
 export { drainControlRequests, publishCapabilities } from "./dispatch.js";
-export { kiroControlAdapter } from "./kiro-adapter.js";
 export {
   baseStateDirFromRunState,
   controlCapabilitiesFile,

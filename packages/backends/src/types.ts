@@ -1,9 +1,13 @@
 export interface BackendSpec {
   kind: string;
+  provider?: string;
   command: string;
   args: string[];
   promptMode: string;
   timeoutMs: number;
+  trustAllTools?: boolean;
+  agent?: string;
+  model?: string;
 }
 
 export interface BackendRunResult {

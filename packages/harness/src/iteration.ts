@@ -1,4 +1,4 @@
-import { runKiroIteration } from "@mobrienv/autoloop-backends";
+import { runAcpIteration } from "@mobrienv/autoloop-backends";
 import type { AcpClientOptions } from "@mobrienv/autoloop-backends/acp-client";
 import {
   initAcpSession,
@@ -61,44 +61,44 @@ export async function runIteration(
 
   // Fresh ACP session per iteration — ensures each role (researcher, critic,
   // etc.) starts with a clean context window for truly independent review.
-  if (loop.backend.kind === "kiro") {
-    if (loop.kiroSession) {
+  if (iter.backend.kind === "acp") {
+    if (loop.acpSession.current) {
       try {
-        await terminateAcpSession(loop.kiroSession);
+        await terminateAcpSession(loop.acpSession.current);
       } catch {
         /* best-effort */
       }
-      loop.kiroSession = undefined;
+      loop.acpSession.current = undefined;
     }
     const acpOpts: AcpClientOptions = {
-      command: loop.backend.command,
-      args: loop.backend.args,
+      provider: iter.backend.provider,
+      command: iter.backend.command,
+      args: iter.backend.args,
       cwd: loop.paths.workDir,
-      trustAllTools: loop.store.kiro_trust_all_tools !== false,
-      agentName:
-        iter.roleAgent || (loop.store.kiro_agent as string) || undefined,
-      modelId: (loop.store.kiro_model as string) || undefined,
+      trustAllTools: iter.backend.trustAllTools,
+      agentName: iter.backend.agent || undefined,
+      modelId: iter.backend.model || undefined,
       verbose: loop.runtime.logLevel === "debug",
     };
-    loop.kiroSession = await initAcpSession(acpOpts);
+    loop.acpSession.current = await initAcpSession(acpOpts);
     log(
       loop,
       "debug",
-      `new kiro session for iteration ${iteration} agent="${acpOpts.agentName ?? "default"}"`,
+      `new ACP session for iteration ${iteration} provider="${iter.backend.provider || "generic"}" agent="${acpOpts.agentName ?? "default"}"`,
     );
   }
 
   const { output, exitCode, timedOut } =
-    loop.backend.kind === "kiro" && loop.kiroSession
-      ? await runKiroIteration(
-          loop.kiroSession,
+    iter.backend.kind === "acp" && loop.acpSession.current
+      ? await runAcpIteration(
+          loop.acpSession.current,
           iter.prompt,
-          loop.backend.timeoutMs,
+          iter.backend.timeoutMs,
         )
       : runProcess(
           buildBackendCommand(loop, iter),
-          loop.backend.timeoutMs,
-          loop.backend.kind,
+          iter.backend.timeoutMs,
+          iter.backend.kind,
         );
   const elapsedS = Math.floor(Date.now() / 1000) - startEpoch;
 

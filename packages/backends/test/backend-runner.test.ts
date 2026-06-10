@@ -1,11 +1,29 @@
 import {
   buildBackendShellCommand,
   normalizeProviderKind,
+  runAcpIteration,
+  runKiroIteration,
 } from "@mobrienv/autoloop-backends";
 import { runShellCommand } from "@mobrienv/autoloop-backends/run-command";
 import { describe, expect, it } from "vitest";
 
 describe("backend runner", () => {
+  it("exports runAcpIteration as the canonical ACP runner with the Kiro alias preserved", () => {
+    expect(runAcpIteration).toBeTypeOf("function");
+    expect(runKiroIteration).toBe(runAcpIteration);
+  });
+
+  it("normalizes ACP provider kind with provider label", () => {
+    expect(
+      normalizeProviderKind({
+        kind: "acp",
+        provider: "claude-agent-acp",
+        command: "npx",
+        args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      }),
+    ).toBe("acp:claude-agent-acp");
+  });
+
   it("normalizes mock provider kind", () => {
     expect(
       normalizeProviderKind({

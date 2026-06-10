@@ -15,6 +15,10 @@
       "types": "./dist/acp-client.d.ts",
       "default": "./dist/acp-client.js"
     },
+    "./acp-providers": {
+      "types": "./dist/acp-providers.d.ts",
+      "default": "./dist/acp-providers.js"
+    },
     "./run-command": {
       "types": "./dist/run-command.d.ts",
       "default": "./dist/run-command.js"

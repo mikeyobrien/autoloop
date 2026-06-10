@@ -185,11 +185,19 @@ export function backendOverrideFromProject(
   const override: Record<string, unknown> = {};
 
   if (typeof section.kind === "string") override.kind = section.kind;
+  if (typeof section.provider === "string")
+    override.provider = section.provider;
   if (typeof section.command === "string") override.command = section.command;
   if (typeof section.prompt_mode === "string")
     override.prompt_mode = section.prompt_mode;
   if (Array.isArray(section.args))
     override.args = (section.args as unknown[]).map(String);
+  if (typeof section.trust_all_tools === "boolean")
+    override.trust_all_tools = section.trust_all_tools;
+  if (typeof section.agent === "string") override.agent = section.agent;
+  if (typeof section.model === "string") override.model = section.model;
+  if (typeof section.timeout_ms === "number")
+    override.timeout_ms = section.timeout_ms;
 
   return override;
 }

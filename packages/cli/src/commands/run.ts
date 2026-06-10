@@ -375,12 +375,18 @@ function backendOverrideSpec(backend: string): Record<string, unknown> {
     return { kind: "pi", command: "pi", args: [], prompt_mode: "arg" };
   }
   if (backend === "kiro" || backend === "kiro-cli") {
-    return {
-      kind: "kiro",
-      command: "kiro-cli",
-      args: ["acp"],
-      prompt_mode: "acp",
-    };
+    return acpBackendOverride("kiro", "kiro-cli", ["acp"]);
+  }
+  if (backend === "claude-agent-acp") {
+    return acpBackendOverride("claude-agent-acp", "npx", [
+      "-y",
+      "@agentclientprotocol/claude-agent-acp",
+    ]);
+  }
+  if (backend.startsWith("acp:")) {
+    const [, provider, ...commandParts] = backend.split(":");
+    const command = commandParts.join(":");
+    return acpBackendOverride(provider || "generic", command || "", []);
   }
   if (claudeBackend(backend)) {
     return {
@@ -391,6 +397,20 @@ function backendOverrideSpec(backend: string): Record<string, unknown> {
     };
   }
   return { kind: "command", command: backend, args: [], prompt_mode: "arg" };
+}
+
+function acpBackendOverride(
+  provider: string,
+  command: string,
+  args: string[],
+): Record<string, unknown> {
+  return {
+    kind: "acp",
+    provider,
+    command,
+    args,
+    prompt_mode: "acp",
+  };
 }
 
 function looksLikeProjectDir(path: string): boolean {

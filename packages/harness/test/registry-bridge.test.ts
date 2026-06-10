@@ -21,6 +21,7 @@ function makeLoopContext(
     isolationMode: string;
     worktreeBranch: string;
     worktreePath: string;
+    backend: Partial<LoopContext["backend"]>;
   }> = {},
 ): LoopContext {
   return {
@@ -33,10 +34,15 @@ function makeLoopContext(
     },
     backend: {
       kind: "command",
+      provider: "",
       command: "echo",
       args: ["--fast"],
       promptMode: "arg",
       timeoutMs: 5000,
+      trustAllTools: true,
+      agent: "",
+      model: "",
+      ...overrides.backend,
     },
     paths: {
       projectDir: "/tmp/proj",
@@ -102,6 +108,27 @@ describe("registryStart", () => {
     expect(r.isolation_mode).toBe("shared");
     expect(r.backend).toBe("echo");
     expect(r.backend_args).toEqual(["--fast"]);
+  });
+
+  it("labels ACP provider runs by provider instead of wrapper command", () => {
+    const loop = makeLoopContext({
+      backend: {
+        kind: "acp",
+        provider: "claude-agent-acp",
+        command: "npx",
+        args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+        promptMode: "acp",
+      },
+    });
+
+    registryStart(loop);
+    const r = readLines()[0];
+
+    expect(r.backend).toBe("acp:claude-agent-acp");
+    expect(r.backend_args).toEqual([
+      "-y",
+      "@agentclientprotocol/claude-agent-acp",
+    ]);
   });
 
   it("includes worktree fields when set", () => {

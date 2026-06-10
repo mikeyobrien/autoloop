@@ -32,7 +32,7 @@ autoloop run --chain autocode,autoqa "objective" --worktree
 
 **When to use `--automerge`:** When the user wants hands-off operation. Appends an automerge step that squash-merges on completion.
 
-**Backend override:** Use `-b claude` or `-b pi` or `-b kiro` to switch backends.
+**Backend override:** Use `-b claude`, `-b pi`, `-b kiro`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>` to switch backends.
 
 Use `run_in_background: true` on the Bash tool when starting runs so the user isn't blocked.
 

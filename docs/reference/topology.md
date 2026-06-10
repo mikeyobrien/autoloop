@@ -61,16 +61,17 @@ Each `[[role]]` table defines one role in the loop. Roles are processed in decla
 | `prompt` | string | No | Inline prompt text for this role. |
 | `prompt_file` | string | No | Path to a markdown file containing the role's prompt, relative to the project directory. |
 | `backend_kind` | string | No | Override the loop's `backend.kind` for iterations routed to this role. See [Per-role backend overrides](#per-role-backend-overrides). |
+| `backend_provider` | string | No | Override the ACP `backend.provider` preset for this role (`kiro`, `claude-agent-acp`, `generic`, or a custom label). |
 | `backend_command` | string | No | Override `backend.command` for this role's iterations. |
 | `backend_args` | array of strings | No | Override `backend.args` entirely (replace, not merge). |
-| `backend_prompt_mode` | string | No | Override `backend.prompt_mode` (`"arg"` or `"stdin"`). |
+| `backend_prompt_mode` | string | No | Override `backend.prompt_mode` (`"arg"`, `"stdin"`, or `"acp"`). |
 | `backend_timeout_ms` | int | No | Override `backend.timeout_ms` for this role's iterations. |
-| `backend_agent` | string | No | Kiro `setSessionMode` agent for this role. **Subordinate to `agents.toml`** when the agent map resolves a non-empty value for the same role. |
-| `backend_model` | string | No | Kiro `unstable_setSessionModel` model id for this role. |
+| `backend_agent` | string | No | ACP `setSessionMode` agent/mode for this role. **Subordinate to `agents.toml`** when the agent map resolves a non-empty value for the same role. |
+| `backend_model` | string | No | ACP `unstable_setSessionModel` model id for this role. |
 
 If both `prompt` and `prompt_file` are set, `prompt` takes precedence. If neither is set, the role has no prompt text.
 
-All seven `backend_*` fields are optional. When unset, the role inherits the global `backend.*` value from `autoloops.toml`. See [Per-role backend overrides](#per-role-backend-overrides) for resolution order, Kiro session lifecycle, and a worked example.
+All eight `backend_*` fields are optional. When unset, the role inherits the global `backend.*` value from `autoloops.toml`. See [Per-role backend overrides](#per-role-backend-overrides) for resolution order, ACP session lifecycle, and a worked example.
 
 ## `[handoff]` — event routing map
 
@@ -99,7 +100,7 @@ This is soft routing: the model sees suggestions and constraints but is not forc
 
 ## Per-role backend overrides
 
-By default every iteration uses the global `backend.*` settings from `autoloops.toml`. The seven optional `backend_*` fields on a `[[role]]` let you route one role to a different backend, command, model, or timeout without changing the rest of the loop. A heavyweight critic can run on a slow, premium model while the planner and builder use a cheaper one; a single role can target the Kiro ACP backend while the rest of the loop runs through Pi.
+By default every iteration uses the global `backend.*` settings from `autoloops.toml`. The optional `backend_*` fields on a `[[role]]` let you route one role to a different backend provider, command, model, or timeout without changing the rest of the loop. A heavyweight critic can run on a slow, premium model while the planner and builder use a cheaper one; a single role can target an ACP provider such as Kiro or Claude Agent ACP while the rest of the loop runs through Pi.
 
 ### Resolution order per iteration
 
@@ -107,7 +108,7 @@ For each iteration, the harness resolves the backend spec by overlaying these la
 
 1. **Global `backend.*` config** from `autoloops.toml` (the baseline).
 2. **Role `backend_*` fields** from `topology.toml` for the first suggested role of the current routing event. Each defined field overrides the corresponding global value; unset fields fall through.
-3. **`agents.toml` overlay** on `backend_agent` only — and only when `resolveRoleAgent(...)` returns a non-empty string. This wins over a role's `backend_agent` for Kiro agent routing; it does not affect any other backend field.
+3. **`agents.toml` overlay** on `backend_agent` only — and only when `resolveRoleAgent(...)` returns a non-empty string. This wins over a role's `backend_agent` for ACP agent/mode routing; it does not affect any other backend field.
 
 Two other rules:
 
@@ -118,32 +119,33 @@ Two other rules:
 
 Each `backend_*` field overrides the corresponding global field independently. Unspecified role fields fall through to the global value. Notably, `backend_args` is **replace, not merge** — when a role sets `backend_args`, the global `backend.args` is discarded for that role's iterations.
 
-### Kiro session lifecycle
+### ACP session lifecycle
 
-When the loop uses the Kiro backend, the harness keeps a single live ACP session per `LoopContext`. The session is keyed by a **signature** over `command`, `args`, `cwd`, `trust_all_tools`, `agent`, and `model`. Per iteration:
+When the loop uses an ACP backend, the harness starts a fresh stdio ACP session for each iteration. Per iteration:
 
-- **Iteration is non-Kiro and a session is live** → terminate the session, then run via the command/pi backend.
-- **Iteration is Kiro and no session exists** → spin up lazily.
-- **Iteration is Kiro and the signature matches the live session** → reuse. Only call `setSessionMode` / `unstable_setSessionModel` when the tracked agent / model actually differs.
-- **Iteration is Kiro and the signature differs** (any of `command`, `args`, `cwd`, `trust_all_tools`, `agent`, `model` changed) → terminate, then re-init with the new spec.
+- **Iteration is non-ACP and a session is live** → terminate the session, then run via the command/pi backend.
+- **Iteration is ACP** → initialize the provider command, create a new session, apply supported `agent` / `model` settings, send the prompt, then terminate the session after the turn.
+- **Role/provider settings differ between iterations** → no special reuse logic is needed; each iteration already gets an isolated provider session.
 
 ### Minimal example
 
-A single role pinned to a different Kiro model than the rest of the loop:
+A single role pinned to a different ACP model than the rest of the loop:
 
 ```toml
 [[role]]
 id = "critic"
 emits = ["review.passed", "review.rejected"]
 prompt_file = "roles/critic.md"
-backend_kind = "kiro"
+backend_kind = "acp"
+backend_provider = "kiro"
 backend_command = "kiro-cli"
+backend_args = ["acp"]
 backend_model = "anthropic/claude-opus-4"
 ```
 
 ### End-to-end worked example: per-role backends and models
 
-A three-role loop where the planner runs on the global Pi backend, the builder uses Kiro with one model, and the critic uses Kiro with a different model:
+A three-role loop where the planner runs on the global Pi backend, the builder uses Kiro ACP with one model, and the critic uses Claude Agent ACP with a different model:
 
 ```toml
 # autoloops.toml
@@ -163,7 +165,8 @@ prompt_file = "roles/planner.md"
 id = "builder"
 emits = ["review.ready"]
 prompt_file = "roles/builder.md"
-backend_kind = "kiro"
+backend_kind = "acp"
+backend_provider = "kiro"
 backend_command = "kiro-cli"
 backend_args = ["acp"]
 backend_model = "anthropic/claude-sonnet-4"
@@ -172,20 +175,21 @@ backend_model = "anthropic/claude-sonnet-4"
 id = "critic"
 emits = ["review.passed", "review.rejected"]
 prompt_file = "roles/critic.md"
-backend_kind = "kiro"
-backend_command = "kiro-cli"
-backend_args = ["acp"]
+backend_kind = "acp"
+backend_provider = "claude-agent-acp"
+backend_command = "npx"
+backend_args = ["-y", "@agentclientprotocol/claude-agent-acp"]
 backend_model = "anthropic/claude-opus-4"
 ```
 
 Walkthrough of one full cycle:
 
-1. **`loop.start` → planner.** No `backend_*` fields, so `iter.backend` is the global `pi` spec. No Kiro session exists; the iteration runs through the Pi adapter.
-2. **`tasks.ready` → builder.** `iter.backend` resolves to `kiro` + `kiro-cli acp` + `claude-sonnet-4`. No live session yet, so the harness lazily inits the Kiro session with the builder signature.
-3. **`review.ready` → critic.** `iter.backend` resolves to `kiro` + `kiro-cli acp` + `claude-opus-4`. The model field differs, so the signature differs — the harness terminates the builder session and re-inits a fresh one for the critic.
-4. **`review.rejected` → builder.** Routes back to the builder. The signature reverts to the builder spec, so the harness terminates the critic session and re-inits for the builder. (If routing went to a non-Kiro role instead, the harness would simply terminate the live session and run the next iteration via Pi.)
+1. **`loop.start` → planner.** No `backend_*` fields, so `iter.backend` is the global `pi` spec. No ACP session exists; the iteration runs through the Pi adapter.
+2. **`tasks.ready` → builder.** `iter.backend` resolves to `acp:kiro` + `kiro-cli acp` + `claude-sonnet-4`. The harness creates a fresh Kiro ACP session for the builder turn.
+3. **`review.ready` → critic.** `iter.backend` resolves to `acp:claude-agent-acp` + `npx -y @agentclientprotocol/claude-agent-acp` + `claude-opus-4`. The harness terminates the builder session and creates a fresh Claude Agent ACP session for the critic.
+4. **`review.rejected` → builder.** Routes back to the builder. The harness creates a new Kiro ACP session for the builder, so critic context cannot bleed into the retry. (If routing went to a non-ACP role instead, the harness would simply run the next iteration via Pi.)
 
-See [Backend configuration](configuration.md#backend) for global defaults; see [`agents.toml` — per-role agent routing](configuration.md#agentstoml--per-role-agent-routing) for the Kiro agent overlay that wins over `backend_agent`.
+See [Backend configuration](configuration.md#backend) for global defaults; see [`agents.toml` — per-role ACP agent routing](configuration.md#agentstoml--per-role-acp-agent-routing) for the ACP agent overlay that wins over `backend_agent`.
 
 ## Structured parallel routing
 

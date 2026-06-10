@@ -1,6 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runKiroIteration } from "@mobrienv/autoloop-backends";
+import { runAcpIteration } from "@mobrienv/autoloop-backends";
+import {
+  initAcpSession,
+  terminateAcpSession,
+} from "@mobrienv/autoloop-backends/acp-client";
 import { jsonBool, jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
 import { appendEvent, readRunLines } from "@mobrienv/autoloop-core/journal";
 import { reloadLoop } from "./config-helpers.js";
@@ -50,7 +54,6 @@ export async function maybeRunMetareview(
   if (shouldRunMetareview(loop, iteration)) {
     const verdict = await runMetareviewReview(loop, iteration);
     const reloaded = reloadLoop(loop);
-    reloaded.kiroSession = loop.kiroSession;
     reloaded.lastVerdict = verdict;
     return reloaded;
   }
@@ -84,6 +87,8 @@ export async function runMetareviewReview(
       ", " +
       jsonField("backend_kind", loop.review.kind) +
       ", " +
+      jsonField("backend_provider", loop.review.provider) +
+      ", " +
       jsonField("command", loop.review.command) +
       ", " +
       jsonField("prompt_mode", loop.review.promptMode) +
@@ -94,12 +99,8 @@ export async function runMetareviewReview(
   );
 
   const { output, exitCode, timedOut } =
-    loop.review.kind === "kiro" && loop.kiroSession
-      ? await runKiroIteration(
-          loop.kiroSession,
-          reviewPrompt,
-          loop.review.timeoutMs,
-        )
+    loop.review.kind === "acp"
+      ? await runAcpReview(loop, reviewPrompt)
       : runProcess(
           buildReviewCommand(loop, iteration, reviewPrompt),
           loop.review.timeoutMs,
@@ -170,4 +171,32 @@ export async function runMetareviewReview(
   }
 
   return verdict;
+}
+
+// Reviews get their own ACP session built from the review spec — the live
+// iteration session may belong to a different provider/agent/model and
+// carries the iteration's conversation context.
+async function runAcpReview(
+  loop: LoopContext,
+  reviewPrompt: string,
+): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
+  const session = await initAcpSession({
+    provider: loop.review.provider,
+    command: loop.review.command,
+    args: loop.review.args,
+    cwd: loop.paths.workDir,
+    trustAllTools: loop.review.trustAllTools,
+    agentName: loop.review.agent || undefined,
+    modelId: loop.review.model || undefined,
+    verbose: loop.runtime.logLevel === "debug",
+  });
+  try {
+    return await runAcpIteration(session, reviewPrompt, loop.review.timeoutMs);
+  } finally {
+    try {
+      await terminateAcpSession(session);
+    } catch {
+      /* best-effort */
+    }
+  }
 }

@@ -1,17 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
-import { kiroControlAdapter } from "../../src/control/kiro-adapter.js";
+import {
+  acpControlAdapter,
+  kiroControlAdapter,
+} from "../../src/control/acp-adapter.js";
 import { piControlAdapter } from "../../src/control/pi-adapter.js";
 import { buildRequest } from "../../src/control/queue.js";
 
-describe("kiroControlAdapter", () => {
-  it("reports interrupt as supported", () => {
-    const adapter = kiroControlAdapter("run-1", { triggerInterrupt: () => {} });
+describe("acpControlAdapter", () => {
+  it("reports interrupt as supported for any ACP provider", () => {
+    const adapter = acpControlAdapter("run-1", "claude-agent-acp", {
+      triggerInterrupt: () => {},
+    });
     const caps = adapter.capabilities();
-    expect(caps.backend).toBe("kiro");
+    expect(caps.backend).toBe("acp:claude-agent-acp");
     expect(caps.interrupt.supported).toBe(true);
-    expect(caps.interrupt.detail).toContain("cancel");
+    expect(caps.interrupt.detail).toContain("ACP cancel");
     expect(caps.guidance.supported).toBe(true);
     expect(caps.inspect.supported).toBe(true);
+  });
+
+  it("keeps kiroControlAdapter as a legacy alias", () => {
+    const adapter = kiroControlAdapter("run-1", { triggerInterrupt: () => {} });
+    expect(adapter.capabilities().backend).toBe("acp:kiro");
   });
 
   it("invokes triggerInterrupt on interrupt verb", () => {

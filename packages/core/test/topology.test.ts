@@ -111,6 +111,38 @@ describe("loadTopology", () => {
     expect(topo.handoff["loop.start"]).toEqual(["planner"]);
     expect(topo.handoff["tasks.ready"]).toEqual(["builder"]);
   });
+
+  it("parses ACP provider role backend overrides", () => {
+    const dir = tmpDir("role-provider");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "builder"
+prompt = "Build."
+emits = ["review.ready"]
+backend_kind = "acp"
+backend_provider = "claude-agent-acp"
+backend_command = "npx"
+backend_args = ["-y", "@agentclientprotocol/claude-agent-acp"]
+backend_prompt_mode = "acp"
+backend_agent = "reviewer"
+backend_model = "opus"
+`,
+    );
+
+    const topo = loadTopology(dir);
+
+    expect(topo.roles[0]).toMatchObject({
+      backendKind: "acp",
+      backendProvider: "claude-agent-acp",
+      backendCommand: "npx",
+      backendArgs: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      backendPromptMode: "acp",
+      backendAgent: "reviewer",
+      backendModel: "opus",
+    });
+  });
 });
 
 describe("suggestedRoles", () => {

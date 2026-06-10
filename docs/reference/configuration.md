@@ -74,18 +74,19 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `backend.kind` | string | `"pi"` | Backend type. `"pi"` for the Pi adapter. `"kiro"` for the Kiro ACP backend (persistent session over Agent Client Protocol). `"command"` for mock/test backends. Auto-detected from `backend.command` if empty or unrecognized. |
-| `backend.command` | string | `"pi"` | Executable to invoke. For `kind = "pi"`, this is the Pi binary path. For `kind = "command"`, any executable. |
+| `backend.kind` | string | `"pi"` | Backend type. `"pi"` for the Pi adapter, `"acp"` for Agent Client Protocol providers, and `"command"` for mock/test or shell-command backends. Legacy `"kiro"` is accepted as an alias for `kind = "acp"` + `provider = "kiro"`. |
+| `backend.provider` | string | `"generic"` for ACP | ACP provider preset. Built-ins: `"kiro"`, `"claude-agent-acp"`, `"generic"`. Unknown values use generic ACP behavior while preserving the label. |
+| `backend.command` | string | provider-dependent | Executable to invoke. For `kind = "pi"`, this is the Pi binary path. For `kind = "acp"`, this is the ACP stdio server command (`kiro-cli`, `npx`, a local adapter path, etc.). For `kind = "command"`, any executable. |
 | `backend.timeout_ms` | int | `300000` | Timeout per backend invocation in milliseconds (default 5 minutes). |
-| `backend.args` | list | `[]` | Extra flags appended after the built-in Pi arguments (`-p --mode json --no-session`). Example: `["--model", "anthropic/claude-sonnet-4"]`. |
-| `backend.prompt_mode` | string | `"arg"` | How the prompt is passed to the backend. `"arg"` passes it as a command-line argument. `"stdin"` passes it on standard input. |
-| `backend.trust_all_tools` | bool | `true` | Auto-approve all tool permission requests. Kiro backend only. |
-| `backend.agent` | string | `""` | Agent name to set via ACP `setSessionMode`. Kiro backend only. |
-| `backend.model` | string | `""` | Model ID to set via ACP `unstable_setSessionModel`. Kiro backend only. |
+| `backend.args` | list | provider-dependent | Backend arguments. Kiro defaults to `["acp"]`; Claude Agent ACP defaults to `["-y", "@agentclientprotocol/claude-agent-acp"]`; command backends default to `[]`. |
+| `backend.prompt_mode` | string | provider-dependent | How the prompt is passed to the backend. `"arg"` passes it as a command-line argument, `"stdin"` passes it on standard input, and `"acp"` sends it through the ACP `prompt` request. |
+| `backend.trust_all_tools` | bool | `true` | Auto-approve ACP tool permission requests when the provider supports it. |
+| `backend.agent` | string | `""` | ACP session mode/agent to set via `setSessionMode` when the provider supports it. |
+| `backend.model` | string | `""` | ACP model ID to set via `unstable_setSessionModel` when the provider supports it. |
 
-Kind auto-detection: if `kind` is empty or unrecognized, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); otherwise `"command"`. The `"kiro"` kind is not auto-detected — set `backend.kind = "kiro"` explicitly, or use `-b kiro`.
+Kind auto-detection: if `kind` is empty or unrecognized, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); otherwise `"command"`. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b kiro`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`.
 
-**Per-role overrides.** Any of `backend.kind`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.agent`, `backend.model` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
+**Per-role overrides.** Any of `backend.kind`, `backend.provider`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.trust_all_tools`, `backend.agent`, `backend.model` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
 
 ### Review (metareview)
 
@@ -100,10 +101,16 @@ The review pass is a separate backend invocation that runs periodically for cons
 | `review.args` | list | *backend.args* | Extra flags for the review backend. |
 | `review.prompt_mode` | string | *backend.prompt_mode* | Prompt delivery mode for reviews. |
 | `review.timeout_ms` | int | `300000` | Timeout for review invocations. Raise it only if you intentionally want long-running reviews. |
+| `review.provider` | string | *backend.provider* | ACP provider preset for reviews when `review.kind = "acp"`. |
+| `review.trust_all_tools` | bool | *backend.trust_all_tools* | Auto-approve ACP tool permission requests during reviews. |
+| `review.agent` | string | *backend.agent* | ACP session mode/agent for reviews. |
+| `review.model` | string | *backend.model* | ACP model ID for reviews. |
 | `review.prompt` | string | `""` | Inline review prompt. If set, takes precedence over `prompt_file`. |
 | `review.prompt_file` | string | `"metareview.md"` | Path to the review prompt file, relative to the project directory. |
 
 Review prompt resolution: `review.prompt` > `review.prompt_file` (defaults to `metareview.md`).
+
+When `review.kind = "acp"`, each review runs in its own fresh ACP session built from the `review.*` keys — it does not share the iteration session, so a review can target a different provider, agent, or model than the loop backend.
 
 ### Parallel
 
@@ -232,12 +239,15 @@ backend.args = ["dist/testing/mock-backend.js"]
 
 Command mode invokes the executable directly and captures stdout. It is not a supported production adapter — use Pi for real loops.
 
-## Kiro backend
+## ACP backend providers
 
-The kiro backend communicates with `kiro-cli acp` over the Agent Client Protocol (ACP) — a persistent, bidirectional JSON-RPC 2.0 session over stdio. Unlike `pi` and `command` backends which shell out per iteration, the kiro backend maintains a single child process across the entire run. Session state (conversation history, tool permissions) accumulates across iterations.
+ACP backends communicate with an Agent Client Protocol (ACP) stdio server over JSON-RPC 2.0. Use `backend.kind = "acp"` and select provider-specific defaults with `backend.provider`. Legacy `backend.kind = "kiro"` still works and normalizes to `kind = "acp"` plus `provider = "kiro"`.
+
+Kiro ACP:
 
 ```toml
-backend.kind = "kiro"
+backend.kind = "acp"
+backend.provider = "kiro"
 backend.command = "kiro-cli"
 backend.args = ["acp"]
 backend.trust_all_tools = true
@@ -245,23 +255,46 @@ backend.trust_all_tools = true
 # backend.model = "anthropic/claude-sonnet-4"
 ```
 
-Or use the CLI flag: `autoloop run autocode -b kiro`.
+Claude Agent ACP:
 
-The `trust_all_tools` key (default `true`) auto-approves all tool permission requests from the agent. Set to `false` to reject tool calls. The `agent` and `model` keys are optional — when set, they configure the ACP session mode and model at initialization.
+```toml
+backend.kind = "acp"
+backend.provider = "claude-agent-acp"
+backend.command = "npx"
+backend.args = ["-y", "@agentclientprotocol/claude-agent-acp"]
+backend.trust_all_tools = true
+```
+
+Generic ACP provider:
+
+```toml
+backend.kind = "acp"
+backend.provider = "my-provider"
+backend.command = "/path/to/agent-acp"
+backend.args = []
+```
+
+CLI aliases:
+
+```bash
+autoloop run autocode -b kiro "Fix the login bug"
+autoloop run autocode -b claude-agent-acp "Fix the login bug"
+autoloop run autocode -b acp:my-provider:/path/to/agent-acp "Fix the login bug"
+```
+
+The `trust_all_tools` key (default `true`) auto-approves ACP tool permission requests when the provider exposes them. Set it to `false` to reject tool calls. The `agent` and `model` keys are optional; when set, providers that support `setSessionMode` and `unstable_setSessionModel` receive those requests during session initialization.
 
 ### Session lifecycle
 
-Unlike `pi` and `command` backends which spawn a new process per iteration, the kiro backend maintains a **single persistent child process** across the entire run. The harness communicates with `kiro-cli acp` over a bidirectional JSON-RPC 2.0 channel using `SharedArrayBuffer` + `Atomics` for synchronous blocking on the main thread.
+Unlike `pi` and `command` backends which spawn a process for a single invocation, ACP backends keep one stdio child process per active iteration session. The harness uses a fresh ACP session for each iteration so role-specific prompts, agent names, and model settings do not leak conversation history across planner/builder/critic roles.
 
-Sequence: spawn `kiro-cli acp` → `initialize` handshake → (optional) `setSessionMode` / `unstable_setSessionModel` → iteration prompts via `prompt` commands → `terminate` on loop exit.
+Sequence: spawn provider command → `initialize` handshake → `session/new` → optional `setSessionMode` / `unstable_setSessionModel` → iteration prompt via ACP `prompt` request → `terminate` on iteration or loop exit.
 
-Conversation history and tool permissions accumulate across iterations within the same session.
+### agents.toml — per-role ACP agent routing
 
-### agents.toml — per-role agent routing
+`agents.toml` is an ACP **agent-only** overlay. It does not influence `backend_kind`, `backend_provider`, `backend_command`, `backend_args`, `backend_prompt_mode`, `backend_timeout_ms`, or `backend_model` — those come from the global `backend.*` config or per-role overrides in `topology.toml`.
 
-`agents.toml` is a Kiro **agent-only** overlay. It does not influence `backend_kind`, `backend_command`, `backend_args`, `backend_prompt_mode`, `backend_timeout_ms`, or `backend_model` — those come from the global `backend.*` config or per-role overrides in `topology.toml`.
-
-When using the kiro backend with a multi-role topology, an `agents.toml` file in the project directory can map each role to a different agent. This lets you route the planner to one agent and the builder to another.
+When using an ACP provider with a multi-role topology, an `agents.toml` file in the project directory can map each role to a different agent/mode. This lets you route the planner to one agent and the builder to another.
 
 ```toml
 # agents.toml
@@ -284,7 +317,7 @@ Resolution order (most specific wins):
 
 `agents.toml` wins over a role's `backend_agent` only when it resolves a non-empty value; otherwise the role's `backend_agent` is used.
 
-The resolved agent name is passed to the ACP session via `setSessionMode` at the start of each iteration.
+The resolved agent name is passed to ACP providers that support `setSessionMode` at the start of each iteration session.
 
 ## Preset patterns
 

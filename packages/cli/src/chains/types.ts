@@ -1,7 +1,7 @@
 /**
  * Per-step backend override. Shape mirrors the subset of keys consumed by
- * readBackendConfig() in src/harness/config-helpers.ts: command, kind, args,
- * prompt_mode, timeout_ms. All keys are honored when provided.
+ * readBackendConfig() in src/harness/config-helpers.ts: kind, provider,
+ * command, args, prompt_mode, timeout_ms, trust_all_tools, agent, and model.
  *
  * Precedence at merge time: step.backendOverride > runOptions.backendOverride
  * (CLI -b flag) > preset autoloops.toml defaults.

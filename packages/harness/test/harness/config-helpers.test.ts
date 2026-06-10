@@ -87,8 +87,8 @@ describe("resolveProcessKind", () => {
     expect(resolveProcessKind("", "claude")).toBe("command");
   });
 
-  it("returns kiro when kind is kiro", () => {
-    expect(resolveProcessKind("kiro", "kiro")).toBe("kiro");
+  it("returns acp when kind is legacy kiro", () => {
+    expect(resolveProcessKind("kiro", "kiro")).toBe("acp");
   });
 });
 
@@ -198,6 +198,69 @@ describe("buildLoopContext", () => {
     expect(loop.objective).toBe(
       "Do the task and publish the completion event when finished.",
     );
+  });
+
+  it("normalizes preferred ACP provider config into loop backend fields", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'backend.kind = "acp"',
+        'backend.provider = "claude-agent-acp"',
+        'backend.command = "npx"',
+        'backend.args = ["-y", "@agentclientprotocol/claude-agent-acp"]',
+        'backend.prompt_mode = "acp"',
+        "backend.trust_all_tools = true",
+        'backend.agent = "coder"',
+        'backend.model = "sonnet"',
+      ].join("\n"),
+    );
+
+    const loop = buildLoopContext(
+      projectDir,
+      "test objective",
+      "node dist/main.js",
+      {
+        workDir: projectDir,
+      },
+    );
+
+    expect(loop.backend).toMatchObject({
+      kind: "acp",
+      provider: "claude-agent-acp",
+      command: "npx",
+      args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      promptMode: "acp",
+      trustAllTools: true,
+      agent: "coder",
+      model: "sonnet",
+    });
+  });
+
+  it("normalizes legacy kiro backend config to the ACP kiro provider", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'backend.kind = "kiro"',
+        'backend.command = "kiro-cli"',
+        'backend.args = ["acp"]',
+        'backend.prompt_mode = "acp"',
+      ].join("\n"),
+    );
+
+    const loop = buildLoopContext(
+      projectDir,
+      "test objective",
+      "node dist/main.js",
+      {
+        workDir: projectDir,
+      },
+    );
+
+    expect(loop.backend.kind).toBe("acp");
+    expect(loop.backend.provider).toBe("kiro");
+    expect(loop.backend.command).toBe("kiro-cli");
+    expect(loop.backend.args).toEqual(["acp"]);
+    expect(loop.backend.promptMode).toBe("acp");
   });
 
   it("injects Claude permissions for config-defined Claude backends", () => {

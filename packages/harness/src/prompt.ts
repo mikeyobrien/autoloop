@@ -54,6 +54,8 @@ function resolveIterationBackend(
   const role = loop.topology.roles.find((r) => r.id === backendRole);
   if (role) {
     if (role.backendKind !== undefined) resolved.kind = role.backendKind;
+    if (role.backendProvider !== undefined)
+      resolved.provider = role.backendProvider;
     if (role.backendCommand !== undefined)
       resolved.command = role.backendCommand;
     if (role.backendArgs !== undefined) resolved.args = [...role.backendArgs];

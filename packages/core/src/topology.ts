@@ -9,6 +9,7 @@ export interface Role {
   promptFile: string;
   emits: string[];
   backendKind?: string;
+  backendProvider?: string;
   backendCommand?: string;
   backendArgs?: string[];
   backendPromptMode?: string;
@@ -169,6 +170,9 @@ function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
   if (typeof r.backend_kind === "string" && r.backend_kind !== "") {
     out.backendKind = r.backend_kind;
   }
+  if (typeof r.backend_provider === "string" && r.backend_provider !== "") {
+    out.backendProvider = r.backend_provider;
+  }
   if (typeof r.backend_command === "string" && r.backend_command !== "") {
     out.backendCommand = r.backend_command;
   }
@@ -199,6 +203,7 @@ function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
 export function roleHasBackendOverride(role: Role): boolean {
   return (
     role.backendKind !== undefined ||
+    role.backendProvider !== undefined ||
     role.backendCommand !== undefined ||
     role.backendArgs !== undefined ||
     role.backendPromptMode !== undefined ||
@@ -213,6 +218,9 @@ function renderRoleBackendLines(role: Role, indent: string): string[] {
   const lines: string[] = [];
   if (role.backendKind !== undefined) {
     lines.push(`${indent}backend_kind: ${role.backendKind}`);
+  }
+  if (role.backendProvider !== undefined) {
+    lines.push(`${indent}backend_provider: ${role.backendProvider}`);
   }
   if (role.backendCommand !== undefined) {
     lines.push(`${indent}backend_command: ${role.backendCommand}`);
@@ -404,6 +412,8 @@ function roleBackendJson(role: Role): Record<string, unknown> {
   if (!roleHasBackendOverride(role)) return {};
   const out: Record<string, unknown> = {};
   if (role.backendKind !== undefined) out.backend_kind = role.backendKind;
+  if (role.backendProvider !== undefined)
+    out.backend_provider = role.backendProvider;
   if (role.backendCommand !== undefined)
     out.backend_command = role.backendCommand;
   if (role.backendArgs !== undefined) out.backend_args = role.backendArgs;
