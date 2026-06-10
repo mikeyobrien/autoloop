@@ -50,6 +50,16 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/wave/parse-objectives": `${HARNESS}/wave/parse-objectives.ts`,
       "@mobrienv/autoloop-harness/registry-bridge": `${HARNESS}/registry-bridge.ts`,
       "@mobrienv/autoloop-harness/pi-adapter": `${HARNESS}/pi-adapter.ts`,
+      "@mobrienv/autoloop-harness/control/render": `${HARNESS}/control/render.ts`,
+      "@mobrienv/autoloop-harness/control/types": `${HARNESS}/control/types.ts`,
+      "@mobrienv/autoloop-harness/control/queue": `${HARNESS}/control/queue.ts`,
+      "@mobrienv/autoloop-harness/control/capabilities": `${HARNESS}/control/capabilities.ts`,
+      "@mobrienv/autoloop-harness/control/dispatch": `${HARNESS}/control/dispatch.ts`,
+      "@mobrienv/autoloop-harness/control/paths": `${HARNESS}/control/paths.ts`,
+      "@mobrienv/autoloop-harness/control/adapter": `${HARNESS}/control/adapter.ts`,
+      "@mobrienv/autoloop-harness/control/kiro-adapter": `${HARNESS}/control/kiro-adapter.ts`,
+      "@mobrienv/autoloop-harness/control/pi-adapter": `${HARNESS}/control/pi-adapter.ts`,
+      "@mobrienv/autoloop-harness/control": `${HARNESS}/control/index.ts`,
       "@mobrienv/autoloop-harness/types": `${HARNESS}/types.ts`,
       "@mobrienv/autoloop-harness/events": `${HARNESS}/events.ts`,
       "@mobrienv/autoloop-harness/emit": `${HARNESS}/emit.ts`,
@@ -69,6 +79,9 @@ export default defineConfig({
   },
   test: {
     include: ["test/**/*.test.ts", "packages/*/test/**/*.test.ts"],
+    // Neutralize machine-specific state (e.g. a developer's user-level
+    // ~/.config/autoloop/config.toml) before any test runs. See the setup file.
+    setupFiles: ["test/setup/env.ts"],
     // Integration tests under test/worktree and test/integration spawn git/node
     // subprocesses. Cap worker pool so subprocess-heavy tests don't starve each
     // other; bump testTimeout to absorb spiky CI/load.

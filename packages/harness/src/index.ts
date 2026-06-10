@@ -1,5 +1,6 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { normalizeBackendLabel } from "@mobrienv/autoloop-backends";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import {
@@ -144,6 +145,19 @@ export async function run(
     "info",
     `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`,
   );
+
+  loop.onEvent?.({
+    type: "loop.start",
+    runId: loop.runtime.runId,
+    prompt: loop.objective,
+    workDir: loop.paths.workDir,
+    projectDir: loop.paths.projectDir,
+    preset: loop.launch.preset,
+    backend: normalizeBackendLabel(loop.backend.command),
+    maxIterations: loop.limits.maxIterations,
+    completionEvent: loop.completion.event,
+    completionPromise: loop.completion.promise,
+  });
 
   let summary: RunSummary;
   const trackedIterate = async (

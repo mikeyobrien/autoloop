@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import * as harness from "@mobrienv/autoloop-harness";
 import { cliPrintEvent } from "./cli/event-printer.js";
+import { dispatchAcp } from "./commands/acp.js";
 import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
 import { dispatchControl } from "./commands/control.js";
@@ -105,6 +106,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "dashboard":
       dispatchDashboard(args.slice(1), bundleRoot, selfCmd);
       return;
+    case "acp":
+      await dispatchAcp(args.slice(1), bundleRoot, selfCmd);
+      return;
     case "kanban":
       dispatchKanban(args.slice(1), bundleRoot, selfCmd);
       return;
@@ -152,6 +156,7 @@ function isCliCommand(value: string): boolean {
     "control",
     "dashboard",
     "kanban",
+    "acp",
     "--help",
     "-h",
   ].includes(value);

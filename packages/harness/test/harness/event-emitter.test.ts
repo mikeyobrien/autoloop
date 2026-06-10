@@ -82,6 +82,32 @@ describe("harness.run onEvent (1.3)", () => {
     expect(finish).toMatchObject({ stopReason: "completed", iterations: 1 });
   });
 
+  it("emits a loop.start event with the resolved run parameters", async () => {
+    const events: LoopEvent[] = [];
+    await run(makeProject(), "build the thing", "autoloop", {
+      onEvent: (e) => events.push(e),
+    });
+    const start = events.find((e) => e.type === "loop.start");
+    expect(start).toBeDefined();
+    expect(start).toMatchObject({
+      type: "loop.start",
+      prompt: "build the thing",
+      backend: "echo",
+      preset: expect.any(String),
+      maxIterations: expect.any(Number),
+    });
+    // runId and workDir are resolved, non-empty strings.
+    if (start?.type === "loop.start") {
+      expect(start.runId.length).toBeGreaterThan(0);
+      expect(start.workDir.length).toBeGreaterThan(0);
+    }
+    // loop.start must precede the first iteration.start.
+    const startIdx = events.findIndex((e) => e.type === "loop.start");
+    const iterIdx = events.findIndex((e) => e.type === "iteration.start");
+    expect(startIdx).toBeGreaterThanOrEqual(0);
+    expect(startIdx).toBeLessThan(iterIdx);
+  });
+
   it("emits log events with the message and level", async () => {
     const events: LoopEvent[] = [];
     await run(makeProject(), "prompt", "autoloop", {
