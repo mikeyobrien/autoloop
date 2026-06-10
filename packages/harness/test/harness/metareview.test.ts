@@ -11,12 +11,26 @@ import { describe, expect, it, vi } from "vitest";
 
 const backendMocks = vi.hoisted(() => ({
   runAcpIteration: vi.fn(),
+  initAcpSession: vi.fn(),
+  terminateAcpSession: vi.fn(),
 }));
 
 vi.mock("@mobrienv/autoloop-backends", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@mobrienv/autoloop-backends")>();
   return { ...actual, runAcpIteration: backendMocks.runAcpIteration };
+});
+
+vi.mock("@mobrienv/autoloop-backends/acp-client", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("@mobrienv/autoloop-backends/acp-client")
+    >();
+  return {
+    ...actual,
+    initAcpSession: backendMocks.initAcpSession,
+    terminateAcpSession: backendMocks.terminateAcpSession,
+  };
 });
 
 function makeLoop(
@@ -192,22 +206,78 @@ describe("shouldRunMetareview", () => {
 });
 
 describe("runMetareviewReview", () => {
-  it("uses the generic ACP runner for ACP review backends", async () => {
-    const loop = makeAcpReviewLoop();
+  function mockAcpReviewRun(): AcpSession {
+    const reviewSession = {
+      provider: { id: "claude-agent-acp" },
+    } as unknown as AcpSession;
+    backendMocks.initAcpSession.mockReset();
+    backendMocks.terminateAcpSession.mockReset();
+    backendMocks.runAcpIteration.mockReset();
+    backendMocks.initAcpSession.mockResolvedValue(reviewSession);
+    backendMocks.terminateAcpSession.mockResolvedValue(undefined);
     backendMocks.runAcpIteration.mockResolvedValue({
       output:
         '```json\n{"verdict":"CONTINUE","confidence":0.8,"reasoning":"ok"}\n```',
       exitCode: 0,
       timedOut: false,
     });
+    return reviewSession;
+  }
+
+  it("runs ACP reviews in a dedicated session built from the review spec", async () => {
+    const loop = makeAcpReviewLoop();
+    const reviewSession = mockAcpReviewRun();
 
     const verdict = await runMetareviewReview(loop, 2);
 
+    expect(backendMocks.initAcpSession).toHaveBeenCalledWith({
+      provider: "claude-agent-acp",
+      command: "npx",
+      args: ["-y", "@agentclientprotocol/claude-agent-acp"],
+      cwd: loop.paths.workDir,
+      trustAllTools: true,
+      agentName: "reviewer",
+      modelId: "sonnet",
+      verbose: false,
+    });
     expect(backendMocks.runAcpIteration).toHaveBeenCalledWith(
-      loop.kiroSession,
+      reviewSession,
       expect.stringContaining("You are the metareview meta-reviewer"),
       4321,
     );
     expect(verdict.verdict).toBe("CONTINUE");
+  });
+
+  it("does not reuse the live iteration session for ACP reviews", async () => {
+    const loop = makeAcpReviewLoop();
+    const reviewSession = mockAcpReviewRun();
+
+    await runMetareviewReview(loop, 2);
+
+    const [usedSession] = backendMocks.runAcpIteration.mock.calls[0];
+    expect(usedSession).toBe(reviewSession);
+    expect(usedSession).not.toBe(loop.kiroSession);
+  });
+
+  it("runs ACP reviews even when no iteration session is live", async () => {
+    const loop = makeAcpReviewLoop();
+    loop.kiroSession = undefined;
+    mockAcpReviewRun();
+
+    const verdict = await runMetareviewReview(loop, 2);
+
+    expect(backendMocks.initAcpSession).toHaveBeenCalledTimes(1);
+    expect(verdict.verdict).toBe("CONTINUE");
+  });
+
+  it("terminates the review session after the verdict, even on failure", async () => {
+    const loop = makeAcpReviewLoop();
+    const reviewSession = mockAcpReviewRun();
+    backendMocks.runAcpIteration.mockRejectedValue(new Error("boom"));
+
+    await expect(runMetareviewReview(loop, 2)).rejects.toThrow("boom");
+    expect(backendMocks.terminateAcpSession).toHaveBeenCalledWith(
+      reviewSession,
+    );
   });
 });
