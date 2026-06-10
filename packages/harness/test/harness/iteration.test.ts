@@ -134,6 +134,7 @@ function makeAcpLoop(): LoopContext {
     },
     store: {},
     agentMap: null,
+    acpSession: { current: undefined },
   };
 }
 

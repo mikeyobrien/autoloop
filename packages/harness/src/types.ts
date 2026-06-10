@@ -97,7 +97,12 @@ export interface LoopContext {
   launch: LaunchMetadata;
   store: Record<string, unknown>;
   agentMap: AgentMap | null;
-  acpSession?: AcpSession;
+  /**
+   * Live ACP session holder. Aliased (not copied) across context reloads so
+   * loop-exit, abort, and interrupt handlers always see the current session
+   * even though iterations run on reloaded context clones.
+   */
+  acpSession: { current: AcpSession | undefined };
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

@@ -78,9 +78,9 @@ export async function run(
     aborted = true;
     // Fire-and-forget ACP termination — abort handlers must stay sync.
     // The finally block below awaits a final terminate as backstop.
-    if (loop.acpSession) {
-      const session = loop.acpSession;
-      loop.acpSession = undefined;
+    if (loop.acpSession.current) {
+      const session = loop.acpSession.current;
+      loop.acpSession.current = undefined;
       terminateAcpSession(session).catch(() => {
         /* best-effort */
       });
@@ -156,12 +156,13 @@ export async function run(
   try {
     summary = await trackedIterate(loop, 1);
   } finally {
-    if (loop.acpSession) {
+    if (loop.acpSession.current) {
       try {
-        await terminateAcpSession(loop.acpSession);
+        await terminateAcpSession(loop.acpSession.current);
       } catch {
         /* best-effort */
       }
+      loop.acpSession.current = undefined;
     }
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
@@ -288,7 +289,19 @@ export async function runParallelBranchCli(
 
   const seeded = seedBranchContext(branchLoop, routingEvent);
   const startMs = Date.now();
-  const summary = await iterate(seeded, 1);
+  let summary: RunSummary;
+  try {
+    summary = await iterate(seeded, 1);
+  } finally {
+    if (seeded.acpSession.current) {
+      try {
+        await terminateAcpSession(seeded.acpSession.current);
+      } catch {
+        /* best-effort */
+      }
+      seeded.acpSession.current = undefined;
+    }
+  }
   const finishedMs = Date.now();
   const elapsedMs = finishedMs - startMs;
   const output = iterationFieldForRun(
@@ -329,7 +342,6 @@ function iterateWith(
   recurse: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
 ): Promise<RunSummary> {
   const liveLoop = reloadLoop(loop);
-  liveLoop.acpSession = loop.acpSession;
   liveLoop.controlAdapter = loop.controlAdapter;
   installRuntimeTools(liveLoop);
   return runReviewThenIterate(liveLoop, iteration, recurse);
@@ -384,9 +396,9 @@ function buildControlAdapter(
   if (loop.backend.kind === "acp") {
     return acpControlAdapter(loop.runtime.runId, loop.backend.provider, {
       triggerInterrupt: () => {
-        if (loop.acpSession?.process.pid) {
+        if (loop.acpSession.current?.process.pid) {
           try {
-            process.kill(-loop.acpSession.process.pid, "SIGINT");
+            process.kill(-loop.acpSession.current.process.pid, "SIGINT");
           } catch {
             /* best-effort */
           }

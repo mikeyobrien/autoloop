@@ -144,8 +144,10 @@ function makeAcpReviewLoop(): LoopContext {
     store: {},
     agentMap: null,
     acpSession: {
-      provider: { id: "claude-agent-acp" },
-    } as unknown as AcpSession,
+      current: {
+        provider: { id: "claude-agent-acp" },
+      } as unknown as AcpSession,
+    },
   };
 }
 
@@ -256,12 +258,12 @@ describe("runMetareviewReview", () => {
 
     const [usedSession] = backendMocks.runAcpIteration.mock.calls[0];
     expect(usedSession).toBe(reviewSession);
-    expect(usedSession).not.toBe(loop.acpSession);
+    expect(usedSession).not.toBe(loop.acpSession.current);
   });
 
   it("runs ACP reviews even when no iteration session is live", async () => {
     const loop = makeAcpReviewLoop();
-    loop.acpSession = undefined;
+    loop.acpSession.current = undefined;
     mockAcpReviewRun();
 
     const verdict = await runMetareviewReview(loop, 2);

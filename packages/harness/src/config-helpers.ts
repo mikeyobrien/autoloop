@@ -568,6 +568,8 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     launch: loop.launch,
     store: loop.store,
     agentMap: loadAgentMap(pd),
+    // Alias, never copy: all reloaded contexts must share one session holder.
+    acpSession: loop.acpSession ?? { current: undefined },
     onEvent: loop.onEvent,
   };
   return applyRuntimeModeOverrides(updated);
