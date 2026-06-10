@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import {
   runMetareviewReview,
   shouldRunMetareview,
@@ -13,12 +14,31 @@ const backendMocks = vi.hoisted(() => ({
   runAcpIteration: vi.fn(),
   initAcpSession: vi.fn(),
   terminateAcpSession: vi.fn(),
+  runPiIteration: vi.fn(),
+  initPiSession: vi.fn(),
+  terminatePiSession: vi.fn(),
 }));
 
 vi.mock("@mobrienv/autoloop-backends", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@mobrienv/autoloop-backends")>();
-  return { ...actual, runAcpIteration: backendMocks.runAcpIteration };
+  return {
+    ...actual,
+    runAcpIteration: backendMocks.runAcpIteration,
+    runPiIteration: backendMocks.runPiIteration,
+  };
+});
+
+vi.mock("@mobrienv/autoloop-backends/pi-rpc-client", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("@mobrienv/autoloop-backends/pi-rpc-client")
+    >();
+  return {
+    ...actual,
+    initPiSession: backendMocks.initPiSession,
+    terminatePiSession: backendMocks.terminatePiSession,
+  };
 });
 
 vi.mock("@mobrienv/autoloop-backends/acp-client", async (importOriginal) => {
@@ -148,7 +168,27 @@ function makeAcpReviewLoop(): LoopContext {
         provider: { id: "claude-agent-acp" },
       } as unknown as AcpSession,
     },
+    piSession: { current: undefined },
   };
+}
+
+function makePiReviewLoop(): LoopContext {
+  const loop = makeAcpReviewLoop();
+  loop.runtime.runId = "run-review-pi";
+  loop.review = {
+    ...loop.review,
+    kind: "pi",
+    provider: "",
+    command: "pi",
+    args: ["--thinking", "high"],
+    promptMode: "arg",
+    model: "gpt-5",
+    agent: "",
+  };
+  loop.piSession = {
+    current: { process: { pid: 7 } } as unknown as PiSession,
+  };
+  return loop;
 }
 
 describe("shouldRunMetareview", () => {
@@ -281,5 +321,63 @@ describe("runMetareviewReview", () => {
     expect(backendMocks.terminateAcpSession).toHaveBeenCalledWith(
       reviewSession,
     );
+  });
+
+  function mockPiReviewRun(): PiSession {
+    const reviewSession = { process: { pid: 8 } } as unknown as PiSession;
+    backendMocks.initPiSession.mockReset();
+    backendMocks.terminatePiSession.mockReset();
+    backendMocks.runPiIteration.mockReset();
+    backendMocks.initPiSession.mockResolvedValue(reviewSession);
+    backendMocks.terminatePiSession.mockResolvedValue(undefined);
+    backendMocks.runPiIteration.mockResolvedValue({
+      output:
+        '```json\n{"verdict":"CONTINUE","confidence":0.8,"reasoning":"ok"}\n```',
+      exitCode: 0,
+      timedOut: false,
+    });
+    return reviewSession;
+  }
+
+  it("runs pi reviews in a dedicated RPC session built from the review spec", async () => {
+    const loop = makePiReviewLoop();
+    const reviewSession = mockPiReviewRun();
+
+    const verdict = await runMetareviewReview(loop, 2);
+
+    expect(backendMocks.initPiSession).toHaveBeenCalledWith({
+      command: "pi",
+      args: ["--thinking", "high"],
+      cwd: loop.paths.workDir,
+      modelId: "gpt-5",
+      verbose: false,
+    });
+    expect(backendMocks.runPiIteration).toHaveBeenCalledWith(
+      reviewSession,
+      expect.stringContaining("You are the metareview meta-reviewer"),
+      4321,
+      expect.stringContaining("pi-review.2.jsonl"),
+    );
+    expect(verdict.verdict).toBe("CONTINUE");
+  });
+
+  it("does not reuse the live pi iteration session for reviews", async () => {
+    const loop = makePiReviewLoop();
+    const reviewSession = mockPiReviewRun();
+
+    await runMetareviewReview(loop, 2);
+
+    const [usedSession] = backendMocks.runPiIteration.mock.calls[0];
+    expect(usedSession).toBe(reviewSession);
+    expect(usedSession).not.toBe(loop.piSession.current);
+  });
+
+  it("terminates the pi review session after the verdict, even on failure", async () => {
+    const loop = makePiReviewLoop();
+    const reviewSession = mockPiReviewRun();
+    backendMocks.runPiIteration.mockRejectedValue(new Error("boom"));
+
+    await expect(runMetareviewReview(loop, 2)).rejects.toThrow("boom");
+    expect(backendMocks.terminatePiSession).toHaveBeenCalledWith(reviewSession);
   });
 });

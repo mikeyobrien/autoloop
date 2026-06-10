@@ -5,6 +5,7 @@ import {
   shellWords,
 } from "@mobrienv/autoloop-core";
 import { type AcpSession, sendAcpPrompt } from "./acp-client.js";
+import { type PiSession, sendPiPrompt } from "./pi-rpc-client.js";
 import { buildCommandInvocation, runShellCommand } from "./run-command.js";
 import type { BackendCommandContext, BackendRunResult } from "./types.js";
 
@@ -54,6 +55,42 @@ export async function runAcpIteration(
 }
 
 export const runKiroIteration = runAcpIteration;
+
+/**
+ * Drive one iteration against a live pi RPC session (`pi --mode rpc`) and map
+ * the result into the uniform BackendRunResult shape. The session-based path
+ * replaces the former one-shot python bridge (`pi -p --mode json`) for the
+ * main loop and reviews; parallel waves still use the process-per-task shim.
+ */
+export async function runPiIteration(
+  session: PiSession,
+  prompt: string,
+  timeoutMs: number,
+  streamLogPath?: string,
+): Promise<BackendRunResult> {
+  session.streamLogPath = streamLogPath;
+  const result = await sendPiPrompt(session, prompt, timeoutMs);
+  return {
+    output: failureOutput(result.output, result.error),
+    exitCode: result.error ? 1 : 0,
+    timedOut: result.timedOut,
+    providerKind: "pi",
+    errorCategory: result.timedOut
+      ? "timeout"
+      : result.error
+        ? "non_zero_exit"
+        : "none",
+  };
+}
+
+/**
+ * Keep the error detail in the journaled output on failure — exit codes alone
+ * make failed iterations undiagnosable after the fact.
+ */
+function failureOutput(output: string, error: string | undefined): string {
+  if (!error) return output;
+  return output ? `${output}\n\npi error: ${error}` : `pi error: ${error}`;
+}
 
 /**
  * A "mock" backend is any invocation whose command or argv mentions

@@ -1,4 +1,5 @@
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LiveControlAdapter } from "./control/adapter.js";
@@ -103,6 +104,12 @@ export interface LoopContext {
    * even though iterations run on reloaded context clones.
    */
   acpSession: { current: AcpSession | undefined };
+  /**
+   * Live pi RPC session holder. Same aliasing rules as acpSession: the
+   * process persists across iterations (context resets via `new_session`),
+   * so reloads must share one holder.
+   */
+  piSession: { current: PiSession | undefined };
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

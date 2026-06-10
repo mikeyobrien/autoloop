@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const acpMocks = vi.hoisted(() => ({
   initAcpSession: vi.fn(),
@@ -11,10 +12,22 @@ const acpMocks = vi.hoisted(() => ({
   runAcpIteration: vi.fn(),
 }));
 
+const piMocks = vi.hoisted(() => ({
+  initPiSession: vi.fn(),
+  resetPiSession: vi.fn(),
+  terminatePiSession: vi.fn(),
+  runPiIteration: vi.fn(),
+  getPiSessionStats: vi.fn(),
+}));
+
 vi.mock("@mobrienv/autoloop-backends", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@mobrienv/autoloop-backends")>();
-  return { ...actual, runAcpIteration: acpMocks.runAcpIteration };
+  return {
+    ...actual,
+    runAcpIteration: acpMocks.runAcpIteration,
+    runPiIteration: piMocks.runPiIteration,
+  };
 });
 
 vi.mock("@mobrienv/autoloop-backends/acp-client", async (importOriginal) => {
@@ -26,6 +39,20 @@ vi.mock("@mobrienv/autoloop-backends/acp-client", async (importOriginal) => {
     ...actual,
     initAcpSession: acpMocks.initAcpSession,
     terminateAcpSession: acpMocks.terminateAcpSession,
+  };
+});
+
+vi.mock("@mobrienv/autoloop-backends/pi-rpc-client", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("@mobrienv/autoloop-backends/pi-rpc-client")
+    >();
+  return {
+    ...actual,
+    initPiSession: piMocks.initPiSession,
+    resetPiSession: piMocks.resetPiSession,
+    terminatePiSession: piMocks.terminatePiSession,
+    getPiSessionStats: piMocks.getPiSessionStats,
   };
 });
 
@@ -135,7 +162,26 @@ function makeAcpLoop(): LoopContext {
     store: {},
     agentMap: null,
     acpSession: { current: undefined },
+    piSession: { current: undefined },
   };
+}
+
+function makePiLoop(): LoopContext {
+  const loop = makeAcpLoop();
+  loop.objective = "Use pi";
+  loop.runtime.runId = "run-pi";
+  loop.backend = {
+    kind: "pi",
+    provider: "",
+    command: "pi",
+    args: ["--thinking", "high"],
+    promptMode: "arg",
+    timeoutMs: 4321,
+    trustAllTools: true,
+    agent: "",
+    model: "gpt-5",
+  };
+  return loop;
 }
 
 describe("runIteration ACP provider execution", () => {
@@ -175,6 +221,129 @@ describe("runIteration ACP provider execution", () => {
       1234,
     );
     expect(summary.stopReason).toBe("completion_promise");
+  });
+});
+
+describe("runIteration pi RPC execution", () => {
+  beforeEach(() => {
+    piMocks.initPiSession.mockReset();
+    piMocks.resetPiSession.mockReset();
+    piMocks.terminatePiSession.mockReset();
+    piMocks.runPiIteration.mockReset();
+    piMocks.getPiSessionStats.mockReset();
+    piMocks.getPiSessionStats.mockResolvedValue(undefined);
+    piMocks.runPiIteration.mockResolvedValue({
+      output: "DONE",
+      exitCode: 0,
+      timedOut: false,
+    });
+  });
+
+  it("starts a pi RPC session from iter.backend and runs the pi runner", async () => {
+    const loop = makePiLoop();
+    const fakeSession = { process: { pid: 99 } } as unknown as PiSession;
+    piMocks.initPiSession.mockResolvedValue(fakeSession);
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(piMocks.initPiSession).toHaveBeenCalledWith({
+      command: "pi",
+      args: ["--thinking", "high"],
+      cwd: loop.paths.workDir,
+      modelId: "gpt-5",
+      verbose: false,
+    });
+    expect(piMocks.runPiIteration).toHaveBeenCalledWith(
+      fakeSession,
+      expect.stringContaining("Use pi"),
+      4321,
+      expect.stringContaining("pi-stream.1.jsonl"),
+    );
+    expect(loop.piSession.current).toBe(fakeSession);
+    expect(summary.stopReason).toBe("completion_promise");
+  });
+
+  it("journals a backend.usage event when pi reports session stats", async () => {
+    const loop = makePiLoop();
+    loop.piSession.current = { process: { pid: 99 } } as unknown as PiSession;
+    piMocks.resetPiSession.mockResolvedValue(undefined);
+    piMocks.getPiSessionStats.mockResolvedValue({
+      inputTokens: 100,
+      outputTokens: 40,
+      cacheReadTokens: 5,
+      cacheWriteTokens: 7,
+      totalTokens: 152,
+      costUsd: 0.42,
+      contextPercent: 31,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain('"topic": "backend.usage"');
+    expect(journal).toContain('"total_tokens": 152');
+    expect(journal).toContain('"cost_usd": 0.42');
+    expect(journal).toContain('"context_percent": 31');
+    // backend.usage is a system topic — it must never be mistaken for the
+    // agent's emitted event, which would invalidate the iteration.
+    expect(journal).not.toContain('"topic": "event.invalid"');
+    expect(summary.stopReason).toBe("completion_promise");
+  });
+
+  it("reuses the live session via new_session instead of respawning", async () => {
+    const loop = makePiLoop();
+    const liveSession = { process: { pid: 99 } } as unknown as PiSession;
+    loop.piSession.current = liveSession;
+    piMocks.resetPiSession.mockResolvedValue(undefined);
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(piMocks.resetPiSession).toHaveBeenCalledWith(liveSession);
+    expect(piMocks.initPiSession).not.toHaveBeenCalled();
+    expect(piMocks.runPiIteration).toHaveBeenCalledWith(
+      liveSession,
+      expect.any(String),
+      4321,
+      expect.any(String),
+    );
+  });
+
+  it("terminates and respawns when the session reset fails", async () => {
+    const loop = makePiLoop();
+    const deadSession = { process: { pid: 99 } } as unknown as PiSession;
+    const freshSession = { process: { pid: 100 } } as unknown as PiSession;
+    loop.piSession.current = deadSession;
+    piMocks.resetPiSession.mockRejectedValue(new Error("process gone"));
+    piMocks.terminatePiSession.mockRejectedValue(new Error("already dead"));
+    piMocks.initPiSession.mockResolvedValue(freshSession);
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(piMocks.terminatePiSession).toHaveBeenCalledWith(deadSession);
+    expect(piMocks.initPiSession).toHaveBeenCalledTimes(1);
+    expect(loop.piSession.current).toBe(freshSession);
+    expect(piMocks.runPiIteration).toHaveBeenCalledWith(
+      freshSession,
+      expect.any(String),
+      4321,
+      expect.any(String),
+    );
   });
 });
 

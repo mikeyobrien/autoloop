@@ -32,9 +32,6 @@ beforeAll(() => {
  * and asserts the loop completes through the journal artifacts.
  */
 
-const hasPython3 =
-  spawnSync("python3", ["--version"], { encoding: "utf-8" }).status === 0;
-
 /**
  * The pi adapter re-invokes the CLI via its own executable path (selfCommand
  * uses argv[1]), so the pi test must go through the real bin entry point
@@ -97,53 +94,85 @@ function expectLoopCompleted(project: string): string {
 }
 
 describe("integration: pi backend end to end", () => {
-  // Fake pi binary: verifies the built-in pi flags arrive, reads the prompt
-  // on stdin, and answers with pi --mode json event lines.
+  // Fake pi binary: verifies the harness launches RPC mode, then speaks the
+  // pi --mode rpc JSONL protocol (responses for commands, streamed events).
   const FAKE_PI = `
 const args = process.argv.slice(2);
-for (const flag of ["-p", "--mode", "json", "--no-session"]) {
+for (const flag of ["--mode", "rpc", "--no-session"]) {
   if (!args.includes(flag)) {
     process.stderr.write("fake-pi: missing expected flag " + flag + "\\n");
     process.exit(9);
   }
 }
-let prompt = "";
+const out = (msg) => process.stdout.write(JSON.stringify(msg) + "\\n");
+let buffer = "";
 process.stdin.setEncoding("utf-8");
-process.stdin.on("data", (chunk) => { prompt += chunk; });
-process.stdin.on("end", () => {
-  if (!prompt.trim()) {
-    process.stderr.write("fake-pi: empty prompt on stdin\\n");
-    process.exit(8);
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let idx = buffer.indexOf("\\n");
+  while (idx !== -1) {
+    const line = buffer.slice(0, idx);
+    buffer = buffer.slice(idx + 1);
+    idx = buffer.indexOf("\\n");
+    if (!line.trim()) continue;
+    const cmd = JSON.parse(line);
+    if (cmd.type === "prompt") {
+      if (!cmd.message || !cmd.message.trim()) {
+        process.stderr.write("fake-pi: empty prompt message\\n");
+        process.exit(8);
+      }
+      out({ type: "response", id: cmd.id, command: "prompt", success: true });
+      const text = "pi backend handled the iteration. LOOP_COMPLETE";
+      out({ type: "agent_start" });
+      out({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: text } });
+      out({
+        type: "agent_end",
+        messages: [{ role: "assistant", stopReason: "stop", content: [{ type: "text", text }] }],
+      });
+    } else if (cmd.type === "get_session_stats") {
+      out({
+        type: "response", id: cmd.id, command: cmd.type, success: true,
+        data: {
+          tokens: { input: 120, output: 45, cacheRead: 10, cacheWrite: 3, total: 178 },
+          cost: 0.07,
+          contextUsage: { percent: 12 },
+        },
+      });
+    } else {
+      out({ type: "response", id: cmd.id, command: cmd.type, success: true });
+    }
   }
-  const text = "pi backend handled the iteration. LOOP_COMPLETE";
-  const events = [
-    { type: "message_update", assistantMessageEvent: { type: "text_delta", delta: text } },
-    { type: "turn_end", message: { content: [{ type: "text", text }] } },
-  ];
-  for (const event of events) process.stdout.write(JSON.stringify(event) + "\\n");
 });
 `;
 
-  it.skipIf(!hasPython3)(
-    "completes a loop through the pi adapter bridge",
-    () => {
-      const bin = mkdtempSync(join(tmpdir(), "autoloop-fake-pi-"));
-      const fakePiScript = writeExecutable(bin, "fake-pi.cjs", FAKE_PI);
-      const piPath = wrapNodeScript(bin, "pi", fakePiScript);
+  it("completes a loop through a live pi RPC session", () => {
+    const bin = mkdtempSync(join(tmpdir(), "autoloop-fake-pi-"));
+    const fakePiScript = writeExecutable(bin, "fake-pi.cjs", FAKE_PI);
+    const piPath = wrapNodeScript(bin, "pi", fakePiScript);
 
-      const project = makeBackendProject("pi", [
-        'backend.kind = "pi"',
-        `backend.command = ${JSON.stringify(piPath)}`,
-        "backend.timeout_ms = 30000",
-      ]);
-      const res = runBinCli(["run", project, "pi e2e"], project);
+    const project = makeBackendProject("pi", [
+      'backend.kind = "pi"',
+      `backend.command = ${JSON.stringify(piPath)}`,
+      "backend.timeout_ms = 30000",
+    ]);
+    const res = runBinCli(["run", project, "pi e2e"], project);
 
-      expect(res.status).toBe(0);
-      const journal = expectLoopCompleted(project);
-      expect(journal).toContain("pi backend handled the iteration.");
-    },
-    30_000,
-  );
+    expect(res.status).toBe(0);
+    const journal = expectLoopCompleted(project);
+    expect(journal).toContain("pi backend handled the iteration.");
+
+    // Usage telemetry journaled from pi's get_session_stats
+    expect(journal).toContain('"topic": "backend.usage"');
+    expect(journal).toContain('"total_tokens": 178');
+    expect(journal).toContain('"cost_usd": 0.07');
+
+    // Raw RPC stream persisted per iteration in the run-scoped state dir
+    const runId = journal.match(/"run": "([^"]+)"/)?.[1] ?? "";
+    const streamLog = readText(
+      join(project, ".autoloop/runs", runId, "pi-stream.1.jsonl"),
+    );
+    expect(streamLog).toContain('"type":"agent_end"');
+  }, 30_000);
 });
 
 describe("integration: claude command backend end to end", () => {

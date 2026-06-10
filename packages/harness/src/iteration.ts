@@ -1,11 +1,19 @@
-import { runAcpIteration } from "@mobrienv/autoloop-backends";
+import { join } from "node:path";
+import { runAcpIteration, runPiIteration } from "@mobrienv/autoloop-backends";
 import type { AcpClientOptions } from "@mobrienv/autoloop-backends/acp-client";
 import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
-import { listText } from "@mobrienv/autoloop-core";
 import {
+  getPiSessionStats,
+  initPiSession,
+  resetPiSession,
+  terminatePiSession,
+} from "@mobrienv/autoloop-backends/pi-rpc-client";
+import { jsonFieldRaw, listText } from "@mobrienv/autoloop-core";
+import {
+  appendEvent,
   extractField,
   extractIteration,
   extractTopic,
@@ -88,18 +96,13 @@ export async function runIteration(
     );
   }
 
-  const { output, exitCode, timedOut } =
-    iter.backend.kind === "acp" && loop.acpSession.current
-      ? await runAcpIteration(
-          loop.acpSession.current,
-          iter.prompt,
-          iter.backend.timeoutMs,
-        )
-      : runProcess(
-          buildBackendCommand(loop, iter),
-          iter.backend.timeoutMs,
-          iter.backend.kind,
-        );
+  // Pi reuses one live RPC process across iterations; each iteration starts a
+  // fresh conversation (`new_session`) so roles get a clean context window.
+  if (iter.backend.kind === "pi") {
+    await ensurePiSession(loop, iter, iteration);
+  }
+
+  const { output, exitCode, timedOut } = await runBackendIteration(loop, iter);
   const elapsedS = Math.floor(Date.now() / 1000) - startEpoch;
 
   appendBackendFinish(loop, iter, output, exitCode, timedOut);
@@ -116,6 +119,107 @@ export async function runIteration(
   if (timedOut) return stopBackendTimeout(loop, iteration, output);
   if (exitCode !== 0) return stopBackendFailed(loop, iteration, output);
   return finishIteration(loop, iter, output, iterate);
+}
+
+async function runBackendIteration(
+  loop: LoopContext,
+  iter: IterationContext,
+): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
+  if (iter.backend.kind === "acp" && loop.acpSession.current) {
+    return runAcpIteration(
+      loop.acpSession.current,
+      iter.prompt,
+      iter.backend.timeoutMs,
+    );
+  }
+  if (iter.backend.kind === "pi" && loop.piSession.current) {
+    const result = await runPiIteration(
+      loop.piSession.current,
+      iter.prompt,
+      iter.backend.timeoutMs,
+      join(loop.paths.stateDir, `pi-stream.${iter.iteration}.jsonl`),
+    );
+    await recordPiUsage(loop, iter);
+    return result;
+  }
+  return runProcess(
+    buildBackendCommand(loop, iter),
+    iter.backend.timeoutMs,
+    iter.backend.kind,
+  );
+}
+
+/**
+ * Journal per-iteration token/cost totals from pi's get_session_stats.
+ * Best-effort: telemetry never fails or stalls the iteration.
+ */
+async function recordPiUsage(
+  loop: LoopContext,
+  iter: IterationContext,
+): Promise<void> {
+  const session = loop.piSession.current;
+  if (!session) return;
+  const stats = await getPiSessionStats(session);
+  if (!stats) return;
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iter.iteration),
+    "backend.usage",
+    jsonFieldRaw("input_tokens", String(stats.inputTokens)) +
+      ", " +
+      jsonFieldRaw("output_tokens", String(stats.outputTokens)) +
+      ", " +
+      jsonFieldRaw("cache_read_tokens", String(stats.cacheReadTokens)) +
+      ", " +
+      jsonFieldRaw("cache_write_tokens", String(stats.cacheWriteTokens)) +
+      ", " +
+      jsonFieldRaw("total_tokens", String(stats.totalTokens)) +
+      ", " +
+      jsonFieldRaw("cost_usd", String(stats.costUsd)) +
+      (stats.contextPercent === undefined
+        ? ""
+        : `, ${jsonFieldRaw("context_percent", String(stats.contextPercent))}`),
+  );
+}
+
+/**
+ * Make sure a live pi RPC session with a fresh conversation is available.
+ * Prefers a `new_session` reset on the running process; respawns when the
+ * process is gone or refuses the reset.
+ */
+async function ensurePiSession(
+  loop: LoopContext,
+  iter: IterationContext,
+  iteration: number,
+): Promise<void> {
+  const existing = loop.piSession.current;
+  if (existing) {
+    try {
+      await resetPiSession(existing);
+      log(loop, "debug", `pi session reset for iteration ${iteration}`);
+      return;
+    } catch {
+      loop.piSession.current = undefined;
+      try {
+        await terminatePiSession(existing);
+      } catch {
+        /* best-effort */
+      }
+    }
+  }
+  loop.piSession.current = await initPiSession({
+    command: iter.backend.command,
+    args: iter.backend.args,
+    cwd: loop.paths.workDir,
+    modelId: iter.backend.model || undefined,
+    verbose: loop.runtime.logLevel === "debug",
+  });
+  log(
+    loop,
+    "debug",
+    `new pi RPC session for iteration ${iteration} model="${iter.backend.model || "default"}"`,
+  );
 }
 
 export async function finishIteration(

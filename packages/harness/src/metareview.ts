@@ -1,10 +1,14 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runAcpIteration } from "@mobrienv/autoloop-backends";
+import { runAcpIteration, runPiIteration } from "@mobrienv/autoloop-backends";
 import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
+import {
+  initPiSession,
+  terminatePiSession,
+} from "@mobrienv/autoloop-backends/pi-rpc-client";
 import { jsonBool, jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
 import { appendEvent, readRunLines } from "@mobrienv/autoloop-core/journal";
 import { reloadLoop } from "./config-helpers.js";
@@ -101,11 +105,13 @@ export async function runMetareviewReview(
   const { output, exitCode, timedOut } =
     loop.review.kind === "acp"
       ? await runAcpReview(loop, reviewPrompt)
-      : runProcess(
-          buildReviewCommand(loop, iteration, reviewPrompt),
-          loop.review.timeoutMs,
-          loop.review.kind,
-        );
+      : loop.review.kind === "pi"
+        ? await runPiReview(loop, reviewPrompt, iteration)
+        : runProcess(
+            buildReviewCommand(loop, iteration, reviewPrompt),
+            loop.review.timeoutMs,
+            loop.review.kind,
+          );
 
   appendEvent(
     loop.paths.journalFile,
@@ -176,6 +182,38 @@ export async function runMetareviewReview(
 // Reviews get their own ACP session built from the review spec — the live
 // iteration session may belong to a different provider/agent/model and
 // carries the iteration's conversation context.
+/**
+ * Run a pi metareview in a dedicated RPC session — never the live iteration
+ * session — so the reviewer judges with a clean context window.
+ */
+async function runPiReview(
+  loop: LoopContext,
+  reviewPrompt: string,
+  iteration: number,
+): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
+  const session = await initPiSession({
+    command: loop.review.command,
+    args: loop.review.args,
+    cwd: loop.paths.workDir,
+    modelId: loop.review.model || undefined,
+    verbose: loop.runtime.logLevel === "debug",
+  });
+  try {
+    return await runPiIteration(
+      session,
+      reviewPrompt,
+      loop.review.timeoutMs,
+      join(loop.paths.stateDir, `pi-review.${iteration}.jsonl`),
+    );
+  } finally {
+    try {
+      await terminatePiSession(session);
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
 async function runAcpReview(
   loop: LoopContext,
   reviewPrompt: string,

@@ -19,6 +19,10 @@
       "types": "./dist/acp-providers.d.ts",
       "default": "./dist/acp-providers.js"
     },
+    "./pi-rpc-client": {
+      "types": "./dist/pi-rpc-client.d.ts",
+      "default": "./dist/pi-rpc-client.js"
+    },
     "./run-command": {
       "types": "./dist/run-command.d.ts",
       "default": "./dist/run-command.js"
