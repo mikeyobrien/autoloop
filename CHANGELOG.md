@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- **Cost budget stop condition.** Set `event_loop.max_cost_usd` and the harness stops the run (reason `cost_budget`) once accumulated journaled cost from `backend.usage` events reaches the budget. Journal-derived, so it covers every continue path and survives context reloads. Disabled by default (`0`).
+- **Stall detection.** Set `event_loop.stall_iterations = N` and the harness stops the run (reason `stalled`) after N consecutive byte-identical backend outputs — a loop that repeats itself is burning the rest of its iteration budget. Disabled by default (`0`).
+- **`autoloop inspect usage`.** Per-iteration token counts and cost for a run, aggregated from `backend.usage` journal events (`--run`, `--json` supported). Backed by new `collectUsage`/`formatUsage` helpers in `@mobrienv/autoloop-core`.
+- **`autoloop stats`.** Cross-run analytics grouped by preset: run counts, success rate, average iterations and duration, and total journaled cost. `--json` for agents and scripts.
+- **`autoloop doctor`.** Environment and state-health diagnostics: node/git/backend availability, `.autoloop` writability, malformed registry lines, runs marked `running` whose process is gone, stale wave markers, and orphaned worktrees. Exit code 1 only on failures; `--json` supported.
+- **"Did you mean" suggestions.** Mistyped preset names and `inspect` targets now suggest the closest match (shared Levenshtein-based helper in the CLI).
+- **`autoloop init`.** Project onboarding scaffold: writes a fully commented starter `autoloops.toml`, adds `.autoloop/` to `.gitignore` in git repos, and `--preset <name>` scaffolds a runnable custom preset (config, harness.md, 2-role topology, role prompts, README). Never overwrites existing files.
+- **`autoloop chain run --dry-run`.** Prints the resolved execution plan (steps, preset dirs, backend overrides) plus budget validation without running anything; `--json` for machines; exit 1 on budget violations. Explicit chains are now budget-enforced at the root too: `max_steps` is pre-checked and `max_runtime_ms` is enforced between steps, stopping with outcome `budget_exceeded` (journaled via a `failed_reason` field on `chain.complete`).
+- **`autoloop worktree diff <run-id>`.** Preview a worktree's changes against its base before merging: diffstat summary by default, `--patch` for the full patch, `--json` for the structured result (new `diffWorktree` in `@mobrienv/autoloop-core/worktree`).
+- **Task priorities + soft tasks.** `task add --priority <high|normal|low>` and `--soft`; open tasks sort by priority in prompts and listings, and the completion gate now blocks only on non-soft tasks (soft tasks are advisory). Fully backward compatible with existing `tasks.jsonl` files.
+- **Memory lifecycle: `memory compact` and `memory prune`.** `compact` tombstones exact-duplicate learnings (keeping the oldest); `prune --max-age <days>` tombstones stale learnings (never preferences or meta). Both are append-only via the existing tombstone mechanism.
+- **Finish notifications.** Configure `[notify] command = "..."` (with `notify.on` stop-reason classes `completed,failed,stopped` and `notify.timeout_ms`) and the harness runs it when a loop ends, passing `AUTOLOOP_RUN_ID`/`AUTOLOOP_STOP_REASON`/`AUTOLOOP_ITERATIONS`/`AUTOLOOP_PRESET`/`AUTOLOOP_PROJECT_DIR` env vars plus a JSON payload on stdin. Best-effort, journaled as `notify.sent`/`notify.failed`.
+- **Live dashboard updates.** New `/api/stream` SSE endpoint pushes run-list updates when the registry changes (fs.watch with polling fallback, debounce, keepalives); the dashboard UI consumes it via `EventSource` and falls back to polling on error.
+- **`--json` for operator commands.** `loops [--all]`, `loops show`, `loops artifacts`, `loops health`, and `list` all support `--json` for agents and scripts. Human output is unchanged.
+
 ## [0.7.4] - 2026-05-07
 ### Fixed
 - **Harness: fresh ACP session per iteration.** Previously the kiro backend reused a single session across iterations and flipped modes via `setSessionMode()` — context from the finder role bled into the doer/checker/closer roles. The iteration loop now terminates and recreates the ACP session each pass, matching the AgentSpacesDesktop harness's per-iteration session lifecycle so every role gets an independent context window.

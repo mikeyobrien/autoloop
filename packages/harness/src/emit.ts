@@ -104,12 +104,15 @@ export function emit(
     return acceptEmit(journalFile, topic, payload, validation);
   }
 
-  // Task completion gate: block completion if open tasks remain
+  // Task completion gate: block completion if open blocking tasks remain.
+  // Soft tasks (soft === true) are advisory and never block completion.
   if (topic === validation.completionEvent) {
     const tasksFile = config.resolveTasksFile(projectDir);
-    const openTasks = materializeOpenFrom(tasksFile);
-    if (openTasks.length > 0) {
-      return rejectTaskGate(journalFile, topic, openTasks, validation);
+    const blockingTasks = materializeOpenFrom(tasksFile).filter(
+      (t) => t.soft !== true,
+    );
+    if (blockingTasks.length > 0) {
+      return rejectTaskGate(journalFile, topic, blockingTasks, validation);
     }
   }
 

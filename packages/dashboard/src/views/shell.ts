@@ -497,6 +497,8 @@ function dashboard() {
     newPrompt: "",
     selectedPreset: "",
     pollInterval: null,
+    eventSource: null,
+    streamRetryDelay: 1000,
     lastUpdated: null,
     sectionOpen: { active: false, watching: false, stuck: false, failed: false, completed: false },
     sectionUserToggled: {},
@@ -551,26 +553,59 @@ function dashboard() {
     async startPolling() {
       await this.fetchPresets();
       await this.fetchRuns();
+      this.connectStream();
+    },
+
+    connectStream() {
+      if (typeof EventSource === 'undefined') { this.startFallbackPolling(); return; }
+      const es = new EventSource('/api/stream');
+      this.eventSource = es;
+      es.addEventListener('runs', (e) => {
+        this.streamRetryDelay = 1000;
+        this.stopFallbackPolling();
+        try { this.applyRuns(JSON.parse(e.data)); } catch (err) { /* ignore malformed frame */ }
+      });
+      es.onerror = () => {
+        es.close();
+        this.eventSource = null;
+        this.startFallbackPolling();
+        const delay = this.streamRetryDelay;
+        this.streamRetryDelay = Math.min(delay * 2, 30000);
+        setTimeout(() => this.connectStream(), delay);
+      };
+    },
+
+    startFallbackPolling() {
+      if (this.pollInterval) return;
       this.pollInterval = setInterval(() => this.fetchRuns(), 3000);
+    },
+
+    stopFallbackPolling() {
+      if (!this.pollInterval) return;
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    },
+
+    applyRuns(data) {
+      const byRecent = (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+      for (const key of ['active', 'watching', 'stuck', 'recentFailed', 'recentCompleted']) {
+        if (data[key]) data[key].sort(byRecent);
+      }
+      this.runs = data;
+      this.lastUpdated = new Date().toLocaleTimeString();
+      const defaultOpen = ['active', 'watching', 'stuck'];
+      for (const cat of this.categories) {
+        if (!this.sectionUserToggled[cat.key]) {
+          this.sectionOpen[cat.key] = cat.items.length > 0 && defaultOpen.includes(cat.key);
+        }
+      }
+      if (this.selectedRun) this.fetchEvents(this.selectedRun);
     },
 
     async fetchRuns() {
       try {
         const res = await fetch("/api/runs");
-        const data = await res.json();
-        const byRecent = (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
-        for (const key of ['active', 'watching', 'stuck', 'recentFailed', 'recentCompleted']) {
-          if (data[key]) data[key].sort(byRecent);
-        }
-        this.runs = data;
-        this.lastUpdated = new Date().toLocaleTimeString();
-        const defaultOpen = ['active', 'watching', 'stuck'];
-        for (const cat of this.categories) {
-          if (!this.sectionUserToggled[cat.key]) {
-            this.sectionOpen[cat.key] = cat.items.length > 0 && defaultOpen.includes(cat.key);
-          }
-        }
-        if (this.selectedRun) this.fetchEvents(this.selectedRun);
+        this.applyRuns(await res.json());
       } catch (e) { /* retry on next poll */ }
     },
 

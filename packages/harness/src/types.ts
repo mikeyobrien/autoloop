@@ -34,7 +34,13 @@ export interface Verdict {
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
-  limits: { maxIterations: number };
+  limits: {
+    maxIterations: number;
+    /** Stop after N consecutive identical backend outputs (0 = disabled). */
+    stallIterations?: number;
+    /** Stop once journaled run cost reaches this USD budget (0 = disabled). */
+    maxCostUsd?: number;
+  };
   completion: { promise: string; event: string; requiredEvents: string[] };
   backend: {
     kind: string;

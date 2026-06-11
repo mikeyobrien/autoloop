@@ -1,6 +1,5 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import {
   abortPiTurn,
@@ -8,14 +7,13 @@ import {
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import * as config from "@mobrienv/autoloop-core/config";
-import { readIfExists } from "@mobrienv/autoloop-core/journal";
+import { readIfExists, readRunLines } from "@mobrienv/autoloop-core/journal";
 import {
   cleanWorktrees,
   mergeWorktree,
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "@mobrienv/autoloop-core/worktree";
-import { collectArtifacts, formatArtifacts } from "./artifacts.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
@@ -34,8 +32,10 @@ import {
 import { piControlAdapter } from "./control/pi-adapter.js";
 import { log } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
+import { checkCostBudget, detectStall } from "./guards.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
+import { runFinishNotification } from "./notify.js";
 import {
   appendLoopStart,
   branchStopReason,
@@ -46,7 +46,12 @@ import {
   writeParallelBranchSummary,
 } from "./parallel.js";
 import { registryStart, registryStop } from "./registry-bridge.js";
-import { completeLoop, stopMaxIterations } from "./stop.js";
+import {
+  completeLoop,
+  stopCostBudget,
+  stopMaxIterations,
+  stopStalled,
+} from "./stop.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export type { LoopContext, RunOptions, RunSummary };
@@ -256,6 +261,15 @@ export async function run(
     }
   }
 
+  runFinishNotification({
+    projectDir: loop.paths.mainProjectDir,
+    journalFile: loop.paths.journalFile,
+    runId: loop.runtime.runId,
+    preset: loop.launch.preset,
+    stopReason: summary.stopReason,
+    iterations: summary.iterations,
+  });
+
   loop.onEvent?.({
     type: "summary",
     runId: loop.runtime.runId,
@@ -410,6 +424,27 @@ async function runReviewThenIterate(
 
   if (iteration > reviewed.limits.maxIterations) {
     return stopMaxIterations(reviewed, iteration);
+  }
+  // Guard checks between iterations: both are journal-derived so they cover
+  // every continue path (routed, rejected, plain) without in-memory state.
+  if (iteration > 1) {
+    const runLines = readRunLines(
+      reviewed.paths.journalFile,
+      reviewed.runtime.runId,
+    );
+    const stall = detectStall(runLines, reviewed.limits.stallIterations ?? 0);
+    if (stall.stalled) {
+      return stopStalled(reviewed, iteration - 1, stall.repeats);
+    }
+    const budget = checkCostBudget(runLines, reviewed.limits.maxCostUsd ?? 0);
+    if (budget.exceeded) {
+      return stopCostBudget(
+        reviewed,
+        iteration - 1,
+        budget.costUsd,
+        reviewed.limits.maxCostUsd ?? 0,
+      );
+    }
   }
   return runIteration(reviewed, iteration, recurse);
 }

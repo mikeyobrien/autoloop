@@ -6,12 +6,22 @@ export function dispatchTask(args: string[]): boolean {
 
   switch (sub) {
     case "add": {
-      const text = args.slice(1).join(" ");
-      if (!text || text === "--help") {
-        console.log("Usage: autoloop task add <text...>");
+      const parsed = parseAddArgs(args.slice(1));
+      if (!parsed || parsed.help) {
+        console.log(
+          "Usage: autoloop task add [--priority|-p <high|normal|low>] [--soft] <text...>",
+        );
         return true;
       }
-      const id = tasks.addTask(resolveRuntimeProjectDir(), text, "manual");
+      const id = tasks.addTask(
+        resolveRuntimeProjectDir(),
+        parsed.text,
+        "manual",
+        {
+          priority: parsed.priority,
+          soft: parsed.soft,
+        },
+      );
       console.log(id);
       return true;
     }
@@ -66,6 +76,45 @@ export function dispatchTask(args: string[]): boolean {
       printTaskUsage();
       return true;
   }
+}
+
+interface ParsedAdd {
+  text: string;
+  priority?: tasks.TaskPriority;
+  soft: boolean;
+  help: boolean;
+}
+
+// Returns undefined on invalid input (missing text, bad/missing priority value).
+function parseAddArgs(args: string[]): ParsedAdd | undefined {
+  let priority: tasks.TaskPriority | undefined;
+  let soft = false;
+  let help = false;
+  const textParts: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--help") {
+      help = true;
+      continue;
+    }
+    if (arg === "--soft") {
+      soft = true;
+      continue;
+    }
+    if (arg === "--priority" || arg === "-p") {
+      i += 1;
+      const value = tasks.parsePriority(args[i] ?? "");
+      if (!value) return undefined;
+      priority = value;
+      continue;
+    }
+    textParts.push(arg);
+  }
+
+  const text = textParts.join(" ");
+  if (!text && !help) return undefined;
+  return { text, priority, soft, help };
 }
 
 function resolveRuntimeProjectDir(): string {

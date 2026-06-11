@@ -1,3 +1,4 @@
+import { buildChainPlan, renderChainPlan } from "../chains/dry-run.js";
 import * as chains from "../chains.js";
 
 export async function dispatchChain(
@@ -25,19 +26,32 @@ export async function dispatchChain(
       return true;
     }
     case "run": {
-      const name = args[1];
+      const dryRun = args.includes("--dry-run");
+      const asJson = args.includes("--json");
+      const positional = args
+        .slice(1)
+        .filter((a) => a !== "--dry-run" && a !== "--json");
+      const name = positional[0];
       if (!name) {
         console.log(
-          "Usage: autoloop chain run <name> [project-dir] [prompt...]",
+          "Usage: autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]",
         );
         return true;
       }
-      const projectDir = args[2] ?? resolveRuntimeProjectDir();
-      const prompt = args.slice(3).join(" ") || null;
+      const projectDir = positional[1] ?? resolveRuntimeProjectDir();
+      const prompt = positional.slice(2).join(" ") || null;
       const chainsData = chains.load(projectDir);
       const chainSpec = chains.resolveChain(chainsData, name);
       if (!chainSpec) {
         console.log(`chain \`${name}\` not found in chains.toml`);
+        if (dryRun) process.exitCode = 1;
+        return true;
+      }
+      if (dryRun) {
+        const plan = buildChainPlan(chainSpec, chainsData.budget);
+        if (asJson) console.log(JSON.stringify(plan, null, 2));
+        else console.log(renderChainPlan(plan));
+        if (!plan.validation.ok) process.exitCode = 1;
         return true;
       }
       await chains.runChain(chainSpec, projectDir, selfCmd, {
@@ -48,7 +62,9 @@ export async function dispatchChain(
     default:
       console.log("Usage:");
       console.log("  autoloop chain list [project-dir]");
-      console.log("  autoloop chain run <name> [project-dir] [prompt...]");
+      console.log(
+        "  autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]",
+      );
       return true;
   }
 }

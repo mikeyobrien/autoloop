@@ -16,20 +16,27 @@ import {
   readLines,
 } from "@mobrienv/autoloop-core/journal";
 import * as harness from "@mobrienv/autoloop-harness";
-import { checkBudget, defaultBudget } from "./budget.js";
-import { parseInlineChain } from "./load.js";
+import { checkBudget, checkPlanBudget, defaultBudget } from "./budget.js";
+import { loadBudget, parseInlineChain } from "./load.js";
 import type {
+  Budget,
   ChainSpec,
   ChainTracker,
   DynamicChainSpec,
   StepRecord,
 } from "./types.js";
 
+interface ChainRuntime {
+  budget: Budget;
+  startedAt: number;
+}
+
 export async function runChain(
   chainSpec: ChainSpec,
   projectDir: string,
   selfCommand: string,
   runOptions: harness.RunOptions,
+  budgetOverride?: Budget,
 ): Promise<{
   completed: StepRecord[];
   outcome: string;
@@ -38,6 +45,7 @@ export async function runChain(
 }> {
   const chainName = chainSpec.name;
   const steps = chainSpec.steps;
+  const budget = budgetOverride ?? loadBudget(projectDir);
   const cfg = config.loadProject(projectDir);
   const chainRunId = nextChainRunId(projectDir, cfg);
   const chainDir = join(chainStateRoot(projectDir), chainRunId);
@@ -55,17 +63,25 @@ export async function runChain(
       jsonField("step_count", String(steps.length)),
   );
 
-  const result = await runSteps(
-    steps,
-    1,
-    projectDir,
-    chainDir,
-    chainRunId,
-    selfCommand,
-    runOptions,
-    journalFile,
-    [],
-  );
+  const planCheck = checkPlanBudget(chainSpec, budget);
+  const result = planCheck.ok
+    ? await runSteps(
+        steps,
+        1,
+        projectDir,
+        chainDir,
+        chainRunId,
+        selfCommand,
+        runOptions,
+        journalFile,
+        [],
+        { budget, startedAt: Date.now() },
+      )
+    : {
+        completed: [] as StepRecord[],
+        outcome: "budget_exceeded",
+        failedReason: `budget_exceeded:${planCheck.reason}`,
+      };
 
   appendChainEvent(
     journalFile,
@@ -75,7 +91,10 @@ export async function runChain(
       ", " +
       jsonField("steps_completed", String(result.completed.length)) +
       ", " +
-      jsonField("outcome", result.outcome),
+      jsonField("outcome", result.outcome) +
+      (result.failedReason
+        ? ", " + jsonField("failed_reason", result.failedReason)
+        : ""),
   );
 
   return result;
@@ -149,6 +168,7 @@ async function runSteps(
   runOptions: harness.RunOptions,
   journalFile: string,
   completed: StepRecord[],
+  runtime: ChainRuntime,
 ): Promise<{
   completed: StepRecord[];
   outcome: string;
@@ -157,6 +177,20 @@ async function runSteps(
 }> {
   if (steps.length === 0) {
     return { completed, outcome: "all_steps_complete" };
+  }
+
+  // Enforce maxRuntimeMs between steps: stop before starting the next step
+  // once the chain has run past its runtime budget.
+  if (completed.length > 0) {
+    const elapsed = Date.now() - runtime.startedAt;
+    if (elapsed >= runtime.budget.maxRuntimeMs) {
+      return {
+        completed,
+        outcome: "budget_exceeded",
+        failedStep: stepNum,
+        failedReason: `budget_exceeded:max_runtime_ms exceeded (${elapsed}ms/${runtime.budget.maxRuntimeMs}ms)`,
+      };
+    }
   }
 
   const [step, ...rest] = steps;
@@ -237,6 +271,7 @@ async function runSteps(
       runOptions,
       journalFile,
       updatedCompleted,
+      runtime,
     );
   }
   return {

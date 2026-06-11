@@ -40,6 +40,57 @@ describe("renderTasksPrompt", () => {
     expect(result).toContain("- [x] [task-2] set up project (done)");
   });
 
+  it("shows priority and soft markers in the prompt", () => {
+    const tasks: MaterializedTasks = {
+      open: [
+        {
+          id: "task-1",
+          type: "task",
+          text: "fix the gate",
+          status: "open",
+          source: "manual",
+          created: "2026-01-01T00:00:00Z",
+          priority: "high",
+        },
+        {
+          id: "task-2",
+          type: "task",
+          text: "polish docs",
+          status: "open",
+          source: "manual",
+          created: "2026-01-01T00:00:00Z",
+          soft: true,
+        },
+        {
+          id: "task-3",
+          type: "task",
+          text: "plain default",
+          status: "open",
+          source: "manual",
+          created: "2026-01-01T00:00:00Z",
+        },
+      ],
+      done: [
+        {
+          id: "task-4",
+          type: "task",
+          text: "old chore",
+          status: "done",
+          source: "manual",
+          created: "2026-01-01T00:00:00Z",
+          completed: "2026-01-01T01:00:00Z",
+          priority: "low",
+        },
+      ],
+    };
+
+    const result = renderTasksPrompt(tasks, 4000);
+    expect(result).toContain("- [ ] [task-1] [high] fix the gate");
+    expect(result).toContain("- [ ] [task-2] polish docs (soft)");
+    expect(result).toContain("- [ ] [task-3] plain default");
+    expect(result).toContain("- [x] [task-4] [low] old chore (done)");
+  });
+
   it("truncates when over budget", () => {
     const tasks: MaterializedTasks = {
       open: [

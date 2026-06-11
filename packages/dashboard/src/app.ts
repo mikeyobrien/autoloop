@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { apiRoutes } from "./routes/api.js";
 import { pageRoutes } from "./routes/pages.js";
+import { streamRoutes } from "./routes/stream.js";
 
 export interface PresetInfo {
   name: string;
@@ -43,6 +44,7 @@ export function createApp(ctx: DashboardContext): Hono {
   app.get("/healthz", (c) => c.json({ status: "ok" }));
 
   app.route("/api", apiRoutes(ctx));
+  app.route("/api", streamRoutes(ctx));
 
   pageRoutes(app, ctx.projectDir);
 

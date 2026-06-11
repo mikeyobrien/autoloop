@@ -1,5 +1,5 @@
 import { lineSep } from "@mobrienv/autoloop-core";
-import type { MaterializedTasks } from "./tasks.js";
+import { formatTaskText, type MaterializedTasks } from "./tasks.js";
 
 export function renderTasksPrompt(
   tasks: MaterializedTasks,
@@ -12,14 +12,14 @@ export function renderTasksPrompt(
   if (tasks.open.length > 0) {
     lines.push("Open:");
     for (const t of tasks.open) {
-      lines.push(`- [ ] [${t.id}] ${t.text}`);
+      lines.push(`- [ ] [${t.id}] ${formatTaskText(t)}`);
     }
   }
 
   if (tasks.done.length > 0) {
     lines.push("Done:");
     for (const t of tasks.done) {
-      lines.push(`- [x] [${t.id}] ${t.text} (done)`);
+      lines.push(`- [x] [${t.id}] ${formatTaskText(t)} (done)`);
     }
   }
 

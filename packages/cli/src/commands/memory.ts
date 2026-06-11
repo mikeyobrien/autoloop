@@ -90,6 +90,62 @@ export function dispatchMemory(args: string[]): boolean {
       memory.promote(resolveRuntimeProjectDir(), stateDir, args[1]);
       return true;
     }
+    case "compact": {
+      if (args[1] === "--help") {
+        printMemoryCompactUsage();
+        return true;
+      }
+      const projectDir = args[1] ?? resolveRuntimeProjectDir();
+      const summary = memory.compactMemory(projectDir);
+      if (summary.duplicatesRemoved === 0) {
+        console.log(
+          `Scanned ${summary.scanned} learnings; no duplicates found.`,
+        );
+      } else {
+        console.log(
+          `Scanned ${summary.scanned} learnings; tombstoned ${summary.duplicatesRemoved} duplicate(s):`,
+        );
+        for (const id of summary.ids) console.log(`  ${id}`);
+      }
+      return true;
+    }
+    case "prune": {
+      const rest = args.slice(1);
+      if (rest[0] === "--help") {
+        printMemoryPruneUsage();
+        return true;
+      }
+      const flagIndex = rest.indexOf("--max-age");
+      if (flagIndex === -1) {
+        console.log("error: prune requires --max-age <days>");
+        printMemoryPruneUsage();
+        return true;
+      }
+      const rawDays = rest[flagIndex + 1];
+      const maxAgeDays = Number(rawDays);
+      if (!rawDays || !Number.isInteger(maxAgeDays) || maxAgeDays <= 0) {
+        console.log(
+          `error: --max-age must be a positive integer number of days (got: ${rawDays ?? "nothing"})`,
+        );
+        return true;
+      }
+      const positional = rest.filter(
+        (_, i) => i !== flagIndex && i !== flagIndex + 1,
+      );
+      const projectDir = positional[0] ?? resolveRuntimeProjectDir();
+      const summary = memory.pruneMemory(projectDir, maxAgeDays);
+      if (summary.pruned === 0) {
+        console.log(
+          `Scanned ${summary.scanned} learnings; none older than ${maxAgeDays} days.`,
+        );
+      } else {
+        console.log(
+          `Scanned ${summary.scanned} learnings; tombstoned ${summary.pruned} older than ${maxAgeDays} days:`,
+        );
+        for (const id of summary.ids) console.log(`  ${id}`);
+      }
+      return true;
+    }
     case "remove": {
       if (!args[1] || args[1] === "--help") {
         console.log("Usage: autoloop memory remove <id> [reason...]");
@@ -170,6 +226,22 @@ function dispatchMemoryAdd(args: string[]): void {
     default:
       printMemoryAddUsage();
   }
+}
+
+function printMemoryCompactUsage(): void {
+  console.log("Usage: autoloop memory compact [project-dir]");
+  console.log("");
+  console.log(
+    "Tombstones duplicate learnings (same text after whitespace normalization), keeping the oldest entry of each group.",
+  );
+}
+
+function printMemoryPruneUsage(): void {
+  console.log("Usage: autoloop memory prune --max-age <days> [project-dir]");
+  console.log("");
+  console.log(
+    "Tombstones learnings older than <days>. Preferences and meta entries are never pruned.",
+  );
 }
 
 function resolveRuntimeProjectDir(): string {
