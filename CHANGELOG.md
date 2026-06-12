@@ -26,6 +26,7 @@
 - **`--json` for operator commands.** `loops [--all]`, `loops show`, `loops artifacts`, `loops health`, and `list` all support `--json` for agents and scripts. Human output is unchanged.
 
 ### Fixed
+- **Live steering now reaches the in-flight turn.** `autoloop control guide --no-interrupt` queued the request but never signaled the harness, so live steer could only apply at the next iteration boundary (where no turn is active) — for every backend. The CLI now pokes the harness on every guide request; the signal only triggers a control-queue drain, and the backend adapter decides whether to steer or interrupt.
 - **`autoloop run <preset> --help` no longer starts a loop.** `--help`/`-h` anywhere among the run args shows usage instead of burning iterations against the backend.
 
 ## [0.7.4] - 2026-05-07

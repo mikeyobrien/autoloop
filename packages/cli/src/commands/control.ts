@@ -204,9 +204,11 @@ function handleGuide(stateDir: string, args: string[]): void {
   );
   appendRequest(dir, request);
 
-  if (wantInterrupt) {
-    pokeParent(res);
-  }
+  // Always poke: SIGUSR1 only triggers a control-queue drain — the backend
+  // adapter decides whether the guide steers the live turn or interrupts it.
+  // Without the poke, a --no-interrupt guide would sit queued until the next
+  // iteration boundary and live steering could never happen mid-turn.
+  pokeParent(res);
 
   const interruptNote = !wantInterrupt
     ? "(interrupt skipped by --no-interrupt)"
