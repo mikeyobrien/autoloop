@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { failMissingArg, failUnknown } from "../cli/fail.js";
 import { healthSummary } from "../loops/health.js";
 import {
   artifactsJson,
@@ -39,7 +40,7 @@ export function dispatchLoops(args: string[]): void {
   if (first === "show") {
     const runId = rest[1];
     if (!runId) {
-      console.log("Usage: autoloop loops show <run-id>");
+      failMissingArg("autoloop loops show <run-id>", "run-id");
       return;
     }
     if (json) {
@@ -53,7 +54,7 @@ export function dispatchLoops(args: string[]): void {
   if (first === "artifacts") {
     const runId = rest[1];
     if (!runId) {
-      console.log("Usage: autoloop loops artifacts <run-id>");
+      failMissingArg("autoloop loops artifacts <run-id>", "run-id");
       return;
     }
     if (json) {
@@ -67,7 +68,7 @@ export function dispatchLoops(args: string[]): void {
   if (first === "watch") {
     const runId = rest[1];
     if (!runId) {
-      console.log("Usage: autoloop loops watch <run-id>");
+      failMissingArg("autoloop loops watch <run-id>", "run-id");
       return;
     }
     watchRun(stateDir, runId).catch((err: unknown) => {
@@ -87,8 +88,12 @@ export function dispatchLoops(args: string[]): void {
     return;
   }
 
-  console.log(`Unknown loops subcommand: ${first}`);
-  printLoopsUsage();
+  failUnknown({
+    kind: first.startsWith("-") ? "loops flag" : "loops subcommand",
+    input: first,
+    candidates: ["show", "artifacts", "watch", "health", "--all", "--json"],
+    helpCommand: "autoloop loops --help",
+  });
 }
 
 function printJsonResult(result: JsonResult): void {

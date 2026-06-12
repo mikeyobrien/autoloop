@@ -12,6 +12,7 @@ import {
   mergeWorktree,
   readMeta,
 } from "@mobrienv/autoloop-core/worktree";
+import { failUnknown } from "../cli/fail.js";
 import { formatTime } from "../loops/render.js";
 
 export function dispatchWorktree(args: string[]): void {
@@ -73,8 +74,12 @@ export function dispatchWorktree(args: string[]): void {
     return;
   }
 
-  console.log(`Unknown worktree subcommand: ${sub}`);
-  printWorktreeUsage();
+  failUnknown({
+    kind: "worktree subcommand",
+    input: sub,
+    candidates: ["list", "show", "diff", "merge", "clean"],
+    helpCommand: "autoloop worktree --help",
+  });
 }
 
 function listWorktrees(stateDir: string): void {

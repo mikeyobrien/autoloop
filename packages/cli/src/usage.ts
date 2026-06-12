@@ -1,5 +1,6 @@
 import { joinCsv } from "@mobrienv/autoloop-core";
 import * as chains from "./chains.js";
+import { EXIT_USAGE, fail } from "./cli/fail.js";
 import { didYouMean } from "./cli/suggest.js";
 
 export function printUsage(): void {
@@ -37,6 +38,24 @@ export function printUsage(): void {
   console.log("  autoloop dashboard [--port <port>]");
   console.log("  autoloop kanban [--port <port>]");
   console.log("");
+  console.log("Agent / automation surfaces:");
+  console.log(
+    "  autoloop triage [--json]      One-call status: runs, health, doctor, next commands",
+  );
+  console.log(
+    "  autoloop capabilities         Machine-readable contract (commands, flags, exit codes)",
+  );
+  console.log(
+    "  autoloop robot-docs           Paste-ready agent handbook for this CLI",
+  );
+  console.log(
+    "  autoloop <cmd> --json         Structured output: list, loops, stats, doctor, chain run",
+  );
+  console.log("");
+  console.log(
+    "Exit codes: 0 success · 1 user-input error · 2 environment/state error",
+  );
+  console.log("");
   console.log(
     "The preset argument is required for `run`. It must be a bundled preset",
   );
@@ -47,6 +66,7 @@ export function printUsage(): void {
   console.log("");
   console.log("Flags:");
   console.log("  -h, --help       Show this help");
+  console.log("  -V, --version    Print the autoloop version");
   console.log("  -v, --verbose    Set log level to debug");
   console.log("  -b, --backend    Override backend command");
   console.log(
@@ -235,44 +255,40 @@ export function printMemoryAddUsage(): void {
 }
 
 export function missingPresetError(): void {
-  console.log("error: missing required preset argument");
-  console.log("");
-  console.log(
-    "Usage: autoloop run <preset-name|preset-dir> [prompt...] [flags]",
+  fail(
+    [
+      "error: missing required preset argument",
+      "",
+      "Usage: autoloop run <preset-name|preset-dir> [prompt...] [flags]",
+      "",
+      "Examples:",
+      "  autoloop run autocode",
+      '  autoloop run autocode "Fix the login bug"',
+      '  autoloop run autocode --max-iterations 250 "Fix the login bug"',
+      '  autoloop run autocode --set backend.timeout_ms=900000 "Fix slowly"',
+      '  autoloop run presets/autoqa "QA recent changes"',
+      '  autoloop run . "Run from current directory"',
+      "",
+      "Run 'autoloop list' to see all available presets.",
+    ],
+    EXIT_USAGE,
   );
-  console.log("");
-  console.log("Examples:");
-  console.log("  autoloop run autocode");
-  console.log('  autoloop run autocode "Fix the login bug"');
-  console.log(
-    '  autoloop run autocode --max-iterations 250 "Fix the login bug"',
-  );
-  console.log(
-    '  autoloop run autocode --set backend.timeout_ms=900000 "Fix slowly"',
-  );
-  console.log('  autoloop run presets/autoqa "QA recent changes"');
-  console.log('  autoloop run . "Run from current directory"');
-  console.log("");
-  console.log("Run 'autoloop list' to see all available presets.");
 }
 
 export function unknownPresetError(name: string): void {
-  console.log(`error: preset \`${name}\` not found`);
+  const lines = [`error: preset \`${name}\` not found`];
   const hint = didYouMean(name, chains.listKnownPresets());
-  if (hint) console.log(hint);
-  console.log("");
-  console.log(
+  if (hint) lines.push(hint);
+  lines.push(
+    "",
     `The argument \`${name}\` is not a valid preset name or directory.`,
-  );
-  console.log(
     "A preset must be a directory containing autoloops.toml (or autoloops.conf),",
-  );
-  console.log("or a bundled preset name.");
-  console.log("");
-  console.log(`Available presets: ${joinCsv(chains.listKnownPresets())}`);
-  console.log("Run 'autoloop list' to see all available presets.");
-  console.log("");
-  console.log(
+    "or a bundled preset name.",
+    "",
+    `Available presets: ${joinCsv(chains.listKnownPresets())}`,
+    "Run 'autoloop list' to see all available presets.",
+    "",
     "Usage: autoloop run <preset-name|preset-dir> [prompt...] [flags]",
   );
+  fail(lines, EXIT_USAGE);
 }

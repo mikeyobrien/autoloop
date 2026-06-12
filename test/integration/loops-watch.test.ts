@@ -89,11 +89,11 @@ describe("integration: loops watch", () => {
     expect(watchRes.stdout).toContain("No run matching");
   });
 
-  it("shows usage when no run-id given", () => {
+  it("fails with exact usage on stderr when no run-id given", () => {
     const project = makeTempProject("watch-usage");
     const res = runCli(["loops", "watch"], {}, project);
-    expect(res.stdout).toContain("Usage:");
-    expect(res.stdout).toContain("watch");
+    expect(res.status).toBe(1);
+    expect(res.stderr).toContain("autoloop loops watch <run-id>");
   });
 
   it("prints detail for failed run", () => {

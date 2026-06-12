@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchConfig } from "../../src/commands/config.js";
 
 const TMP_BASE = join(tmpdir(), `autoloop-ts-test-config-show-${process.pid}`);
@@ -198,8 +198,14 @@ describe("dispatchConfig", () => {
     expect(output).toContain("--json");
   });
 
-  it("prints usage for unknown subcommand", () => {
-    const output = captureLogs(() => dispatchConfig(["bogus"]));
-    expect(output).toContain("unknown config subcommand");
+  it("fails on stderr for unknown subcommand", () => {
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    dispatchConfig(["bogus"]);
+    const output = spy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toContain("unknown config subcommand `bogus`");
+    spy.mockRestore();
+    process.exitCode = 0;
   });
 });
