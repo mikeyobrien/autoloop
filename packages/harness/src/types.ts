@@ -41,6 +41,10 @@ export interface LoopContext {
     stallIterations?: number;
     /** Stop once journaled run cost reaches this USD budget (0 = disabled). */
     maxCostUsd?: number;
+    /** Per-iteration runtime cap in ms (0 = fall back to backend.timeoutMs). */
+    maxIterationRuntimeMs?: number;
+    /** Loop wall-clock budget in ms (0 = disabled). */
+    maxRuntimeMs?: number;
   };
   completion: { promise: string; event: string; requiredEvents: string[] };
   backend: {

@@ -525,6 +525,14 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     }),
   };
 
+  // Per-iteration runtime cap: when set, it overrides backend.timeout_ms
+  // (the branch-mode clamp and per-role backend_timeout_ms still apply later).
+  const maxIterationRuntimeMs = config.getDuration(
+    cfg,
+    "event_loop.max_iteration_runtime",
+    0,
+  );
+
   const updated: LoopContext = {
     objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride, {
       workDir: wd,
@@ -536,6 +544,8 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3),
       stallIterations: config.getInt(cfg, "event_loop.stall_iterations", 0),
       maxCostUsd: config.getFloat(cfg, "event_loop.max_cost_usd", 0),
+      maxIterationRuntimeMs,
+      maxRuntimeMs: config.getDuration(cfg, "event_loop.max_runtime", 0),
     },
     completion: {
       promise: config.get(
@@ -549,7 +559,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       ),
       requiredEvents: config.getList(cfg, "event_loop.required_events"),
     },
-    backend,
+    backend:
+      maxIterationRuntimeMs > 0
+        ? { ...backend, timeoutMs: maxIterationRuntimeMs }
+        : backend,
     review: {
       ...review,
       prompt: (() => {

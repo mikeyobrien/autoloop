@@ -185,6 +185,46 @@ export function stopCostBudget(
   return { iterations: completed, stopReason: "cost_budget" };
 }
 
+export function stopMaxRuntime(
+  loop: LoopContext,
+  completed: number,
+  elapsedMs: number,
+  maxRuntimeMs: number,
+  outputTail?: string,
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=max_runtime elapsed_ms=${elapsedMs} max_runtime_ms=${maxRuntimeMs}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration: completed,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:max_runtime",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    "",
+    "loop.stop",
+    jsonField("reason", "max_runtime") +
+      ", " +
+      jsonField("completed_iterations", String(completed)) +
+      ", " +
+      jsonField("elapsed_ms", String(elapsedMs)) +
+      ", " +
+      jsonField("max_runtime_ms", String(maxRuntimeMs)) +
+      (outputTail !== undefined
+        ? ", " + jsonField("output_tail", lastNChars(outputTail, 500))
+        : ""),
+  );
+  registryStop(loop, completed, "max_runtime");
+  return { iterations: completed, stopReason: "max_runtime" };
+}
+
 export function completeLoop(
   loop: LoopContext,
   iteration: number,

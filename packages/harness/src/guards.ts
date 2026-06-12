@@ -36,6 +36,44 @@ export function detectStall(runLines: string[], threshold: number): StallCheck {
   return { stalled: repeats >= threshold, repeats };
 }
 
+/**
+ * Epoch-ms start of the run, from the `created_at` field of the run's
+ * `loop.start` event. Null when absent or unparseable, in which case the
+ * runtime budget guard disables itself.
+ */
+export function loopStartMs(runLines: string[]): number | null {
+  for (const line of runLines) {
+    const event = decodeEvent(line);
+    if (!event || event.shape !== "fields") continue;
+    if (event.topic !== "loop.start") continue;
+    const parsed = Date.parse(event.fields.created_at ?? "");
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+export interface RuntimeBudgetCheck {
+  exceeded: boolean;
+  elapsedMs: number;
+}
+
+/**
+ * Check elapsed wall-clock time (from the journaled `loop.start` event)
+ * against a runtime budget. A budget of 0 disables the check; so does a
+ * missing or unparseable start timestamp.
+ */
+export function checkRuntimeBudget(
+  runLines: string[],
+  maxRuntimeMs: number,
+  nowMs: number = Date.now(),
+): RuntimeBudgetCheck {
+  if (maxRuntimeMs <= 0) return { exceeded: false, elapsedMs: 0 };
+  const startMs = loopStartMs(runLines);
+  if (startMs === null) return { exceeded: false, elapsedMs: 0 };
+  const elapsedMs = nowMs - startMs;
+  return { exceeded: elapsedMs >= maxRuntimeMs, elapsedMs };
+}
+
 export interface CostBudgetCheck {
   exceeded: boolean;
   costUsd: number;

@@ -754,6 +754,77 @@ describe("processIntOverride", () => {
   });
 });
 
+describe("runtime budget limits", () => {
+  it("max_iteration_runtime overrides backend.timeout_ms", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.max_iteration_runtime = "12h"',
+        "backend.timeout_ms = 300000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.timeoutMs).toBe(43_200_000);
+    expect(loop.limits.maxIterationRuntimeMs).toBe(43_200_000);
+  });
+
+  it("leaves backend.timeout_ms in place when max_iteration_runtime is disabled", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.max_iteration_runtime = "0"',
+        "backend.timeout_ms = 120000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.timeoutMs).toBe(120_000);
+    expect(loop.limits.maxIterationRuntimeMs).toBe(0);
+  });
+
+  it("accepts bare millisecond integers", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        "event_loop.max_iteration_runtime = 900000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.timeoutMs).toBe(900_000);
+  });
+
+  it("populates limits.maxRuntimeMs from a duration string", () => {
+    const projectDir = makeProject(
+      ["event_loop.max_iterations = 1", 'event_loop.max_runtime = "3d"'].join(
+        "\n",
+      ),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.limits.maxRuntimeMs).toBe(259_200_000);
+  });
+
+  it("defaults both runtime limits to disabled", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.limits.maxIterationRuntimeMs).toBe(0);
+    expect(loop.limits.maxRuntimeMs).toBe(0);
+  });
+});
+
 describe("buildLoopContext with backendOverride.timeout_ms", () => {
   it("applies timeout_ms from backendOverride", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");

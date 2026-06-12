@@ -132,6 +132,11 @@ completion_promise = "LOOP_COMPLETE"
 stall_iterations = 0
 # Stop once the journaled run cost reaches this USD budget (0 = disabled).
 max_cost_usd = 0
+# Per-iteration runtime cap — duration string ("3d", "90m") or ms int.
+# Overrides backend.timeout_ms when set (0 = disabled).
+# max_iteration_runtime = "12h"
+# Loop wall-clock budget — duration string or ms int (0 = disabled).
+# max_runtime = "3d"
 
 [backend]
 # Command used to drive each iteration.
@@ -155,6 +160,10 @@ event_loop.completion_promise = "LOOP_COMPLETE"
 event_loop.stall_iterations = 0
 # Stop once journaled run cost reaches this USD budget (0 = disabled).
 event_loop.max_cost_usd = 0
+# Per-iteration runtime cap ("3d", "90m", or ms int; overrides backend.timeout_ms).
+# event_loop.max_iteration_runtime = "12h"
+# Loop wall-clock budget ("12h", "3d", or ms int; 0 = disabled).
+# event_loop.max_runtime = "3d"
 
 backend.kind = "command"
 backend.command = "claude"

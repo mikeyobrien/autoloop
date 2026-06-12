@@ -7,6 +7,7 @@
 
 import { accessSync, constants, existsSync, readFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
+import { MAX_TIMER_MS, parseDurationMs } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readRegistry } from "@mobrienv/autoloop-core/registry/read";
 import { listWorktreeMetas } from "@mobrienv/autoloop-core/worktree";
@@ -46,6 +47,7 @@ export function runDoctorChecks(projectDir: string): DoctorCheck[] {
   checks.push(checkNode());
   checks.push(checkGit(projectDir));
   checks.push(checkBackendCommand(projectDir));
+  checks.push(checkRuntimeLimits(projectDir));
   checks.push(checkStateDir(stateDir));
   if (existsSync(stateDir)) {
     checks.push(checkRegistry(stateDir));
@@ -128,6 +130,61 @@ function checkBackendCommand(projectDir: string): DoctorCheck {
     name: "backend",
     status: "warn",
     detail: `configured backend command \`${executable}\` not found on PATH`,
+  };
+}
+
+function checkRuntimeLimits(projectDir: string): DoctorCheck {
+  let iterationRaw = "";
+  let runtimeRaw = "";
+  try {
+    const cfg = config.loadProject(projectDir);
+    iterationRaw = config.get(cfg, "event_loop.max_iteration_runtime", "0");
+    runtimeRaw = config.get(cfg, "event_loop.max_runtime", "0");
+  } catch {
+    /* fall through with the defaults */
+  }
+  const problems: string[] = [];
+  const values: Record<string, number> = {};
+  for (const [key, raw] of [
+    ["max_iteration_runtime", iterationRaw],
+    ["max_runtime", runtimeRaw],
+  ] as const) {
+    const parsed = parseDurationMs(raw);
+    if (parsed === null) {
+      problems.push(
+        `event_loop.${key} = "${raw}" is not a valid duration — treated as disabled`,
+      );
+      values[key] = 0;
+      continue;
+    }
+    if (parsed > MAX_TIMER_MS) {
+      problems.push(
+        `event_loop.${key} = "${raw}" exceeds the Node timer limit — clamped to ~24.8 days`,
+      );
+    }
+    values[key] = Math.min(parsed, MAX_TIMER_MS);
+  }
+  if (
+    values.max_iteration_runtime > 0 &&
+    values.max_runtime > 0 &&
+    values.max_iteration_runtime > values.max_runtime
+  ) {
+    problems.push(
+      "event_loop.max_iteration_runtime exceeds max_runtime — iterations will be clamped to the remaining loop budget",
+    );
+  }
+  if (problems.length > 0) {
+    return {
+      name: "runtime limits",
+      status: "warn",
+      detail: problems.join("; "),
+    };
+  }
+  const show = (ms: number) => (ms > 0 ? `${ms}ms` : "off");
+  return {
+    name: "runtime limits",
+    status: "ok",
+    detail: `max_iteration_runtime=${show(values.max_iteration_runtime)}, max_runtime=${show(values.max_runtime)}`,
   };
 }
 

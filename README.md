@@ -60,6 +60,7 @@ If Ralph is the broader experimentation surface, autoloop is the cleaner runtime
 - **Dynamic chains** -- compose presets into multi-stage pipelines
 - **Persistent memory + profiles** -- loops accumulate learnings across runs and can load repo/user tuning profiles
 - **Cost budgets + stall protection** -- stop runaway loops automatically with `event_loop.max_cost_usd` (journaled token cost) and `event_loop.stall_iterations` (repeated identical outputs)
+- **Runtime budgets** -- bound wall-clock time with `event_loop.max_runtime` (whole loop) and `event_loop.max_iteration_runtime` (per iteration, for iterations that wait days on long-running workflows); both take `"3d"`/`"12h"`-style durations
 - **Finish notifications** -- run any command when a loop ends (`[notify] command = "..."`) with run metadata in env vars and a JSON payload on stdin
 
 ## What autoloop is
