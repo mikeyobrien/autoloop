@@ -2,6 +2,11 @@ import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import {
+  abortClaudeSdkTurn,
+  steerClaudeSdkTurn,
+  terminateClaudeSdkSession,
+} from "@mobrienv/autoloop-backends/claude-sdk-client";
+import {
   abortPiTurn,
   steerPiTurn,
   terminatePiSession,
@@ -25,6 +30,7 @@ import {
 } from "./config-helpers.js";
 import { acpControlAdapter } from "./control/acp-adapter.js";
 import type { LiveControlAdapter } from "./control/adapter.js";
+import { claudeSdkControlAdapter } from "./control/claude-sdk-adapter.js";
 import {
   drainControlRequests,
   publishCapabilities,
@@ -99,6 +105,13 @@ export async function run(
       const session = loop.piSession.current;
       loop.piSession.current = undefined;
       terminatePiSession(session).catch(() => {
+        /* best-effort */
+      });
+    }
+    if (loop.claudeSdkSession.current) {
+      const session = loop.claudeSdkSession.current;
+      loop.claudeSdkSession.current = undefined;
+      terminateClaudeSdkSession(session).catch(() => {
         /* best-effort */
       });
     }
@@ -188,6 +201,14 @@ export async function run(
         /* best-effort */
       }
       loop.piSession.current = undefined;
+    }
+    if (loop.claudeSdkSession.current) {
+      try {
+        await terminateClaudeSdkSession(loop.claudeSdkSession.current);
+      } catch {
+        /* best-effort */
+      }
+      loop.claudeSdkSession.current = undefined;
     }
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
@@ -343,6 +364,14 @@ export async function runParallelBranchCli(
       }
       seeded.piSession.current = undefined;
     }
+    if (seeded.claudeSdkSession.current) {
+      try {
+        await terminateClaudeSdkSession(seeded.claudeSdkSession.current);
+      } catch {
+        /* best-effort */
+      }
+      seeded.claudeSdkSession.current = undefined;
+    }
   }
   const finishedMs = Date.now();
   const elapsedMs = finishedMs - startMs;
@@ -479,6 +508,20 @@ function buildControlAdapter(
       triggerSteer: (message) => {
         if (loop.piSession.current) {
           steerPiTurn(loop.piSession.current, message);
+        }
+      },
+    });
+  }
+  if (loop.backend.kind === "claude-sdk") {
+    return claudeSdkControlAdapter(loop.runtime.runId, {
+      triggerInterrupt: () => {
+        if (loop.claudeSdkSession.current) {
+          abortClaudeSdkTurn(loop.claudeSdkSession.current);
+        }
+      },
+      triggerSteer: (message) => {
+        if (loop.claudeSdkSession.current) {
+          steerClaudeSdkTurn(loop.claudeSdkSession.current, message);
         }
       },
     });

@@ -187,7 +187,9 @@ if (!args.includes("-p") || !args.includes("--dangerously-skip-permissions")) {
 process.stdout.write("claude backend handled the iteration. LOOP_COMPLETE\\n");
 `;
 
-  it("injects headless flags via -b and completes a loop", () => {
+  // The shell path is opt-in now that plain `claude` defaults to the
+  // claude-sdk backend: pin kind = "command" to exercise flag injection.
+  it("injects headless flags on the explicit command kind and completes a loop", () => {
     const bin = mkdtempSync(join(tmpdir(), "autoloop-fake-claude-"));
     const fakeClaudeScript = writeExecutable(
       bin,
@@ -198,10 +200,10 @@ process.stdout.write("claude backend handled the iteration. LOOP_COMPLETE\\n");
 
     const project = makeBackendProject("claude", [
       'backend.kind = "command"',
-      'backend.command = "echo"',
+      `backend.command = "${claudePath}"`,
       "backend.timeout_ms = 30000",
     ]);
-    const res = runCli(["run", project, "claude e2e", "-b", claudePath], {});
+    const res = runCli(["run", project, "claude e2e"], {});
 
     expect(res.status).toBe(0);
     const journal = expectLoopCompleted(project);

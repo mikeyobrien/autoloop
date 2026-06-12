@@ -1,4 +1,5 @@
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import type { ClaudeSdkSession } from "@mobrienv/autoloop-backends/claude-sdk-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
 import type * as topo from "@mobrienv/autoloop-core/topology";
@@ -116,6 +117,12 @@ export interface LoopContext {
    * so reloads must share one holder.
    */
   piSession: { current: PiSession | undefined };
+  /**
+   * Live Claude Agent SDK session holder. Fresh session per iteration (one
+   * query is one conversation), but aliased like the others so live control
+   * (interrupt/steer) always targets the in-flight session.
+   */
+  claudeSdkSession: { current: ClaudeSdkSession | undefined };
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

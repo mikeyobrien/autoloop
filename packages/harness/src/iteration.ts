@@ -1,10 +1,19 @@
 import { join } from "node:path";
-import { runAcpIteration, runPiIteration } from "@mobrienv/autoloop-backends";
+import {
+  runAcpIteration,
+  runClaudeSdkIteration,
+  runPiIteration,
+} from "@mobrienv/autoloop-backends";
 import type { AcpClientOptions } from "@mobrienv/autoloop-backends/acp-client";
 import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
+import {
+  getClaudeSdkUsage,
+  initClaudeSdkSession,
+  terminateClaudeSdkSession,
+} from "@mobrienv/autoloop-backends/claude-sdk-client";
 import {
   getPiSessionStats,
   initPiSession,
@@ -102,6 +111,35 @@ export async function runIteration(
     await ensurePiSession(loop, iter, iteration);
   }
 
+  // Fresh Claude Agent SDK session per iteration — one query is one
+  // conversation, so a new query gives each role a clean context window
+  // while keeping the streaming-input channel for live interrupt/steer.
+  if (iter.backend.kind === "claude-sdk") {
+    if (loop.claudeSdkSession.current) {
+      try {
+        await terminateClaudeSdkSession(loop.claudeSdkSession.current);
+      } catch {
+        /* best-effort */
+      }
+      loop.claudeSdkSession.current = undefined;
+    }
+    loop.claudeSdkSession.current = await initClaudeSdkSession({
+      command:
+        iter.backend.command && iter.backend.command !== "claude"
+          ? iter.backend.command
+          : undefined,
+      model: iter.backend.model || undefined,
+      cwd: loop.paths.workDir,
+      trustAllTools: iter.backend.trustAllTools,
+      verbose: loop.runtime.logLevel === "debug",
+    });
+    log(
+      loop,
+      "debug",
+      `new claude-sdk session for iteration ${iteration} model="${iter.backend.model || "default"}"`,
+    );
+  }
+
   const { output, exitCode, timedOut } = await runBackendIteration(loop, iter);
   const elapsedS = Math.floor(Date.now() / 1000) - startEpoch;
 
@@ -142,6 +180,16 @@ async function runBackendIteration(
     await recordPiUsage(loop, iter);
     return result;
   }
+  if (iter.backend.kind === "claude-sdk" && loop.claudeSdkSession.current) {
+    const result = await runClaudeSdkIteration(
+      loop.claudeSdkSession.current,
+      iter.prompt,
+      iter.backend.timeoutMs,
+      join(loop.paths.stateDir, `claude-stream.${iter.iteration}.jsonl`),
+    );
+    recordClaudeSdkUsage(loop, iter);
+    return result;
+  }
   return runProcess(
     buildBackendCommand(loop, iter),
     iter.backend.timeoutMs,
@@ -180,6 +228,35 @@ async function recordPiUsage(
       (stats.contextPercent === undefined
         ? ""
         : `, ${jsonFieldRaw("context_percent", String(stats.contextPercent))}`),
+  );
+}
+
+/**
+ * Journal per-iteration token/cost totals from the claude-sdk result message.
+ * Same event shape as the pi backend so cost-budget guards and usage
+ * reporting work unchanged. Best-effort: telemetry never fails the iteration.
+ */
+function recordClaudeSdkUsage(loop: LoopContext, iter: IterationContext): void {
+  const session = loop.claudeSdkSession.current;
+  if (!session) return;
+  const stats = getClaudeSdkUsage(session);
+  if (!stats) return;
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iter.iteration),
+    "backend.usage",
+    jsonFieldRaw("input_tokens", String(stats.inputTokens)) +
+      ", " +
+      jsonFieldRaw("output_tokens", String(stats.outputTokens)) +
+      ", " +
+      jsonFieldRaw("cache_read_tokens", String(stats.cacheReadTokens)) +
+      ", " +
+      jsonFieldRaw("cache_write_tokens", String(stats.cacheWriteTokens)) +
+      ", " +
+      jsonFieldRaw("total_tokens", String(stats.totalTokens)) +
+      ", " +
+      jsonFieldRaw("cost_usd", String(stats.costUsd)),
   );
 }
 

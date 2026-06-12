@@ -4,7 +4,7 @@ Long-running loops fail in two expensive ways: they burn money without convergin
 
 ## Cost budget (`event_loop.max_cost_usd`)
 
-Backends with usage telemetry (the pi RPC backend today) journal one `backend.usage` event per iteration with token counts and cost. Set a USD budget and the harness stops the run once accumulated journaled cost reaches it:
+Backends with usage telemetry (the claude-sdk and pi RPC backends today) journal one `backend.usage` event per iteration with token counts and cost. Set a USD budget and the harness stops the run once accumulated journaled cost reaches it:
 
 ```toml
 [event_loop]

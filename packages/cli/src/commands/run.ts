@@ -392,11 +392,14 @@ function backendOverrideSpec(backend: string): Record<string, unknown> {
     const command = commandParts.join(":");
     return acpBackendOverride(provider || "generic", command || "", []);
   }
-  if (claudeBackend(backend)) {
+  // Claude runs through the Agent SDK session backend by default — live
+  // interrupt/steer + cost telemetry. `--set backend.kind=command` restores
+  // the legacy `claude -p` shell path.
+  if (backend === "claude-sdk" || claudeBackend(backend)) {
     return {
-      kind: "command",
-      command: backend,
-      args: ["-p", "--dangerously-skip-permissions"],
+      kind: "claude-sdk",
+      command: backend === "claude-sdk" ? "claude" : backend,
+      args: [],
       prompt_mode: "arg",
     };
   }

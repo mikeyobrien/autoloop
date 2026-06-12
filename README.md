@@ -177,7 +177,7 @@ Errors always go to stderr with a documented exit code (0 success, 1 user-input 
 |------|-------------|
 | `-h`, `--help` | Show usage |
 | `-v`, `--verbose` | Debug-level logging |
-| `-b`, `--backend` | Override backend command (e.g. `-b claude`) |
+| `-b`, `--backend` | Override backend (e.g. `-b claude-sdk`, `-b pi`, `-b kiro`, or a command) |
 | `-p`, `--preset` | Resolve a named or custom preset |
 | `--chain` | Run an inline chain of comma-separated presets |
 | `--profile <spec>` | Activate a profile (`repo:<name>` or `user:<name>`), repeatable |

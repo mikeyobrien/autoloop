@@ -45,6 +45,38 @@ describe("backend runner", () => {
     expect(command).toContain("'echo' 'hello'");
   });
 
+  it("injects headless claude flags for claude-sdk specs in shell fallback", () => {
+    const command = buildBackendShellCommand({
+      paths: { stateDir: "/tmp/state", piAdapterPath: "/tmp/pi-adapter" },
+      spec: {
+        kind: "claude-sdk",
+        command: "claude",
+        args: [],
+        promptMode: "arg",
+      },
+      prompt: "wave task",
+      runtimeEnv: "",
+    });
+    expect(command).toContain(
+      "'claude' '-p' '--dangerously-skip-permissions' 'wave task'",
+    );
+  });
+
+  it("does not duplicate headless flags already present on claude-sdk specs", () => {
+    const command = buildBackendShellCommand({
+      paths: { stateDir: "/tmp/state", piAdapterPath: "/tmp/pi-adapter" },
+      spec: {
+        kind: "claude-sdk",
+        command: "claude",
+        args: ["-p", "--dangerously-skip-permissions"],
+        promptMode: "arg",
+      },
+      prompt: "wave task",
+      runtimeEnv: "",
+    });
+    expect(command.match(/--dangerously-skip-permissions/g)?.length).toBe(1);
+  });
+
   it("reports non-zero exit failures", () => {
     const result = runShellCommand(
       "command",

@@ -5,6 +5,7 @@ export {
   defaultCapabilities,
   supportsInterrupt,
 } from "./capabilities.js";
+export { claudeSdkControlAdapter } from "./claude-sdk-adapter.js";
 export { drainControlRequests, publishCapabilities } from "./dispatch.js";
 export {
   baseStateDirFromRunState,
