@@ -39,6 +39,7 @@ export default defineConfig({
       "@mobrienv/autoloop-dashboard": `${DASHBOARD}/app.ts`,
       "@mobrienv/autoloop-backends/acp-client": `${BACKENDS}/acp-client.ts`,
       "@mobrienv/autoloop-backends/acp-providers": `${BACKENDS}/acp-providers.ts`,
+      "@mobrienv/autoloop-backends/claude-sdk-client": `${BACKENDS}/claude-sdk-client.ts`,
       "@mobrienv/autoloop-backends/pi-rpc-client": `${BACKENDS}/pi-rpc-client.ts`,
       "@mobrienv/autoloop-backends/run-command": `${BACKENDS}/run-command.ts`,
       "@mobrienv/autoloop-backends/types": `${BACKENDS}/types.ts`,

@@ -1,10 +1,18 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runAcpIteration, runPiIteration } from "@mobrienv/autoloop-backends";
+import {
+  runAcpIteration,
+  runClaudeSdkIteration,
+  runPiIteration,
+} from "@mobrienv/autoloop-backends";
 import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
+import {
+  initClaudeSdkSession,
+  terminateClaudeSdkSession,
+} from "@mobrienv/autoloop-backends/claude-sdk-client";
 import {
   initPiSession,
   terminatePiSession,
@@ -107,11 +115,13 @@ export async function runMetareviewReview(
       ? await runAcpReview(loop, reviewPrompt)
       : loop.review.kind === "pi"
         ? await runPiReview(loop, reviewPrompt, iteration)
-        : runProcess(
-            buildReviewCommand(loop, iteration, reviewPrompt),
-            loop.review.timeoutMs,
-            loop.review.kind,
-          );
+        : loop.review.kind === "claude-sdk"
+          ? await runClaudeSdkReview(loop, reviewPrompt, iteration)
+          : runProcess(
+              buildReviewCommand(loop, iteration, reviewPrompt),
+              loop.review.timeoutMs,
+              loop.review.kind,
+            );
 
   appendEvent(
     loop.paths.journalFile,
@@ -208,6 +218,41 @@ async function runPiReview(
   } finally {
     try {
       await terminatePiSession(session);
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
+/**
+ * Run a claude-sdk metareview in a dedicated SDK session — never the live
+ * iteration session — so the reviewer judges with a clean context window.
+ */
+async function runClaudeSdkReview(
+  loop: LoopContext,
+  reviewPrompt: string,
+  iteration: number,
+): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
+  const session = await initClaudeSdkSession({
+    command:
+      loop.review.command && loop.review.command !== "claude"
+        ? loop.review.command
+        : undefined,
+    model: loop.review.model || undefined,
+    cwd: loop.paths.workDir,
+    trustAllTools: loop.review.trustAllTools,
+    verbose: loop.runtime.logLevel === "debug",
+  });
+  try {
+    return await runClaudeSdkIteration(
+      session,
+      reviewPrompt,
+      loop.review.timeoutMs,
+      join(loop.paths.stateDir, `claude-review.${iteration}.jsonl`),
+    );
+  } finally {
+    try {
+      await terminateClaudeSdkSession(session);
     } catch {
       /* best-effort */
     }

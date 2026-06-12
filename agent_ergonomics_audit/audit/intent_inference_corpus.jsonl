@@ -1,0 +1,10 @@
+{"corpus_id":"I-001","invocation":"autoloop --version","intent":"get version","outcome":"useless_error","detail":"preset error on stdout exit 0"}
+{"corpus_id":"I-002","invocation":"autoloop help","intent":"see help","outcome":"useless_error","detail":"preset error"}
+{"corpus_id":"I-003","invocation":"autoloop staus","intent":"run stats","outcome":"useless_error","detail":"preset error; no command did-you-mean"}
+{"corpus_id":"I-004","invocation":"autoloop loops --jsno","intent":"loops json","outcome":"useless_error","detail":"unknown subcommand, exit 0, no hint"}
+{"corpus_id":"I-005","invocation":"autoloop capabilities --json","intent":"read contract","outcome":"useless_error","detail":"surface missing"}
+{"corpus_id":"I-006","invocation":"autoloop memory lst","intent":"memory list","outcome":"useless_error","detail":"usage dump exit 0, no suggestion"}
+{"corpus_id":"I-007","invocation":"autoloop task ad hello","intent":"task add","outcome":"useless_error","detail":"usage dump exit 0, no suggestion"}
+{"corpus_id":"I-008","invocation":"autoloop inspect scratchpd","intent":"inspect scratchpad","outcome":"useful_hint","detail":"did-you-mean works; but exit 0"}
+{"corpus_id":"I-009","invocation":"autoloop run autocod","intent":"run autocode","outcome":"useful_hint","detail":"preset did-you-mean exists (usage.ts:261); exit 0 though"}
+{"corpus_id":"I-010","invocation":"autoloop (bare)","intent":"discover tool","outcome":"useless_error","detail":"'error: missing required preset' exit 0 instead of help"}

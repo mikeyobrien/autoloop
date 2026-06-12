@@ -1,0 +1,13 @@
+{"surface_id":"err_contract_global","scores":{"output_parseability":150,"composability":200,"error_pedagogy":450,"determinism_and_reproducibility":700},"evidence":"usage.ts:237-278 console.log for errors; probes: all error paths exit 0 on stdout","score_confidence":"high"}
+{"surface_id":"flag_root_version","scores":{"agent_intuitiveness":0,"self_documentation":0},"evidence":"probe I-001: preset error","score_confidence":"high"}
+{"surface_id":"cmd_unknown_fallthrough","scores":{"agent_intuitiveness":300,"intent_inference":300,"error_pedagogy":400},"evidence":"main.ts:123; probe I-003: no command suggestion","score_confidence":"high"}
+{"surface_id":"cmd_capabilities","scores":{"self_documentation":0,"output_parseability":0},"evidence":"missing; discover-cli existing_surfaces all false","score_confidence":"high"}
+{"surface_id":"cmd_robot_docs","scores":{"self_documentation":0},"evidence":"missing","score_confidence":"high"}
+{"surface_id":"cmd_root_bare","scores":{"agent_intuitiveness":350,"error_pedagogy":500},"evidence":"probe I-010","score_confidence":"high"}
+{"surface_id":"cmd_loops","scores":{"output_parseability":750,"intent_inference":250},"evidence":"loops --json returns []; --jsno useless error exit 0","score_confidence":"high"}
+{"surface_id":"cmd_doctor","scores":{"output_parseability":800,"self_documentation":750},"evidence":"doctor --json valid JSON; exitCode 1 on fail doctor.ts:40","score_confidence":"high"}
+{"surface_id":"cmd_stats","scores":{"output_parseability":800},"evidence":"stats --json valid JSON","score_confidence":"high"}
+{"surface_id":"cmd_inspect","scores":{"intent_inference":700,"composability":400},"evidence":"did-you-mean present; usage-on-noargs exit 0","score_confidence":"high"}
+{"surface_id":"cmd_memory","scores":{"intent_inference":300,"composability":400},"evidence":"probe I-006","score_confidence":"high"}
+{"surface_id":"cmd_task","scores":{"intent_inference":300,"composability":400},"evidence":"probe I-007","score_confidence":"high"}
+{"surface_id":"exit_code_dictionary","scores":{"composability":300,"self_documentation":200},"evidence":"only 0/1; undocumented; many error paths exit 0","score_confidence":"high"}

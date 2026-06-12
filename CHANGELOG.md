@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 ### Added
+- **Claude Agent SDK backend (`kind = "claude-sdk"`) — now the default for Claude.** Iterations run through a `@anthropic-ai/claude-agent-sdk` streaming session instead of one-shot `claude -p` shells: live interrupt (`autoloop control interrupt`) and mid-turn steering (`autoloop control guide`) like the pi backend, per-iteration `backend.usage` token/cost telemetry (so `event_loop.max_cost_usd` budgets work out of the box), and the raw SDK message stream persisted to `claude-stream.<iteration>.jsonl` per iteration. Each iteration gets a fresh session (clean context per role); metareviews run in their own dedicated session; parallel-wave tasks fall back to one-shot headless `claude -p` shells. `backend.model` maps to the SDK model option and `backend.command` to a custom Claude Code executable path.
+- **Agent-ergonomics contract.** Every CLI error path now writes to stderr and exits non-zero (0 success, 1 user-input error, 2 environment error — dictionary documented in `--help` and `capabilities`). Mistyped commands (`autoloop staus`), subcommands (`memory lst`, `task ad`, `config shwo`), and flags (`loops --jsno`) fail fast with a "Did you mean" correction instead of being misread as preset names or dumping usage with exit 0.
+- **`autoloop triage [--json]`.** One-call status mega-command for agents and operators: active runs, health, doctor checks, per-preset stats, and copy-paste recommended next commands — equivalent to `loops` + `loops health` + `doctor` + `stats` in a single invocation.
+- **`autoloop capabilities`.** Machine-readable CLI contract: command list with JSON/mutating annotations, exit-code dictionary, env vars, and the stdout/stderr output contract. Deterministic output.
+- **`autoloop robot-docs`.** Paste-ready in-tool agent handbook — canonical first commands, JSON-capable read surfaces, live-run controls, contract, and gotchas. No external docs lookup needed.
+- **`autoloop --version` / `-V` / `version`** prints the CLI version (previously interpreted as a preset name).
+- **`autoloop help [command]`** word-form alias for `--help`, with per-command help re-dispatch (`autoloop help loops`).
+- **Bare `autoloop`** now prints the full usage instead of a `run` error.
+- **`autoloop config unset`.** Removes a user/repo preset override key (was advertised in `--help` but unimplemented). Prunes empty sections from the override file.
 - **Cost budget stop condition.** Set `event_loop.max_cost_usd` and the harness stops the run (reason `cost_budget`) once accumulated journaled cost from `backend.usage` events reaches the budget. Journal-derived, so it covers every continue path and survives context reloads. Disabled by default (`0`).
 - **Stall detection.** Set `event_loop.stall_iterations = N` and the harness stops the run (reason `stalled`) after N consecutive byte-identical backend outputs — a loop that repeats itself is burning the rest of its iteration budget. Disabled by default (`0`).
 - **`autoloop inspect usage`.** Per-iteration token counts and cost for a run, aggregated from `backend.usage` journal events (`--run`, `--json` supported). Backed by new `collectUsage`/`formatUsage` helpers in `@mobrienv/autoloop-core`.
@@ -16,6 +25,13 @@
 - **Finish notifications.** Configure `[notify] command = "..."` (with `notify.on` stop-reason classes `completed,failed,stopped` and `notify.timeout_ms`) and the harness runs it when a loop ends, passing `AUTOLOOP_RUN_ID`/`AUTOLOOP_STOP_REASON`/`AUTOLOOP_ITERATIONS`/`AUTOLOOP_PRESET`/`AUTOLOOP_PROJECT_DIR` env vars plus a JSON payload on stdin. Best-effort, journaled as `notify.sent`/`notify.failed`.
 - **Live dashboard updates.** New `/api/stream` SSE endpoint pushes run-list updates when the registry changes (fs.watch with polling fallback, debounce, keepalives); the dashboard UI consumes it via `EventSource` and falls back to polling on error.
 - **`--json` for operator commands.** `loops [--all]`, `loops show`, `loops artifacts`, `loops health`, and `list` all support `--json` for agents and scripts. Human output is unchanged.
+
+### Changed
+- **Default backend behavior change.** A plain `claude` backend (the default, or `-b claude`) now resolves to the new `claude-sdk` backend instead of the `claude -p` shell path. The legacy shell path is unchanged and still available: pin `backend.kind = "command"` (or `--set backend.kind=command`), and configs with custom `backend.args` automatically stay on the shell path since the SDK doesn't take CLI args.
+
+### Fixed
+- **Live steering now reaches the in-flight turn.** `autoloop control guide --no-interrupt` queued the request but never signaled the harness, so live steer could only apply at the next iteration boundary (where no turn is active) — for every backend. The CLI now pokes the harness on every guide request; the signal only triggers a control-queue drain, and the backend adapter decides whether to steer or interrupt.
+- **`autoloop run <preset> --help` no longer starts a loop.** `--help`/`-h` anywhere among the run args shows usage instead of burning iterations against the backend.
 
 ## [0.7.4] - 2026-05-07
 ### Fixed

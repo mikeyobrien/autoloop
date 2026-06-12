@@ -160,10 +160,16 @@ autoloop task <add|complete|update|remove|list> [args]
 autoloop runs clean [--max-age <days>]
 autoloop stats [project-dir] [--json]
 autoloop doctor [project-dir] [--json]
+autoloop triage [project-dir] [--json]
 autoloop config <show|set|unset|path> [args]
+autoloop capabilities
+autoloop robot-docs
+autoloop --version
 ```
 
-Use `run` to start work, `loops` and `inspect` to understand what happened, and `dashboard` when you want a local operator surface. `stats` summarizes success rates and cost per preset; `doctor` diagnoses the environment and `.autoloop` state.
+Use `run` to start work, `loops` and `inspect` to understand what happened, and `dashboard` when you want a local operator surface. `stats` summarizes success rates and cost per preset; `doctor` diagnoses the environment and `.autoloop` state. `triage` is the one-call status command for agents — runs, health, doctor, and recommended next commands in a single (optionally `--json`) invocation. `capabilities` prints the machine-readable CLI contract (commands, JSON surfaces, exit codes) and `robot-docs` prints a paste-ready agent handbook.
+
+Errors always go to stderr with a documented exit code (0 success, 1 user-input error, 2 environment error), and mistyped commands, subcommands, and flags get a "Did you mean" correction instead of being misinterpreted.
 
 ### Flags
 
@@ -171,7 +177,7 @@ Use `run` to start work, `loops` and `inspect` to understand what happened, and 
 |------|-------------|
 | `-h`, `--help` | Show usage |
 | `-v`, `--verbose` | Debug-level logging |
-| `-b`, `--backend` | Override backend command (e.g. `-b claude`) |
+| `-b`, `--backend` | Override backend (e.g. `-b claude-sdk`, `-b pi`, `-b kiro`, or a command) |
 | `-p`, `--preset` | Resolve a named or custom preset |
 | `--chain` | Run an inline chain of comma-separated presets |
 | `--profile <spec>` | Activate a profile (`repo:<name>` or `user:<name>`), repeatable |

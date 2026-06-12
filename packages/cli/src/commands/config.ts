@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { resolvePresetDir } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
+import { fail, failUnknown } from "../cli/fail.js";
 
 export function dispatchConfig(args: string[]): boolean {
   const sub = args[0] ?? "";
@@ -14,6 +15,10 @@ export function dispatchConfig(args: string[]): boolean {
     return configSet(args.slice(1));
   }
 
+  if (sub === "unset") {
+    return configUnset(args.slice(1));
+  }
+
   if (sub === "path") {
     return configPath();
   }
@@ -23,8 +28,12 @@ export function dispatchConfig(args: string[]): boolean {
     return true;
   }
 
-  console.log(`unknown config subcommand: ${sub}`);
-  printConfigUsage();
+  failUnknown({
+    kind: "config subcommand",
+    input: sub,
+    candidates: ["show", "set", "unset", "path"],
+    helpCommand: "autoloop config --help",
+  });
   return true;
 }
 
@@ -99,23 +108,28 @@ function configSet(args: string[]): boolean {
     } else if (!assignment) {
       assignment = arg;
     } else {
-      console.log(`unexpected config set argument: ${arg}`);
-      printConfigUsage();
+      fail([
+        `error: unexpected config set argument \`${arg}\``,
+        "Run `autoloop config --help` for usage.",
+      ]);
       return true;
     }
   }
 
   if (!scope || !presetName || !assignment) {
-    console.log(
+    fail([
+      "error: missing required arguments for config set",
       "Usage: autoloop config set (--user|--repo) --preset <name> [--project <dir>] key=value",
-    );
+    ]);
     return true;
   }
 
   const parsed = parseAssignment(assignment);
   if (!parsed) {
-    console.log(`invalid assignment: ${assignment}`);
-    console.log("Expected key=value, e.g. event_loop.max_iterations=250");
+    fail([
+      `error: invalid assignment \`${assignment}\``,
+      "Expected key=value, e.g. event_loop.max_iterations=250",
+    ]);
     return true;
   }
 
@@ -132,6 +146,84 @@ function configSet(args: string[]): boolean {
   writeFileSync(path, stringifyConfigToml(next));
   console.log(`set ${parsed.key}=${parsed.value} in ${path}`);
   return true;
+}
+
+function configUnset(args: string[]): boolean {
+  let scope: "user" | "repo" | "" = "";
+  let projectDir = ".";
+  let presetName = "";
+  let key = "";
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--user") {
+      scope = "user";
+    } else if (arg === "--repo") {
+      scope = "repo";
+    } else if ((arg === "--project" || arg === "-d") && args[i + 1]) {
+      projectDir = args[++i];
+    } else if (arg === "--preset" && args[i + 1]) {
+      presetName = args[++i];
+    } else if (!key) {
+      key = arg;
+    } else {
+      fail([
+        `error: unexpected config unset argument \`${arg}\``,
+        "Run `autoloop config --help` for usage.",
+      ]);
+      return true;
+    }
+  }
+
+  if (!scope || !presetName || !key) {
+    fail([
+      "error: missing required arguments for config unset",
+      "Usage: autoloop config unset (--user|--repo) --preset <name> [--project <dir>] <key>",
+    ]);
+    return true;
+  }
+
+  const path =
+    scope === "user"
+      ? config.userPresetOverridePath(presetName)
+      : config.repoPresetOverridePath(projectDir, presetName);
+  if (!existsSync(path)) {
+    fail([
+      `error: no override file at ${path}`,
+      "Nothing to unset. Run `autoloop config show` to see resolved values.",
+    ]);
+    return true;
+  }
+
+  const current = config.stringifyValues(
+    config.parseRawToml(readFileSync(path, "utf-8")),
+  );
+  if (!deleteKeyPath(current, key.split("."))) {
+    fail([
+      `error: key \`${key}\` is not set in ${path}`,
+      "Run `autoloop config show` to see resolved values and sources.",
+    ]);
+    return true;
+  }
+
+  writeFileSync(path, stringifyConfigToml(current));
+  console.log(`unset ${key} in ${path}`);
+  return true;
+}
+
+/** Remove a dotted key path from a nested record; prune empty sections. */
+function deleteKeyPath(obj: Record<string, unknown>, path: string[]): boolean {
+  const [head, ...rest] = path;
+  if (!(head in obj)) return false;
+  if (rest.length === 0) {
+    delete obj[head];
+    return true;
+  }
+  const child = obj[head];
+  if (!isPlainObject(child)) return false;
+  const removed = deleteKeyPath(child, rest);
+  if (removed && Object.keys(child).length === 0) delete obj[head];
+  return removed;
 }
 
 function stringifyConfigToml(cfg: Record<string, unknown>): string {
@@ -195,6 +287,9 @@ function printConfigUsage(): void {
   );
   console.log(
     "  set               Write a user/repo preset override: config set (--user|--repo) --preset <name> key=value",
+  );
+  console.log(
+    "  unset             Remove a user/repo preset override: config unset (--user|--repo) --preset <name> <key>",
   );
   console.log("  path              Print user config file path and existence");
   console.log("");

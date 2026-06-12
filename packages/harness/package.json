@@ -115,6 +115,10 @@
       "types": "./dist/control/adapter.d.ts",
       "default": "./dist/control/adapter.js"
     },
+    "./control/claude-sdk-adapter": {
+      "types": "./dist/control/claude-sdk-adapter.d.ts",
+      "default": "./dist/control/claude-sdk-adapter.js"
+    },
     "./control/kiro-adapter": {
       "types": "./dist/control/kiro-adapter.d.ts",
       "default": "./dist/control/kiro-adapter.js"

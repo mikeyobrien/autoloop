@@ -133,9 +133,21 @@ export function installRuntimeTools(loop: LoopContext): void {
   chmodSync(loop.paths.piAdapterPath, 0o755);
 }
 
-export function resolveProcessKind(kind: string, command: string): string {
+export function resolveProcessKind(
+  kind: string,
+  command: string,
+  opts?: { hasCustomArgs?: boolean },
+): string {
   if (kind === "pi" || piBinary(command)) return "pi";
+  if (kind === "claude-sdk") return "claude-sdk";
   if (isAcpBackendKind(kind)) return "acp";
+  // Default: a plain `claude` invocation runs through the Agent SDK session
+  // backend (live interrupt/steer + cost telemetry). Custom args mean the
+  // user is tailoring the CLI invocation — respect it and keep the shell
+  // path, as does an explicit `kind = "command"`.
+  if (kind === "" && claudeBackend(command) && !opts?.hasCustomArgs) {
+    return "claude-sdk";
+  }
   return "command";
 }
 
@@ -573,6 +585,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     // Alias, never copy: all reloaded contexts must share one session holder.
     acpSession: loop.acpSession ?? { current: undefined },
     piSession: loop.piSession ?? { current: undefined },
+    claudeSdkSession: loop.claudeSdkSession ?? { current: undefined },
     onEvent: loop.onEvent,
   };
   return applyRuntimeModeOverrides(updated);
@@ -613,10 +626,13 @@ function readBackendConfig(
     "command",
     cfgCommand !== cfgCommandMarker ? cfgCommand : commandFallback,
   );
-  const kind = resolveProcessKind(rawKind, command);
-  const provider = kind === "acp" ? acpProvider.id : "";
   const cfgArgsMarker = "__missing_args__";
   const rawCfgArgs = config.get(cfg, "backend.args", cfgArgsMarker);
+  const hasCustomArgs =
+    (Array.isArray(bo.args) && bo.args.length > 0) ||
+    (rawCfgArgs !== cfgArgsMarker && splitCsv(rawCfgArgs).length > 0);
+  const kind = resolveProcessKind(rawKind, command, { hasCustomArgs });
+  const provider = kind === "acp" ? acpProvider.id : "";
   const argsFallback =
     rawCfgArgs === cfgArgsMarker
       ? kind === "acp"

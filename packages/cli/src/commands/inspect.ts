@@ -5,6 +5,7 @@ import * as profiles from "@mobrienv/autoloop-core/profiles";
 import * as tasks from "@mobrienv/autoloop-core/tasks";
 import * as topo from "@mobrienv/autoloop-core/topology";
 import * as chains from "../chains.js";
+import { fail } from "../cli/fail.js";
 import * as render from "../cli/render.js";
 import { suggestClosest } from "../cli/suggest.js";
 import { printInspectUsage } from "../usage.js";
@@ -100,19 +101,20 @@ export function dispatchInspect(args: string[]): boolean {
       return true;
     case "output":
       if (!selector) {
-        console.log("inspect output requires an iteration selector");
+        fail([
+          "error: inspect output requires an iteration selector",
+          "Usage: autoloop inspect output <iteration>",
+        ]);
         return true;
       }
       render.renderOutput(projectDir, selector, spec.run);
       return true;
     default: {
+      const lines = [`error: unknown inspect target \`${artifact}\``];
       const suggestion = suggestClosest(artifact, INSPECT_TARGETS);
-      console.log(`Unknown inspect target \`${artifact}\`.`);
-      if (suggestion) {
-        console.log(`Did you mean \`${suggestion}\`?`);
-      }
-      console.log("");
-      console.log(`Valid targets: ${INSPECT_TARGETS.join(", ")}`);
+      if (suggestion) lines.push(`Did you mean \`${suggestion}\`?`);
+      lines.push(`Valid targets: ${INSPECT_TARGETS.join(", ")}`);
+      fail(lines);
       return true;
     }
   }

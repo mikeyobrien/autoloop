@@ -1,4 +1,5 @@
 import * as tasks from "@mobrienv/autoloop-core/tasks";
+import { failUnknown } from "../cli/fail.js";
 import { printTaskUsage } from "../usage.js";
 
 export function dispatchTask(args: string[]): boolean {
@@ -73,7 +74,16 @@ export function dispatchTask(args: string[]): boolean {
       console.log(tasks.listTasks(args[1] ?? resolveRuntimeProjectDir()));
       return true;
     default:
-      printTaskUsage();
+      if (sub === "" || sub === "--help" || sub === "-h") {
+        printTaskUsage();
+        return true;
+      }
+      failUnknown({
+        kind: "task subcommand",
+        input: sub,
+        candidates: ["add", "complete", "update", "remove", "list"],
+        helpCommand: "autoloop task --help",
+      });
       return true;
   }
 }

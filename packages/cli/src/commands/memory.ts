@@ -1,4 +1,5 @@
 import * as memory from "@mobrienv/autoloop-core/memory";
+import { failUnknown } from "../cli/fail.js";
 import { printMemoryAddUsage, printMemoryUsage } from "../usage.js";
 
 export function dispatchMemory(args: string[]): boolean {
@@ -166,7 +167,24 @@ export function dispatchMemory(args: string[]): boolean {
       return true;
     }
     default:
-      printMemoryUsage();
+      if (sub === "" || sub === "--help" || sub === "-h") {
+        printMemoryUsage();
+        return true;
+      }
+      failUnknown({
+        kind: "memory subcommand",
+        input: sub,
+        candidates: [
+          "list",
+          "status",
+          "find",
+          "add",
+          "remove",
+          "compact",
+          "prune",
+        ],
+        helpCommand: "autoloop memory --help",
+      });
       return true;
   }
 }
@@ -224,7 +242,16 @@ function dispatchMemoryAdd(args: string[]): void {
       return;
     }
     default:
-      printMemoryAddUsage();
+      if (kind === "" || kind === "--help" || kind === "-h") {
+        printMemoryAddUsage();
+        return;
+      }
+      failUnknown({
+        kind: "memory add kind",
+        input: kind,
+        candidates: ["learning", "preference", "meta"],
+        helpCommand: "autoloop memory add --help",
+      });
   }
 }
 

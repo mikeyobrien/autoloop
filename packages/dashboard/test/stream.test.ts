@@ -133,16 +133,32 @@ describe("watchRegistry", () => {
     writeFileSync(ctx.registryPath, "", "utf-8");
     let calls = 0;
     const watcher = watchRegistry(ctx.registryPath, () => calls++, {
-      debounceMs: 50,
+      debounceMs: 100,
     });
     try {
+      // fs.watch registration is asynchronous (fsevents on macOS): a write
+      // that lands before the watcher is live is silently missed. Nudge the
+      // file on an interval longer than the debounce window until the first
+      // event proves the watcher is live, then test coalescing separately.
+      const nudge = setInterval(
+        () => appendFileSync(ctx.registryPath, "nudge\n", "utf-8"),
+        300,
+      );
+      try {
+        await waitFor(() => calls >= 1, 10000);
+      } finally {
+        clearInterval(nudge);
+      }
+      // Drain any pending debounce window from the nudges.
+      await new Promise((r) => setTimeout(r, 400));
+      const base = calls;
+
       // Burst of writes should coalesce into a single onChange.
       appendFileSync(ctx.registryPath, "line-1\n", "utf-8");
       appendFileSync(ctx.registryPath, "line-2\n", "utf-8");
-      await waitFor(() => calls >= 1, 5000);
-      // Allow a second debounce window to elapse; no further writes occurred.
-      await new Promise((r) => setTimeout(r, 150));
-      expect(calls).toBe(1);
+      await waitFor(() => calls > base, 10000);
+      await new Promise((r) => setTimeout(r, 400));
+      expect(calls).toBe(base + 1);
     } finally {
       watcher.close();
     }

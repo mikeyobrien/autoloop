@@ -93,7 +93,7 @@ export function formatUsage(usage: RunUsage, format: string): string {
   if (usage.rows.length === 0) {
     return [
       "No backend usage telemetry recorded for this run.",
-      "(Token and cost stats are reported by backends with usage support — the pi backend today.)",
+      "(Token and cost stats are reported by backends with usage support — the claude-sdk and pi backends today.)",
     ].join("\n");
   }
   const header = [
