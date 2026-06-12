@@ -37,7 +37,11 @@ export async function dispatchRun(
   bundleRoot: string,
   selfCmd: string,
 ): Promise<boolean> {
-  if (args[0] === "--help" || args[0] === "-h") {
+  // `--help` anywhere among the args shows help instead of starting a loop —
+  // `autoloop run autocode --help` must never burn iterations. A quoted
+  // prompt that merely *contains* "--help" arrives as one larger arg and is
+  // unaffected.
+  if (args.some((a) => a === "--help" || a === "-h")) {
     printRunUsage();
     return true;
   }
