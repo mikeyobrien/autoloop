@@ -1,0 +1,13 @@
+{
+  "target_path": "/Users/rook/projects/autoloop",
+  "discovered_at": "2026-06-12T00:41:59Z",
+  "languages": ["typescript_or_javascript"],
+  "binaries": ["autoloop"],
+  "env_var_prefix": "",
+  "existing_surfaces": {
+    "robot_mode": false,
+    "capabilities": false,
+    "robot_docs": false
+  },
+  "recommended_mode": "full"
+}
