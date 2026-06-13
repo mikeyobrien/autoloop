@@ -77,6 +77,7 @@ export function resolveAcpProvider(
   const explicit = input.provider?.trim();
   if (explicit) return providerById(explicit) ?? providerById("generic");
   if (input.kind === "kiro") return providerById("kiro");
+  if (input.kind === "hermes") return providerById("hermes");
   if (basename(input.command ?? "") === "kiro-cli") return providerById("kiro");
   if (basename(input.command ?? "") === "hermes") return providerById("hermes");
   return providerById("generic");
