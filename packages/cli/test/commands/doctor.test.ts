@@ -143,4 +143,54 @@ describe("doctor", () => {
     dispatchDoctor(["--help"]);
     expect(lines.join("\n")).toContain("Usage: autoloop doctor");
   });
+
+  it("reports ok runtime limits when unset", () => {
+    const limits = check("runtime limits");
+    expect(limits.status).toBe("ok");
+    expect(limits.detail).toContain("max_iteration_runtime=off");
+    expect(limits.detail).toContain("max_runtime=off");
+  });
+
+  it("summarizes configured runtime limits", () => {
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      ['event_loop.max_iteration_runtime = "12h"'].join("\n"),
+    );
+    const limits = check("runtime limits");
+    expect(limits.status).toBe("ok");
+    expect(limits.detail).toContain("max_iteration_runtime=43200000ms");
+  });
+
+  it("warns on unparseable runtime limit values", () => {
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      'event_loop.max_runtime = "forever"\n',
+    );
+    const limits = check("runtime limits");
+    expect(limits.status).toBe("warn");
+    expect(limits.detail).toContain("not a valid duration");
+  });
+
+  it("warns when the iteration cap exceeds the loop budget", () => {
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      [
+        'event_loop.max_iteration_runtime = "3d"',
+        'event_loop.max_runtime = "1h"',
+      ].join("\n"),
+    );
+    const limits = check("runtime limits");
+    expect(limits.status).toBe("warn");
+    expect(limits.detail).toContain("clamped to the remaining loop budget");
+  });
+
+  it("warns when a runtime limit exceeds the Node timer cap", () => {
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      'event_loop.max_iteration_runtime = "30d"\n',
+    );
+    const limits = check("runtime limits");
+    expect(limits.status).toBe("warn");
+    expect(limits.detail).toContain("Node timer limit");
+  });
 });

@@ -67,6 +67,8 @@ autoloop config show --preset autocode --explain
 | `event_loop.required_events` | list | `[]` (empty) | Events that must appear in the journal before the completion event is accepted. Prevents premature completion. |
 | `event_loop.prompt` | string | `""` | Inline prompt text for the loop objective. If set, takes precedence over `prompt_file`. |
 | `event_loop.prompt_file` | string | `""` | Path to a file containing the loop objective, relative to the project directory. Used when `prompt` is empty. |
+| `event_loop.max_iteration_runtime` | duration | `0` (disabled) | Per-iteration runtime cap. Accepts a duration string (`"45s"`, `"90m"`, `"12h"`, `"3d"`, `"1h30m"`) or a bare millisecond integer. When set, it overrides `backend.timeout_ms` (per-role `backend_timeout_ms` and the branch-mode `parallel.branch_timeout_ms` clamp still win). Values are capped at ~24.8 days (the Node timer limit). |
+| `event_loop.max_runtime` | duration | `0` (disabled) | Loop wall-clock budget, same duration grammar. Derived from the journaled `loop.start` timestamp, so it survives reloads. Checked between iterations, and the running iteration's timeout is clamped to the remaining budget so the loop never overshoots. Stops with reason `max_runtime`. Not inherited by parallel branches (they have `parallel.branch_timeout_ms`). |
 
 Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop.prompt_file`.
 
@@ -77,7 +79,7 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | `backend.kind` | string | `""` (auto) | Backend type. `"claude-sdk"` for the Claude Agent SDK session backend, `"pi"` for the Pi adapter, `"acp"` for Agent Client Protocol providers, and `"command"` for mock/test or shell-command backends. Legacy `"kiro"` is accepted as an alias for `kind = "acp"` + `provider = "kiro"`. |
 | `backend.provider` | string | `"generic"` for ACP | ACP provider preset. Built-ins: `"kiro"`, `"claude-agent-acp"`, `"generic"`. Unknown values use generic ACP behavior while preserving the label. |
 | `backend.command` | string | `"claude"` | Executable to invoke. For `kind = "claude-sdk"`, an optional custom Claude Code executable path. For `kind = "pi"`, this is the Pi binary path. For `kind = "acp"`, this is the ACP stdio server command (`kiro-cli`, `npx`, a local adapter path, etc.). For `kind = "command"`, any executable. |
-| `backend.timeout_ms` | int | `300000` | Timeout per backend invocation in milliseconds (default 5 minutes). |
+| `backend.timeout_ms` | int | `300000` | Timeout per backend invocation in milliseconds (default 5 minutes). Fallback when `event_loop.max_iteration_runtime` is unset. |
 | `backend.args` | list | provider-dependent | Backend arguments. Kiro defaults to `["acp"]`; Claude Agent ACP defaults to `["-y", "@agentclientprotocol/claude-agent-acp"]`; command backends default to `[]`. Not used by `kind = "claude-sdk"` — configuring args on a claude command keeps it on the shell path. |
 | `backend.prompt_mode` | string | provider-dependent | How the prompt is passed to the backend. `"arg"` passes it as a command-line argument, `"stdin"` passes it on standard input, and `"acp"` sends it through the ACP `prompt` request. Ignored by `kind = "claude-sdk"` (prompts go over the SDK session). |
 | `backend.trust_all_tools` | bool | `true` | Auto-approve tool permission requests. For `kind = "claude-sdk"`, maps to the SDK's `bypassPermissions` mode (the session equivalent of `--dangerously-skip-permissions`). For ACP, applies when the provider supports it. |

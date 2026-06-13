@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
+import { encodeEvent } from "@mobrienv/autoloop-core";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -340,6 +341,126 @@ describe("runIteration pi RPC execution", () => {
     expect(loop.piSession.current).toBe(freshSession);
     expect(piMocks.runPiIteration).toHaveBeenCalledWith(
       freshSession,
+      expect.any(String),
+      4321,
+      expect.any(String),
+    );
+  });
+});
+
+describe("runIteration loop runtime budget clamp", () => {
+  beforeEach(() => {
+    piMocks.resetPiSession.mockReset();
+    piMocks.runPiIteration.mockReset();
+    piMocks.getPiSessionStats.mockReset();
+    piMocks.getPiSessionStats.mockResolvedValue(undefined);
+  });
+
+  function makeBudgetLoop(
+    maxRuntimeMs: number,
+    elapsedMs: number,
+  ): LoopContext {
+    const loop = makePiLoop();
+    loop.limits = { maxIterations: 5, maxRuntimeMs };
+    loop.piSession.current = { process: { pid: 99 } } as unknown as PiSession;
+    piMocks.resetPiSession.mockResolvedValue(undefined);
+    const createdAt = new Date(Date.now() - elapsedMs).toISOString();
+    writeFileSync(
+      loop.paths.journalFile,
+      `${encodeEvent({
+        shape: "fields",
+        run: loop.runtime.runId,
+        iteration: "",
+        topic: "loop.start",
+        fields: { max_iterations: "5", created_at: createdAt },
+      })}\n`,
+    );
+    return loop;
+  }
+
+  it("clamps the journaled backend timeout to the remaining loop budget", async () => {
+    // 8s of a 10s budget elapsed: remaining ~2s is below the 4321ms timeout.
+    const loop = makeBudgetLoop(10_000, 8_000);
+    piMocks.runPiIteration.mockResolvedValue({
+      output: "DONE",
+      exitCode: 0,
+      timedOut: false,
+    });
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    const effectiveTimeout = piMocks.runPiIteration.mock.calls[0][2];
+    expect(effectiveTimeout).toBeGreaterThan(0);
+    expect(effectiveTimeout).toBeLessThan(4321);
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain(`"timeout_ms": "${effectiveTimeout}"`);
+  });
+
+  it("journals max_runtime when a budget-clamped iteration times out", async () => {
+    const loop = makeBudgetLoop(10_000, 8_000);
+    piMocks.runPiIteration.mockResolvedValue({
+      output: "partial work",
+      exitCode: 1,
+      timedOut: true,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(summary.stopReason).toBe("max_runtime");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain('"reason": "max_runtime"');
+    expect(journal).toContain('"max_runtime_ms": "10000"');
+    expect(journal).toContain('"output_tail": "partial work"');
+  });
+
+  it("keeps backend_timeout when the per-iteration limit was the binding constraint", async () => {
+    // Plenty of loop budget left: the 4321ms backend timeout is unclamped.
+    const loop = makeBudgetLoop(600_000, 1_000);
+    piMocks.runPiIteration.mockResolvedValue({
+      output: "slow",
+      exitCode: 1,
+      timedOut: true,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(summary.stopReason).toBe("backend_timeout");
+    expect(piMocks.runPiIteration).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      4321,
+      expect.any(String),
+    );
+  });
+
+  it("does not clamp when no runtime budget is configured", async () => {
+    const loop = makeBudgetLoop(0, 8_000);
+    piMocks.runPiIteration.mockResolvedValue({
+      output: "DONE",
+      exitCode: 0,
+      timedOut: false,
+    });
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(piMocks.runPiIteration).toHaveBeenCalledWith(
+      expect.anything(),
       expect.any(String),
       4321,
       expect.any(String),

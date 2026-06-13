@@ -77,7 +77,7 @@ loop.complete   or   loop.stop
 | `review.start` | Before a metareview review pass. | `kind` (`"metareview"`), `backend_kind`, `command`, `prompt_mode`, `prompt`, `timeout_ms` |
 | `review.finish` | After review completes. | `kind` (`"metareview"`), `exit_code`, `timed_out` (boolean), `output` |
 | `loop.complete` | Loop finished successfully. | `reason` (`"completion_event"` or `"completion_promise"`) |
-| `loop.stop` | Loop halted without completion. | `reason` (`"max_iterations"`, `"backend_failed"`, or `"backend_timeout"`). The `max_iterations` variant also includes `completed_iterations`, `stopped_before_iteration`, and `max_iterations`. The `backend_failed` and `backend_timeout` variants also include `iteration` and `output_tail`. |
+| `loop.stop` | Loop halted without completion. | `reason` (`"max_iterations"`, `"backend_failed"`, `"backend_timeout"`, `"stalled"`, `"cost_budget"`, or `"max_runtime"`). The `max_iterations` variant also includes `completed_iterations`, `stopped_before_iteration`, and `max_iterations`. The `backend_failed` and `backend_timeout` variants also include `iteration` and `output_tail`. The `max_runtime` variant includes `completed_iterations`, `elapsed_ms`, `max_runtime_ms`, and (when a budget-clamped iteration timed out) `output_tail`. |
 
 ### Agent events (custom)
 

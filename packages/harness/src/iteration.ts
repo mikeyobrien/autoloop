@@ -35,6 +35,7 @@ import {
   parallelTriggerTopic,
   systemTopic,
 } from "./emit.js";
+import { loopStartMs } from "./guards.js";
 import {
   appendBackendFinish,
   appendBackendStart,
@@ -46,7 +47,12 @@ import {
 import type { IterationContext } from "./prompt.js";
 import { buildIterationContext } from "./prompt.js";
 import { registryProgress } from "./registry-bridge.js";
-import { completeLoop, stopBackendFailed, stopBackendTimeout } from "./stop.js";
+import {
+  completeLoop,
+  stopBackendFailed,
+  stopBackendTimeout,
+  stopMaxRuntime,
+} from "./stop.js";
 import type { LoopContext, RunSummary } from "./types.js";
 import {
   continueAfterParallelJoin,
@@ -59,7 +65,33 @@ export async function runIteration(
   iteration: number,
   iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
 ): Promise<RunSummary> {
-  const iter = buildIterationContext(loop, iteration);
+  let iter = buildIterationContext(loop, iteration);
+
+  // Clamp the iteration timeout to the remaining loop wall-clock budget so a
+  // long iteration never overshoots event_loop.max_runtime. Applied before
+  // appendBackendStart so the journaled timeout_ms is the effective value.
+  const maxRuntimeMs = loop.limits.maxRuntimeMs ?? 0;
+  let clampedByLoopBudget = false;
+  let loopStartedMs: number | null = null;
+  if (maxRuntimeMs > 0) {
+    loopStartedMs = loopStartMs(
+      readRunLines(loop.paths.journalFile, loop.runtime.runId),
+    );
+    if (loopStartedMs !== null) {
+      const remainingMs = Math.max(
+        1,
+        maxRuntimeMs - (Date.now() - loopStartedMs),
+      );
+      if (remainingMs < iter.backend.timeoutMs) {
+        iter = {
+          ...iter,
+          backend: { ...iter.backend, timeoutMs: remainingMs },
+        };
+        clampedByLoopBudget = true;
+      }
+    }
+  }
+
   loop.onEvent?.({
     type: "iteration.banner",
     iteration: iter.iteration,
@@ -154,6 +186,17 @@ export async function runIteration(
   });
   loop.onEvent?.({ type: "backend.output", output });
 
+  if (timedOut && clampedByLoopBudget && loopStartedMs !== null) {
+    // The loop budget, not the per-iteration limit, was the binding
+    // constraint on the timeout that fired — journal max_runtime.
+    return stopMaxRuntime(
+      loop,
+      iteration,
+      Date.now() - loopStartedMs,
+      maxRuntimeMs,
+      output,
+    );
+  }
   if (timedOut) return stopBackendTimeout(loop, iteration, output);
   if (exitCode !== 0) return stopBackendFailed(loop, iteration, output);
   return finishIteration(loop, iter, output, iterate);

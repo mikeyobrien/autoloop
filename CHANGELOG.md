@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 ### Added
+- **Runtime budgets.** Two new duration keys under `[event_loop]`, accepting duration strings (`"3d"`, `"12h"`, `"1h30m"`) or millisecond integers: `max_iteration_runtime` caps a single iteration's runtime (overriding `backend.timeout_ms` — iterations can now legitimately run for days while waiting on long-running workflows or PR reviews), and `max_runtime` bounds the whole loop's wall-clock time, stopping with reason `max_runtime`. The loop guard is journal-derived from the `loop.start` timestamp (survives reloads, covers every continue path), each iteration's timeout is clamped to the remaining loop budget so the run never overshoots, and `autoloop doctor` gains a `runtime limits` check (invalid durations, iteration cap > loop budget, ~24.8-day Node timer cap).
 - **Claude Agent SDK backend (`kind = "claude-sdk"`) — now the default for Claude.** Iterations run through a `@anthropic-ai/claude-agent-sdk` streaming session instead of one-shot `claude -p` shells: live interrupt (`autoloop control interrupt`) and mid-turn steering (`autoloop control guide`) like the pi backend, per-iteration `backend.usage` token/cost telemetry (so `event_loop.max_cost_usd` budgets work out of the box), and the raw SDK message stream persisted to `claude-stream.<iteration>.jsonl` per iteration. Each iteration gets a fresh session (clean context per role); metareviews run in their own dedicated session; parallel-wave tasks fall back to one-shot headless `claude -p` shells. `backend.model` maps to the SDK model option and `backend.command` to a custom Claude Code executable path.
 - **Agent-ergonomics contract.** Every CLI error path now writes to stderr and exits non-zero (0 success, 1 user-input error, 2 environment error — dictionary documented in `--help` and `capabilities`). Mistyped commands (`autoloop staus`), subcommands (`memory lst`, `task ad`, `config shwo`), and flags (`loops --jsno`) fail fast with a "Did you mean" correction instead of being misread as preset names or dumping usage with exit 0.
 - **`autoloop triage [--json]`.** One-call status mega-command for agents and operators: active runs, health, doctor checks, per-preset stats, and copy-paste recommended next commands — equivalent to `loops` + `loops health` + `doctor` + `stats` in a single invocation.
@@ -31,6 +32,7 @@
 
 ### Fixed
 - **Live steering now reaches the in-flight turn.** `autoloop control guide --no-interrupt` queued the request but never signaled the harness, so live steer could only apply at the next iteration boundary (where no turn is active) — for every backend. The CLI now pokes the harness on every guide request; the signal only triggers a control-queue drain, and the backend adapter decides whether to steer or interrupt.
+
 - **`autoloop run <preset> --help` no longer starts a loop.** `--help`/`-h` anywhere among the run args shows usage instead of burning iterations against the backend.
 
 ## [0.7.4] - 2026-05-07
