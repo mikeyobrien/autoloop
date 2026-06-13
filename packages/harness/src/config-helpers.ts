@@ -690,6 +690,11 @@ function readBackendConfig(
     "model",
     config.get(cfg, "backend.model", ""),
   );
+  const profile = processStringOverride(
+    bo,
+    "profile",
+    config.get(cfg, "backend.profile", ""),
+  );
   return {
     kind,
     provider,
@@ -700,6 +705,7 @@ function readBackendConfig(
     trustAllTools,
     agent,
     model,
+    profile,
   };
 }
 
@@ -738,6 +744,7 @@ function readReviewConfig(
       ) !== "false",
     agent: config.get(cfg, "review.agent", backend.agent),
     model: config.get(cfg, "review.model", backend.model),
+    profile: config.get(cfg, "review.profile", backend.profile),
   };
 }
 

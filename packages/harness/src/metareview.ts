@@ -9,6 +9,7 @@ import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
+import { providerLaunchArgs } from "@mobrienv/autoloop-backends/acp-providers";
 import {
   initClaudeSdkSession,
   terminateClaudeSdkSession,
@@ -266,7 +267,11 @@ async function runAcpReview(
   const session = await initAcpSession({
     provider: loop.review.provider,
     command: loop.review.command,
-    args: loop.review.args,
+    args: providerLaunchArgs(
+      loop.review.provider,
+      loop.review.profile,
+      loop.review.args,
+    ),
     cwd: loop.paths.workDir,
     trustAllTools: loop.review.trustAllTools,
     agentName: loop.review.agent || undefined,

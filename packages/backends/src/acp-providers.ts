@@ -68,7 +68,7 @@ export const ACP_PROVIDERS: AcpProvider[] = [
 ];
 
 export function isAcpBackendKind(kind: string | undefined): boolean {
-  return kind === "acp" || kind === "kiro";
+  return kind === "acp" || kind === "kiro" || kind === "hermes";
 }
 
 export function resolveAcpProvider(

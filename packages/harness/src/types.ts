@@ -57,6 +57,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
   };
   review: {
     enabled: boolean;
@@ -72,6 +73,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
   memory: { budgetChars: number };
