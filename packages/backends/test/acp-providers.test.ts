@@ -1,6 +1,7 @@
 import {
   ACP_PROVIDERS,
   isAcpBackendKind,
+  providerLaunchArgs,
   resolveAcpProvider,
 } from "@mobrienv/autoloop-backends/acp-providers";
 import { describe, expect, it } from "vitest";
@@ -49,5 +50,54 @@ describe("ACP providers", () => {
     expect(new Set(ACP_PROVIDERS.map((p) => p.id)).size).toBe(
       ACP_PROVIDERS.length,
     );
+  });
+
+  it("knows the Hermes ACP default invocation", () => {
+    const provider = resolveAcpProvider({ kind: "acp", provider: "hermes" });
+
+    expect(provider.id).toBe("hermes");
+    expect(provider.defaultCommand).toBe("hermes");
+    expect(provider.defaultArgs).toEqual(["acp"]);
+    expect(provider.crashLabel).toBe("hermes");
+    expect(provider.supportsSessionMode).toBe(true);
+    expect(provider.supportsSessionModel).toBe(true);
+  });
+
+  it("auto-detects hermes by command basename", () => {
+    expect(
+      resolveAcpProvider({ kind: "acp", command: "/usr/local/bin/hermes" }).id,
+    ).toBe("hermes");
+    expect(resolveAcpProvider({ kind: "acp", command: "hermes" }).id).toBe(
+      "hermes",
+    );
+    expect(resolveAcpProvider({ kind: "acp", command: "hermes-x" }).id).toBe(
+      "generic",
+    );
+  });
+});
+
+describe("providerLaunchArgs", () => {
+  it("prepends --profile before the acp subcommand for hermes", () => {
+    expect(providerLaunchArgs("hermes", "architect", ["acp"])).toEqual([
+      "--profile",
+      "architect",
+      "acp",
+    ]);
+  });
+
+  it("returns args unchanged when no profile is set", () => {
+    expect(providerLaunchArgs("hermes", "", ["acp"])).toEqual(["acp"]);
+    expect(providerLaunchArgs("hermes", undefined, ["acp"])).toEqual(["acp"]);
+  });
+
+  it("ignores profile for non-hermes providers", () => {
+    expect(providerLaunchArgs("kiro", "architect", ["acp"])).toEqual(["acp"]);
+    expect(providerLaunchArgs("generic", "architect", [])).toEqual([]);
+  });
+
+  it("does not mutate the input args array", () => {
+    const args = ["acp"];
+    providerLaunchArgs("hermes", "architect", args);
+    expect(args).toEqual(["acp"]);
   });
 });
