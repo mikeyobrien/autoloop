@@ -10,6 +10,7 @@ export interface ResolvedIterationBackend {
   trustAllTools: boolean;
   agent: string;
   model: string;
+  profile: string;
 }
 
 export function resolvedFromLoopBackend(
@@ -25,5 +26,6 @@ export function resolvedFromLoopBackend(
     trustAllTools: loop.backend.trustAllTools,
     agent: loop.backend.agent,
     model: loop.backend.model,
+    profile: loop.backend.profile ?? "",
   };
 }

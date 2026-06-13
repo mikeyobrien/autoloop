@@ -68,10 +68,11 @@ Each `[[role]]` table defines one role in the loop. Roles are processed in decla
 | `backend_timeout_ms` | int | No | Override `backend.timeout_ms` for this role's iterations. |
 | `backend_agent` | string | No | ACP `setSessionMode` agent/mode for this role. **Subordinate to `agents.toml`** when the agent map resolves a non-empty value for the same role. |
 | `backend_model` | string | No | ACP `unstable_setSessionModel` model id for this role. |
+| `backend_profile` | string | No | Hermes agent profile (`--profile <name> acp`) for this role. Only effective when `backend_provider = "hermes"`. |
 
 If both `prompt` and `prompt_file` are set, `prompt` takes precedence. If neither is set, the role has no prompt text.
 
-All eight `backend_*` fields are optional. When unset, the role inherits the global `backend.*` value from `autoloops.toml`. See [Per-role backend overrides](#per-role-backend-overrides) for resolution order, ACP session lifecycle, and a worked example.
+All nine `backend_*` fields are optional. When unset, the role inherits the global `backend.*` value from `autoloops.toml`. See [Per-role backend overrides](#per-role-backend-overrides) for resolution order, ACP session lifecycle, and a worked example.
 
 ## `[handoff]` — event routing map
 
