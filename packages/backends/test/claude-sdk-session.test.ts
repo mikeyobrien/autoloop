@@ -170,11 +170,17 @@ beforeEach(() => {
 
 /** Wait for the lazy SDK import + query() call to produce the mock. */
 async function awaitMockQuery(): Promise<MockQuery> {
-  for (let i = 0; i < 50; i++) {
+  // Time-based deadline, not a fixed tick count: on a loaded CI runner the
+  // module transform behind the lazy import can outlast any number of bare
+  // setImmediate turns.
+  const deadline = Date.now() + 2000;
+  while (true) {
     const q = (globalThis as Record<string, unknown>)
       .__lastClaudeSdkMockQuery as MockQuery | undefined;
     if (q) return q;
+    if (Date.now() >= deadline) break;
     await settle();
+    await sleep(5);
   }
   throw new Error("mock query was never created");
 }
