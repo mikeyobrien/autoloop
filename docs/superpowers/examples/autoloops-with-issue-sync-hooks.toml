@@ -1,0 +1,30 @@
+# Example: autoloops.toml [hooks] wiring for issue sync.
+#
+# For a project using Linear (autoloop-linear-sync):
+[hooks]
+pre_run        = "autoloop-linear-sync pull"
+post_iteration = "autoloop-linear-sync push"
+post_run       = "autoloop-linear-sync push"
+# strict = true   # Uncomment to abort the run if pull fails
+
+# `push` moves every issue whose task is marked done (via `autoloop task complete
+# <id>`) to In Review. Completion is read from task STATUS, not git commits, so it
+# works for whole-queue, main-branch development. Add `--release` to also promote
+# In Review → Done. The loop's completion gate makes the agent complete each pulled
+# task before the run can end, so a clean run leaves nothing un-synced.
+
+# For a project using GitHub (autoloop-gh-sync):
+# [hooks]
+# pre_run        = "autoloop-gh-sync pull"
+# post_iteration = "autoloop-gh-sync push"
+# post_run       = "autoloop-gh-sync push"
+
+# The following env vars are available in every hook:
+#   AUTOLOOP_PROJECT_DIR   - the source project directory
+#   AUTOLOOP_RUN_ID        - the current run ID
+#   AUTOLOOP_PRESET        - the preset name
+#   AUTOLOOP_TASKS_FILE    - path to tasks.jsonl
+#   AUTOLOOP_ITERATION     - current iteration number (iteration hooks only)
+#   AUTOLOOP_GIT_SHA_BEFORE - git HEAD before the iteration (iteration hooks)
+#   AUTOLOOP_GIT_SHA_AFTER  - git HEAD after the iteration (iteration hooks)
+#   AUTOLOOP_STOP_REASON    - run outcome ("completed" = success); set on post_run
