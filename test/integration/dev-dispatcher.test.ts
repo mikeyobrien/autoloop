@@ -5,11 +5,11 @@ import { describe, expect, it } from "vitest";
 const ROOT = resolve(import.meta.dirname, "../..");
 const DEV = resolve(ROOT, "bin/dev");
 
-function run(args: string[]): string {
+function run(args: string[], timeoutMs = 30_000): string {
   return execFileSync(DEV, args, {
     cwd: ROOT,
     encoding: "utf-8",
-    timeout: 30_000,
+    timeout: timeoutMs,
     env: { ...process.env },
   });
 }
@@ -60,7 +60,9 @@ describe("bin/dev", () => {
   });
 
   it("build subcommand runs tsc successfully", () => {
-    const _out = run(["build"]);
+    // Full-monorepo tsc can exceed 30s under whole-suite load; the spawn
+    // timeout must match the test's own 60s budget.
+    const _out = run(["build"], 60_000);
     // tsc produces no output on success, but npm logs the script name
     // Just verify it exits 0 (no throw)
     expect(true).toBe(true);
@@ -68,7 +70,7 @@ describe("bin/dev", () => {
 
   it("test subcommand delegates to vitest", () => {
     // Run a small, fast unit test to verify delegation without self-recursion
-    const out = run(["test", "test/agent-map.test.ts"]);
+    const out = run(["test", "test/agent-map.test.ts"], 60_000);
     expect(out).toContain("agent-map");
   }, 60_000);
 });

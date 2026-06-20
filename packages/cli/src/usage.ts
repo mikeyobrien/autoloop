@@ -1,33 +1,61 @@
 import { joinCsv } from "@mobrienv/autoloop-core";
 import * as chains from "./chains.js";
+import { EXIT_USAGE, fail } from "./cli/fail.js";
+import { didYouMean } from "./cli/suggest.js";
 
 export function printUsage(): void {
   console.log("autoloop — autonomous LLM loop harness");
   console.log("");
   console.log("Usage:");
   console.log("  autoloop run <preset-name|preset-dir> [prompt...] [flags]");
+  console.log("  autoloop init [--preset <name>] [dir]");
   console.log("  autoloop emit <topic> [summary]");
   console.log(
     "  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]",
   );
-  console.log("  autoloop memory <list|status|find|add|remove> [args]");
+  console.log(
+    "  autoloop memory <list|status|find|add|remove|compact|prune> [args]",
+  );
   console.log("  autoloop task <add|complete|update|remove|list> [args]");
-  console.log("  autoloop list");
-  console.log("  autoloop loops [--all]");
+  console.log("  autoloop list [--json]");
+  console.log("  autoloop loops [--all] [--json]");
   console.log("  autoloop loops show <run-id>");
   console.log("  autoloop loops artifacts <run-id>");
   console.log("  autoloop loops watch <run-id>");
-  console.log("  autoloop loops health [--verbose]");
+  console.log("  autoloop loops health [--verbose] [--json]");
   console.log(
     "  autoloop control <show|capabilities|interrupt|guide> <run-id>",
   );
-  console.log("  autoloop chain <list|run> [args]");
+  console.log("  autoloop chain list [project-dir]");
+  console.log(
+    "  autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]",
+  );
   console.log("  autoloop runs clean [--max-age <days>]");
-  console.log("  autoloop worktree <list|show|merge|clean> [args]");
+  console.log("  autoloop stats [project-dir] [--json]");
+  console.log("  autoloop doctor [project-dir] [--json]");
+  console.log("  autoloop worktree <list|show|diff|merge|clean> [args]");
   console.log("  autoloop config <show|set|unset|path> [args]");
   console.log("  autoloop dashboard [--port <port>]");
   console.log("  autoloop kanban [--port <port>]");
   console.log("  autoloop acp [--project-dir <dir>]");
+  console.log("");
+  console.log("Agent / automation surfaces:");
+  console.log(
+    "  autoloop triage [--json]      One-call status: runs, health, doctor, next commands",
+  );
+  console.log(
+    "  autoloop capabilities         Machine-readable contract (commands, flags, exit codes)",
+  );
+  console.log(
+    "  autoloop robot-docs           Paste-ready agent handbook for this CLI",
+  );
+  console.log(
+    "  autoloop <cmd> --json         Structured output: list, loops, stats, doctor, chain run",
+  );
+  console.log("");
+  console.log(
+    "Exit codes: 0 success · 1 user-input error · 2 environment/state error",
+  );
   console.log("");
   console.log(
     "The preset argument is required for `run`. It must be a bundled preset",
@@ -39,8 +67,11 @@ export function printUsage(): void {
   console.log("");
   console.log("Flags:");
   console.log("  -h, --help       Show this help");
+  console.log("  -V, --version    Print the autoloop version");
   console.log("  -v, --verbose    Set log level to debug");
-  console.log("  -b, --backend    Override backend command");
+  console.log(
+    "  -b, --backend    Override backend (claude-sdk, pi, kiro, claude-agent-acp, acp:<provider>:<cmd>, or a command)",
+  );
   console.log(
     "  --max-iterations <n>  Override event_loop.max_iterations for this run",
   );
@@ -82,7 +113,9 @@ export function printRunUsage(): void {
   console.log("Flags:");
   console.log("  -h, --help       Show this help");
   console.log("  -v, --verbose    Set log level to debug");
-  console.log("  -b, --backend    Override backend command");
+  console.log(
+    "  -b, --backend    Override backend (claude-sdk, pi, kiro, claude-agent-acp, acp:<provider>:<cmd>, or a command)",
+  );
   console.log(
     "  --max-iterations <n>  Override event_loop.max_iterations for this run",
   );
@@ -173,6 +206,9 @@ export function printInspectUsage(): void {
     "  metrics        [run_id]      md, terminal, csv, json terminal",
   );
   console.log(
+    "  usage          [--run]       terminal, json          terminal",
+  );
+  console.log(
     "  profiles       —             terminal                terminal",
   );
   console.log(
@@ -196,11 +232,15 @@ export function printMemoryUsage(): void {
   console.log("  autoloop memory add preference <category> <text...>");
   console.log("  autoloop memory add meta <key> <value...>");
   console.log("  autoloop memory remove <id> [reason...]");
+  console.log("  autoloop memory compact [project-dir]");
+  console.log("  autoloop memory prune --max-age <days> [project-dir]");
 }
 
 export function printTaskUsage(): void {
   console.log("Usage:");
-  console.log("  autoloop task add <text...>");
+  console.log(
+    "  autoloop task add [--priority|-p <high|normal|low>] [--soft] <text...>",
+  );
   console.log("  autoloop task complete <id>");
   console.log("  autoloop task update <id> <text...>");
   console.log("  autoloop task remove <id> [reason...]");
@@ -220,42 +260,40 @@ export function printMemoryAddUsage(): void {
 }
 
 export function missingPresetError(): void {
-  console.log("error: missing required preset argument");
-  console.log("");
-  console.log(
-    "Usage: autoloop run <preset-name|preset-dir> [prompt...] [flags]",
+  fail(
+    [
+      "error: missing required preset argument",
+      "",
+      "Usage: autoloop run <preset-name|preset-dir> [prompt...] [flags]",
+      "",
+      "Examples:",
+      "  autoloop run autocode",
+      '  autoloop run autocode "Fix the login bug"',
+      '  autoloop run autocode --max-iterations 250 "Fix the login bug"',
+      '  autoloop run autocode --set backend.timeout_ms=900000 "Fix slowly"',
+      '  autoloop run presets/autoqa "QA recent changes"',
+      '  autoloop run . "Run from current directory"',
+      "",
+      "Run 'autoloop list' to see all available presets.",
+    ],
+    EXIT_USAGE,
   );
-  console.log("");
-  console.log("Examples:");
-  console.log("  autoloop run autocode");
-  console.log('  autoloop run autocode "Fix the login bug"');
-  console.log(
-    '  autoloop run autocode --max-iterations 250 "Fix the login bug"',
-  );
-  console.log(
-    '  autoloop run autocode --set backend.timeout_ms=900000 "Fix slowly"',
-  );
-  console.log('  autoloop run presets/autoqa "QA recent changes"');
-  console.log('  autoloop run . "Run from current directory"');
-  console.log("");
-  console.log("Run 'autoloop list' to see all available presets.");
 }
 
 export function unknownPresetError(name: string): void {
-  console.log(`error: preset \`${name}\` not found`);
-  console.log("");
-  console.log(
+  const lines = [`error: preset \`${name}\` not found`];
+  const hint = didYouMean(name, chains.listKnownPresets());
+  if (hint) lines.push(hint);
+  lines.push(
+    "",
     `The argument \`${name}\` is not a valid preset name or directory.`,
-  );
-  console.log(
     "A preset must be a directory containing autoloops.toml (or autoloops.conf),",
-  );
-  console.log("or a bundled preset name.");
-  console.log("");
-  console.log(`Available presets: ${joinCsv(chains.listKnownPresets())}`);
-  console.log("Run 'autoloop list' to see all available presets.");
-  console.log("");
-  console.log(
+    "or a bundled preset name.",
+    "",
+    `Available presets: ${joinCsv(chains.listKnownPresets())}`,
+    "Run 'autoloop list' to see all available presets.",
+    "",
     "Usage: autoloop run <preset-name|preset-dir> [prompt...] [flags]",
   );
+  fail(lines, EXIT_USAGE);
 }

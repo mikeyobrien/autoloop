@@ -1,4 +1,5 @@
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import type { ClaudeSdkSession } from "@mobrienv/autoloop-backends/claude-sdk-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
 import type * as topo from "@mobrienv/autoloop-core/topology";
@@ -34,7 +35,17 @@ export interface Verdict {
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
-  limits: { maxIterations: number };
+  limits: {
+    maxIterations: number;
+    /** Stop after N consecutive identical backend outputs (0 = disabled). */
+    stallIterations?: number;
+    /** Stop once journaled run cost reaches this USD budget (0 = disabled). */
+    maxCostUsd?: number;
+    /** Per-iteration runtime cap in ms (0 = fall back to backend.timeoutMs). */
+    maxIterationRuntimeMs?: number;
+    /** Loop wall-clock budget in ms (0 = disabled). */
+    maxRuntimeMs?: number;
+  };
   completion: { promise: string; event: string; requiredEvents: string[] };
   backend: {
     kind: string;
@@ -110,6 +121,12 @@ export interface LoopContext {
    * so reloads must share one holder.
    */
   piSession: { current: PiSession | undefined };
+  /**
+   * Live Claude Agent SDK session holder. Fresh session per iteration (one
+   * query is one conversation), but aliased like the others so live control
+   * (interrupt/steer) always targets the in-flight session.
+   */
+  claudeSdkSession: { current: ClaudeSdkSession | undefined };
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

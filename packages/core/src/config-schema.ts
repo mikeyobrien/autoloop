@@ -6,6 +6,7 @@
 // keep a single import surface (`import * as config from "./config.js"`).
 
 import TOML from "@iarna/toml";
+import { MAX_TIMER_MS, parseDurationMs } from "./duration.js";
 import { parseStringList } from "./utils.js";
 
 export type Config = Record<string, unknown>;
@@ -23,6 +24,14 @@ export function defaults(): Config {
       completion_promise: "LOOP_COMPLETE",
       completion_event: "task.complete",
       required_events: "",
+      // Stop after N consecutive identical backend outputs (0 = disabled).
+      stall_iterations: "0",
+      // Stop once journaled run cost reaches this USD budget (0 = disabled).
+      max_cost_usd: "0",
+      // Per-iteration runtime cap ("3d", "90m", or ms int; 0 = use backend.timeout_ms).
+      max_iteration_runtime: "0",
+      // Loop wall-clock budget ("12h", "3d", or ms int; 0 = disabled).
+      max_runtime: "0",
     },
     backend: { kind: "", command: "claude", timeout_ms: "300000" },
     parallel: {
@@ -51,6 +60,34 @@ export function getInt(config: Config, key: string, fallback: number): number {
   if (raw === "") return fallback;
   const parsed = parseInt(raw, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+export function getFloat(
+  config: Config,
+  key: string,
+  fallback: number,
+): number {
+  const raw = get(config, key, "");
+  if (raw === "") return fallback;
+  const parsed = Number.parseFloat(raw);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+/**
+ * Duration accessor: accepts "3d"/"1h30m"-style strings or bare millisecond
+ * integers. Missing or unparseable values fall back (matching getInt/getFloat);
+ * results are clamped to MAX_TIMER_MS so every timer consumer stays valid.
+ */
+export function getDuration(
+  config: Config,
+  key: string,
+  fallbackMs: number,
+): number {
+  const raw = get(config, key, "");
+  if (raw === "") return fallbackMs;
+  const parsed = parseDurationMs(raw);
+  if (parsed === null) return fallbackMs;
+  return Math.min(parsed, MAX_TIMER_MS);
 }
 
 export function getList(config: Config, key: string): string[] {

@@ -8,6 +8,7 @@
 
 export * from "./bundled-presets.js";
 export * from "./color.js";
+export * from "./duration.js";
 export * from "./events/decode.js";
 export * from "./events/encode.js";
 export * from "./events/guards.js";
@@ -16,4 +17,5 @@ export * from "./helpers.js";
 export * from "./json.js";
 export * from "./markdown.js";
 export * from "./runs-health.js";
+export * from "./usage.js";
 export * from "./utils.js";

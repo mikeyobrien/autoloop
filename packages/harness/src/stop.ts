@@ -114,6 +114,117 @@ export function stopBackendTimeout(
   return { iterations: iteration, stopReason: "backend_timeout" };
 }
 
+export function stopStalled(
+  loop: LoopContext,
+  completed: number,
+  repeats: number,
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=stalled identical_outputs=${repeats} threshold=${loop.limits.stallIterations ?? 0}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration: completed,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:stalled",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    "",
+    "loop.stop",
+    jsonField("reason", "stalled") +
+      ", " +
+      jsonField("completed_iterations", String(completed)) +
+      ", " +
+      jsonField("identical_outputs", String(repeats)) +
+      ", " +
+      jsonField("stall_iterations", String(loop.limits.stallIterations ?? 0)),
+  );
+  registryStop(loop, completed, "stalled");
+  return { iterations: completed, stopReason: "stalled" };
+}
+
+export function stopCostBudget(
+  loop: LoopContext,
+  completed: number,
+  costUsd: number,
+  maxCostUsd: number,
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=cost_budget cost_usd=${costUsd.toFixed(4)} max_cost_usd=${maxCostUsd}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration: completed,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:cost_budget",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    "",
+    "loop.stop",
+    jsonField("reason", "cost_budget") +
+      ", " +
+      jsonField("completed_iterations", String(completed)) +
+      ", " +
+      jsonField("cost_usd", costUsd.toFixed(6)) +
+      ", " +
+      jsonField("max_cost_usd", String(maxCostUsd)),
+  );
+  registryStop(loop, completed, "cost_budget");
+  return { iterations: completed, stopReason: "cost_budget" };
+}
+
+export function stopMaxRuntime(
+  loop: LoopContext,
+  completed: number,
+  elapsedMs: number,
+  maxRuntimeMs: number,
+  outputTail?: string,
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=max_runtime elapsed_ms=${elapsedMs} max_runtime_ms=${maxRuntimeMs}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration: completed,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:max_runtime",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    "",
+    "loop.stop",
+    jsonField("reason", "max_runtime") +
+      ", " +
+      jsonField("completed_iterations", String(completed)) +
+      ", " +
+      jsonField("elapsed_ms", String(elapsedMs)) +
+      ", " +
+      jsonField("max_runtime_ms", String(maxRuntimeMs)) +
+      (outputTail !== undefined
+        ? ", " + jsonField("output_tail", lastNChars(outputTail, 500))
+        : ""),
+  );
+  registryStop(loop, completed, "max_runtime");
+  return { iterations: completed, stopReason: "max_runtime" };
+}
+
 export function completeLoop(
   loop: LoopContext,
   iteration: number,

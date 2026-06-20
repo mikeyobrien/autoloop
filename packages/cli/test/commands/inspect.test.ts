@@ -165,21 +165,27 @@ describe("dispatchInspect catch-all error", () => {
     process.env.AUTOLOOP_PROJECT_DIR = "/tmp/test-project";
   });
 
-  it("prints valid targets for unknown artifact", () => {
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it("prints valid targets for unknown artifact on stderr", () => {
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
     dispatchInspect(["bogus"]);
-    const output = spy.mock.calls.map((c) => c[0]).join("\n");
-    expect(output).toContain("Unknown inspect target `bogus`");
+    const output = spy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toContain("unknown inspect target `bogus`");
     expect(output).toContain("Valid targets:");
     expect(output).toContain("topology");
     spy.mockRestore();
+    process.exitCode = 0;
   });
 
-  it("suggests closest target for near-miss", () => {
-    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+  it("suggests closest target for near-miss on stderr", () => {
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
     dispatchInspect(["topolog"]);
-    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    const output = spy.mock.calls.map((c) => String(c[0])).join("");
     expect(output).toContain("Did you mean `topology`");
     spy.mockRestore();
+    process.exitCode = 0;
   });
 });

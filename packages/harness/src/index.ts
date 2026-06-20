@@ -4,19 +4,23 @@ import { normalizeBackendLabel } from "@mobrienv/autoloop-backends";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import {
+  abortClaudeSdkTurn,
+  steerClaudeSdkTurn,
+  terminateClaudeSdkSession,
+} from "@mobrienv/autoloop-backends/claude-sdk-client";
+import {
   abortPiTurn,
   steerPiTurn,
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import * as config from "@mobrienv/autoloop-core/config";
-import { readIfExists } from "@mobrienv/autoloop-core/journal";
+import { readIfExists, readRunLines } from "@mobrienv/autoloop-core/journal";
 import {
   cleanWorktrees,
   mergeWorktree,
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "@mobrienv/autoloop-core/worktree";
-import { collectArtifacts, formatArtifacts } from "./artifacts.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
@@ -28,6 +32,7 @@ import {
 } from "./config-helpers.js";
 import { acpControlAdapter } from "./control/acp-adapter.js";
 import type { LiveControlAdapter } from "./control/adapter.js";
+import { claudeSdkControlAdapter } from "./control/claude-sdk-adapter.js";
 import {
   drainControlRequests,
   publishCapabilities,
@@ -35,8 +40,10 @@ import {
 import { piControlAdapter } from "./control/pi-adapter.js";
 import { log } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
+import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
+import { runFinishNotification } from "./notify.js";
 import {
   appendLoopStart,
   branchStopReason,
@@ -47,7 +54,13 @@ import {
   writeParallelBranchSummary,
 } from "./parallel.js";
 import { registryStart, registryStop } from "./registry-bridge.js";
-import { completeLoop, stopMaxIterations } from "./stop.js";
+import {
+  completeLoop,
+  stopCostBudget,
+  stopMaxIterations,
+  stopMaxRuntime,
+  stopStalled,
+} from "./stop.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export type { LoopContext, RunOptions, RunSummary };
@@ -95,6 +108,13 @@ export async function run(
       const session = loop.piSession.current;
       loop.piSession.current = undefined;
       terminatePiSession(session).catch(() => {
+        /* best-effort */
+      });
+    }
+    if (loop.claudeSdkSession.current) {
+      const session = loop.claudeSdkSession.current;
+      loop.claudeSdkSession.current = undefined;
+      terminateClaudeSdkSession(session).catch(() => {
         /* best-effort */
       });
     }
@@ -198,6 +218,14 @@ export async function run(
       }
       loop.piSession.current = undefined;
     }
+    if (loop.claudeSdkSession.current) {
+      try {
+        await terminateClaudeSdkSession(loop.claudeSdkSession.current);
+      } catch {
+        /* best-effort */
+      }
+      loop.claudeSdkSession.current = undefined;
+    }
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
 
@@ -269,6 +297,15 @@ export async function run(
       }
     }
   }
+
+  runFinishNotification({
+    projectDir: loop.paths.mainProjectDir,
+    journalFile: loop.paths.journalFile,
+    runId: loop.runtime.runId,
+    preset: loop.launch.preset,
+    stopReason: summary.stopReason,
+    iterations: summary.iterations,
+  });
 
   loop.onEvent?.({
     type: "summary",
@@ -342,6 +379,14 @@ export async function runParallelBranchCli(
         /* best-effort */
       }
       seeded.piSession.current = undefined;
+    }
+    if (seeded.claudeSdkSession.current) {
+      try {
+        await terminateClaudeSdkSession(seeded.claudeSdkSession.current);
+      } catch {
+        /* best-effort */
+      }
+      seeded.claudeSdkSession.current = undefined;
     }
   }
   const finishedMs = Date.now();
@@ -425,6 +470,39 @@ async function runReviewThenIterate(
   if (iteration > reviewed.limits.maxIterations) {
     return stopMaxIterations(reviewed, iteration);
   }
+  // Guard checks between iterations: both are journal-derived so they cover
+  // every continue path (routed, rejected, plain) without in-memory state.
+  if (iteration > 1) {
+    const runLines = readRunLines(
+      reviewed.paths.journalFile,
+      reviewed.runtime.runId,
+    );
+    const stall = detectStall(runLines, reviewed.limits.stallIterations ?? 0);
+    if (stall.stalled) {
+      return stopStalled(reviewed, iteration - 1, stall.repeats);
+    }
+    const budget = checkCostBudget(runLines, reviewed.limits.maxCostUsd ?? 0);
+    if (budget.exceeded) {
+      return stopCostBudget(
+        reviewed,
+        iteration - 1,
+        budget.costUsd,
+        reviewed.limits.maxCostUsd ?? 0,
+      );
+    }
+    const runtime = checkRuntimeBudget(
+      runLines,
+      reviewed.limits.maxRuntimeMs ?? 0,
+    );
+    if (runtime.exceeded) {
+      return stopMaxRuntime(
+        reviewed,
+        iteration - 1,
+        runtime.elapsedMs,
+        reviewed.limits.maxRuntimeMs ?? 0,
+      );
+    }
+  }
   return runIteration(reviewed, iteration, recurse);
 }
 
@@ -458,6 +536,20 @@ function buildControlAdapter(
       triggerSteer: (message) => {
         if (loop.piSession.current) {
           steerPiTurn(loop.piSession.current, message);
+        }
+      },
+    });
+  }
+  if (loop.backend.kind === "claude-sdk") {
+    return claudeSdkControlAdapter(loop.runtime.runId, {
+      triggerInterrupt: () => {
+        if (loop.claudeSdkSession.current) {
+          abortClaudeSdkTurn(loop.claudeSdkSession.current);
+        }
+      },
+      triggerSteer: (message) => {
+        if (loop.claudeSdkSession.current) {
+          steerClaudeSdkTurn(loop.claudeSdkSession.current, message);
         }
       },
     });

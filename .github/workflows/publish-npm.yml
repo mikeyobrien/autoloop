@@ -10,7 +10,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
-  contents: read
+  # contents: write is needed to create the GitHub release after publish.
+  contents: write
   id-token: write
 
 jobs:
@@ -133,9 +134,21 @@ jobs:
             console.log(owned.join('\n'));
           " > /tmp/workspace-deps.txt
 
+          # The registry index lags the publish by a few seconds, so a dep
+          # published moments ago can 404 here (this aborted the v0.8.0 run).
+          # Retry with backoff before declaring a dep unresolvable.
           while IFS= read -r dep; do
             [ -z "$dep" ] && continue
-            if ! npm view "$dep@$ROOT_VERSION" version >/dev/null 2>&1; then
+            resolvable=false
+            for attempt in 1 2 3 4 5 6; do
+              if npm view "$dep@$ROOT_VERSION" version >/dev/null 2>&1; then
+                resolvable=true
+                break
+              fi
+              echo "wait: $dep@$ROOT_VERSION not indexed yet (attempt $attempt/6), retrying in 10s"
+              sleep 10
+            done
+            if [ "$resolvable" != "true" ]; then
               echo "::error::Workspace dep $dep@$ROOT_VERSION is not resolvable on the registry. Aborting before root publish."
               exit 1
             fi
@@ -163,3 +176,28 @@ jobs:
       - name: Publish summary
         if: steps.npm_version.outputs.already_published == 'true'
         run: echo "Root publish skipped because this version is already on npm."
+
+      - name: Create GitHub release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="$GITHUB_REF_NAME"
+          VERSION="${TAG#v}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists; skipping"
+            exit 0
+          fi
+          # Pull this version's section out of CHANGELOG.md for the notes.
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { found = 1; next }
+            /^## \[/ && found { exit }
+            found { print }
+          ' CHANGELOG.md > /tmp/release-notes.md
+          if [ -s /tmp/release-notes.md ]; then
+            gh release create "$TAG" --title "$TAG" --notes-file /tmp/release-notes.md
+          else
+            echo "no CHANGELOG section for $VERSION; falling back to generated notes"
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi

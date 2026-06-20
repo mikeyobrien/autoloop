@@ -1,0 +1,16 @@
+{"surface_id":"cmd_root_bare","kind":"verb","name":"autoloop (bare)","evidence":"probe: exit=0, stdout 'error: missing required preset argument'","notes":"bare invocation routes to run via default fallthrough main.ts:123"}
+{"surface_id":"flag_root_version","kind":"flag","name":"--version","evidence":"probe: treated as preset name, exit=0","notes":"missing entirely"}
+{"surface_id":"cmd_root_help_word","kind":"verb","name":"help","evidence":"probe: treated as preset name","notes":"only -h/--help supported"}
+{"surface_id":"cmd_unknown_fallthrough","kind":"verb","name":"<unknown cmd>","evidence":"main.ts:123-124 default→dispatchRun; probe 'staus'→preset error, no command suggestion","notes":"P0"}
+{"surface_id":"err_contract_global","kind":"error-channel","name":"error output contract","evidence":"usage.ts:237-278 console.log; probes show exit=0 on all error paths","notes":"errors→stdout, exit 0"}
+{"surface_id":"cmd_capabilities","kind":"verb","name":"capabilities","evidence":"probe: preset error","notes":"missing"}
+{"surface_id":"cmd_robot_docs","kind":"verb","name":"robot-docs","evidence":"discover-cli: robot_docs=false","notes":"missing"}
+{"surface_id":"cmd_list","kind":"verb","name":"list","evidence":"probe: --json works, plain piped output","notes":"good"}
+{"surface_id":"cmd_loops","kind":"verb","name":"loops","evidence":"probe: --json works; --jsno → 'Unknown loops subcommand' exit 0 stdout","notes":"flag typo unhandled"}
+{"surface_id":"cmd_doctor","kind":"verb","name":"doctor","evidence":"probe: --json works, exitCode=1 on fail (doctor.ts:40)","notes":"good"}
+{"surface_id":"cmd_stats","kind":"verb","name":"stats","evidence":"probe: --json works","notes":"good"}
+{"surface_id":"cmd_inspect","kind":"verb","name":"inspect","evidence":"probe: did-you-mean on bad artifact; usage exit 0 on noargs","notes":"suggestion exists; exit code wrong"}
+{"surface_id":"cmd_memory","kind":"verb","name":"memory","evidence":"probe: 'memory lst' prints usage exit 0, no suggestion","notes":"no subverb suggestion"}
+{"surface_id":"cmd_task","kind":"verb","name":"task","evidence":"probe: 'task ad hello' prints usage exit 0, no suggestion","notes":"no subverb suggestion"}
+{"surface_id":"cmd_help_drift","kind":"docs","name":"--help completeness","evidence":"usage.ts printUsage lists init/control/stats/doctor at HEAD; ok post-build","notes":"help drift fixed at HEAD; no mention of exit codes or agent surfaces"}
+{"surface_id":"exit_code_dictionary","kind":"exit-code","name":"exit code contract","evidence":"grep: only 0/1 used, no documented dictionary","notes":"undocumented"}

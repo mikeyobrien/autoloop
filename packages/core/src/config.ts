@@ -30,6 +30,8 @@ export {
   deepMerge,
   defaults,
   get,
+  getDuration,
+  getFloat,
   getInt,
   getList,
   getProfileDefaults,

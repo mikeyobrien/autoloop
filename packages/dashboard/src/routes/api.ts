@@ -29,22 +29,27 @@ function enrichRecords(stateDir: string, records: RunRecord[]): void {
   for (const r of records) enrichWithWorktreeMeta(stateDir, r);
 }
 
+/** Categorized + enriched run list — shared by /runs and /stream. */
+export function buildRunsPayload(
+  ctx: DashboardContext,
+): ReturnType<typeof categorizeRuns> {
+  const result = categorizeRuns(ctx.stateDir);
+  for (const bucket of [
+    result.active,
+    result.watching,
+    result.stuck,
+    result.recentFailed,
+    result.recentCompleted,
+  ]) {
+    enrichRecords(ctx.stateDir, bucket);
+  }
+  return result;
+}
+
 export function apiRoutes(ctx: DashboardContext): Hono {
   const api = new Hono();
 
-  api.get("/runs", (c) => {
-    const result = categorizeRuns(ctx.stateDir);
-    for (const bucket of [
-      result.active,
-      result.watching,
-      result.stuck,
-      result.recentFailed,
-      result.recentCompleted,
-    ]) {
-      enrichRecords(ctx.stateDir, bucket);
-    }
-    return c.json(result);
-  });
+  api.get("/runs", (c) => c.json(buildRunsPayload(ctx)));
 
   api.get("/runs/:id", (c) => {
     const id = c.req.param("id");

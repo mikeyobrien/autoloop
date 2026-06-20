@@ -1,4 +1,4 @@
-import type { Budget, ChainTracker } from "./types.js";
+import type { Budget, ChainSpec, ChainTracker } from "./types.js";
 
 export function defaultBudget(): Budget {
   return {
@@ -36,6 +36,24 @@ export function checkBudget(
     return {
       ok: false,
       reason: `max_consecutive_failures exceeded (${tracker.consecutiveFailures}/${budget.maxConsecutiveFailures})`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Static (pre-execution) budget validation for an explicit chain: the chain's
+ * own step count must fit within maxSteps. Runtime limits (maxRuntimeMs,
+ * consecutive failures) are enforced during execution instead.
+ */
+export function checkPlanBudget(
+  spec: Pick<ChainSpec, "steps">,
+  budget: Budget,
+): { ok: boolean; reason?: string } {
+  if (spec.steps.length > budget.maxSteps) {
+    return {
+      ok: false,
+      reason: `max_steps exceeded (${spec.steps.length}/${budget.maxSteps})`,
     };
   }
   return { ok: true };

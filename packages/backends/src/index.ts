@@ -5,6 +5,10 @@ import {
   shellWords,
 } from "@mobrienv/autoloop-core";
 import { type AcpSession, sendAcpPrompt } from "./acp-client.js";
+import {
+  type ClaudeSdkSession,
+  sendClaudeSdkPrompt,
+} from "./claude-sdk-client.js";
 import { type PiSession, sendPiPrompt } from "./pi-rpc-client.js";
 import { buildCommandInvocation, runShellCommand } from "./run-command.js";
 import type { BackendCommandContext, BackendRunResult } from "./types.js";
@@ -84,12 +88,45 @@ export async function runPiIteration(
 }
 
 /**
+ * Drive one iteration against a live Claude Agent SDK session and map the
+ * result into the uniform BackendRunResult shape. The streaming-input session
+ * is what enables live control: interrupt() of the in-flight turn and
+ * mid-turn steering via queued user messages.
+ */
+export async function runClaudeSdkIteration(
+  session: ClaudeSdkSession,
+  prompt: string,
+  timeoutMs: number,
+  streamLogPath?: string,
+): Promise<BackendRunResult> {
+  session.streamLogPath = streamLogPath;
+  const result = await sendClaudeSdkPrompt(session, prompt, timeoutMs);
+  return {
+    output: failureOutput(result.output, result.error, "claude-sdk"),
+    exitCode: result.error ? 1 : 0,
+    timedOut: result.timedOut,
+    providerKind: "claude-sdk",
+    errorCategory: result.timedOut
+      ? "timeout"
+      : result.error
+        ? "non_zero_exit"
+        : "none",
+  };
+}
+
+/**
  * Keep the error detail in the journaled output on failure — exit codes alone
  * make failed iterations undiagnosable after the fact.
  */
-function failureOutput(output: string, error: string | undefined): string {
+function failureOutput(
+  output: string,
+  error: string | undefined,
+  label = "pi",
+): string {
   if (!error) return output;
-  return output ? `${output}\n\npi error: ${error}` : `pi error: ${error}`;
+  return output
+    ? `${output}\n\n${label} error: ${error}`
+    : `${label} error: ${error}`;
 }
 
 /**
@@ -118,8 +155,27 @@ export function buildBackendShellCommand(ctx: BackendCommandContext): string {
           ctx.spec.command,
           ...ctx.spec.args,
         ])
-      : buildCommandInvocation(ctx.spec, ctx.prompt);
+      : buildCommandInvocation(headlessShellSpec(ctx.spec), ctx.prompt);
   return envLines + wrapProcessInvocation(childCommand);
+}
+
+/**
+ * One-shot shell fallback for the claude-sdk backend — parallel waves run
+ * process-per-task instead of through the SDK session. The SDK spec carries
+ * no CLI args, so inject the headless flags the legacy command path uses;
+ * a bare `claude <prompt>` would open the interactive UI and hang until the
+ * wave timeout.
+ */
+function headlessShellSpec(
+  spec: BackendCommandContext["spec"],
+): BackendCommandContext["spec"] {
+  if (spec.kind !== "claude-sdk") return spec;
+  const args = [...spec.args];
+  if (!args.includes("-p")) args.unshift("-p");
+  if (!args.includes("--dangerously-skip-permissions")) {
+    args.push("--dangerously-skip-permissions");
+  }
+  return { ...spec, args };
 }
 
 export function runBackendCommand(
@@ -137,6 +193,7 @@ export function normalizeProviderKind(spec: {
   args: string[];
 }): string {
   if (spec.kind === "pi") return "pi";
+  if (spec.kind === "claude-sdk") return "claude-sdk";
   if (spec.kind === "acp") return `acp:${spec.provider || "generic"}`;
   if (spec.kind === "kiro") return "acp:kiro";
   if (isMockInvocation(spec.command, spec.args)) return "mock";

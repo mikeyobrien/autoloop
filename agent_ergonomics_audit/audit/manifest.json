@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.1.0",
+  "tool_name": "autoloop",
+  "tool_repo": "/Users/rook/projects/autoloop",
+  "audit_workspace": "/Users/rook/projects/autoloop/agent_ergonomics_audit",
+  "rubric_version": "<git SHA of references/rubric/SCORING-RUBRIC.md when scoring ran>",
+  "passes": [
+    {
+      "pass": 1,
+      "applied_changes_count": 13,
+      "median_uplift": 550,
+      "regressions": 0,
+      "check_gate": "green"
+    }
+  ],
+  "current_pass": 1,
+  "pass_N+1_ready": false,
+  "next_pass_focus": null,
+  "mode": "full"
+}

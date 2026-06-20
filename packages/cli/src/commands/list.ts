@@ -6,6 +6,16 @@ export function dispatchList(args: string[], bundleRoot: string): boolean {
     return true;
   }
   const presets = chains.listPresetsWithDescriptions(bundleRoot);
+  if (args.includes("--json")) {
+    console.log(
+      JSON.stringify(
+        presets.map(({ name, description }) => ({ name, description })),
+        null,
+        2,
+      ),
+    );
+    return true;
+  }
   const maxName = Math.max(...presets.map((p) => p.name.length));
   for (const { name, description } of presets) {
     const pad = " ".repeat(maxName - name.length + 2);

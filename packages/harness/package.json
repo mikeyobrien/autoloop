@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-harness",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "license": "MIT",
   "description": "autoloop harness runtime (iteration loop, metareview, wave orchestration, backend drivers)",
   "type": "module",
@@ -42,6 +42,10 @@
     "./metrics": {
       "types": "./dist/metrics.d.ts",
       "default": "./dist/metrics.js"
+    },
+    "./guards": {
+      "types": "./dist/guards.d.ts",
+      "default": "./dist/guards.js"
     },
     "./scratchpad": {
       "types": "./dist/scratchpad.d.ts",
@@ -111,6 +115,10 @@
       "types": "./dist/control/adapter.d.ts",
       "default": "./dist/control/adapter.js"
     },
+    "./control/claude-sdk-adapter": {
+      "types": "./dist/control/claude-sdk-adapter.d.ts",
+      "default": "./dist/control/claude-sdk-adapter.js"
+    },
     "./control/kiro-adapter": {
       "types": "./dist/control/kiro-adapter.d.ts",
       "default": "./dist/control/kiro-adapter.js"
@@ -134,8 +142,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.0",
     "@iarna/toml": "^2.2.5",
-    "@mobrienv/autoloop-backends": "0.7.4",
-    "@mobrienv/autoloop-core": "0.7.4"
+    "@mobrienv/autoloop-backends": "0.8.0",
+    "@mobrienv/autoloop-core": "0.8.0"
   },
   "scripts": {
     "build": "tsc"

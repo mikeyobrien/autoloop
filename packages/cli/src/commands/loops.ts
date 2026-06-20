@@ -1,5 +1,13 @@
 import { join } from "node:path";
+import { failMissingArg, failUnknown } from "../cli/fail.js";
 import { healthSummary } from "../loops/health.js";
+import {
+  artifactsJson,
+  healthJson,
+  type JsonResult,
+  listRunsJson,
+  showRunJson,
+} from "../loops/json.js";
 import { listRuns } from "../loops/list.js";
 import { showArtifacts, showRun } from "../loops/show.js";
 import { watchRun } from "../loops/watch.js";
@@ -7,13 +15,17 @@ import { watchRun } from "../loops/watch.js";
 export function dispatchLoops(args: string[]): void {
   const projectDir = resolveProjectDir();
   const stateDir = join(projectDir, ".autoloop");
+  const json = args.includes("--json");
+  const rest = json ? args.filter((a) => a !== "--json") : args;
 
-  if (args.length === 0) {
-    console.log(listRuns(stateDir, false));
+  if (rest.length === 0) {
+    console.log(
+      json ? listRunsJson(stateDir, false) : listRuns(stateDir, false),
+    );
     return;
   }
 
-  const first = args[0];
+  const first = rest[0];
 
   if (first === "--help" || first === "-h") {
     printLoopsUsage();
@@ -21,14 +33,18 @@ export function dispatchLoops(args: string[]): void {
   }
 
   if (first === "--all") {
-    console.log(listRuns(stateDir, true));
+    console.log(json ? listRunsJson(stateDir, true) : listRuns(stateDir, true));
     return;
   }
 
   if (first === "show") {
-    const runId = args[1];
+    const runId = rest[1];
     if (!runId) {
-      console.log("Usage: autoloop loops show <run-id>");
+      failMissingArg("autoloop loops show <run-id>", "run-id");
+      return;
+    }
+    if (json) {
+      printJsonResult(showRunJson(stateDir, runId));
       return;
     }
     console.log(showRun(stateDir, runId));
@@ -36,9 +52,13 @@ export function dispatchLoops(args: string[]): void {
   }
 
   if (first === "artifacts") {
-    const runId = args[1];
+    const runId = rest[1];
     if (!runId) {
-      console.log("Usage: autoloop loops artifacts <run-id>");
+      failMissingArg("autoloop loops artifacts <run-id>", "run-id");
+      return;
+    }
+    if (json) {
+      printJsonResult(artifactsJson(stateDir, runId));
       return;
     }
     console.log(showArtifacts(stateDir, runId));
@@ -46,9 +66,9 @@ export function dispatchLoops(args: string[]): void {
   }
 
   if (first === "watch") {
-    const runId = args[1];
+    const runId = rest[1];
     if (!runId) {
-      console.log("Usage: autoloop loops watch <run-id>");
+      failMissingArg("autoloop loops watch <run-id>", "run-id");
       return;
     }
     watchRun(stateDir, runId).catch((err: unknown) => {
@@ -59,13 +79,28 @@ export function dispatchLoops(args: string[]): void {
   }
 
   if (first === "health") {
-    const verbose = args.includes("--verbose") || args.includes("-v");
+    if (json) {
+      console.log(healthJson(stateDir));
+      return;
+    }
+    const verbose = rest.includes("--verbose") || rest.includes("-v");
     console.log(healthSummary(stateDir, verbose));
     return;
   }
 
-  console.log(`Unknown loops subcommand: ${first}`);
-  printLoopsUsage();
+  failUnknown({
+    kind: first.startsWith("-") ? "loops flag" : "loops subcommand",
+    input: first,
+    candidates: ["show", "artifacts", "watch", "health", "--all", "--json"],
+    helpCommand: "autoloop loops --help",
+  });
+}
+
+function printJsonResult(result: JsonResult): void {
+  console.log(result.output);
+  if (result.exitCode !== 0) {
+    process.exitCode = result.exitCode;
+  }
 }
 
 function printLoopsUsage(): void {

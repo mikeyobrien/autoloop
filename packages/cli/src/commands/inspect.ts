@@ -5,7 +5,9 @@ import * as profiles from "@mobrienv/autoloop-core/profiles";
 import * as tasks from "@mobrienv/autoloop-core/tasks";
 import * as topo from "@mobrienv/autoloop-core/topology";
 import * as chains from "../chains.js";
+import { fail } from "../cli/fail.js";
 import * as render from "../cli/render.js";
+import { suggestClosest } from "../cli/suggest.js";
 import { printInspectUsage } from "../usage.js";
 
 const INSPECT_TARGETS = [
@@ -19,6 +21,7 @@ const INSPECT_TARGETS = [
   "coordination",
   "chain",
   "metrics",
+  "usage",
   "profiles",
   "topology",
 ];
@@ -77,6 +80,9 @@ export function dispatchInspect(args: string[]): boolean {
     case "metrics":
       render.renderMetrics(projectDir, format, selector || spec.run);
       return true;
+    case "usage":
+      render.renderUsage(projectDir, format, spec.run);
+      return true;
     case "chain":
       console.log(chains.renderChainState(projectDir));
       return true;
@@ -95,19 +101,20 @@ export function dispatchInspect(args: string[]): boolean {
       return true;
     case "output":
       if (!selector) {
-        console.log("inspect output requires an iteration selector");
+        fail([
+          "error: inspect output requires an iteration selector",
+          "Usage: autoloop inspect output <iteration>",
+        ]);
         return true;
       }
       render.renderOutput(projectDir, selector, spec.run);
       return true;
     default: {
-      const suggestion = findClosestTarget(artifact, INSPECT_TARGETS);
-      console.log(`Unknown inspect target \`${artifact}\`.`);
-      if (suggestion) {
-        console.log(`Did you mean \`${suggestion}\`?`);
-      }
-      console.log("");
-      console.log(`Valid targets: ${INSPECT_TARGETS.join(", ")}`);
+      const lines = [`error: unknown inspect target \`${artifact}\``];
+      const suggestion = suggestClosest(artifact, INSPECT_TARGETS);
+      if (suggestion) lines.push(`Did you mean \`${suggestion}\`?`);
+      lines.push(`Valid targets: ${INSPECT_TARGETS.join(", ")}`);
+      fail(lines);
       return true;
     }
   }
@@ -234,32 +241,4 @@ function renderProfilesInspect(projectDir: string): void {
         (err instanceof Error ? err.message : String(err)),
     );
   }
-}
-
-function findClosestTarget(input: string, targets: string[]): string | null {
-  let best: string | null = null;
-  let bestScore = Infinity;
-  for (const t of targets) {
-    if (t.startsWith(input) || input.startsWith(t)) {
-      const d = Math.abs(t.length - input.length);
-      if (d < bestScore) {
-        bestScore = d;
-        best = t;
-      }
-    }
-  }
-  if (best) return best;
-  // simple character overlap heuristic
-  for (const t of targets) {
-    let overlap = 0;
-    for (const ch of input) {
-      if (t.includes(ch)) overlap++;
-    }
-    const score = input.length - overlap;
-    if (score < bestScore) {
-      bestScore = score;
-      best = t;
-    }
-  }
-  return bestScore <= 2 ? best : null;
 }

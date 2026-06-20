@@ -3,6 +3,7 @@ import {
   acpControlAdapter,
   kiroControlAdapter,
 } from "../../src/control/acp-adapter.js";
+import { claudeSdkControlAdapter } from "../../src/control/claude-sdk-adapter.js";
 import { piControlAdapter } from "../../src/control/pi-adapter.js";
 import { buildRequest } from "../../src/control/queue.js";
 
@@ -175,5 +176,106 @@ describe("piControlAdapter", () => {
     const ack = adapter.onRequest(buildRequest("run-1", "interrupt", {}));
     expect(ack.state).toBe("rejected");
     expect(ack.detail).toContain("rpc gone");
+  });
+});
+
+describe("claudeSdkControlAdapter", () => {
+  function makeHooks() {
+    return { triggerInterrupt: vi.fn(), triggerSteer: vi.fn() };
+  }
+
+  it("reports interrupt and live-steer guidance as supported", () => {
+    const adapter = claudeSdkControlAdapter("run-1", makeHooks());
+    const caps = adapter.capabilities();
+    expect(caps.backend).toBe("claude-sdk");
+    expect(caps.interrupt.supported).toBe(true);
+    expect(caps.interrupt.detail).toContain("SDK interrupt()");
+    expect(caps.guidance.supported).toBe(true);
+    expect(caps.guidance.detail).toContain("live steer");
+    expect(caps.inspect.supported).toBe(true);
+  });
+
+  it("invokes triggerInterrupt on interrupt verb", () => {
+    const hooks = makeHooks();
+    const adapter = claudeSdkControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(buildRequest("run-1", "interrupt", {}));
+    expect(hooks.triggerInterrupt).toHaveBeenCalledTimes(1);
+    expect(ack.state).toBe("applied");
+    expect(ack.detail).toContain("SDK interrupt sent");
+  });
+
+  it("invokes interrupt when guide payload requests it", () => {
+    const hooks = makeHooks();
+    const adapter = claudeSdkControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "guide", {
+        message: "pivot",
+        interrupt: true,
+      }),
+    );
+    expect(hooks.triggerInterrupt).toHaveBeenCalledTimes(1);
+    expect(hooks.triggerSteer).not.toHaveBeenCalled();
+    expect(ack.state).toBe("applied");
+    expect(ack.detail).toContain("guidance-driven");
+  });
+
+  it("steers guidance into the live turn when interrupt is not requested", () => {
+    const hooks = makeHooks();
+    const adapter = claudeSdkControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "guide", {
+        message: "focus on tests",
+        interrupt: false,
+      }),
+    );
+    expect(hooks.triggerInterrupt).not.toHaveBeenCalled();
+    expect(hooks.triggerSteer).toHaveBeenCalledWith("focus on tests");
+    expect(ack.state).toBe("applied");
+    expect(ack.detail).toContain("steered into live turn");
+  });
+
+  it("still applies guidance when live steering throws", () => {
+    const hooks = makeHooks();
+    hooks.triggerSteer.mockImplementation(() => {
+      throw new Error("session gone");
+    });
+    const adapter = claudeSdkControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "guide", {
+        message: "still durable",
+        interrupt: false,
+      }),
+    );
+    expect(ack.state).toBe("applied");
+    expect(ack.detail).toContain("live steer unavailable");
+  });
+
+  it("applies guidance without steering when the message is empty", () => {
+    const hooks = makeHooks();
+    const adapter = claudeSdkControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "guide", { message: "", interrupt: false }),
+    );
+    expect(hooks.triggerSteer).not.toHaveBeenCalled();
+    expect(ack.state).toBe("applied");
+  });
+
+  it("ignores unknown verbs", () => {
+    const adapter = claudeSdkControlAdapter("run-1", makeHooks());
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "inspect" as never, {}),
+    );
+    expect(ack.state).toBe("ignored");
+  });
+
+  it("reports rejected when the interrupt hook throws", () => {
+    const hooks = makeHooks();
+    hooks.triggerInterrupt.mockImplementation(() => {
+      throw new Error("query gone");
+    });
+    const adapter = claudeSdkControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(buildRequest("run-1", "interrupt", {}));
+    expect(ack.state).toBe("rejected");
+    expect(ack.detail).toContain("query gone");
   });
 });

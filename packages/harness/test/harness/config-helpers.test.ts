@@ -79,12 +79,27 @@ describe("resolveProcessKind", () => {
     expect(resolveProcessKind("", "pi")).toBe("pi");
   });
 
-  it("returns command for non-pi commands with kind command", () => {
+  it("keeps the shell path when kind is explicitly command", () => {
     expect(resolveProcessKind("command", "claude")).toBe("command");
   });
 
-  it("returns command for non-pi commands with empty kind", () => {
-    expect(resolveProcessKind("", "claude")).toBe("command");
+  it("defaults a plain claude command to the claude-sdk backend", () => {
+    expect(resolveProcessKind("", "claude")).toBe("claude-sdk");
+    expect(resolveProcessKind("", "/usr/local/bin/claude")).toBe("claude-sdk");
+  });
+
+  it("returns claude-sdk when kind is explicitly claude-sdk", () => {
+    expect(resolveProcessKind("claude-sdk", "claude")).toBe("claude-sdk");
+  });
+
+  it("keeps the shell path for claude with custom args", () => {
+    expect(resolveProcessKind("", "claude", { hasCustomArgs: true })).toBe(
+      "command",
+    );
+  });
+
+  it("returns command for non-claude commands with empty kind", () => {
+    expect(resolveProcessKind("", "codex")).toBe("command");
   });
 
   it("returns acp when kind is legacy kiro", () => {
@@ -578,25 +593,54 @@ describe("buildLoopContext run-scoped isolation", () => {
 });
 
 describe("default backend", () => {
-  it("defaults to claude with permissions injection when no backend is configured", () => {
+  it("defaults to the claude-sdk backend when no backend is configured", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
     });
 
     expect(loop.backend.command).toBe("claude");
-    expect(loop.backend.kind).toBe("command");
-    expect(loop.backend.args).toEqual(["-p", "--dangerously-skip-permissions"]);
+    expect(loop.backend.kind).toBe("claude-sdk");
+    expect(loop.backend.args).toEqual([]);
   });
 
-  it("review backend also defaults to claude", () => {
+  it("review backend also defaults to claude-sdk", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
       workDir: projectDir,
     });
 
     expect(loop.review.command).toBe("claude");
-    expect(loop.review.args).toEqual(["-p", "--dangerously-skip-permissions"]);
+    expect(loop.review.kind).toBe("claude-sdk");
+  });
+
+  it("keeps the legacy shell path when kind is pinned to command", () => {
+    const projectDir = makeProject(
+      'event_loop.max_iterations = 1\n\n[backend]\nkind = "command"\n',
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.kind).toBe("command");
+    expect(loop.backend.args).toEqual(["-p", "--dangerously-skip-permissions"]);
+  });
+
+  it("keeps the legacy shell path when custom args are configured", () => {
+    const projectDir = makeProject(
+      'event_loop.max_iterations = 1\n\n[backend]\nargs = "--model,opus"\n',
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.kind).toBe("command");
+    expect(loop.backend.args).toEqual([
+      "-p",
+      "--model",
+      "opus",
+      "--dangerously-skip-permissions",
+    ]);
   });
 });
 
@@ -707,6 +751,77 @@ describe("processIntOverride", () => {
     expect(() =>
       processIntOverride({ timeout_ms: 3.14 }, "timeout_ms", 300000),
     ).toThrow(/backend override "timeout_ms" must be an integer/);
+  });
+});
+
+describe("runtime budget limits", () => {
+  it("max_iteration_runtime overrides backend.timeout_ms", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.max_iteration_runtime = "12h"',
+        "backend.timeout_ms = 300000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.timeoutMs).toBe(43_200_000);
+    expect(loop.limits.maxIterationRuntimeMs).toBe(43_200_000);
+  });
+
+  it("leaves backend.timeout_ms in place when max_iteration_runtime is disabled", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.max_iteration_runtime = "0"',
+        "backend.timeout_ms = 120000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.timeoutMs).toBe(120_000);
+    expect(loop.limits.maxIterationRuntimeMs).toBe(0);
+  });
+
+  it("accepts bare millisecond integers", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        "event_loop.max_iteration_runtime = 900000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.timeoutMs).toBe(900_000);
+  });
+
+  it("populates limits.maxRuntimeMs from a duration string", () => {
+    const projectDir = makeProject(
+      ["event_loop.max_iterations = 1", 'event_loop.max_runtime = "3d"'].join(
+        "\n",
+      ),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.limits.maxRuntimeMs).toBe(259_200_000);
+  });
+
+  it("defaults both runtime limits to disabled", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.limits.maxIterationRuntimeMs).toBe(0);
+    expect(loop.limits.maxRuntimeMs).toBe(0);
   });
 });
 

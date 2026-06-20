@@ -59,6 +59,9 @@ If Ralph is the broader experimentation surface, autoloop is the cleaner runtime
 - **Designed for agents too** -- autoloop is intentionally shaped as a surface that agents can use directly, not just a human operator CLI
 - **Dynamic chains** -- compose presets into multi-stage pipelines
 - **Persistent memory + profiles** -- loops accumulate learnings across runs and can load repo/user tuning profiles
+- **Cost budgets + stall protection** -- stop runaway loops automatically with `event_loop.max_cost_usd` (journaled token cost) and `event_loop.stall_iterations` (repeated identical outputs)
+- **Runtime budgets** -- bound wall-clock time with `event_loop.max_runtime` (whole loop) and `event_loop.max_iteration_runtime` (per iteration, for iterations that wait days on long-running workflows); both take `"3d"`/`"12h"`-style durations
+- **Finish notifications** -- run any command when a loop ends (`[notify] command = "..."`) with run metadata in env vars and a JSON payload on stdin
 
 ## What autoloop is
 
@@ -140,23 +143,34 @@ The main commands are:
 
 ```
 autoloop run <preset-name|preset-dir> [prompt...] [flags]
-autoloop list
-autoloop loops [--all]
-autoloop loops show <run-id>
-autoloop loops artifacts <run-id>
+autoloop init [--preset <name>] [dir]
+autoloop list [--json]
+autoloop loops [--all] [--json]
+autoloop loops show <run-id> [--json]
+autoloop loops artifacts <run-id> [--json]
 autoloop loops watch <run-id>
+autoloop loops health [--verbose] [--json]
 autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]
 autoloop dashboard [--port <port>]
-autoloop worktree <list|show|merge|clean> [args]
-autoloop chain <list|run> [args]
+autoloop worktree <list|show|diff|merge|clean> [args]
+autoloop chain list [project-dir]
+autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]
 autoloop emit <topic> [summary]
-autoloop memory <list|status|find|add|remove> [args]
+autoloop memory <list|status|find|add|remove|compact|prune> [args]
 autoloop task <add|complete|update|remove|list> [args]
 autoloop runs clean [--max-age <days>]
+autoloop stats [project-dir] [--json]
+autoloop doctor [project-dir] [--json]
+autoloop triage [project-dir] [--json]
 autoloop config <show|set|unset|path> [args]
+autoloop capabilities
+autoloop robot-docs
+autoloop --version
 ```
 
-Use `run` to start work, `loops` and `inspect` to understand what happened, and `dashboard` when you want a local operator surface.
+Use `run` to start work, `loops` and `inspect` to understand what happened, and `dashboard` when you want a local operator surface. `stats` summarizes success rates and cost per preset; `doctor` diagnoses the environment and `.autoloop` state. `triage` is the one-call status command for agents — runs, health, doctor, and recommended next commands in a single (optionally `--json`) invocation. `capabilities` prints the machine-readable CLI contract (commands, JSON surfaces, exit codes) and `robot-docs` prints a paste-ready agent handbook.
+
+Errors always go to stderr with a documented exit code (0 success, 1 user-input error, 2 environment error), and mistyped commands, subcommands, and flags get a "Did you mean" correction instead of being misinterpreted.
 
 ### Flags
 
@@ -164,7 +178,7 @@ Use `run` to start work, `loops` and `inspect` to understand what happened, and 
 |------|-------------|
 | `-h`, `--help` | Show usage |
 | `-v`, `--verbose` | Debug-level logging |
-| `-b`, `--backend` | Override backend command (e.g. `-b claude`) |
+| `-b`, `--backend` | Override backend (e.g. `-b claude-sdk`, `-b pi`, `-b kiro`, or a command) |
 | `-p`, `--preset` | Resolve a named or custom preset |
 | `--chain` | Run an inline chain of comma-separated presets |
 | `--profile <spec>` | Activate a profile (`repo:<name>` or `user:<name>`), repeatable |

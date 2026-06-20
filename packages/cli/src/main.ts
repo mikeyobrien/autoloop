@@ -2,22 +2,31 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import * as harness from "@mobrienv/autoloop-harness";
+import * as chains from "./chains.js";
 import { cliPrintEvent } from "./cli/event-printer.js";
 import { dispatchAcp } from "./commands/acp.js";
+import { fail } from "./cli/fail.js";
+import { editDistance, suggestClosest } from "./cli/suggest.js";
+import { cliVersion, dispatchCapabilities } from "./commands/capabilities.js";
 import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
 import { dispatchControl } from "./commands/control.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
+import { dispatchDoctor } from "./commands/doctor.js";
 import { dispatchGuide } from "./commands/guide.js";
+import { dispatchInit } from "./commands/init.js";
 import { dispatchInspect } from "./commands/inspect.js";
 import { dispatchKanban } from "./commands/kanban.js";
 import { dispatchList } from "./commands/list.js";
 import { dispatchLoops } from "./commands/loops.js";
 import { dispatchMemory } from "./commands/memory.js";
 import { dispatchPiAdapter } from "./commands/pi-adapter.js";
+import { dispatchRobotDocs } from "./commands/robot-docs.js";
 import { dispatchRun } from "./commands/run.js";
 import { dispatchRuns } from "./commands/runs.js";
+import { dispatchStats } from "./commands/stats.js";
 import { dispatchTask } from "./commands/task.js";
+import { dispatchTriage } from "./commands/triage.js";
 import { dispatchWorktree } from "./commands/worktree.js";
 import { printEmitUsage, printUsage } from "./usage.js";
 
@@ -33,9 +42,36 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
   const bundleRoot = resolveBundleRoot(argv);
 
   switch (cmd) {
+    case "":
+      // Bare invocation: show the full usage instead of a run error so the
+      // first thing an agent tries produces something useful.
+      printUsage();
+      return;
     case "--help":
     case "-h":
       printUsage();
+      return;
+    case "help":
+      // `autoloop help <cmd>` re-dispatches as `<cmd> --help`.
+      if (args[1] && args[1] !== "help") {
+        await dispatch([args[1], "--help"], argv);
+        return;
+      }
+      printUsage();
+      return;
+    case "--version":
+    case "-V":
+    case "version":
+      console.log(cliVersion());
+      return;
+    case "capabilities":
+      dispatchCapabilities(args.slice(1));
+      return;
+    case "robot-docs":
+      dispatchRobotDocs(args.slice(1));
+      return;
+    case "triage":
+      dispatchTriage(args.slice(1));
       return;
     case "run":
       await dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
@@ -91,6 +127,15 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "runs":
       dispatchRuns(args.slice(1));
       return;
+    case "stats":
+      dispatchStats(args.slice(1));
+      return;
+    case "doctor":
+      dispatchDoctor(args.slice(1));
+      return;
+    case "init":
+      dispatchInit(args.slice(1));
+      return;
     case "chain":
       await dispatchChain(args.slice(1), selfCmd);
       return;
@@ -112,9 +157,38 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "kanban":
       dispatchKanban(args.slice(1), bundleRoot, selfCmd);
       return;
-    default:
+    default: {
+      // `autoloop <preset>` is shorthand for `autoloop run <preset>` — but a
+      // mistyped command must never be silently treated as a preset. When
+      // the word is not a real preset or directory and is a near-miss of a
+      // command name, fail fast with the correction instead.
+      const typo = commandTypo(cmd);
+      if (typo) {
+        fail([
+          `error: unknown command \`${cmd}\``,
+          `Did you mean \`autoloop ${typo}\`?`,
+          "Run `autoloop --help` to see all commands.",
+        ]);
+        return;
+      }
       await dispatchRun(args, argv, bundleRoot, selfCmd);
+    }
   }
+}
+
+/**
+ * Return the closest command name when `word` looks like a mistyped command
+ * (within edit distance 2) rather than a preset or directory, else null.
+ */
+function commandTypo(word: string): string | null {
+  if (word.startsWith("-")) return null;
+  if (existsSync(word)) return null;
+  if (chains.listKnownPresets().includes(word)) return null;
+  const suggestion = suggestClosest(word, CLI_COMMANDS);
+  if (!suggestion) return null;
+  if (suggestion.toLowerCase().startsWith(word.toLowerCase()))
+    return suggestion;
+  return editDistance(word.toLowerCase(), suggestion) <= 2 ? suggestion : null;
 }
 
 function resolveRuntimeProjectDir(): string {
@@ -137,29 +211,37 @@ function runtimeArgv(argv: string[]): string[] {
   return userArgs;
 }
 
+const CLI_COMMANDS = [
+  "run",
+  "emit",
+  "inspect",
+  "memory",
+  "task",
+  "list",
+  "loops",
+  "runs",
+  "stats",
+  "doctor",
+  "triage",
+  "init",
+  "chain",
+  "pi-adapter",
+  "branch-run",
+  "worktree",
+  "config",
+  "guide",
+  "control",
+  "dashboard",
+  "kanban",
+  "capabilities",
+  "robot-docs",
+  "acp",
+  "help",
+  "version",
+];
+
 function isCliCommand(value: string): boolean {
-  return [
-    "run",
-    "emit",
-    "inspect",
-    "memory",
-    "task",
-    "list",
-    "loops",
-    "runs",
-    "chain",
-    "pi-adapter",
-    "branch-run",
-    "worktree",
-    "config",
-    "guide",
-    "control",
-    "dashboard",
-    "kanban",
-    "acp",
-    "--help",
-    "-h",
-  ].includes(value);
+  return [...CLI_COMMANDS, "--help", "-h", "--version", "-V"].includes(value);
 }
 
 function selfCommand(argv: string[]): string {
