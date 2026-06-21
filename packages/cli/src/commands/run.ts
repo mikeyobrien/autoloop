@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { joinCsv } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
@@ -422,7 +423,7 @@ function acpBackendOverride(
 
 function looksLikeProjectDir(path: string): boolean {
   try {
-    if (!require("node:fs").statSync(path).isDirectory()) return false;
+    if (!statSync(path).isDirectory()) return false;
   } catch {
     return false;
   }
