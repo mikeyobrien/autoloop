@@ -71,6 +71,10 @@ export default defineConfig({
   },
   test: {
     include: ["test/**/*.test.ts", "packages/*/test/**/*.test.ts"],
+    // Hermetic env: isolate from the developer's global autoloop config + local TZ
+    // so the suite is reproducible (see test/setup/hermetic-env.ts).
+    setupFiles: ["./test/setup/hermetic-env.ts"],
+    env: { TZ: "UTC" },
     // Integration tests under test/worktree and test/integration spawn git/node
     // subprocesses. Cap worker pool so subprocess-heavy tests don't starve each
     // other; bump testTimeout to absorb spiky CI/load.
