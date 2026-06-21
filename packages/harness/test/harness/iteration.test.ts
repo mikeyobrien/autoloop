@@ -121,6 +121,13 @@ function makeAcpLoop(): LoopContext {
       agent: "",
       model: "",
     },
+    hooks: {
+      preRun: "",
+      preIteration: "",
+      postIteration: "",
+      postRun: "",
+      strict: false,
+    },
     parallel: { enabled: false, maxBranches: 0, branchTimeoutMs: 0 },
     memory: { budgetChars: 1000 },
     tasks: { budgetChars: 1000 },

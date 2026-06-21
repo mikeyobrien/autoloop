@@ -39,6 +39,7 @@ import { piControlAdapter } from "./control/pi-adapter.js";
 import { log } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
+import { buildHookEnv, runHook } from "./hooks.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
 import { runFinishNotification } from "./notify.js";
@@ -80,6 +81,7 @@ export async function run(
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
   appendLoopStart(loop);
+  runHook(loop, "pre_run", loop.hooks.preRun, buildHookEnv(loop));
   registryStart(loop);
   loop.controlAdapter = buildControlAdapter(loop);
   if (loop.controlAdapter) {
@@ -283,6 +285,12 @@ export async function run(
     }
   }
 
+  runHook(
+    loop,
+    "post_run",
+    loop.hooks.postRun,
+    buildHookEnv(loop, { stopReason: summary.stopReason }),
+  );
   runFinishNotification({
     projectDir: loop.paths.mainProjectDir,
     journalFile: loop.paths.journalFile,

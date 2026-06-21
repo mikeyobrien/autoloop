@@ -1,0 +1,35 @@
+{
+  "name": "@mobrienv/autoloop-issue-sync-core",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Tracker-agnostic issue sync core for autoloop (pull/push/release, state file, adapter interface)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/autoloop.git",
+    "directory": "packages/issue-sync-core"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@mobrienv/autoloop-core": "*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

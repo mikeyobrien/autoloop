@@ -39,6 +39,13 @@ export function defaults(): Config {
       max_branches: "3",
       branch_timeout_ms: "180000",
     },
+    hooks: {
+      pre_run: "",
+      pre_iteration: "",
+      post_iteration: "",
+      post_run: "",
+      strict: "false",
+    },
     memory: { prompt_budget_chars: "8000" },
     core: {
       state_dir: ".autoloop",

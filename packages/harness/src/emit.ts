@@ -14,7 +14,10 @@ import {
   latestRunId,
 } from "@mobrienv/autoloop-core/journal";
 import type { TaskEntry } from "@mobrienv/autoloop-core/tasks";
-import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
+import {
+  materializeOpenFrom,
+  resolveFile,
+} from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
 
 const COORDINATION_TOPICS = new Set([
@@ -107,7 +110,10 @@ export function emit(
   // Task completion gate: block completion if open blocking tasks remain.
   // Soft tasks (soft === true) are advisory and never block completion.
   if (topic === validation.completionEvent) {
-    const tasksFile = config.resolveTasksFile(projectDir);
+    // Honor AUTOLOOP_TASKS_FILE so the gate checks the SAME run-scoped queue that
+    // pull seeds, the agent completes into, and push reads. Using the project-level
+    // file here let runs complete while pulled issues stayed open — sync never fired.
+    const tasksFile = resolveFile(projectDir);
     const blockingTasks = materializeOpenFrom(tasksFile).filter(
       (t) => t.soft !== true,
     );
