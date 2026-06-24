@@ -137,7 +137,72 @@ export function emit(
   ) {
     return rejectEmit(journalFile, topic, validation);
   }
+
+  // Evidence gate (opt-in): a configured success event must carry its required
+  // evidence in the payload, else it is rejected and the typed `blocked` event
+  // is journaled instead. Preserves an evidence-bearing quality gate over a
+  // topology that otherwise only checks allowed-event routing.
+  const gate = topology.gateForEvent(validation.topo, topic);
+  if (gate && gate.requires.length > 0) {
+    const missing = missingEvidence(gate.requires, payload);
+    if (missing.length > 0) {
+      return rejectEvidenceGate(
+        journalFile,
+        topic,
+        gate,
+        missing,
+        payload,
+        validation,
+      );
+    }
+  }
+
   return acceptEmit(journalFile, topic, payload, validation);
+}
+
+/**
+ * Evidence keys present in a payload. A key is "present" if the payload has a
+ * `key=value` / `key: value` token (non-empty value) or a JSON object with that
+ * key set to a non-empty value. Matching is case-sensitive on the key.
+ */
+export function payloadEvidenceKeys(payload: string): Set<string> {
+  const present = new Set<string>();
+  if (!payload) return present;
+
+  // JSON object payloads: any top-level key with a non-empty value.
+  const trimmed = payload.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const obj = JSON.parse(trimmed) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(obj)) {
+        if (v !== null && v !== undefined && String(v).trim() !== "") {
+          present.add(k);
+        }
+      }
+    } catch {
+      // not JSON — fall through to token scan
+    }
+  }
+
+  // Evidence tokens: `key=value` (value must immediately follow `=`, so a
+  // trailing `key=` with no value does NOT swallow the next token) or
+  // `key: value` (a space after the colon is idiomatic and allowed). Values may
+  // be quoted. A key with an empty value is treated as absent.
+  const re =
+    /([A-Za-z_][\w.-]*)(?:=("[^"]*"|'[^']*'|[^\s,;]+)|:\s*("[^"]*"|'[^']*'|[^\s,;]+))/g;
+  let m: RegExpExecArray | null = re.exec(payload);
+  while (m !== null) {
+    const value = (m[2] ?? m[3] ?? "").replace(/^["']|["']$/g, "").trim();
+    if (value !== "") present.add(m[1]);
+    m = re.exec(payload);
+  }
+  return present;
+}
+
+/** Required evidence keys absent from the payload, in declaration order. */
+export function missingEvidence(requires: string[], payload: string): string[] {
+  const present = payloadEvidenceKeys(payload);
+  return requires.filter((key) => !present.has(key));
 }
 
 export function invalidEvent(
@@ -241,6 +306,7 @@ interface EmitValidation {
   allowedEvents: string[];
   parallelEnabled: boolean;
   completionEvent: string;
+  topo: topology.Topology;
 }
 
 function emitValidationContext(
@@ -266,6 +332,7 @@ function emitValidationContext(
     allowedEvents: envCsvList("AUTOLOOP_ALLOWED_EVENTS"),
     parallelEnabled,
     completionEvent: compEvent,
+    topo,
   };
 }
 
@@ -366,6 +433,48 @@ export function resolveEmitJournalFile(projectDir: string): string {
   const envEvents = process.env.AUTOLOOP_EVENTS_FILE;
   if (envEvents) return envEvents;
   return config.resolveJournalFile(projectDir);
+}
+
+function rejectEvidenceGate(
+  journalFile: string,
+  topic: string,
+  gate: topology.Gate,
+  missing: string[],
+  payload: string,
+  validation: EmitValidation,
+): EmitResult {
+  // Journal the typed blocked event with the evidence shortfall + the original
+  // summary, so an observer (and the next iteration's prompt) sees why it was
+  // blocked and what is still needed.
+  appendEvent(
+    journalFile,
+    validation.runId,
+    validation.iteration,
+    gate.blocked,
+    jsonField("gated_event", topic) +
+      ", " +
+      jsonField("missing_evidence", joinCsv(missing)) +
+      ", " +
+      jsonField("required_evidence", joinCsv(gate.requires)) +
+      ", " +
+      jsonField("summary", payload),
+  );
+  return {
+    ok: false,
+    topic,
+    error:
+      "`" +
+      topic +
+      "` requires evidence " +
+      listText(gate.requires) +
+      "; missing: " +
+      listText(missing) +
+      ". Emitted `" +
+      gate.blocked +
+      "` instead. Include the evidence in the payload (e.g. `key=value`) and emit `" +
+      topic +
+      "` again.",
+  };
 }
 
 function rejectTaskGate(
