@@ -36,7 +36,7 @@ import {
   publishCapabilities,
 } from "./control/dispatch.js";
 import { piControlAdapter } from "./control/pi-adapter.js";
-import { log } from "./display.js";
+import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
 import { runIteration } from "./iteration.js";
@@ -292,11 +292,13 @@ export async function run(
     iterations: summary.iterations,
   });
 
+  const costUsd = runCostUsd(loop);
   loop.onEvent?.({
     type: "summary",
     runId: loop.runtime.runId,
     iterations: summary.iterations,
     stopReason: summary.stopReason,
+    costUsd,
     journalFile: loop.paths.journalFile,
     memoryFile: loop.paths.memoryFile,
     reviewEvery: loop.review.every,
@@ -307,6 +309,7 @@ export async function run(
     iterations: summary.iterations,
     stopReason: summary.stopReason,
     runId: loop.runtime.runId,
+    costUsd,
   });
   return { ...summary, runId: loop.runtime.runId };
 }
