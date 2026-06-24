@@ -559,6 +559,12 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       ),
       requiredEvents: config.getList(cfg, "event_loop.required_events"),
     },
+    ask: {
+      event: config.get(cfg, "event_loop.ask_event", "human.ask"),
+      enabled: config.get(cfg, "event_loop.ask_event", "human.ask") !== "",
+      timeoutMs: config.getDuration(cfg, "event_loop.ask_timeout", 300000),
+      pollMs: config.getInt(cfg, "event_loop.ask_poll_ms", 500),
+    },
     backend:
       maxIterationRuntimeMs > 0
         ? { ...backend, timeoutMs: maxIterationRuntimeMs }
@@ -600,6 +606,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     piSession: loop.piSession ?? { current: undefined },
     claudeSdkSession: loop.claudeSdkSession ?? { current: undefined },
     onEvent: loop.onEvent,
+    signal: loop.signal,
   };
   return applyRuntimeModeOverrides(updated);
 }

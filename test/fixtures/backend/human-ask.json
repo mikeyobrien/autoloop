@@ -1,0 +1,7 @@
+{
+  "output": "I need a human decision before proceeding.",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "human.ask",
+  "emit_payload": "Which approach should I take, A or B?"
+}

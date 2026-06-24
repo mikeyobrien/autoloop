@@ -25,6 +25,20 @@ export function drainControlRequests(
 ): ControlRequest[] {
   const requests = pendingRequests(runStateDir);
   for (const request of requests) {
+    if (request.verb === "respond") {
+      // `respond` is consumed by the human-ask poll (awaitHumanResponse), not
+      // the live-control adapter. Ack it here as defense so a stray response
+      // (with no matching ask) never reaches the adapter and never lingers.
+      appendStatus(runStateDir, {
+        id: request.id,
+        runId: request.runId,
+        verb: request.verb,
+        state: "ignored",
+        at: new Date().toISOString(),
+        detail: "respond is handled by the human-ask poll",
+      });
+      continue;
+    }
     ackRequest(runStateDir, adapter, request);
   }
   return requests;
