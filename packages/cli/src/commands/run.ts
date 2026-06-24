@@ -5,6 +5,7 @@ import * as harness from "@mobrienv/autoloop-harness";
 import { claudeBackend } from "@mobrienv/autoloop-harness/config-helpers";
 import * as chains from "../chains.js";
 import { cliPrintEvent } from "../cli/event-printer.js";
+import { ndjsonEventSink, teeEvents } from "../cli/events-sink.js";
 import {
   missingPresetError,
   printRunUsage,
@@ -29,6 +30,7 @@ interface RunOptions {
   mergeStrategy?: string;
   automerge?: boolean;
   keepWorktree?: boolean;
+  eventsPath?: string;
 }
 
 export async function dispatchRun(
@@ -75,6 +77,15 @@ export async function dispatchRun(
   process.on("SIGINT", onSig);
   process.on("SIGTERM", onSig);
 
+  // Optional structured event stream: write every LoopEvent as NDJSON to
+  // --events <path>, in addition to (not replacing) terminal rendering.
+  const eventSink = options.eventsPath
+    ? ndjsonEventSink(options.eventsPath)
+    : null;
+  const onEvent = eventSink
+    ? teeEvents(cliPrintEvent, eventSink.onEvent)
+    : cliPrintEvent;
+
   try {
     await harness.run(
       options.projectDir,
@@ -85,11 +96,12 @@ export async function dispatchRun(
         profiles: options.profiles.length > 0 ? options.profiles : undefined,
         noDefaultProfiles: options.noDefaultProfiles || undefined,
         signal: abort.signal,
-        onEvent: cliPrintEvent,
+        onEvent,
         ...chainableOptions(options),
       },
     );
   } finally {
+    eventSink?.close();
     process.removeListener("SIGINT", onSig);
     process.removeListener("SIGTERM", onSig);
     // Preserve historical exit-code behavior: re-raise the signal so the
@@ -244,6 +256,17 @@ function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--keep-worktree") {
       options.keepWorktree = true;
       i++;
+      continue;
+    }
+    if (token === "--events") {
+      const path = args[i + 1];
+      if (!path) {
+        console.log("missing path after --events");
+        options.usageError = true;
+        return options;
+      }
+      options.eventsPath = path;
+      i += 2;
       continue;
     }
 
