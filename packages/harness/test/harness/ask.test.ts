@@ -9,6 +9,7 @@ import {
   readStatuses,
 } from "@mobrienv/autoloop-harness/control";
 import type { RespondPayload } from "@mobrienv/autoloop-harness/control/types";
+import { routingTopic } from "@mobrienv/autoloop-harness/emit";
 import { describe, expect, it } from "vitest";
 
 function tmpStateDir(): string {
@@ -104,5 +105,22 @@ describe("awaitHumanResponse", () => {
     );
 
     expect(await pending).toBe("delivered late");
+  });
+});
+
+describe("ask topics are non-routing", () => {
+  // After an ask, recentEvent must NOT become an ask.* topic, or the next
+  // iteration would have an empty allowed-event set and the routing gate would
+  // drop for a cycle. The human-ask topics are therefore non-routing.
+  it("does not treat human-ask topics as routing events", () => {
+    expect(routingTopic("human.ask")).toBe(false);
+    expect(routingTopic("ask.pending")).toBe(false);
+    expect(routingTopic("ask.answered")).toBe(false);
+    expect(routingTopic("ask.timeout")).toBe(false);
+  });
+
+  it("still treats ordinary success events as routing", () => {
+    expect(routingTopic("verify.passed")).toBe(true);
+    expect(routingTopic("tasks.ready")).toBe(true);
   });
 });
