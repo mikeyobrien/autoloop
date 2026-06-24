@@ -308,15 +308,22 @@ requires = ["tests", "coverage"]  # evidence keys the payload must carry
 blocked = "verify.blocked"        # optional; defaults to <prefix>.blocked
 ```
 
-When a role emits `verify.passed`, its payload must contain every required key
-as a `key=value` / `key: value` token (or a JSON object) with a non-empty value:
+When a role emits `verify.passed`, its payload must carry every required key as
+a structured `key=value` token (or a JSON object) with a non-empty value.
+Free-text `key: value` prose does **not** count — that would let an agent satisfy
+the gate just by mentioning the words, so machine-checkable `key=value` (or JSON)
+is required:
 
 ```bash
 # rejected -> emits verify.blocked with missing_evidence="coverage"
 autoloop emit verify.passed "tests=42 passed"
 
+# rejected -> prose is not machine-checkable evidence
+autoloop emit verify.passed "tests: all good, coverage: looks fine"
+
 # accepted
 autoloop emit verify.passed "tests=42 passed coverage=87%"
+autoloop emit verify.passed '{"tests": 42, "coverage": "87%"}'
 ```
 
 The `blocked` event flows through `[handoff]` like any other, so you can route

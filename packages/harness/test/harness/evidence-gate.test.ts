@@ -26,10 +26,19 @@ function tmpProject(topologyToml: string): string {
 }
 
 describe("payloadEvidenceKeys / missingEvidence", () => {
-  it("detects key=value and key: value tokens with non-empty values", () => {
-    const keys = payloadEvidenceKeys("tests=42 passed, coverage: 87%");
+  it("detects structured key=value tokens with non-empty values", () => {
+    const keys = payloadEvidenceKeys("tests=42 passed, coverage=87%");
     expect(keys.has("tests")).toBe(true);
     expect(keys.has("coverage")).toBe(true);
+  });
+
+  it("does NOT accept colon-prose as evidence (defeats free-text bypass)", () => {
+    // Plain English that merely mentions the required words must not satisfy.
+    const keys = payloadEvidenceKeys(
+      "tests: all green and coverage: looks complete",
+    );
+    expect(keys.has("tests")).toBe(false);
+    expect(keys.has("coverage")).toBe(false);
   });
 
   it("ignores keys with empty values", () => {
@@ -38,13 +47,21 @@ describe("payloadEvidenceKeys / missingEvidence", () => {
     expect(keys.has("coverage")).toBe(true);
   });
 
-  it("reads JSON object payloads", () => {
+  it("reads JSON object payloads (non-empty scalar values only)", () => {
     const keys = payloadEvidenceKeys(
       '{"tests": "pass", "coverage": 0.87, "empty": ""}',
     );
     expect(keys.has("tests")).toBe(true);
     expect(keys.has("coverage")).toBe(true);
     expect(keys.has("empty")).toBe(false);
+  });
+
+  it("treats vacuous JSON values as absent; numeric 0 counts", () => {
+    expect(payloadEvidenceKeys('{"tests": {}}').has("tests")).toBe(false);
+    expect(payloadEvidenceKeys('{"tests": false}').has("tests")).toBe(false);
+    expect(payloadEvidenceKeys('{"tests": null}').has("tests")).toBe(false);
+    expect(payloadEvidenceKeys('{"tests": []}').has("tests")).toBe(false);
+    expect(payloadEvidenceKeys('{"errors": 0}').has("errors")).toBe(true);
   });
 
   it("returns required keys absent from the payload, in declaration order", () => {
@@ -133,6 +150,18 @@ describe("evidence gate (emit)", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain("coverage");
     expect(result.error).not.toMatch(/missing:[^.]*\btests\b/);
+  });
+
+  it("blocks when evidence is only colon-prose, not structured (security regression)", () => {
+    const result = emit(
+      dir,
+      "verify.passed",
+      "tests: all green, coverage: looks complete",
+    );
+    expect(result.ok).toBe(false);
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "verify.blocked"');
+    expect(journal).not.toContain('"topic": "verify.passed"');
   });
 
   it("does not gate events without a configured gate (default = no behavior change)", () => {
