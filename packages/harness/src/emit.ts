@@ -14,7 +14,10 @@ import {
   latestRunId,
 } from "@mobrienv/autoloop-core/journal";
 import type { TaskEntry } from "@mobrienv/autoloop-core/tasks";
-import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
+import {
+  materializeOpenFrom,
+  resolveFile as resolveTasksFile,
+} from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
 
 const COORDINATION_TOPICS = new Set([
@@ -106,8 +109,16 @@ export function emit(
 
   // Task completion gate: block completion if open blocking tasks remain.
   // Soft tasks (soft === true) are advisory and never block completion.
+  //
+  // Resolve via tasks.resolveFile (NOT config.resolveTasksFile) so the gate
+  // honors the AUTOLOOP_TASKS_FILE env override — the same resolver the task
+  // CLI and the agent's `task add`/`task complete` use (tools.ts exports
+  // AUTOLOOP_TASKS_FILE into the agent env). This keeps the gate reading the
+  // exact store the tasks are written to, including when an external parent
+  // (e.g. ralph) points autoloop at a canonical store. Using the config path
+  // here would silently read a different file and miss open tasks.
   if (topic === validation.completionEvent) {
-    const tasksFile = config.resolveTasksFile(projectDir);
+    const tasksFile = resolveTasksFile(projectDir);
     const blockingTasks = materializeOpenFrom(tasksFile).filter(
       (t) => t.soft !== true,
     );

@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { appendEvent } from "@mobrienv/autoloop-core/journal";
@@ -144,6 +144,36 @@ describe("task completion gate", () => {
 
     const result = emit(dir, "task.complete", "done");
 
+    expect(result.ok).toBe(true);
+  });
+
+  it("honors AUTOLOOP_TASKS_FILE: gate reads the overridden store, not the config default", () => {
+    // Point the canonical store somewhere OTHER than .autoloop/tasks.jsonl so a
+    // parent (e.g. ralph) can point autoloop at its own store. addTask and the
+    // gate must agree on which file that is.
+    const canonical = join(dir, "canonical", "tasks.jsonl");
+    vi.stubEnv("AUTOLOOP_TASKS_FILE", canonical);
+
+    // addTask honors the env override -> writes to the canonical store.
+    addTask(dir, "work in the canonical store", "manual");
+    // The config-default store is never created/written.
+    expect(existsSync(join(dir, ".autoloop/tasks.jsonl"))).toBe(false);
+    expect(existsSync(canonical)).toBe(true);
+
+    // The gate must read the OVERRIDDEN store and block (it previously read the
+    // config-default path and silently missed this open task).
+    const result = emit(dir, "task.complete", "done");
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("work in the canonical store");
+  });
+
+  it("allows completion when the overridden store has no open tasks", () => {
+    const canonical = join(dir, "canonical", "tasks.jsonl");
+    vi.stubEnv("AUTOLOOP_TASKS_FILE", canonical);
+    addTask(dir, "done in canonical", "manual");
+    completeTask(dir, "task-1");
+
+    const result = emit(dir, "task.complete", "done");
     expect(result.ok).toBe(true);
   });
 });
