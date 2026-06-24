@@ -63,6 +63,26 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
       continue;
     }
 
+    if (topic === "loop.resume") {
+      // A terminated run is being continued. Flip it back to running and clear
+      // the prior stop reason; subsequent iteration.finish / loop.* events
+      // update iteration and final status as usual. The resume point is the
+      // iteration the loop re-enters at, so the next completed iteration is
+      // resumed_from_iteration - 1 + 1 = resumed_from_iteration.
+      record.status = "running";
+      record.stop_reason = "";
+      record.updated_at = record.created_at;
+      record.latest_event = topic;
+      const resumedFrom = fieldValue(event, "resumed_from_iteration");
+      const newMax = Number(fieldValue(event, "new_max_iterations"));
+      if (resumedFrom) {
+        const iter = parseInt(resumedFrom, 10);
+        if (!Number.isNaN(iter)) record.iteration = iter - 1;
+      }
+      if (!Number.isNaN(newMax) && newMax > 0) record.max_iterations = newMax;
+      continue;
+    }
+
     if (topic === "loop.complete") {
       record.status = "completed";
       record.stop_reason = fieldValue(event, "reason");

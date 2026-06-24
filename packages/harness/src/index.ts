@@ -86,6 +86,22 @@ export async function run(
     publishCapabilities(loop.paths.stateDir, loop.controlAdapter);
   }
 
+  return driveLoop(loop, runOptions, 1);
+}
+
+/**
+ * Drive the iteration loop for an already-built, already-registered
+ * LoopContext, starting at `startIteration`. Owns abort/teardown wiring,
+ * the tracked-iterate recursion, session cleanup, post-run worktree
+ * lifecycle, and finish notifications. Shared by `run()` and `resume()` so
+ * both paths exercise identical signal handlers, stop handlers, and
+ * registry/journal behavior.
+ */
+export async function driveLoop(
+  loop: LoopContext,
+  runOptions: RunOptions,
+  startIteration: number,
+): Promise<RunSummary> {
   // Track current iteration for abort handler (must be mutable)
   let currentIteration = 0;
   let aborted = false;
@@ -185,7 +201,7 @@ export async function run(
     return iterateWith(ctx, iter, trackedIterate);
   };
   try {
-    summary = await trackedIterate(loop, 1);
+    summary = await trackedIterate(loop, startIteration);
   } finally {
     if (loop.acpSession.current) {
       try {
@@ -311,6 +327,13 @@ export async function run(
   return { ...summary, runId: loop.runtime.runId };
 }
 
+export {
+  buildResumeContext,
+  determineResumeIteration,
+  type ResumeOptions,
+  type ResumeResult,
+  resume,
+} from "./resume.js";
 export { emitCmd as emit };
 
 export async function runParallelBranchCli(
@@ -495,7 +518,7 @@ function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
   return iterateWith(loop, iteration, iterate);
 }
 
-function buildControlAdapter(
+export function buildControlAdapter(
   loop: LoopContext,
 ): LiveControlAdapter | undefined {
   if (loop.backend.kind === "acp") {
