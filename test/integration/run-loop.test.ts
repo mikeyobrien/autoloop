@@ -257,6 +257,79 @@ describe("integration: run loop with mock backend", () => {
     expect(res.stdout).toContain("Task completed successfully.");
   });
 
+  it("writes the structured NDJSON LoopEvent stream to --events <path>", () => {
+    const project = makeTempProject("events-stream");
+    const fixture = join(FIXTURES_DIR, "complete-success.json");
+    const eventsPath = join(project, "events.ndjson");
+    const res = runCli(
+      ["run", project, "events stream", "--events", eventsPath],
+      { MOCK_FIXTURE_PATH: fixture },
+    );
+
+    expect(res.status).toBe(0);
+    expect(pathExists(eventsPath)).toBe(true);
+
+    const events = readText(eventsPath)
+      .split("\n")
+      .filter((l) => l.trim() !== "")
+      .map((l) => JSON.parse(l));
+
+    // Every line is a structured LoopEvent.
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((e) => typeof e.type === "string")).toBe(true);
+
+    // The resolved routing/outcome `progress` event is on the stream (it is
+    // NOT in the journal — this is the whole point of the structured stream).
+    expect(events.some((e) => e.type === "progress")).toBe(true);
+
+    // A final machine-readable run result is present (loop.finish or summary).
+    const result = events.find(
+      (e) => e.type === "loop.finish" || e.type === "summary",
+    );
+    expect(result).toBeTruthy();
+    expect(result.runId).toBeTruthy();
+    expect(typeof result.iterations).toBe("number");
+    expect(result.stopReason).toBeTruthy();
+  });
+
+  it("fails cleanly (no stack trace) when the --events path is unwritable", () => {
+    const project = makeTempProject("events-unwritable");
+    const fixture = join(FIXTURES_DIR, "complete-success.json");
+    // Parent directories do not exist -> openSync('a') throws ENOENT.
+    const badPath = join(project, "no", "such", "dir", "events.ndjson");
+    const res = runCli(
+      ["run", project, "events unwritable", "--events", badPath],
+      { MOCK_FIXTURE_PATH: fixture },
+    );
+
+    expect(res.stderr).toContain("cannot open --events file");
+    // Clean message, not a raw thrown stack.
+    expect(res.stderr).not.toMatch(/\n\s+at\s+.+:\d+:\d+/);
+    // The loop never started.
+    expect(pathExists(join(project, ".autoloop/journal.jsonl"))).toBe(false);
+  });
+
+  it("stamps every journal line with the versioned, timestamped contract (#31)", () => {
+    const project = makeTempProject("journal-contract");
+    const fixture = join(FIXTURES_DIR, "complete-success.json");
+    const res = runCli(["run", project, "journal contract"], {
+      MOCK_FIXTURE_PATH: fixture,
+    });
+    expect(res.status).toBe(0);
+
+    const lines = readText(join(project, ".autoloop/journal.jsonl"))
+      .split("\n")
+      .filter((l) => l.trim() !== "")
+      .map((l) => JSON.parse(l));
+
+    expect(lines.length).toBeGreaterThan(0);
+    for (const ev of lines) {
+      expect(ev.v).toBe(1);
+      expect(typeof ev.ts).toBe("string");
+      expect(Number.isNaN(Date.parse(ev.ts))).toBe(false);
+    }
+  });
+
   it("inspect commands render metrics, scratchpad, and memory", () => {
     const project = makeTempProject("inspect");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
