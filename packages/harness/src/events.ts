@@ -20,6 +20,7 @@ export type LoopEvent =
       iterations: number;
       stopReason: string;
       runId: string;
+      costUsd: number;
     }
   // Display-requested — the harness asks the caller to render something.
   | {
@@ -64,6 +65,7 @@ export type LoopEvent =
       runId: string;
       iterations: number;
       stopReason: string;
+      costUsd: number;
       journalFile: string;
       memoryFile: string;
       reviewEvery: number;
