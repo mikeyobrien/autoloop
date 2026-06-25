@@ -16,6 +16,7 @@ import type { ControlSnapshot } from "@mobrienv/autoloop-harness/control/render"
 import type {
   ControlRequest,
   GuidePayload,
+  RespondPayload,
 } from "@mobrienv/autoloop-harness/control/types";
 
 export function dispatchControl(args: string[]): void {
@@ -42,6 +43,10 @@ export function dispatchControl(args: string[]): void {
   }
   if (sub === "guide") {
     handleGuide(stateDir, args.slice(1));
+    return;
+  }
+  if (sub === "respond") {
+    handleRespond(stateDir, args.slice(1));
     return;
   }
 
@@ -114,6 +119,32 @@ function handleCapabilities(stateDir: string, args: string[]): void {
   }
   const caps = readCapabilities(runStateDir(res));
   console.log(renderCapabilities(caps));
+}
+
+function handleRespond(stateDir: string, args: string[]): void {
+  const runArg = args[0];
+  const questionId = args[1];
+  const answer = args.slice(2).join(" ");
+  if (!runArg || !questionId || answer === "") {
+    console.log(
+      'Usage: autoloop control respond <run-id> <question-id> "<answer>"',
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const res = resolveRun(stateDir, runArg);
+  if ("error" in res) {
+    console.log(res.error);
+    process.exitCode = 1;
+    return;
+  }
+  const dir = runStateDir(res);
+  const payload: RespondPayload = { questionId, answer };
+  const request = buildRequest(res.run_id, "respond", payload, "respond");
+  appendRequest(dir, request);
+  console.log(
+    `Response delivered to ${res.run_id} for question ${questionId}.`,
+  );
 }
 
 function handleInterrupt(stateDir: string, args: string[]): void {
@@ -262,4 +293,7 @@ function printUsage(): void {
   );
   console.log("  autoloop control interrupt <run-id> [-m <reason>]");
   console.log('  autoloop control guide <run-id> "<message>" [--no-interrupt]');
+  console.log(
+    '  autoloop control respond <run-id> <question-id> "<answer>"  Answer a human.ask',
+  );
 }

@@ -6,7 +6,7 @@
  * canonical for what actually happened.
  */
 
-export type ControlVerb = "interrupt" | "guide";
+export type ControlVerb = "interrupt" | "guide" | "respond";
 export type CapabilityVerb = "guidance" | "interrupt" | "inspect";
 
 export interface GuidePayload {
@@ -17,7 +17,17 @@ export interface GuidePayload {
 
 export type InterruptPayload = Record<string, never>;
 
-export type ControlPayload = GuidePayload | InterruptPayload;
+/**
+ * Answer to a blocking `human.ask`. An external supervisor (e.g. ralph relaying
+ * a Telegram reply) writes this to deliver the human's response to the run that
+ * is paused waiting on `questionId`.
+ */
+export interface RespondPayload {
+  questionId: string;
+  answer: string;
+}
+
+export type ControlPayload = GuidePayload | InterruptPayload | RespondPayload;
 
 export interface ControlRequest {
   id: string;

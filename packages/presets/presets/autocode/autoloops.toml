@@ -25,6 +25,12 @@ core.state_dir = ".autoloop"
 core.journal_file = ".autoloop/journal.jsonl"
 core.memory_file = ".autoloop/memory.jsonl"
 
+# Issue sync hooks (optional — requires autoloop-linear-sync or autoloop-gh-sync in PATH + .autoloop/issue-sync.toml):
+# [hooks]
+# pre_run        = "autoloop-linear-sync pull"   # or "autoloop-gh-sync pull"
+# post_run       = "autoloop-linear-sync push"   # or "autoloop-gh-sync push"
+# # strict = true   # abort run if pre_run fails
+
 # ACP providers:
 # backend.kind = "acp"
 # backend.provider = "kiro"
