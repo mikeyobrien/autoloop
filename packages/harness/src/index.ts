@@ -200,6 +200,7 @@ export async function run(
       iterations: currentIteration > 0 ? currentIteration - 1 : 0,
       stopReason: "error",
       runId: loop.runtime.runId,
+      costUsd: runCostUsd(loop),
     });
     throw err;
   } finally {
