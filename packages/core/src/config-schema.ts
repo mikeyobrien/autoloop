@@ -32,6 +32,11 @@ export function defaults(): Config {
       max_iteration_runtime: "0",
       // Loop wall-clock budget ("12h", "3d", or ms int; 0 = disabled).
       max_runtime: "0",
+      // Human-in-the-loop: when an agent emits this event, the loop blocks for
+      // an operator response (via the `respond` control verb) up to ask_timeout,
+      // then injects the answer into the next prompt. Empty ask_event disables.
+      ask_event: "human.ask",
+      ask_timeout: "5m",
     },
     backend: { kind: "", command: "claude", timeout_ms: "300000" },
     parallel: {

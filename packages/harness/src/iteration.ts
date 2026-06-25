@@ -20,14 +20,16 @@ import {
   resetPiSession,
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
-import { jsonFieldRaw, listText } from "@mobrienv/autoloop-core";
+import { jsonField, jsonFieldRaw, listText } from "@mobrienv/autoloop-core";
 import {
   appendEvent,
+  appendOperatorEvent,
   extractField,
   extractIteration,
   extractTopic,
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
+import { awaitHumanResponse } from "./ask.js";
 import { log } from "./display.js";
 import {
   appendInvalidEvent,
@@ -386,6 +388,14 @@ export async function finishIteration(
       outcome,
     });
 
+  // Human-in-the-loop: a `human.ask` event pauses the loop until an operator
+  // responds (or the timeout elapses); the answer is injected into the next
+  // iteration as guidance. Handled before routing so the ask topic itself is
+  // never treated as a routing/invalid event.
+  if (loop.ask?.enabled && emitted.topic === loop.ask.event) {
+    return finishAskIteration(loop, iter, emitted.payload, iterate, progress);
+  }
+
   if (
     invalidEvent(
       emitted.topic,
@@ -430,6 +440,88 @@ export async function finishIteration(
     return completeLoop(loop, iter.iteration, "completion_event");
   if (resolved.action === "complete_promise")
     return completeLoop(loop, iter.iteration, "completion_promise");
+  return iterate(loop, iter.iteration + 1);
+}
+
+/**
+ * Block the loop on a `human.ask` until an operator responds (via the `respond`
+ * control verb) or the timeout elapses, then continue. The answer is injected
+ * into the next iteration's prompt via the existing operator-guidance path.
+ */
+async function finishAskIteration(
+  loop: LoopContext,
+  iter: IterationContext,
+  question: string,
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+  progress: (emittedTopic: string, outcome: string) => void,
+): Promise<RunSummary> {
+  const runId = loop.runtime.runId;
+  const iteration = String(iter.iteration);
+  const questionId = `ask_${runId}_${iter.iteration}`;
+
+  appendEvent(
+    loop.paths.journalFile,
+    runId,
+    iteration,
+    "ask.pending",
+    `${jsonField("question_id", questionId)}, ${jsonField("question", question)}`,
+  );
+  loop.onEvent?.({
+    type: "ask.pending",
+    runId,
+    iteration: iter.iteration,
+    questionId,
+    question,
+  });
+  progress(loop.ask.event, "ask:waiting");
+
+  const answer = await awaitHumanResponse({
+    stateDir: loop.paths.stateDir,
+    runId,
+    questionId,
+    timeoutMs: loop.ask.timeoutMs,
+    pollMs: loop.ask.pollMs,
+    signal: loop.signal,
+  });
+
+  if (answer === null) {
+    if (loop.signal?.aborted) {
+      return { iterations: iter.iteration, stopReason: "interrupted", runId };
+    }
+    appendEvent(
+      loop.paths.journalFile,
+      runId,
+      iteration,
+      "ask.timeout",
+      jsonField("question_id", questionId),
+    );
+    progress(loop.ask.event, "ask:timeout");
+    return iterate(loop, iter.iteration + 1);
+  }
+
+  appendEvent(
+    loop.paths.journalFile,
+    runId,
+    iteration,
+    "ask.answered",
+    `${jsonField("question_id", questionId)}, ${jsonField("answer", answer)}`,
+  );
+  // Inject the answer into the next prompt via the operator-guidance path.
+  appendOperatorEvent(
+    loop.paths.journalFile,
+    runId,
+    iteration,
+    "operator.guidance",
+    `Human response to "${question}": ${answer}`,
+  );
+  loop.onEvent?.({
+    type: "ask.answered",
+    runId,
+    iteration: iter.iteration,
+    questionId,
+    answer,
+  });
+  progress(loop.ask.event, "ask:answered");
   return iterate(loop, iter.iteration + 1);
 }
 

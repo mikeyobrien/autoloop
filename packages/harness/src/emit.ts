@@ -121,6 +121,12 @@ export function emit(
     }
   }
 
+  // The human-ask event is always accepted regardless of routing — it pauses
+  // the loop for a human answer; the harness owns the block, not `[handoff]`.
+  if (validation.askEvent !== "" && topic === validation.askEvent) {
+    return acceptEmit(journalFile, topic, payload, validation);
+  }
+
   if (coordinationTopic(topic)) {
     return acceptEmit(journalFile, topic, payload, validation);
   }
@@ -312,6 +318,15 @@ export function routingTopic(topic: string): boolean {
     "event.invalid",
     "operator.guidance",
     "operator.guidance.consumed",
+    // Human-in-the-loop topics are not routing: a `human.ask` pause must not
+    // move the routing position, or the iteration after an ask would have an
+    // empty allowed-event set (no topology transition) and the agent would be
+    // unconstrained for that cycle. The ask.* topics are harness-written with
+    // fixed names; `human.ask` is the default ask event.
+    "human.ask",
+    "ask.pending",
+    "ask.answered",
+    "ask.timeout",
     "",
   ]);
   if (nonRouting.has(topic)) return false;
@@ -327,6 +342,7 @@ interface EmitValidation {
   parallelEnabled: boolean;
   completionEvent: string;
   topo: topology.Topology;
+  askEvent: string;
 }
 
 function emitValidationContext(
@@ -353,6 +369,7 @@ function emitValidationContext(
     parallelEnabled,
     completionEvent: compEvent,
     topo,
+    askEvent: config.get(cfg, "event_loop.ask_event", "human.ask"),
   };
 }
 

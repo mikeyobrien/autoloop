@@ -77,6 +77,7 @@ export async function run(
     runOptions,
   );
   loop.onEvent = runOptions.onEvent;
+  loop.signal = runOptions.signal;
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
