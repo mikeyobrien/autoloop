@@ -292,6 +292,47 @@ A role that cannot proceed emits a `.blocked` event, routing to a role that can 
 "fix.blocked" = ["diagnoser"]
 ```
 
+## Evidence gates
+
+Routing (`[handoff]`) only checks *which* event was emitted, not whether it is
+*earned*. An evidence gate makes a success event require machine-checkable
+evidence in its payload — otherwise the emit is rejected and a typed `.blocked`
+event is journaled instead, so the loop must supply proof before it can advance.
+
+Gates are opt-in, declared as array-of-tables in `topology.toml`:
+
+```toml
+[[gate]]
+event = "verify.passed"           # the success event to guard
+requires = ["tests", "coverage"]  # evidence keys the payload must carry
+blocked = "verify.blocked"        # optional; defaults to <prefix>.blocked
+```
+
+When a role emits `verify.passed`, its payload must carry every required key as
+a structured `key=value` token (or a JSON object) with a non-empty value.
+Free-text `key: value` prose does **not** count — that would let an agent satisfy
+the gate just by mentioning the words, so machine-checkable `key=value` (or JSON)
+is required:
+
+```bash
+# rejected -> emits verify.blocked with missing_evidence="coverage"
+autoloop emit verify.passed "tests=42 passed"
+
+# rejected -> prose is not machine-checkable evidence
+autoloop emit verify.passed "tests: all good, coverage: looks fine"
+
+# accepted
+autoloop emit verify.passed "tests=42 passed coverage=87%"
+autoloop emit verify.passed '{"tests": 42, "coverage": "87%"}'
+```
+
+The `blocked` event flows through `[handoff]` like any other, so you can route
+it back to a role that can supply the missing evidence:
+
+```toml
+"verify.blocked" = ["builder"]
+```
+
 ## Examples
 
 Every `auto*` preset in `presets/` includes a `topology.toml`. See:

@@ -175,6 +175,30 @@ export function printFailureDiagnostic(
   console.log("──────────────────────────────────────");
 }
 
+export function printHookOutput(
+  name: string,
+  exitCode: number,
+  output: string,
+  failed: boolean,
+): void {
+  const lines = output.split(lineSep());
+  const body = lines.slice(-15).join(lineSep());
+  // Silent successful hooks (no output) print nothing; failures always show.
+  if (!failed && !body.trim()) return;
+  const header = failed
+    ? `── hook: ${name} failed (exit ${exitCode}) ──`
+    : `── hook: ${name} (exit ${exitCode}) ──`;
+  console.log("");
+  console.log(header);
+  if (lines.length > 15) {
+    console.log(`… (${lines.length - 15} earlier lines in journal)`);
+  }
+  if (body.trim()) console.log(body);
+  if (decorativeOutputEnabled()) {
+    console.log("──────────────────────────────────────");
+  }
+}
+
 export function terminalWidth(): number {
   const envWidth = parseInt(process.env.AUTOLOOP_WIDTH ?? "", 10);
   if (envWidth > 0) return envWidth;

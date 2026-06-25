@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# autoloop-linear-open — launched by Linear's "open in coding tool" feature
+# (https://linear.app/docs/open-issues-with-custom-scripts) via ~/.linear/coding-tools.json.
+#
+# Linear injects the selected issue's context as LINEAR_* environment variables
+# (declared in the `env` array of coding-tools.json). This launcher then starts an
+# autoloop run scoped to that issue, on the issue's suggested branch, with the
+# issue-sync hooks wired so progress flows back to Linear automatically.
+set -euo pipefail
+
+WORKDIR="${LINEAR_WORK_DIR:-$PWD}"
+ISSUE="${LINEAR_ISSUE_IDENTIFIER:-}"
+BRANCH="${LINEAR_ISSUE_BRANCH_NAME:-}"
+PROMPT="${LINEAR_PROMPT:-}"
+[ -n "$PROMPT" ] || PROMPT="Implement Linear issue ${ISSUE}. Read the issue for the contract; one commit per logical change."
+
+# The issue-sync hooks read LINEAR_API_KEY from the environment. autoloop does not
+# manage secrets — ensure LINEAR_API_KEY is exported in the environment this launcher
+# runs in. A GUI-triggered launch may not inherit your login shell; if so, point Linear's
+# coding-tools.json `path` at your own wrapper that exports it (from whatever secret
+# manager you use) and then exec's this launcher, or use `launchctl setenv`.
+if [ -z "${LINEAR_API_KEY:-}" ]; then
+  echo "warning: LINEAR_API_KEY is not set — Linear sync hooks will be skipped." >&2
+fi
+
+cd "$WORKDIR"
+
+# Work on the issue's suggested branch so Linear auto-links the resulting commits/PR.
+if [ -n "$BRANCH" ] && command -v git >/dev/null 2>&1; then
+  git switch "$BRANCH" 2>/dev/null || git switch -c "$BRANCH" 2>/dev/null || true
+fi
+
+mkdir -p "$WORKDIR/.autoloop"
+LOG="$WORKDIR/.autoloop/linear-open-${ISSUE:-run}.log"
+
+# Launch detached so the GUI trigger returns immediately. Progress streams to LOG and
+# `autoloop kanban`. pre_run pulls the repo's Todo queue (this issue + siblings) for
+# context; post_iteration / post_run push completion back to Linear (→ In Review).
+nohup autoloop run -b claude-sdk autocode \
+  --set backend.timeout_ms=1800000 \
+  --set hooks.pre_run="autoloop-linear-sync pull" \
+  --set hooks.post_iteration="autoloop-linear-sync push" \
+  --set hooks.post_run="autoloop-linear-sync push --final" \
+  "$PROMPT (Linear $ISSUE)" >"$LOG" 2>&1 &
+
+echo "autoloop launched for ${ISSUE:-issue} in $WORKDIR (branch ${BRANCH:-current})."
+echo "Logs: $LOG"
+echo "Watch: autoloop kanban"

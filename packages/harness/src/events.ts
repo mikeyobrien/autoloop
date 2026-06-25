@@ -43,6 +43,21 @@ export type LoopEvent =
       outcome: string;
     }
   | { type: "review.banner"; iteration: number }
+  // Human-in-the-loop: the loop is paused on a question / has received an answer.
+  | {
+      type: "ask.pending";
+      runId: string;
+      iteration: number;
+      questionId: string;
+      question: string;
+    }
+  | {
+      type: "ask.answered";
+      runId: string;
+      iteration: number;
+      questionId: string;
+      answer: string;
+    }
   | { type: "backend.output"; output: string; maxLines?: number }
   | { type: "failure.diagnostic"; output: string; stopReason: string }
   | {
