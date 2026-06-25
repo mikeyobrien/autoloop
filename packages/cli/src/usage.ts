@@ -8,6 +8,9 @@ export function printUsage(): void {
   console.log("");
   console.log("Usage:");
   console.log("  autoloop run <preset-name|preset-dir> [prompt...] [flags]");
+  console.log(
+    "  autoloop resume <run-id> [--add-iterations N] [-b <backend>] [-v]",
+  );
   console.log("  autoloop init [--preset <name>] [dir]");
   console.log("  autoloop emit <topic> [summary]");
   console.log(

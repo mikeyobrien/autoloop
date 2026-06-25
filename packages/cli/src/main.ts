@@ -20,6 +20,7 @@ import { dispatchList } from "./commands/list.js";
 import { dispatchLoops } from "./commands/loops.js";
 import { dispatchMemory } from "./commands/memory.js";
 import { dispatchPiAdapter } from "./commands/pi-adapter.js";
+import { dispatchResume } from "./commands/resume.js";
 import { dispatchRobotDocs } from "./commands/robot-docs.js";
 import { dispatchRun } from "./commands/run.js";
 import { dispatchRuns } from "./commands/runs.js";
@@ -74,6 +75,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
       return;
     case "run":
       await dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
+      return;
+    case "resume":
+      await dispatchResume(args.slice(1));
       return;
     case "emit": {
       if (!args[1] || args[1] === "--help" || args[1] === "-h") {
@@ -209,6 +213,7 @@ function runtimeArgv(argv: string[]): string[] {
 
 const CLI_COMMANDS = [
   "run",
+  "resume",
   "emit",
   "inspect",
   "memory",

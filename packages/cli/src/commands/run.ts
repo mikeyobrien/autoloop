@@ -437,7 +437,7 @@ function normalizePrompt(prompt: string | null): string | null {
   return prompt;
 }
 
-function backendOverrideSpec(backend: string): Record<string, unknown> {
+export function backendOverrideSpec(backend: string): Record<string, unknown> {
   if (backend === "pi") {
     return { kind: "pi", command: "pi", args: [], prompt_mode: "arg" };
   }

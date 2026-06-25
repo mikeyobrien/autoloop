@@ -68,6 +68,15 @@ function loopStopLine(
   }).trim();
 }
 
+function loopResumeLine(runId: string, fields: Record<string, string>): string {
+  return encodeEvent({
+    shape: "fields",
+    run: runId,
+    topic: "loop.resume",
+    fields,
+  }).trim();
+}
+
 describe("deriveRunRecords", () => {
   it("creates a running record from loop.start", () => {
     const lines = [loopStartLine("run-1")];
@@ -158,6 +167,48 @@ describe("deriveRunRecords", () => {
     const records = deriveRunRecords(lines);
     expect(records[0].status).toBe("stopped");
     expect(records[0].stop_reason).toBe("max_iterations");
+  });
+
+  it("transitions a stopped run back to running on loop.resume", () => {
+    const lines = [
+      loopStartLine("run-1", { max_iterations: "3" }),
+      iterationFinishLine("run-1", "1"),
+      iterationFinishLine("run-1", "2"),
+      iterationFinishLine("run-1", "3"),
+      loopStopLine("run-1", "3", "max_iterations"),
+      loopResumeLine("run-1", {
+        resumed_from_iteration: "4",
+        previous_stop_reason: "max_iterations",
+        add_iterations: "2",
+        new_max_iterations: "5",
+      }),
+    ];
+    const records = deriveRunRecords(lines);
+    expect(records[0].status).toBe("running");
+    expect(records[0].stop_reason).toBe("");
+    expect(records[0].latest_event).toBe("loop.resume");
+    // iteration set to resumed_from - 1 (the last completed iteration)
+    expect(records[0].iteration).toBe(3);
+    expect(records[0].max_iterations).toBe(5);
+  });
+
+  it("continues normal lifecycle after a resume to a later completion", () => {
+    const lines = [
+      loopStartLine("run-1", { max_iterations: "3" }),
+      loopStopLine("run-1", "3", "max_iterations"),
+      loopResumeLine("run-1", {
+        resumed_from_iteration: "4",
+        previous_stop_reason: "max_iterations",
+        add_iterations: "2",
+        new_max_iterations: "5",
+      }),
+      iterationFinishLine("run-1", "4"),
+      loopCompleteLine("run-1", "4", "completion_event"),
+    ];
+    const records = deriveRunRecords(lines);
+    expect(records[0].status).toBe("completed");
+    expect(records[0].stop_reason).toBe("completion_event");
+    expect(records[0].iteration).toBe(4);
   });
 
   it("handles multiple runs", () => {
