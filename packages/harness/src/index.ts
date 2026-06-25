@@ -39,6 +39,7 @@ import { piControlAdapter } from "./control/pi-adapter.js";
 import { log } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
+import { buildHookEnv, runHook } from "./hooks.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
 import { runFinishNotification } from "./notify.js";
@@ -81,6 +82,7 @@ export async function run(
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
   appendLoopStart(loop);
+  runHook(loop, "pre_run", loop.hooks.preRun, buildHookEnv(loop));
   registryStart(loop);
   loop.controlAdapter = buildControlAdapter(loop);
   if (loop.controlAdapter) {
@@ -187,6 +189,19 @@ export async function run(
   };
   try {
     summary = await trackedIterate(loop, 1);
+  } catch (err: unknown) {
+    // An unexpected throw (e.g. init/store failure outside per-iteration error
+    // handling) must still produce a terminal event so an external --events
+    // consumer always learns the run ended, instead of waiting forever for a
+    // loop.finish. Data already written is flushed (synchronous appends); we
+    // emit the terminal marker and re-raise.
+    loop.onEvent?.({
+      type: "loop.finish",
+      iterations: currentIteration > 0 ? currentIteration - 1 : 0,
+      stopReason: "error",
+      runId: loop.runtime.runId,
+    });
+    throw err;
   } finally {
     if (loop.acpSession.current) {
       try {
@@ -284,6 +299,12 @@ export async function run(
     }
   }
 
+  runHook(
+    loop,
+    "post_run",
+    loop.hooks.postRun,
+    buildHookEnv(loop, { stopReason: summary.stopReason }),
+  );
   runFinishNotification({
     projectDir: loop.paths.mainProjectDir,
     journalFile: loop.paths.journalFile,

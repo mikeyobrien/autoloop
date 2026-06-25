@@ -145,6 +145,9 @@ export function printRunUsage(): void {
   );
   console.log("  --automerge            Auto-merge worktree on completion");
   console.log("  --keep-worktree        Keep worktree after run completes");
+  console.log(
+    "  --events <path>        Append the NDJSON LoopEvent stream to <path>",
+  );
   console.log("");
   console.log("Examples:");
   console.log("  autoloop run autocode");

@@ -38,6 +38,7 @@ import {
   systemTopic,
 } from "./emit.js";
 import { loopStartMs } from "./guards.js";
+import { buildHookEnv, captureGitSha, runHook } from "./hooks.js";
 import {
   appendBackendFinish,
   appendBackendStart,
@@ -109,6 +110,14 @@ export async function runIteration(
   log(loop, "debug", `backend start command=${iter.backend.command}`);
 
   const startEpoch = Math.floor(Date.now() / 1000);
+  const gitShaBefore = captureGitSha(loop.paths.workDir);
+  runHook(
+    loop,
+    "pre_iteration",
+    loop.hooks.preIteration,
+    buildHookEnv(loop, { iteration, gitShaBefore }),
+    String(iteration),
+  );
 
   // Fresh ACP session per iteration — ensures each role (researcher, critic,
   // etc.) starts with a clean context window for truly independent review.
@@ -179,6 +188,14 @@ export async function runIteration(
 
   appendBackendFinish(loop, iter, output, exitCode, timedOut);
   appendIterationFinish(loop, iter, output, exitCode, timedOut, elapsedS);
+  const gitShaAfter = captureGitSha(loop.paths.workDir);
+  runHook(
+    loop,
+    "post_iteration",
+    loop.hooks.postIteration,
+    buildHookEnv(loop, { iteration, gitShaBefore, gitShaAfter }),
+    String(iteration),
+  );
   registryProgress(loop, iteration);
   log(loop, "debug", `iteration ${iteration} finish exit_code=${exitCode}`);
   loop.onEvent?.({

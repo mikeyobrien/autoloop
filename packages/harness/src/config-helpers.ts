@@ -578,6 +578,13 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       })(),
     },
     parallel,
+    hooks: {
+      preRun: config.get(cfg, "hooks.pre_run", ""),
+      preIteration: config.get(cfg, "hooks.pre_iteration", ""),
+      postIteration: config.get(cfg, "hooks.post_iteration", ""),
+      postRun: config.get(cfg, "hooks.post_run", ""),
+      strict: config.get(cfg, "hooks.strict", "false") === "true",
+    },
     memory: {
       budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
     },

@@ -1,0 +1,41 @@
+{
+  "name": "@mobrienv/autoloop-linear-sync",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "Linear issue sync adapter for autoloop (@linear/sdk + LINEAR_API_KEY)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "autoloop-linear-sync": "dist/cli.js",
+    "autoloop-linear-open": "bin/autoloop-linear-open"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeyobrien/autoloop.git",
+    "directory": "packages/linear-sync"
+  },
+  "dependencies": {
+    "@linear/sdk": "^33.0.0",
+    "@mobrienv/autoloop-issue-sync-core": "*"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

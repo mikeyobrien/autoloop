@@ -81,6 +81,13 @@ export interface LoopContext {
     model: string;
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
+  hooks: {
+    preRun: string;
+    preIteration: string;
+    postIteration: string;
+    postRun: string;
+    strict: boolean;
+  };
   memory: { budgetChars: number };
   tasks: { budgetChars: number };
   harness: { instructions: string };

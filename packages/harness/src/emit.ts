@@ -16,7 +16,7 @@ import {
 import type { TaskEntry } from "@mobrienv/autoloop-core/tasks";
 import {
   materializeOpenFrom,
-  resolveFile as resolveTasksFile,
+  resolveFile,
 } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
 
@@ -146,7 +146,7 @@ export function emit(
   // (e.g. ralph) points autoloop at a canonical store. Using the config path
   // here would silently read a different file and miss open tasks.
   if (topic === validation.completionEvent) {
-    const tasksFile = resolveTasksFile(projectDir);
+    const tasksFile = resolveFile(projectDir);
     const blockingTasks = materializeOpenFrom(tasksFile).filter(
       (t) => t.soft !== true,
     );

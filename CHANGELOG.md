@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+### Fixed
+- **`--chain` now roots at the target project dir instead of the bundled presets dir.**
+  `looksLikeProjectDir` used CommonJS `require("node:fs")` inside the ESM build, so every
+  call threw `ReferenceError: require is not defined`, the `catch` returned `false`, and the
+  function always reported "not a project dir." As a result `autoloop run --chain <presets>
+  <project-dir>` (and chain runs from a project cwd) ignored an explicit/cwd `autoloops.toml`
+  and always fell back to `defaultChainProjectDir` → the bundled-presets dir, misrooting chain
+  state (`.autoloop/chains`, runs) into the install instead of the user's repo. Fixed by
+  importing `statSync` from `node:fs` via ESM. Affects both source and npm installs
+  (`@mobrienv/autoloop-cli`'s published dist carried the same bug).
+
 ## [0.8.0] - 2026-06-12
 ### Added
 - **Runtime budgets.** Two new duration keys under `[event_loop]`, accepting duration strings (`"3d"`, `"12h"`, `"1h30m"`) or millisecond integers: `max_iteration_runtime` caps a single iteration's runtime (overriding `backend.timeout_ms` — iterations can now legitimately run for days while waiting on long-running workflows or PR reviews), and `max_runtime` bounds the whole loop's wall-clock time, stopping with reason `max_runtime`. The loop guard is journal-derived from the `loop.start` timestamp (survives reloads, covers every continue path), each iteration's timeout is clamped to the remaining loop budget so the run never overshoots, and `autoloop doctor` gains a `runtime limits` check (invalid durations, iteration cap > loop budget, ~24.8-day Node timer cap).
