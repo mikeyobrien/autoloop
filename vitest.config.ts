@@ -8,6 +8,12 @@ const CORE = resolve(import.meta.dirname, "packages/core/src");
 const HARNESS = resolve(import.meta.dirname, "packages/harness/src");
 const BACKENDS = resolve(import.meta.dirname, "packages/backends/src");
 const DASHBOARD = resolve(import.meta.dirname, "packages/dashboard/src");
+const ISSUE_SYNC_CORE = resolve(
+  import.meta.dirname,
+  "packages/issue-sync-core/src",
+);
+const GH_SYNC = resolve(import.meta.dirname, "packages/gh-sync/src");
+const LINEAR_SYNC = resolve(import.meta.dirname, "packages/linear-sync/src");
 
 export default defineConfig({
   resolve: {
@@ -67,10 +73,17 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/tools": `${HARNESS}/tools.ts`,
       "@mobrienv/autoloop-harness/prompt": `${HARNESS}/prompt.ts`,
       "@mobrienv/autoloop-harness": `${HARNESS}/index.ts`,
+      "@mobrienv/autoloop-issue-sync-core": `${ISSUE_SYNC_CORE}/index.ts`,
+      "@mobrienv/autoloop-gh-sync": `${GH_SYNC}/index.ts`,
+      "@mobrienv/autoloop-linear-sync": `${LINEAR_SYNC}/index.ts`,
     },
   },
   test: {
     include: ["test/**/*.test.ts", "packages/*/test/**/*.test.ts"],
+    // Hermetic env: isolate from the developer's global autoloop config + local TZ
+    // so the suite is reproducible (see test/setup/hermetic-env.ts).
+    setupFiles: ["./test/setup/hermetic-env.ts"],
+    env: { TZ: "UTC" },
     // Integration tests under test/worktree and test/integration spawn git/node
     // subprocesses. Cap worker pool so subprocess-heavy tests don't starve each
     // other; bump testTimeout to absorb spiky CI/load.

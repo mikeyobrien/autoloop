@@ -1,0 +1,17 @@
+# Example: .autoloop/issue-sync.toml for a project using Linear as the tracker.
+# Place this file at .autoloop/issue-sync.toml in the source project.
+# Add "!.autoloop/issue-sync.toml" to the project's .gitignore to track it.
+#
+# Run: LINEAR_API_KEY=<key> autoloop-linear-sync pull
+#      LINEAR_API_KEY=<key> autoloop-linear-sync push
+#      LINEAR_API_KEY=<key> autoloop-linear-sync release v1.0.0
+
+tracker = "linear"
+
+[linear]
+project      = "HTML → PPTX (library + skill)"
+team         = "Sauhsoj"
+repo_label   = "repo:library"  # only issues with this label are owned by this repo
+pull_states  = ["Todo"]
+review_state = "In Review"
+done_state   = "Done"
