@@ -6,6 +6,37 @@ import * as config from "./config.js";
 
 export type TaskPriority = "high" | "normal" | "low";
 
+/**
+ * Task store contract — for external writers (e.g. a parent orchestrator
+ * pointing autoloop at a shared/canonical store).
+ *
+ * ## Location
+ *
+ * Resolved by {@link resolveFile} with this precedence:
+ * 1. `AUTOLOOP_TASKS_FILE` env var (absolute path) — highest priority.
+ * 2. `core.tasks_file` config key (default `.autoloop/tasks.jsonl`).
+ *
+ * Both the task CLI/agent tools AND the completion gate use this resolver, so
+ * an external writer that sets `AUTOLOOP_TASKS_FILE` controls the exact file the
+ * gate reads. (Memory has the symmetric `AUTOLOOP_MEMORY_FILE` / `core.memory_file`.)
+ *
+ * ## Wire format
+ *
+ * Append-only JSONL. State is materialized newest-first: the last line for a
+ * given `id` wins, and a tombstone removes it. One object per line:
+ *
+ * - Task record:
+ *   `{"id":"task-1","type":"task","text":"…","status":"open"|"done","source":"…","created":"<iso>"[, "completed":"<iso>"][, "priority":"high"|"low"][, "soft":true]}`
+ *   - `priority` is omitted when `normal`; `soft` is omitted when false (so
+ *     default-task lines stay byte-identical to the pre-priority format).
+ * - Tombstone (removal): `{"id":"task-1","type":"task-tombstone","target_id":"task-1"}`.
+ *
+ * ## Completion gate semantics
+ *
+ * Open tasks with `soft !== true` block the configured completion event
+ * (the gate rejects it and emits `task.gate`). `soft` tasks are advisory and
+ * never block. An empty/absent store never blocks.
+ */
 export interface TaskEntry {
   id: string;
   type: "task" | "task-tombstone";

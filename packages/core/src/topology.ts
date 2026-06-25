@@ -18,12 +18,53 @@ export interface Role {
   backendModel?: string;
 }
 
+/**
+ * An evidence gate (opt-in). When an agent emits `event`, its payload must
+ * carry every key in `requires` (as `key=value` / `key: value` tokens or a JSON
+ * object, with a non-empty value). If any are missing, the emit is rejected and
+ * the typed `blocked` event is journaled instead — preserving an evidence-bearing
+ * quality gate over a topology that otherwise only checks allowed-event routing.
+ *
+ * Declared in topology.toml as array-of-tables (parsed raw, so the structure
+ * survives — unlike the stringified autoloops.toml config layer):
+ *
+ *   [[gate]]
+ *   event = "verify.passed"
+ *   requires = ["tests", "coverage"]
+ *   blocked = "verify.blocked"   # optional; defaults to <prefix>.blocked
+ */
+export interface Gate {
+  event: string;
+  requires: string[];
+  blocked: string;
+}
+
 export interface Topology {
   name: string;
   completion: string;
   roles: Role[];
   handoff: Record<string, string[]>;
   handoffKeys: string[];
+  gates: Gate[];
+}
+
+/**
+ * Default typed-blocked topic for a gated event: replace the last dotted segment
+ * with `blocked` (`verify.passed` -> `verify.blocked`, `build.done` ->
+ * `build.blocked`); a single-segment event gets `.blocked` appended.
+ */
+export function deriveBlockedTopic(event: string): string {
+  const dot = event.lastIndexOf(".");
+  if (dot <= 0) return `${event}.blocked`;
+  return `${event.slice(0, dot)}.blocked`;
+}
+
+/** The gate configured for `topic`, if any. */
+export function gateForEvent(
+  topology: Topology,
+  topic: string,
+): Gate | undefined {
+  return topology.gates.find((g) => g.event === topic);
 }
 
 export function eventMatchesAny(topic: string, patterns: string[]): boolean {
@@ -123,7 +164,14 @@ export function renderWithContext(
 }
 
 function defaultTopology(): Topology {
-  return { name: "", completion: "", roles: [], handoff: {}, handoffKeys: [] };
+  return {
+    name: "",
+    completion: "",
+    roles: [],
+    handoff: {},
+    handoffKeys: [],
+    gates: [],
+  };
 }
 
 function loadExisting(path: string, projectDir: string): Topology {
@@ -162,7 +210,22 @@ function buildTopology(
     handoffKeys.push(key);
   }
 
-  return { name, completion, roles, handoff, handoffKeys };
+  const rawGates = (parsed.gate ?? []) as Array<Record<string, unknown>>;
+  const gates: Gate[] = rawGates
+    .filter((g) => typeof g.event === "string" && g.event !== "")
+    .map((g) => {
+      const event = g.event as string;
+      const requires = Array.isArray(g.requires)
+        ? g.requires.map(String).filter((r) => r !== "")
+        : [];
+      const blocked =
+        typeof g.blocked === "string" && g.blocked !== ""
+          ? g.blocked
+          : deriveBlockedTopic(event);
+      return { event, requires, blocked };
+    });
+
+  return { name, completion, roles, handoff, handoffKeys, gates };
 }
 
 function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
