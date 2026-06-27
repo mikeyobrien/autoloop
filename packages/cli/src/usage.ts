@@ -35,7 +35,9 @@ export function printUsage(): void {
   );
   console.log("  autoloop runs clean [--max-age <days>]");
   console.log("  autoloop stats [project-dir] [--json]");
+  console.log("  autoloop verify [project-dir] [run-id] [--json]");
   console.log("  autoloop doctor [project-dir] [--json]");
+  console.log("  autoloop preset promote <source.toml> <name>");
   console.log("  autoloop worktree <list|show|diff|merge|clean> [args]");
   console.log("  autoloop config <show|set|unset|path> [args]");
   console.log("  autoloop dashboard [--port <port>]");

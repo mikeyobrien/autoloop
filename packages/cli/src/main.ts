@@ -21,6 +21,7 @@ import { dispatchList } from "./commands/list.js";
 import { dispatchLoops } from "./commands/loops.js";
 import { dispatchMemory } from "./commands/memory.js";
 import { dispatchPiAdapter } from "./commands/pi-adapter.js";
+import { dispatchPreset } from "./commands/preset.js";
 import { dispatchResume } from "./commands/resume.js";
 import { dispatchRobotDocs } from "./commands/robot-docs.js";
 import { dispatchRun } from "./commands/run.js";
@@ -28,6 +29,7 @@ import { dispatchRuns } from "./commands/runs.js";
 import { dispatchStats } from "./commands/stats.js";
 import { dispatchTask } from "./commands/task.js";
 import { dispatchTriage } from "./commands/triage.js";
+import { dispatchVerify } from "./commands/verify.js";
 import { dispatchWorktree } from "./commands/worktree.js";
 import { printEmitUsage, printUsage } from "./usage.js";
 
@@ -108,6 +110,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "inspect":
       dispatchInspect(args.slice(1));
       return;
+    case "preset":
+      dispatchPreset(args.slice(1));
+      return;
     case "pi-adapter":
       dispatchPiAdapter(args.slice(1));
       return;
@@ -133,6 +138,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
       return;
     case "stats":
       dispatchStats(args.slice(1));
+      return;
+    case "verify":
+      dispatchVerify(args.slice(1));
       return;
     case "doctor":
       dispatchDoctor(args.slice(1));

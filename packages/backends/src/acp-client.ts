@@ -2,6 +2,10 @@ import { type ChildProcess, spawn } from "node:child_process";
 import * as acp from "@agentclientprotocol/sdk";
 import type { AcpProvider } from "./acp-providers.js";
 import { resolveAcpProvider } from "./acp-providers.js";
+import {
+  commandFloorDecision,
+  extractCommandFromToolInput,
+} from "./command-risk.js";
 
 export interface AcpClientOptions {
   provider?: string;
@@ -187,6 +191,19 @@ export async function initAcpSession(
     async requestPermission(
       params: acp.RequestPermissionRequest,
     ): Promise<acp.RequestPermissionResponse> {
+      // Harness-owned hard-deny floor: classify the requested command before any
+      // auto-allow. Catastrophic commands are rejected even with trustAllTools.
+      const command = extractCommandFromToolInput(params.toolCall?.rawInput);
+      if (command !== null && commandFloorDecision(command).catastrophic) {
+        const reject =
+          params.options?.find((o) => o.kind === "reject_always") ??
+          params.options?.find((o) => o.kind === "reject_once");
+        if (reject)
+          return {
+            outcome: { outcome: "selected", optionId: reject.optionId },
+          };
+        return { outcome: { outcome: "cancelled" } };
+      }
       if (opts.trustAllTools && params.options?.length) {
         const allow =
           params.options.find((o) => o.kind === "allow_always") ??

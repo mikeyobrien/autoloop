@@ -25,6 +25,7 @@ preset (a loop recipe) and it iterates a backend agent until completion.
     autoloop loops show <run-id> --json
     autoloop loops health --json      # stuck/stale detection
     autoloop stats --json             # per-preset success rates and cost
+    autoloop verify --json            # independently re-verify a completed run
     autoloop doctor --json            # environment + state diagnostics
     autoloop inspect journal --json   # iteration-by-iteration event log
     autoloop config show --json       # resolved config with provenance

@@ -22,6 +22,8 @@ const INSPECT_TARGETS = [
   "chain",
   "metrics",
   "usage",
+  "progress",
+  "diff",
   "profiles",
   "topology",
 ];
@@ -40,6 +42,13 @@ interface InspectSpec {
 export function dispatchInspect(args: string[]): boolean {
   if (!args[0] || args[0] === "--help" || args[0] === "-h") {
     printInspectUsage();
+    return true;
+  }
+
+  // `inspect diff <run> <iterA> <iterB>` has its own positional shape; handle
+  // it before the generic spec parse.
+  if (args[0] === "diff") {
+    render.renderIterationDiffInspect(args.slice(1));
     return true;
   }
 
@@ -82,6 +91,9 @@ export function dispatchInspect(args: string[]): boolean {
       return true;
     case "usage":
       render.renderUsage(projectDir, format, spec.run);
+      return true;
+    case "progress":
+      render.renderProgress(projectDir, format, spec.run);
       return true;
     case "chain":
       console.log(chains.renderChainState(projectDir));

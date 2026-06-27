@@ -1,5 +1,7 @@
 import { writeFileSync } from "node:fs";
 import type {
+  HookInput,
+  HookJSONOutput,
   Options,
   Query,
   SDKAssistantMessage,
@@ -7,6 +9,10 @@ import type {
   SDKResultMessage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import {
+  commandFloorDecision,
+  extractCommandFromToolInput,
+} from "./command-risk.js";
 
 export interface ClaudeSdkClientOptions {
   /** Path to the Claude Code executable when it isn't the bare `claude` on PATH. */
@@ -24,6 +30,28 @@ export interface ClaudeSdkClientOptions {
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000;
 const DEFAULT_INTERRUPT_GRACE_MS = 2_000;
+
+/**
+ * PreToolUse hard-deny floor. Denies a tool call whose command classifies as
+ * catastrophic; otherwise stays out of the way (returns an empty result so the
+ * configured permission mode decides). Non-overridable by design.
+ */
+export async function commandRiskHook(
+  input: HookInput,
+): Promise<HookJSONOutput> {
+  if (input.hook_event_name !== "PreToolUse") return {};
+  const command = extractCommandFromToolInput(input.tool_input);
+  if (command === null) return {};
+  const risk = commandFloorDecision(command);
+  if (!risk.catastrophic) return {};
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: `Blocked by autoloop safety floor [${risk.rule}]: ${risk.reason}`,
+    },
+  };
+}
 
 export interface ClaudeSdkSession {
   query: Query;
@@ -144,6 +172,16 @@ export async function initClaudeSdkSession(
     options.permissionMode = "bypassPermissions";
     options.allowDangerouslySkipPermissions = true;
   }
+  // Harness-owned hard-deny floor. A PreToolUse hook runs before permission
+  // resolution, so it denies catastrophic commands even under
+  // bypassPermissions — and a preset cannot remove it.
+  options.hooks = {
+    ...options.hooks,
+    PreToolUse: [
+      ...(options.hooks?.PreToolUse ?? []),
+      { hooks: [commandRiskHook] },
+    ],
+  };
 
   const q = query({ prompt: input, options });
   const session: ClaudeSdkSession = {

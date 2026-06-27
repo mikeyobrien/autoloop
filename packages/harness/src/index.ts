@@ -14,7 +14,11 @@ import {
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import * as config from "@mobrienv/autoloop-core/config";
-import { readIfExists, readRunLines } from "@mobrienv/autoloop-core/journal";
+import {
+  quarantineJournal,
+  readIfExists,
+  readRunLines,
+} from "@mobrienv/autoloop-core/journal";
 import {
   cleanWorktrees,
   mergeWorktree,
@@ -42,6 +46,7 @@ import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
 import { buildHookEnv, runHook } from "./hooks.js";
+import { journalAcceptanceContract } from "./intent.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
 import { runFinishNotification } from "./notify.js";
@@ -54,12 +59,19 @@ import {
   seedBranchContext,
   writeParallelBranchSummary,
 } from "./parallel.js";
+import {
+  countRearms,
+  detectPrematureQuit,
+  rearmPrematureQuit,
+} from "./premature-quit.js";
 import { registryStart, registryStop } from "./registry-bridge.js";
 import {
   completeLoop,
   stopCostBudget,
   stopMaxIterations,
   stopMaxRuntime,
+  stopPrematureQuit,
+  stopReviewUnknown,
   stopStalled,
 } from "./stop.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
@@ -82,8 +94,18 @@ export async function run(
   loop.signal = runOptions.signal;
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
+  // Self-heal a journal poisoned by a prior crash (torn last record) before we
+  // append to it — quarantine corrupt lines so they cannot wedge this run.
+  try {
+    quarantineJournal(loop.paths.journalFile);
+  } catch {
+    /* best-effort: readLines already skips corrupt lines, so this is belt-and-suspenders */
+  }
   installRuntimeTools(loop);
   appendLoopStart(loop);
+  // Bind the acceptance contract (intent) at loop start so the deterministic
+  // gate keys its criteria off what was asked.
+  journalAcceptanceContract(loop);
   runHook(loop, "pre_run", loop.hooks.preRun, buildHookEnv(loop));
   registryStart(loop);
   loop.controlAdapter = buildControlAdapter(loop);
@@ -209,6 +231,9 @@ export async function driveLoop(
         stopReason: "interrupted",
         runId: ctx.runtime.runId,
       };
+    if (iter > ctx.limits.maxIterations) {
+      return stopMaxIterations(ctx, iter);
+    }
     currentIteration = iter;
     ctx.onEvent?.({
       type: "iteration.start",
@@ -499,6 +524,16 @@ async function runReviewThenIterate(
   const verdict = reviewed.lastVerdict;
 
   if (verdict) {
+    // Fail-closed: an UNKNOWN verdict carries no trustworthy signal. Never let
+    // it advance the loop like CONTINUE — route it by on_error.
+    if (
+      verdict.verdict === "UNKNOWN" &&
+      reviewed.review.onError !== "continue"
+    ) {
+      if (reviewed.review.onError === "exit")
+        return completeLoop(reviewed, iteration, "verdict_unknown");
+      return stopReviewUnknown(reviewed, iteration, verdict.reasoning);
+    }
     if (verdict.verdict === "EXIT")
       return completeLoop(reviewed, iteration, "verdict_exit");
     if (verdict.verdict === "TAKEOVER")
@@ -528,6 +563,17 @@ async function runReviewThenIterate(
     );
     const stall = detectStall(runLines, reviewed.limits.stallIterations ?? 0);
     if (stall.stalled) {
+      // A stall with authorized work remaining and no blocker is a premature
+      // quit (announce-then-halt / drift-stop), not a legitimate stop. Re-arm
+      // it (bounded) with a nudge, then escalate to attention if it persists.
+      const pq = detectPrematureQuit(reviewed, runLines);
+      if (pq.premature) {
+        if (countRearms(runLines) < (reviewed.limits.prematureMaxRearms ?? 1)) {
+          rearmPrematureQuit(reviewed, iteration - 1, pq);
+          return runIteration(reviewed, iteration, recurse);
+        }
+        return stopPrematureQuit(reviewed, iteration - 1, pq.reasons);
+      }
       return stopStalled(reviewed, iteration - 1, stall.repeats);
     }
     const budget = checkCostBudget(runLines, reviewed.limits.maxCostUsd ?? 0);

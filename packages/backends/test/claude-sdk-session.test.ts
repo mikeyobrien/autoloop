@@ -212,6 +212,24 @@ describe("initClaudeSdkSession", () => {
     expect(lastQuery.options.allowDangerouslySkipPermissions).toBeUndefined();
   });
 
+  it("registers the hard-deny floor as a PreToolUse hook even under bypassPermissions", async () => {
+    await startSession({ trustAllTools: true });
+    expect(lastQuery.options.permissionMode).toBe("bypassPermissions");
+    const hooks = lastQuery.options.hooks as
+      | { PreToolUse?: Array<{ hooks: unknown[] }> }
+      | undefined;
+    expect(hooks?.PreToolUse?.length).toBeGreaterThan(0);
+    expect(hooks?.PreToolUse?.[0]?.hooks?.length).toBeGreaterThan(0);
+  });
+
+  it("registers the floor even when tools are not trusted", async () => {
+    await startSession({ trustAllTools: false });
+    const hooks = lastQuery.options.hooks as
+      | { PreToolUse?: unknown[] }
+      | undefined;
+    expect(hooks?.PreToolUse?.length).toBeGreaterThan(0);
+  });
+
   it("omits executable path for the bare claude command", async () => {
     await startSession({});
     expect(lastQuery.options.pathToClaudeCodeExecutable).toBeUndefined();

@@ -70,6 +70,7 @@ const base = {
   completionEvent: "task.complete",
   requiredEvents: [] as string[],
   completionPromise: "",
+  hasBlockingTasks: false,
 };
 
 function makeAcpLoop(): LoopContext {
@@ -94,6 +95,16 @@ function makeAcpLoop(): LoopContext {
       promise: "DONE",
       event: "task.complete",
       requiredEvents: [],
+    },
+    acceptance: {
+      verifyCmds: [],
+      timeoutMs: 300000,
+      assertNoTodo: false,
+      assertNoSkippedTests: false,
+      assertNoSecrets: false,
+      assertCleanTree: false,
+      screenTestTamper: false,
+      criteria: [],
     },
     backend: {
       kind: "acp",
@@ -229,6 +240,123 @@ describe("runIteration ACP provider execution", () => {
       1234,
     );
     expect(summary.stopReason).toBe("completion_promise");
+  });
+
+  const noGuards = {
+    assertNoTodo: false,
+    assertNoSkippedTests: false,
+    assertNoSecrets: false,
+    assertCleanTree: false,
+    screenTestTamper: false,
+    criteria: [] as string[],
+  };
+
+  it("parks then holds completion when the acceptance gate fails", async () => {
+    const loop = makeAcpLoop();
+    loop.acceptance = { verifyCmds: ["false"], timeoutMs: 30000, ...noGuards };
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    } as unknown as AcpSession);
+    acpMocks.runAcpIteration.mockResolvedValue({
+      output: "DONE",
+      exitCode: 0,
+      timedOut: false,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    // Done-claim met the promise, parked, but the failing verify_cmd holds it.
+    expect(summary.stopReason).toBe("continued");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain('"state": "awaiting_acceptance"');
+    expect(journal).toContain('"state": "held"');
+    expect(journal).not.toContain('"state": "accepted"');
+  });
+
+  it("maps a 429 backend error to a typed rate_limited stop (breaker open)", async () => {
+    const loop = makeAcpLoop();
+    // Open the breaker immediately so the run stops without pausing.
+    loop.limits = { ...loop.limits, transientMaxPauses: 0 };
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    } as unknown as AcpSession);
+    acpMocks.runAcpIteration.mockResolvedValue({
+      output: "HTTP 429 Too Many Requests: rate limit exceeded",
+      exitCode: 1,
+      timedOut: false,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(summary.stopReason).toBe("rate_limited");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain('"reason": "rate_limited"');
+  });
+
+  it("retries a transient error with backoff (continues) instead of dying", async () => {
+    const loop = makeAcpLoop();
+    // Allow retries; base 0 → no real sleep in the test.
+    loop.limits = {
+      ...loop.limits,
+      transientMaxPauses: 3,
+      transientPauseMs: 0,
+    };
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    } as unknown as AcpSession);
+    acpMocks.runAcpIteration.mockResolvedValue({
+      output: "503 Service Unavailable",
+      exitCode: 1,
+      timedOut: false,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    // Not a death: the transient blip is retried (loop continues).
+    expect(summary.stopReason).toBe("continued");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain("backend.transient");
+    expect(journal).toContain('"error_class": "transient_error"');
+  });
+
+  it("parks then releases completion when the acceptance gate passes", async () => {
+    const loop = makeAcpLoop();
+    loop.acceptance = { verifyCmds: ["true"], timeoutMs: 30000, ...noGuards };
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    } as unknown as AcpSession);
+    acpMocks.runAcpIteration.mockResolvedValue({
+      output: "DONE",
+      exitCode: 0,
+      timedOut: false,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(summary.stopReason).toBe("completion_promise");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain('"state": "awaiting_acceptance"');
+    expect(journal).toContain('"state": "accepted"');
   });
 });
 
@@ -542,6 +670,41 @@ describe("resolveOutcome", () => {
       hadInvalidEvents: true,
       output: "LOOP_COMPLETE",
       completionPromise: "LOOP_COMPLETE",
+    });
+    expect(result).toEqual({ action: "continue", outcome: "continue" });
+  });
+
+  it("does not complete via promise when required events are unmet", () => {
+    const result = resolveOutcome({
+      ...base,
+      output: "LOOP_COMPLETE",
+      completionPromise: "LOOP_COMPLETE",
+      requiredEvents: ["verify.done"],
+      allTopics: [],
+    });
+    expect(result).toEqual({ action: "continue", outcome: "continue" });
+  });
+
+  it("completes via promise once required events are satisfied", () => {
+    const result = resolveOutcome({
+      ...base,
+      output: "LOOP_COMPLETE",
+      completionPromise: "LOOP_COMPLETE",
+      requiredEvents: ["verify.done"],
+      allTopics: ["verify.done"],
+    });
+    expect(result).toEqual({
+      action: "complete_promise",
+      outcome: "complete:completion_promise",
+    });
+  });
+
+  it("does not complete via promise when blocking tasks remain open", () => {
+    const result = resolveOutcome({
+      ...base,
+      output: "LOOP_COMPLETE",
+      completionPromise: "LOOP_COMPLETE",
+      hasBlockingTasks: true,
     });
     expect(result).toEqual({ action: "continue", outcome: "continue" });
   });
