@@ -72,7 +72,7 @@ export function printUsage(): void {
   console.log("  -V, --version    Print the autoloop version");
   console.log("  -v, --verbose    Set log level to debug");
   console.log(
-    "  -b, --backend    Override backend (claude-sdk, pi, kiro, claude-agent-acp, acp:<provider>:<cmd>, or a command)",
+    "  -b, --backend    Override backend (claude-sdk, pi, kiro, hermes[:profile], claude-agent-acp, acp:<provider>:<cmd>, or a command)",
   );
   console.log(
     "  --max-iterations <n>  Override event_loop.max_iterations for this run",
@@ -116,7 +116,7 @@ export function printRunUsage(): void {
   console.log("  -h, --help       Show this help");
   console.log("  -v, --verbose    Set log level to debug");
   console.log(
-    "  -b, --backend    Override backend (claude-sdk, pi, kiro, claude-agent-acp, acp:<provider>:<cmd>, or a command)",
+    "  -b, --backend    Override backend (claude-sdk, pi, kiro, hermes[:profile], claude-agent-acp, acp:<provider>:<cmd>, or a command)",
   );
   console.log(
     "  --max-iterations <n>  Override event_loop.max_iterations for this run",

@@ -141,6 +141,9 @@ export function resolveProcessKind(
   if (kind === "pi" || piBinary(command)) return "pi";
   if (kind === "claude-sdk") return "claude-sdk";
   if (isAcpBackendKind(kind)) return "acp";
+  // Hermes ACP: `hermes acp` is a native ACP provider like pi. Map it to the
+  // ACP session path so providerLaunchArgs injects --profile correctly.
+  if (hermesBinary(command)) return "acp";
   // Default: a plain `claude` invocation runs through the Agent SDK session
   // backend (live interrupt/steer + cost telemetry). Custom args mean the
   // user is tailoring the CLI invocation — respect it and keep the shell
@@ -153,6 +156,11 @@ export function resolveProcessKind(
 
 function piBinary(command: string): boolean {
   return command === "pi" || command.endsWith("/pi");
+}
+
+function hermesBinary(command: string): boolean {
+  const base = command.split("/").pop() ?? "";
+  return base === "hermes";
 }
 
 export function normalizePromptMode(value: string): string {
@@ -622,7 +630,7 @@ function readBackendConfig(
   cfg: config.Config,
   bo: Record<string, unknown>,
 ): LoopContext["backend"] {
-  const rawKind = processStringOverride(
+  let rawKind = processStringOverride(
     bo,
     "kind",
     config.get(cfg, "backend.kind", ""),
@@ -645,6 +653,13 @@ function readBackendConfig(
     provider: rawProvider,
     command: explicitCommand,
   });
+  // If the config specifies an explicit provider (not a generic fallback), ensure
+  // the ACP path so that resolveProcessKind derives the right backend kind.
+  // This handles the case where `backend.provider = "hermes"` is set in config
+  // without an explicit `backend.kind`.
+  if (!rawKind && rawProvider && acpProvider.id !== "generic") {
+    rawKind = "acp";
+  }
   const commandFallback = isAcpBackendKind(rawKind)
     ? acpProvider.defaultCommand
     : "claude";
@@ -704,6 +719,11 @@ function readBackendConfig(
     "model",
     config.get(cfg, "backend.model", ""),
   );
+  const profile = processStringOverride(
+    bo,
+    "profile",
+    config.get(cfg, "backend.profile", ""),
+  );
   return {
     kind,
     provider,
@@ -714,6 +734,7 @@ function readBackendConfig(
     trustAllTools,
     agent,
     model,
+    profile,
   };
 }
 
@@ -752,6 +773,7 @@ function readReviewConfig(
       ) !== "false",
     agent: config.get(cfg, "review.agent", backend.agent),
     model: config.get(cfg, "review.model", backend.model),
+    profile: config.get(cfg, "review.profile", backend.profile),
   };
 }
 

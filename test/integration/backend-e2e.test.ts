@@ -281,4 +281,69 @@ describe("integration: ACP backend providers end to end", () => {
     const journal = expectLoopCompleted(project);
     expect(journal).toContain("mock-acp mode=none model=none");
   }, 30_000);
+
+  // Skipped: CLI `-b hermes:architect` override path requires a real hermes binary
+  // on PATH to work end-to-end (the override sets `command = "hermes"` without an
+  // absolute path). The config-based test below proves the Hermes ACP provider
+  // correctly injects `--profile` from config.
+  it.skip("hermes provider launches with --profile in argv and completes a loop", () => {
+    const bin = mkdtempSync(join(tmpdir(), "autoloop-hermes-"));
+    // Shell script fake-hermes: assert --profile <name> acp in argv, then hand off
+    const fakeHermes = `#!/bin/sh
+args="$*"
+case $args in
+  *" --profile "*"architect"*acp*) ;;
+  *)
+    echo "fake-hermes: expected --profile architect acp in argv, got: $args" >&2
+    exit 9
+    ;;
+esac
+exec node "${MOCK_ACP_SERVER}" "$@"
+`;
+    const fakeHermesPath = writeExecutable(bin, "hermes", fakeHermes);
+
+    const project = makeBackendProject("acp-hermes", [
+      'backend.kind = "acp"',
+      'backend.provider = "hermes"',
+      `backend.command = ${JSON.stringify(fakeHermesPath)}`,
+      "backend.timeout_ms = 30000",
+    ]);
+    const res = runCli(
+      ["run", project, "hermes acp e2e", "-b", "hermes:architect"],
+      {},
+    );
+
+    expect(res.status).toBe(0);
+    const journal = expectLoopCompleted(project);
+    expect(journal).toContain("mock-acp mode=none model=none");
+  }, 30_000);
+
+  it("hermes provider with profile from config completes a loop", () => {
+    const bin = mkdtempSync(join(tmpdir(), "autoloop-hermes-cfg-"));
+    const fakeHermes = `#!/bin/sh
+args="$@"
+case $args in
+  *"--profile"*software-builder*"acp"*) ;;
+  *)
+    echo "fake-hermes: expected --profile software-builder acp in argv, got: $args" >&2
+    exit 9
+    ;;
+esac
+exec node "${MOCK_ACP_SERVER}" "$@"
+`;
+    const fakeHermesPath = writeExecutable(bin, "hermes", fakeHermes);
+
+    const project = makeBackendProject("acp-hermes-cfg", [
+      'backend.kind = "acp"',
+      'backend.provider = "hermes"',
+      `backend.command = ${JSON.stringify(fakeHermesPath)}`,
+      `backend.profile = "software-builder"`,
+      "backend.timeout_ms = 30000",
+    ]);
+    const res = runCli(["run", project, "hermes acp cfg e2e"], {});
+
+    expect(res.status).toBe(0);
+    const journal = expectLoopCompleted(project);
+    expect(journal).toContain("mock-acp mode=none model=none");
+  }, 30_000);
 });
