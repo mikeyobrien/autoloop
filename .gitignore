@@ -14,3 +14,4 @@ kiro-loop.sh
 docs/.vitepress/dist
 docs/.vitepress/cache
 .hermes/
+.beads/

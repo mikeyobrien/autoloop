@@ -1,6 +1,7 @@
 import {
   categorizeRuns,
   type HealthResult,
+  reapStaleRuns,
 } from "@mobrienv/autoloop-core/runs-health";
 import { renderListHeader, renderRunLine } from "./render.js";
 
@@ -9,6 +10,7 @@ export {
   categorizeRuns,
   type HealthResult,
   policyForPreset,
+  reapStaleRuns,
   type SupervisionPolicy,
 } from "@mobrienv/autoloop-core/runs-health";
 
@@ -16,8 +18,12 @@ export {
  * Produce a health summary string from the registry.
  * Exception-focused: only surfaces issues by default.
  * Pass verbose=true to also list recent completions.
+ *
+ * Runs the registry reaper first so that stale "running" entries (PID dead)
+ * are corrected before the health report is produced.
  */
 export function healthSummary(stateDir: string, verbose: boolean): string {
+  reapStaleRuns(stateDir);
   const result = categorizeRuns(stateDir);
   return renderHealth(result, verbose);
 }

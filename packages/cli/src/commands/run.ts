@@ -1,7 +1,8 @@
-import { statSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { existsSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { joinCsv } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
+import * as topo from "@mobrienv/autoloop-core/topology";
 import * as harness from "@mobrienv/autoloop-harness";
 import { claudeBackend } from "@mobrienv/autoloop-harness/config-helpers";
 import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
@@ -18,6 +19,7 @@ import {
 
 interface RunOptions {
   projectDir: string;
+  presetFile?: string;
   prompt: string | null;
   backendOverride: Record<string, unknown>;
   configOverride: Record<string, unknown>;
@@ -35,6 +37,16 @@ interface RunOptions {
   automerge?: boolean;
   keepWorktree?: boolean;
   eventsPath?: string;
+  /** Route an objective-without-preset through the `autoarchitect` preset. */
+  architect?: boolean;
+  /** Architect intensity: bias generation toward exhaustive fan-out + verify. */
+  ultra?: boolean;
+  /** Advisory dollar target for the architect; also the hard `max_cost_usd` ceiling. */
+  budgetUsd?: string;
+  /** The original objective, preserved to run the generated preset with. */
+  architectObjective?: string;
+  /** Path the architect must write the generated preset to (CLI-controlled). */
+  architectOutputPath?: string;
 }
 
 export async function dispatchRun(
@@ -140,10 +152,62 @@ export async function dispatchRun(
         process.kill(process.pid, caughtSignal);
       }
     }
+
+    // Architect auto-chain: the architect run designed a single-file preset;
+    // validate it, then run it with the original objective (the generated
+    // workflow doing the actual work).
+    if (options.architect && options.architectOutputPath) {
+      await runGeneratedPreset(options, selfCmd, onEvent);
+    }
     return true;
   } finally {
     eventSink?.close();
   }
+}
+
+/**
+ * Second link of the architect chain: load + statically validate the preset the
+ * architect produced, then run it with the original objective. Refuses to run a
+ * preset that does not exist or that the validator flags — the dead-topology
+ * guard the whole design rests on.
+ */
+async function runGeneratedPreset(
+  options: RunOptions,
+  selfCmd: string,
+  onEvent: (e: LoopEvent) => void,
+): Promise<void> {
+  const file = options.architectOutputPath as string;
+  if (!existsSync(file)) {
+    process.stderr.write(
+      `\narchitect: no generated preset at ${file}; nothing to run.\n`,
+    );
+    process.exitCode = EXIT_ENV;
+    return;
+  }
+  const topology = topo.loadTopologyFromFile(file);
+  const warnings = topo.validateTopology(topology, { singleFile: true });
+  if (warnings.length > 0) {
+    process.stderr.write(
+      `\narchitect: generated preset ${file} failed validation; not running:\n` +
+        warnings.map((w) => `  - ${w.message}`).join("\n") +
+        "\n",
+    );
+    process.exitCode = EXIT_ENV;
+    return;
+  }
+  process.stderr.write(`\narchitect: running generated preset ${file}\n\n`);
+  await harness.run(
+    dirname(file),
+    normalizePrompt(options.architectObjective ?? null),
+    selfCmd,
+    {
+      presetFile: file,
+      workDir: options.workDir,
+      backendOverride: options.backendOverride,
+      logLevel: options.logLevel,
+      onEvent,
+    },
+  );
 }
 
 export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
@@ -200,6 +264,31 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
       i += 2;
       continue;
     }
+    if (token === "--architect" || token === "--dynamic") {
+      options.architect = true;
+      i++;
+      continue;
+    }
+    if (token === "--ultra") {
+      // --ultra implies the architect path at maximum intensity.
+      options.architect = true;
+      options.ultra = true;
+      i++;
+      continue;
+    }
+    if (token === "--budget") {
+      const value = args[i + 1];
+      if (!value || !isFiniteBudget(value)) {
+        console.log(`invalid --budget (expected a dollar amount): ${value}`);
+        options.usageError = true;
+        return options;
+      }
+      options.budgetUsd = value;
+      // Opt-in hard ceiling: the advisory target also caps spend via the guard.
+      setConfigOverride(options, "event_loop.max_cost_usd", value);
+      i += 2;
+      continue;
+    }
     if (token === "--set") {
       const assignment = args[i + 1];
       if (!assignment) {
@@ -224,13 +313,14 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
         options.usageError = true;
         return options;
       }
-      const resolved = config.resolveProjectDir(preset, bundleRoot);
-      if (!resolved) {
+      const source = config.resolvePresetSource(preset, bundleRoot);
+      if (!source) {
         console.log(`preset \`${preset}\` not found`);
         options.usageError = true;
         return options;
       }
-      options.projectDir = resolved;
+      options.projectDir = source.projectDir;
+      if (source.kind === "file") options.presetFile = source.file;
       options.presetExplicit = true;
       i += 2;
       continue;
@@ -331,9 +421,74 @@ function parseConfigAssignment(
   return { key, value };
 }
 
+function isFiniteBudget(value: string): boolean {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0;
+}
+
+/**
+ * Compose the design brief handed to the `autoarchitect` preset: the objective,
+ * the intensity and optional advisory budget the architect sizes against, and
+ * the exact path it must write the generated single-file preset to (so the CLI
+ * can find, validate, and run it afterward).
+ */
+export function architectBrief(
+  objective: string,
+  ultra: boolean,
+  outputPath: string,
+  budgetUsd?: string,
+): string {
+  const intensity = ultra ? "ultra (maximally exhaustive)" : "standard";
+  const budget = budgetUsd
+    ? ` Budget target: $${budgetUsd} (also the hard ceiling).`
+    : " No budget ceiling set; size the workflow modestly.";
+  return (
+    `Design directive: intensity=${intensity}.${budget}\n` +
+    `Generated preset path: write the single-file preset to EXACTLY ${outputPath}\n\n` +
+    `Objective: ${objective}`
+  );
+}
+
+function architectOutputPath(workDir: string | undefined): string {
+  return resolve(workDir || ".", ".autoloop", "generated-preset.toml");
+}
+
+function finalizeArchitectRun(
+  options: RunOptions,
+  bundleRoot: string,
+): RunOptions {
+  const source = config.resolvePresetSource("autoarchitect", bundleRoot);
+  if (!source) {
+    console.log("error: autoarchitect preset not found");
+    options.usageError = true;
+    return options;
+  }
+  options.projectDir = source.projectDir;
+  if (source.kind === "file") options.presetFile = source.file;
+  const objective = options.positionals.join(" ");
+  options.architectObjective = objective;
+  options.architectOutputPath = architectOutputPath(options.workDir);
+  // Remove any stale generated preset from a prior run so a design that aborts
+  // or emits design.blocked cannot leave the auto-chain running an old file.
+  rmSync(options.architectOutputPath, { force: true });
+  options.prompt = objective
+    ? architectBrief(
+        objective,
+        options.ultra ?? false,
+        options.architectOutputPath,
+        options.budgetUsd,
+      )
+    : null;
+  return applyGlobalBackendOverride(options);
+}
+
 function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
   if (options.usageError) return options;
   const positionals = options.positionals;
+
+  if (options.architect && !options.presetExplicit) {
+    return finalizeArchitectRun(options, bundleRoot);
+  }
 
   if (options.presetExplicit) {
     options.prompt = positionals.join(" ") || null;
@@ -370,13 +525,14 @@ function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
     return applyGlobalBackendOverride(options);
   }
 
-  const bundledPreset = config.resolveProjectDir(first, bundleRoot);
-  if (!bundledPreset) {
+  const source = config.resolvePresetSource(first, bundleRoot);
+  if (!source) {
     unknownPresetError(first);
     options.usageError = true;
     return options;
   }
-  options.projectDir = bundledPreset;
+  options.projectDir = source.projectDir;
+  if (source.kind === "file") options.presetFile = source.file;
   options.prompt = rest.join(" ") || null;
   return applyGlobalBackendOverride(options);
 }

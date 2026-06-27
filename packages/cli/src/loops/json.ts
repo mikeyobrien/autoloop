@@ -7,6 +7,7 @@ import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import {
   categorizeRecords,
   categorizeRuns,
+  reapStaleRuns,
 } from "@mobrienv/autoloop-core/runs-health";
 
 /** Result of a JSON command: text to print plus desired exit code. */
@@ -147,8 +148,11 @@ export function artifactsJson(stateDir: string, partial: string): JsonResult {
 /**
  * JSON equivalent of healthSummary: every bucket with counts and run ids.
  * The JSON form always includes all buckets (verbose has no effect).
+ *
+ * Reaps stale runs first so the health snapshot reflects reality.
  */
 export function healthJson(stateDir: string): string {
+  reapStaleRuns(stateDir);
   const h = categorizeRuns(stateDir);
   const bucket = (runs: RunRecord[]) => ({
     count: runs.length,

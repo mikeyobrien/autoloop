@@ -4,9 +4,9 @@
 // ./config-schema.ts and are re-exported here so existing callers that do
 // `import * as config from "./config.js"` keep working unchanged.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
   type Config,
   deepMerge,
@@ -101,6 +101,24 @@ export function loadLayered(
   projectDir: string,
   options: LoadLayeredOptions = {},
 ): LayeredConfig {
+  return loadLayeredFrom(
+    resolveConfigPath(projectDir),
+    basename(projectDir),
+    options,
+  );
+}
+
+/**
+ * Layered config load parameterized by the project-layer config path and the
+ * default preset name. `loadLayered` (directory presets) and
+ * `loadProjectFromFile` (single-file presets) both funnel through here so the
+ * defaults → user → project → overrides → CLI precedence stays identical.
+ */
+function loadLayeredFrom(
+  projectPath: string,
+  defaultPresetName: string,
+  options: LoadLayeredOptions = {},
+): LayeredConfig {
   const base = defaults();
   const provenance: Provenance = {};
   recordProvenance(base, "default", provenance, "");
@@ -109,16 +127,15 @@ export function loadLayered(
   let merged = deepMerge(base, userCfg);
   recordProvenance(userCfg, `user (${userConfigPath()})`, provenance, "");
 
-  const projectPath = resolveConfigPath(projectDir);
   if (existsSync(projectPath)) {
-    const projectCfg = stringifyValues(
-      parseRawToml(readFileSync(projectPath, "utf-8")),
+    const projectCfg = stripTopologyKeys(
+      stringifyValues(parseRawToml(readFileSync(projectPath, "utf-8"))),
     );
     merged = deepMerge(merged, projectCfg);
     recordProvenance(projectCfg, `project (${projectPath})`, provenance, "");
   }
 
-  const presetName = options.presetName || basename(projectDir);
+  const presetName = options.presetName || defaultPresetName;
   const userOverridePath = userPresetOverridePath(presetName);
   if (existsSync(userOverridePath)) {
     const userOverride = stringifyValues(
@@ -167,6 +184,37 @@ export function loadProject(
   return loadLayered(projectDir, options).config;
 }
 
+/**
+ * Top-level keys that belong to the topology layer, not the config layer. In a
+ * single-file merged-TOML preset they share the document with config tables, so
+ * the config layer strips them — keeping the config map identical in shape to a
+ * directory preset's (whose autoloops.toml never carries these). The topology
+ * layer reads them separately via `topology.loadTopologyFromFile`.
+ */
+const TOPOLOGY_ONLY_KEYS = ["name", "completion", "role", "handoff", "gate"];
+
+function stripTopologyKeys(cfg: Config): Config {
+  const out: Config = {};
+  for (const [key, value] of Object.entries(cfg)) {
+    if (!TOPOLOGY_ONLY_KEYS.includes(key)) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Load config from a single merged-TOML preset file. The file's config tables
+ * (`event_loop`/`backend`/`parallel`/`hooks`/`memory`/`core`) form the project
+ * layer; its topology tables are read separately by
+ * `topology.loadTopologyFromFile`. The preset name (for overrides) defaults to
+ * the file's basename without the `.toml` extension.
+ */
+export function loadProjectFromFile(
+  file: string,
+  options: LoadLayeredOptions = {},
+): Config {
+  return loadLayeredFrom(file, basename(file, ".toml"), options).config;
+}
+
 export function load(path: string): Config {
   if (!existsSync(path)) return defaults();
   return parseToml(readFileSync(path, "utf-8"));
@@ -209,6 +257,48 @@ export function projectHasConfig(projectDir: string): boolean {
     existsSync(join(projectDir, "autoloops.toml")) ||
     existsSync(join(projectDir, "autoloops.conf"))
   );
+}
+
+/** True when `p` is an existing single-file (`.toml`) preset. */
+export function pathIsSingleFilePreset(p: string): boolean {
+  if (!p.endsWith(".toml")) return false;
+  try {
+    return statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A resolved preset: either a directory preset (today's autoloops.toml +
+ * topology.toml + roles/) or a single merged-TOML file. Callers thread this
+ * through load sites instead of re-sniffing the filesystem.
+ */
+export type PresetSource =
+  | { kind: "dir"; projectDir: string }
+  | { kind: "file"; file: string; projectDir: string };
+
+/**
+ * Resolve a preset name or path to a tagged `PresetSource`, recognizing both
+ * directory presets and single-file `.toml` presets. Returns null when nothing
+ * resolves. Directory presets win over a same-named `.toml` (preserves prior
+ * behavior). An explicit path to a `.toml` file resolves to a file source.
+ */
+export function resolvePresetSource(
+  nameOrPath: string,
+  bundleRoot: string,
+): PresetSource | null {
+  if (projectHasConfig(nameOrPath)) {
+    return { kind: "dir", projectDir: nameOrPath };
+  }
+  if (pathIsSingleFilePreset(nameOrPath)) {
+    return { kind: "file", file: nameOrPath, projectDir: dirname(nameOrPath) };
+  }
+  const dir = resolveBundledPresetDir(nameOrPath, bundleRoot);
+  if (dir) return { kind: "dir", projectDir: dir };
+  const file = resolveBundledPresetFile(nameOrPath, bundleRoot);
+  if (file) return { kind: "file", file, projectDir: dirname(file) };
+  return null;
 }
 
 export function resolveProjectDir(
@@ -296,6 +386,24 @@ function resolveBundledPresetDir(name: string, bundleRoot: string): string {
   if (bundledRoot) {
     const bundledCandidate = join(bundledRoot, name);
     if (projectHasConfig(bundledCandidate)) return bundledCandidate;
+  }
+  return "";
+}
+
+/**
+ * Resolve a single-file (`<name>.toml`) preset across the same search roots as
+ * `resolveBundledPresetDir`. Returns "" when none exists.
+ */
+function resolveBundledPresetFile(name: string, bundleRoot: string): string {
+  const candidates = [
+    join(bundleRoot, `presets/${name}.toml`),
+    join(".", `presets/${name}.toml`),
+    join(userPresetsDir(), `${name}.toml`),
+  ];
+  const bundledRoot = bundledPresetsRoot();
+  if (bundledRoot) candidates.push(join(bundledRoot, `${name}.toml`));
+  for (const candidate of candidates) {
+    if (pathIsSingleFilePreset(candidate)) return candidate;
   }
   return "";
 }

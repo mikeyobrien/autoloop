@@ -1,6 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import TOML from "@iarna/toml";
+import type {
+  FanoutKind,
+  FanoutStage,
+  JoinKind,
+  VoteThreshold,
+} from "./fanout.js";
 import { lineSep, listContains, listText } from "./utils.js";
 
 export interface Role {
@@ -46,6 +52,7 @@ export interface Topology {
   handoff: Record<string, string[]>;
   handoffKeys: string[];
   gates: Gate[];
+  stages: FanoutStage[];
 }
 
 /**
@@ -106,6 +113,29 @@ export function loadTopology(projectDir: string): Topology {
   const path = join(projectDir, "topology.toml");
   if (!existsSync(path)) return defaultTopology();
   return loadExisting(path, projectDir);
+}
+
+/**
+ * Load a topology from a single merged-TOML preset file. The file carries both
+ * config and topology tables in one document; only the topology tables
+ * (`name`/`completion`/`role`/`handoff`/`gate`) are read here — the config
+ * tables are ignored. Role prompts must be inline (`prompt = "..."`);
+ * `prompt_file` is unsupported in single-file mode because there is no sibling
+ * preset directory to resolve it against (the validator flags such roles).
+ */
+export function loadTopologyFromFile(file: string): Topology {
+  if (!existsSync(file)) return defaultTopology();
+  return loadExisting(file, dirname(file));
+}
+
+/** True when `target` points at an existing single-file (`.toml`) preset. */
+export function isSingleFilePresetPath(target: string): boolean {
+  if (!target.endsWith(".toml")) return false;
+  try {
+    return statSync(target).isFile();
+  } catch {
+    return false;
+  }
 }
 
 export function completionEvent(topology: Topology, fallback: string): string {
@@ -171,6 +201,7 @@ function defaultTopology(): Topology {
     handoff: {},
     handoffKeys: [],
     gates: [],
+    stages: [],
   };
 }
 
@@ -180,7 +211,7 @@ function loadExisting(path: string, projectDir: string): Topology {
   return buildTopology(parsed, projectDir);
 }
 
-function buildTopology(
+export function buildTopology(
   parsed: Record<string, unknown>,
   projectDir: string,
 ): Topology {
@@ -225,7 +256,53 @@ function buildTopology(
       return { event, requires, blocked };
     });
 
-  return { name, completion, roles, handoff, handoffKeys, gates };
+  const rawStages = (parsed.stage ?? []) as Array<Record<string, unknown>>;
+  const stages: FanoutStage[] = rawStages
+    .filter((s) => typeof s.id === "string" && s.id !== "")
+    .map(parseStage);
+
+  return { name, completion, roles, handoff, handoffKeys, gates, stages };
+}
+
+function str(value: unknown, fallback: string): string {
+  return typeof value === "string" && value !== "" ? value : fallback;
+}
+
+function num(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function parseStage(s: Record<string, unknown>): FanoutStage {
+  const id = s.id as string;
+  const kind: FanoutKind = s.kind === "verdict" ? "verdict" : "discovery";
+  const join = str(s.join, "concat") as JoinKind;
+  const onPass = str(s.on_pass, `${id}.passed`);
+  const onFail = str(s.on_fail, `${id}.blocked`);
+  const voteThreshold = ((): VoteThreshold => {
+    if (s.vote_threshold === "supermajority") return "supermajority";
+    if (s.vote_threshold === "unanimous") return "unanimous";
+    return "majority";
+  })();
+  return {
+    id,
+    kind,
+    branches: num(s.branches, 0),
+    role: str(s.role, ""),
+    roles: Array.isArray(s.roles) ? s.roles.map(String) : [],
+    join,
+    requires: Array.isArray(s.requires)
+      ? s.requires.map(String).filter((r) => r !== "")
+      : [],
+    voteField: str(s.vote_field, "affirm"),
+    voteThreshold,
+    itemsField: str(s.items_field, "items"),
+    keyField: str(s.key_field, "key"),
+    countMin: num(s.count_min, 1),
+    quorum: num(s.quorum, 0),
+    onPass,
+    onFail,
+    synthesizerRole: str(s.synthesizer_role, ""),
+  };
 }
 
 function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
@@ -391,11 +468,34 @@ function promptSummary(prompt: string): string {
 /* ── inspect topology ─────────────────────────────────────── */
 
 export interface TopologyWarning {
-  kind: "orphan-role" | "unreachable-event" | "no-emits";
+  kind:
+    | "orphan-role"
+    | "unreachable-event"
+    | "no-emits"
+    | "completion-unreachable"
+    | "gate-dead-event"
+    | "gate-blocked-unroutable"
+    | "prompt-file-in-single-file"
+    | "stage-unknown-role"
+    | "stage-event-unroutable"
+    | "stage-empty"
+    | "stage-schema-incoherent"
+    | "stage-not-executed";
   message: string;
 }
 
-export function validateTopology(topology: Topology): TopologyWarning[] {
+export interface ValidateTopologyOptions {
+  /**
+   * Single-file preset mode: flag roles that rely on `prompt_file`, which is
+   * unsupported when the preset is one file with no sibling directory.
+   */
+  singleFile?: boolean;
+}
+
+export function validateTopology(
+  topology: Topology,
+  options: ValidateTopologyOptions = {},
+): TopologyWarning[] {
   const warnings: TopologyWarning[] = [];
 
   const targetedRoleIds = handoffTargetIds(topology);
@@ -410,6 +510,12 @@ export function validateTopology(topology: Topology): TopologyWarning[] {
       warnings.push({
         kind: "no-emits",
         message: `role \`${role.id}\` has no emits`,
+      });
+    }
+    if (options.singleFile && !role.prompt && role.promptFile) {
+      warnings.push({
+        kind: "prompt-file-in-single-file",
+        message: `role \`${role.id}\` uses prompt_file \`${role.promptFile}\`, unsupported in single-file presets; use an inline prompt`,
       });
     }
   }
@@ -427,14 +533,122 @@ export function validateTopology(topology: Topology): TopologyWarning[] {
     }
   }
 
+  // Completion must be emittable by some role; otherwise the loop can never
+  // reach its completion event and runs until another guard stops it.
+  if (topology.completion !== "" && !emitted.includes(topology.completion)) {
+    warnings.push({
+      kind: "completion-unreachable",
+      message: `completion event \`${topology.completion}\` is never emitted by any role`,
+    });
+  }
+
+  // Evidence gates: the gated event must be emittable, and the typed blocked
+  // topic must route somewhere (a handoff rule or the completion event).
+  for (const gate of topology.gates) {
+    if (!emitted.includes(gate.event)) {
+      warnings.push({
+        kind: "gate-dead-event",
+        message: `gate event \`${gate.event}\` is never emitted by any role`,
+      });
+    }
+    if (
+      !eventMatchesAny(gate.blocked, topology.handoffKeys) &&
+      gate.blocked !== topology.completion
+    ) {
+      warnings.push({
+        kind: "gate-blocked-unroutable",
+        message: `gate blocked topic \`${gate.blocked}\` has no matching handoff rule and is not the completion event`,
+      });
+    }
+  }
+
+  validateStages(topology, warnings);
+
+  // Fan-out stages parse and validate, but stage EXECUTION is not yet wired into
+  // the run loop. On the runnable (single-file) path, flag a preset that defines
+  // stages so the dead-topology gate refuses it rather than silently no-opping.
+  if (options.singleFile && topology.stages.length > 0) {
+    warnings.push({
+      kind: "stage-not-executed",
+      message: `topology defines ${topology.stages.length} fan-out [[stage]] block(s), but stage execution is not yet wired into the run loop; they would not run`,
+    });
+  }
+
   return warnings;
 }
 
-export function renderTopologyInspect(
-  projectDir: string,
-  format: string,
-): void {
-  const topology = loadTopology(projectDir);
+function validateStages(topology: Topology, warnings: TopologyWarning[]): void {
+  const roleIds = new Set(getRoleIds(topology));
+  const routes = (event: string): boolean =>
+    eventMatchesAny(event, topology.handoffKeys) ||
+    event === topology.completion;
+
+  for (const stage of topology.stages) {
+    // Every referenced role must exist.
+    const referenced = [
+      ...(stage.role ? [stage.role] : []),
+      ...stage.roles,
+      ...(stage.synthesizerRole ? [stage.synthesizerRole] : []),
+    ];
+    for (const roleId of referenced) {
+      if (!roleIds.has(roleId)) {
+        warnings.push({
+          kind: "stage-unknown-role",
+          message: `stage \`${stage.id}\` references role \`${roleId}\` that no [[role]] defines`,
+        });
+      }
+    }
+
+    // A stage must launch something: a K-identical panel (role + branches) or
+    // an N-distinct panel (roles).
+    const hasIdentical = stage.role !== "" && stage.branches > 0;
+    if (!hasIdentical && stage.roles.length === 0) {
+      warnings.push({
+        kind: "stage-empty",
+        message: `stage \`${stage.id}\` launches no branches; set role+branches or roles`,
+      });
+    }
+
+    // The stage's outcome events must route somewhere.
+    for (const event of [stage.onPass, stage.onFail]) {
+      if (!routes(event)) {
+        warnings.push({
+          kind: "stage-event-unroutable",
+          message: `stage \`${stage.id}\` event \`${event}\` has no matching handoff rule and is not the completion event`,
+        });
+      }
+    }
+
+    // Seam coherence: the reducer's required fields must be guaranteed by the
+    // branch schema, else votes/dedup operate on data that may be absent.
+    if (stage.requires.length > 0) {
+      if (
+        stage.join === "majority-vote" &&
+        !stage.requires.includes(stage.voteField)
+      ) {
+        warnings.push({
+          kind: "stage-schema-incoherent",
+          message: `stage \`${stage.id}\` votes on \`${stage.voteField}\` but its schema does not require it`,
+        });
+      }
+      if (
+        (stage.join === "dedup-by-key" || stage.join === "count-threshold") &&
+        !stage.requires.includes(stage.itemsField)
+      ) {
+        warnings.push({
+          kind: "stage-schema-incoherent",
+          message: `stage \`${stage.id}\` reduces \`${stage.itemsField}\` but its schema does not require it`,
+        });
+      }
+    }
+  }
+}
+
+export function renderTopologyInspect(target: string, format: string): void {
+  const singleFile = isSingleFilePresetPath(target);
+  const topology = singleFile
+    ? loadTopologyFromFile(target)
+    : loadTopology(target);
 
   if (topology.roles.length === 0) {
     console.log("No topology defined.");
@@ -443,19 +657,19 @@ export function renderTopologyInspect(
 
   switch (format) {
     case "json":
-      renderTopologyJson(topology);
+      renderTopologyJson(topology, singleFile);
       break;
     case "graph":
       renderTopologyGraph(topology);
       break;
     default:
-      renderTopologyTerminal(topology);
+      renderTopologyTerminal(topology, singleFile);
       break;
   }
 }
 
-function renderTopologyJson(topology: Topology): void {
-  const warnings = validateTopology(topology);
+function renderTopologyJson(topology: Topology, singleFile: boolean): void {
+  const warnings = validateTopology(topology, { singleFile });
   const out = {
     name: topology.name,
     completion: topology.completion,
@@ -506,7 +720,7 @@ function renderTopologyGraph(topology: Topology): void {
   console.log(lines.join("\n"));
 }
 
-function renderTopologyTerminal(topology: Topology): void {
+function renderTopologyTerminal(topology: Topology, singleFile: boolean): void {
   const lines: string[] = [];
   lines.push(`## Topology: ${topology.name || "(unnamed)"}`);
   lines.push("");
@@ -532,7 +746,7 @@ function renderTopologyTerminal(topology: Topology): void {
   }
   lines.push("");
 
-  const warnings = validateTopology(topology);
+  const warnings = validateTopology(topology, { singleFile });
   if (warnings.length > 0) {
     lines.push("### Warnings");
     for (const w of warnings) {

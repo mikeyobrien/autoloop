@@ -1,0 +1,36 @@
+# Example single-file preset: a three-role review loop in one merged-TOML file.
+# Config tables (event_loop/backend/...) and topology tables (name/completion/
+# role/handoff) live together; role prompts are inline. Inspect it with:
+#   autoloop inspect topology docs/examples/autoreview.toml --format json
+name = "autoreview"
+completion = "task.complete"
+
+[event_loop]
+max_iterations = 25
+completion_event = "task.complete"
+
+[backend]
+kind = "command"
+command = "claude"
+timeout_ms = 600000
+
+[[role]]
+id = "planner"
+prompt = "You are the planner. Break the objective into concrete review targets and emit targets.ready."
+emits = ["targets.ready"]
+
+[[role]]
+id = "reviewer"
+prompt = "You are the reviewer. Review each target; emit review.ready when done or review.blocked if you need a re-plan."
+emits = ["review.ready", "review.blocked"]
+
+[[role]]
+id = "finalizer"
+prompt = "You are the finalizer. Confirm every target was reviewed, then emit task.complete."
+emits = ["task.complete"]
+
+[handoff]
+"loop.start" = ["planner"]
+"targets.ready" = ["reviewer"]
+"review.ready" = ["finalizer"]
+"review.blocked" = ["planner"]

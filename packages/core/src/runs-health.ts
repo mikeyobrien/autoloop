@@ -8,9 +8,15 @@
  * health` command and the dashboard API.
  */
 
+import { join } from "node:path";
 import { isProcessAlive } from "./helpers.js";
-import { readMergedRegistry } from "./registry/discover.js";
+import {
+  discoverChainRegistries,
+  readMergedRegistry,
+} from "./registry/discover.js";
+import { readRegistry } from "./registry/read.js";
 import type { RunRecord } from "./registry/types.js";
+import { appendRegistryEntry } from "./registry/update.js";
 
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -140,4 +146,45 @@ function isRecent(r: RunRecord, nowMs: number): boolean {
   const updatedMs = new Date(r.updated_at).getTime();
   if (Number.isNaN(updatedMs)) return false;
   return nowMs - updatedMs <= RECENT_WINDOW_MS;
+}
+
+/**
+ * Registry reaper: find all running runs whose recorded PID is dead, and
+ * append corrected entries back to their respective registry files so the
+ * append-only log reflects reality.
+ *
+ * Returns the count of stale runs reaped across all registry files.
+ */
+export function reapStaleRuns(stateDir: string): number {
+  let total = 0;
+
+  for (const regPath of allRegistryPaths(stateDir)) {
+    const records = readRegistry(regPath);
+    let changed = false;
+
+    for (const r of records) {
+      if (r.status === "running" && r.pid != null && !isProcessAlive(r.pid)) {
+        const reaped: RunRecord = {
+          ...r,
+          status: "stopped",
+          stop_reason: "reaped: pid no longer alive",
+          updated_at: new Date().toISOString(),
+        };
+        appendRegistryEntry(regPath, reaped);
+        changed = true;
+        total++;
+      }
+    }
+  }
+
+  return total;
+}
+
+function allRegistryPaths(stateDir: string): string[] {
+  const rootPath = join(stateDir, "registry.jsonl");
+  const paths = [rootPath];
+  for (const child of discoverChainRegistries(stateDir)) {
+    paths.push(child);
+  }
+  return paths;
 }
