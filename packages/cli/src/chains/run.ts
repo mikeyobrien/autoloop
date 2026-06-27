@@ -286,7 +286,13 @@ function chainStepSuccess(stopReason: string): boolean {
   return (
     stopReason === "max_iterations" ||
     stopReason === "completion_event" ||
-    stopReason === "completion_promise"
+    stopReason === "completion_promise" ||
+    // The metareview's EXIT and TAKEOVER verdicts terminate the loop via
+    // completeLoop() (see harness index.ts) — they are successful completions
+    // ("output already sufficient" / "solved directly"), not failures. Without
+    // these, a step the meta-reviewer approves stopping wrongly fails the chain.
+    stopReason === "verdict_exit" ||
+    stopReason === "verdict_takeover"
   );
 }
 
