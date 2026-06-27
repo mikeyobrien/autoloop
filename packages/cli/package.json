@@ -48,6 +48,7 @@
     "directory": "packages/cli"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.18.0",
     "@hono/node-server": "^1.13.7",
     "@mobrienv/autoloop-core": "0.8.0",
     "@mobrienv/autoloop-dashboard": "0.8.0",
