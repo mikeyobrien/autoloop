@@ -38,9 +38,10 @@ import {
   publishCapabilities,
 } from "./control/dispatch.js";
 import { piControlAdapter } from "./control/pi-adapter.js";
-import { log } from "./display.js";
+import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
+import { buildHookEnv, runHook } from "./hooks.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
 import { runFinishNotification } from "./notify.js";
@@ -78,16 +79,34 @@ export async function run(
     runOptions,
   );
   loop.onEvent = runOptions.onEvent;
+  loop.signal = runOptions.signal;
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
   appendLoopStart(loop);
+  runHook(loop, "pre_run", loop.hooks.preRun, buildHookEnv(loop));
   registryStart(loop);
   loop.controlAdapter = buildControlAdapter(loop);
   if (loop.controlAdapter) {
     publishCapabilities(loop.paths.stateDir, loop.controlAdapter);
   }
 
+  return driveLoop(loop, runOptions, 1);
+}
+
+/**
+ * Drive the iteration loop for an already-built, already-registered
+ * LoopContext, starting at `startIteration`. Owns abort/teardown wiring,
+ * the tracked-iterate recursion, session cleanup, post-run worktree
+ * lifecycle, and finish notifications. Shared by `run()` and `resume()` so
+ * both paths exercise identical signal handlers, stop handlers, and
+ * registry/journal behavior.
+ */
+export async function driveLoop(
+  loop: LoopContext,
+  runOptions: RunOptions,
+  startIteration: number,
+): Promise<RunSummary> {
   // Track current iteration for abort handler (must be mutable)
   let currentIteration = 0;
   let aborted = false;
@@ -200,7 +219,21 @@ export async function run(
     return iterateWith(ctx, iter, trackedIterate);
   };
   try {
-    summary = await trackedIterate(loop, 1);
+    summary = await trackedIterate(loop, startIteration);
+  } catch (err: unknown) {
+    // An unexpected throw (e.g. init/store failure outside per-iteration error
+    // handling) must still produce a terminal event so an external --events
+    // consumer always learns the run ended, instead of waiting forever for a
+    // loop.finish. Data already written is flushed (synchronous appends); we
+    // emit the terminal marker and re-raise.
+    loop.onEvent?.({
+      type: "loop.finish",
+      iterations: currentIteration > 0 ? currentIteration - 1 : 0,
+      stopReason: "error",
+      runId: loop.runtime.runId,
+      costUsd: runCostUsd(loop),
+    });
+    throw err;
   } finally {
     if (loop.acpSession.current) {
       try {
@@ -298,6 +331,12 @@ export async function run(
     }
   }
 
+  runHook(
+    loop,
+    "post_run",
+    loop.hooks.postRun,
+    buildHookEnv(loop, { stopReason: summary.stopReason }),
+  );
   runFinishNotification({
     projectDir: loop.paths.mainProjectDir,
     journalFile: loop.paths.journalFile,
@@ -307,11 +346,13 @@ export async function run(
     iterations: summary.iterations,
   });
 
+  const costUsd = runCostUsd(loop);
   loop.onEvent?.({
     type: "summary",
     runId: loop.runtime.runId,
     iterations: summary.iterations,
     stopReason: summary.stopReason,
+    costUsd,
     journalFile: loop.paths.journalFile,
     memoryFile: loop.paths.memoryFile,
     reviewEvery: loop.review.every,
@@ -322,10 +363,18 @@ export async function run(
     iterations: summary.iterations,
     stopReason: summary.stopReason,
     runId: loop.runtime.runId,
+    costUsd,
   });
   return { ...summary, runId: loop.runtime.runId };
 }
 
+export {
+  buildResumeContext,
+  determineResumeIteration,
+  type ResumeOptions,
+  type ResumeResult,
+  resume,
+} from "./resume.js";
 export { emitCmd as emit };
 
 export async function runParallelBranchCli(
@@ -510,7 +559,7 @@ function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
   return iterateWith(loop, iteration, iterate);
 }
 
-function buildControlAdapter(
+export function buildControlAdapter(
   loop: LoopContext,
 ): LiveControlAdapter | undefined {
   if (loop.backend.kind === "acp") {

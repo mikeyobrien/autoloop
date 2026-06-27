@@ -47,6 +47,13 @@ export interface LoopContext {
     maxRuntimeMs?: number;
   };
   completion: { promise: string; event: string; requiredEvents: string[] };
+  /**
+   * Human-in-the-loop. When an agent emits `ask.event`, the loop blocks until
+   * an operator responds (via the `respond` control verb) or `timeoutMs`
+   * elapses, then injects the answer into the next prompt as guidance.
+   * Disabled when `enabled` is false (ask.event is empty).
+   */
+  ask: { enabled: boolean; event: string; timeoutMs: number; pollMs: number };
   backend: {
     kind: string;
     provider: string;
@@ -74,6 +81,13 @@ export interface LoopContext {
     model: string;
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
+  hooks: {
+    preRun: string;
+    preIteration: string;
+    postIteration: string;
+    postRun: string;
+    strict: boolean;
+  };
   memory: { budgetChars: number };
   tasks: { budgetChars: number };
   harness: { instructions: string };
@@ -131,6 +145,8 @@ export interface LoopContext {
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;
   controlAdapter?: LiveControlAdapter;
+  /** Abort signal for the run; consulted while blocking on a human ask. */
+  signal?: AbortSignal;
 }
 
 export interface RunOptions {

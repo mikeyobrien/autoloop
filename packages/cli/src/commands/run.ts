@@ -1,10 +1,15 @@
+import { statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { joinCsv } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import * as harness from "@mobrienv/autoloop-harness";
 import { claudeBackend } from "@mobrienv/autoloop-harness/config-helpers";
+import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 import * as chains from "../chains.js";
 import { cliPrintEvent } from "../cli/event-printer.js";
+import type { EventSink } from "../cli/events-sink.js";
+import { ndjsonEventSink, teeEvents } from "../cli/events-sink.js";
+import { EXIT_ENV } from "../cli/fail.js";
 import {
   missingPresetError,
   printRunUsage,
@@ -29,6 +34,7 @@ interface RunOptions {
   mergeStrategy?: string;
   automerge?: boolean;
   keepWorktree?: boolean;
+  eventsPath?: string;
 }
 
 export async function dispatchRun(
@@ -48,55 +54,96 @@ export async function dispatchRun(
   const options = parseRunArgs(args, bundleRoot);
   if (options.usageError) return true;
 
-  if (options.chain) {
-    await runInlineChain(options.chain, options.projectDir, selfCmd, options);
-    return true;
+  // Optional structured event stream: write every LoopEvent as NDJSON to
+  // --events <path>, in addition to (not replacing) terminal rendering. Built
+  // up front so it covers the chain/automerge paths too. A bad path fails fast
+  // with a clean message rather than an unhandled exception.
+  let eventSink: EventSink | null = null;
+  if (options.eventsPath) {
+    try {
+      eventSink = ndjsonEventSink(options.eventsPath);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(
+        `error: cannot open --events file '${options.eventsPath}': ${msg}\n`,
+      );
+      process.exitCode = EXIT_ENV;
+      return true;
+    }
   }
-
-  // --automerge sugar: build inline chain [preset, automerge]
-  if (options.automerge) {
-    const presetName = basename(options.projectDir);
-    const chainCsv = `${presetName},automerge`;
-    const chainProjectDir = defaultChainProjectDir(bundleRoot);
-    await runInlineChain(chainCsv, chainProjectDir, selfCmd, options);
-    return true;
-  }
-
-  // Install SIGINT/SIGTERM handlers that abort the harness via AbortSignal.
-  // Previously the harness installed process.on handlers itself; the CLI
-  // now owns that so the harness is embed-able from SDK consumers.
-  const abort = new AbortController();
-  let caughtSignal: NodeJS.Signals | null = null;
-  const onSig = (sig: NodeJS.Signals) => {
-    if (caughtSignal) return;
-    caughtSignal = sig;
-    abort.abort();
-  };
-  process.on("SIGINT", onSig);
-  process.on("SIGTERM", onSig);
+  const onEvent = eventSink
+    ? teeEvents(cliPrintEvent, eventSink.onEvent)
+    : cliPrintEvent;
 
   try {
-    await harness.run(
-      options.projectDir,
-      normalizePrompt(options.prompt),
-      selfCmd,
-      {
-        ...options,
-        profiles: options.profiles.length > 0 ? options.profiles : undefined,
-        noDefaultProfiles: options.noDefaultProfiles || undefined,
-        signal: abort.signal,
-        onEvent: cliPrintEvent,
-        ...chainableOptions(options),
-      },
-    );
+    if (options.chain) {
+      await runInlineChain(
+        options.chain,
+        options.projectDir,
+        selfCmd,
+        options,
+        onEvent,
+      );
+      return true;
+    }
+
+    // --automerge sugar: build inline chain [preset, automerge]
+    if (options.automerge) {
+      const presetName = basename(options.projectDir);
+      const chainCsv = `${presetName},automerge`;
+      const chainProjectDir = defaultChainProjectDir(bundleRoot);
+      await runInlineChain(
+        chainCsv,
+        chainProjectDir,
+        selfCmd,
+        options,
+        onEvent,
+      );
+      return true;
+    }
+
+    // Install SIGINT/SIGTERM handlers that abort the harness via AbortSignal.
+    // Previously the harness installed process.on handlers itself; the CLI
+    // now owns that so the harness is embed-able from SDK consumers.
+    const abort = new AbortController();
+    let caughtSignal: NodeJS.Signals | null = null;
+    const onSig = (sig: NodeJS.Signals) => {
+      if (caughtSignal) return;
+      caughtSignal = sig;
+      abort.abort();
+    };
+    process.on("SIGINT", onSig);
+    process.on("SIGTERM", onSig);
+
+    try {
+      await harness.run(
+        options.projectDir,
+        normalizePrompt(options.prompt),
+        selfCmd,
+        {
+          ...options,
+          profiles: options.profiles.length > 0 ? options.profiles : undefined,
+          noDefaultProfiles: options.noDefaultProfiles || undefined,
+          signal: abort.signal,
+          onEvent,
+          ...chainableOptions(options),
+        },
+      );
+    } finally {
+      process.removeListener("SIGINT", onSig);
+      process.removeListener("SIGTERM", onSig);
+      // Preserve historical exit-code behavior: re-raise the signal so the
+      // process exits with 128+signum rather than 0 on Ctrl-C. Close the sink
+      // first since the re-raised signal terminates the process.
+      if (caughtSignal) {
+        eventSink?.close();
+        process.kill(process.pid, caughtSignal);
+      }
+    }
+    return true;
   } finally {
-    process.removeListener("SIGINT", onSig);
-    process.removeListener("SIGTERM", onSig);
-    // Preserve historical exit-code behavior: re-raise the signal so the
-    // process exits with 128+signum rather than 0 on Ctrl-C.
-    if (caughtSignal) process.kill(process.pid, caughtSignal);
+    eventSink?.close();
   }
-  return true;
 }
 
 export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
@@ -246,6 +293,17 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
       i++;
       continue;
     }
+    if (token === "--events") {
+      const path = args[i + 1];
+      if (!path) {
+        console.log("missing path after --events");
+        options.usageError = true;
+        return options;
+      }
+      options.eventsPath = path;
+      i += 2;
+      continue;
+    }
 
     options.positionals.push(token);
     i++;
@@ -353,6 +411,7 @@ export async function runInlineChain(
   projectDir: string,
   selfCmd: string,
   options: RunOptions,
+  onEvent?: (e: LoopEvent) => void,
 ): Promise<void> {
   const chainSpec = chains.parseInlineChain(chainCsv, projectDir);
   const stepNames = chainSpec.steps.map((s) => s.name);
@@ -365,8 +424,12 @@ export async function runInlineChain(
     console.log(`Known presets: ${joinCsv(chains.listKnownPresets())}`);
     return;
   }
+  // Forward the structured event sink so --events also captures chain steps.
+  // Each step spreads these options into harness.run (chains/run.ts), so onEvent
+  // propagates to every step's loop.
   await chains.runChain(chainSpec, projectDir, selfCmd, {
     prompt: normalizePrompt(options.prompt),
+    onEvent,
     ...chainableOptions(options),
   });
 }
@@ -376,7 +439,7 @@ export function normalizePrompt(prompt: string | null): string | null {
   return prompt;
 }
 
-function backendOverrideSpec(backend: string): Record<string, unknown> {
+export function backendOverrideSpec(backend: string): Record<string, unknown> {
   if (backend === "pi") {
     return { kind: "pi", command: "pi", args: [], prompt_mode: "arg" };
   }
@@ -424,7 +487,7 @@ function acpBackendOverride(
 
 function looksLikeProjectDir(path: string): boolean {
   try {
-    if (!require("node:fs").statSync(path).isDirectory()) return false;
+    if (!statSync(path).isDirectory()) return false;
   } catch {
     return false;
   }

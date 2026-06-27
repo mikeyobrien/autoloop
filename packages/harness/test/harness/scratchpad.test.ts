@@ -31,6 +31,22 @@ function otherLine(topic: string): string {
   }).trim();
 }
 
+function resumeLine(previousStopReason: string, addIterations: string): string {
+  return encodeEvent({
+    shape: "fields",
+    run: "r1",
+    topic: "loop.resume",
+    fields: {
+      previous_stop_reason: previousStopReason,
+      add_iterations: addIterations,
+    },
+    rawFields: {
+      previous_stop_reason: previousStopReason,
+      add_iterations: addIterations,
+    },
+  }).trim();
+}
+
 describe("renderRunScratchpadFull", () => {
   it("returns empty string for no lines", () => {
     expect(renderRunScratchpadFull([])).toBe("");
@@ -138,5 +154,49 @@ describe("renderRunScratchpadPrompt", () => {
     ];
     const result = renderRunScratchpadPrompt(lines);
     expect(result).toContain("(no output)");
+  });
+});
+
+describe("loop.resume scratchpad marker", () => {
+  it("renders a visible resume separator inline between iterations", () => {
+    const lines = [
+      iterFinishLine("1", "0", "first"),
+      resumeLine("max_iterations", "10"),
+      iterFinishLine("2", "0", "second"),
+    ];
+    const result = renderRunScratchpadFull(lines);
+    expect(result).toContain(
+      "--- resumed (was: max_iterations, adding 10 iterations) ---",
+    );
+    // Ordered between iteration 1 and iteration 2.
+    const pos1 = result.indexOf("Iteration 1");
+    const posResume = result.indexOf("--- resumed");
+    const pos2 = result.indexOf("Iteration 2");
+    expect(pos1).toBeLessThan(posResume);
+    expect(posResume).toBeLessThan(pos2);
+  });
+
+  it("falls back to 'unknown' reason and '0' when fields are absent", () => {
+    const lines = [resumeLine("", "")];
+    const result = renderRunScratchpadFull(lines);
+    expect(result).toContain(
+      "--- resumed (was: unknown, adding 0 iterations) ---",
+    );
+  });
+
+  it("renders the resume marker in the compacted earlier section", () => {
+    const lines = [
+      iterFinishLine("1", "0", "a"),
+      resumeLine("interrupted", "5"),
+      iterFinishLine("2", "0", "b"),
+      iterFinishLine("3", "0", "c"),
+      iterFinishLine("4", "0", "d"),
+      iterFinishLine("5", "0", "e"),
+    ];
+    const result = renderRunScratchpadPrompt(lines);
+    expect(result).toContain("Earlier iterations (compacted)");
+    expect(result).toContain(
+      "--- resumed (was: interrupted, adding 5 iterations) ---",
+    );
   });
 });

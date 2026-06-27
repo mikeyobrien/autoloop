@@ -1,0 +1,9 @@
+# Example: .autoloop/issue-sync.toml for a project using GitHub as the tracker.
+# Place this file at .autoloop/issue-sync.toml in the source project.
+# Run: autoloop-gh-sync pull / autoloop-gh-sync push / autoloop-gh-sync release v1.0.0
+
+tracker = "github"
+
+[github]
+repo         = "jsamuel1/PptxGenJS"
+queued_label = "autoloop:queued"
