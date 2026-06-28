@@ -4,6 +4,7 @@ agents.toml
 dist/
 *.tsbuildinfo
 .autoloop/
+.understand-anything/
 .tonic/
 .agents/
 test-results/
