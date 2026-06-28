@@ -315,6 +315,12 @@ export function routingTopic(topic: string): boolean {
     "review.finish",
     "backend.start",
     "backend.finish",
+    // Telemetry/observability emits, NOT routing. Without these the per-iteration
+    // `backend.usage` (and any `hook.output`) would clobber the routing position every
+    // cycle, collapsing topology backpressure to all-roles freedom after iteration 1 —
+    // letting the agent self-route and skip required intermediate steps.
+    "backend.usage",
+    "hook.output",
     "event.invalid",
     "operator.guidance",
     "operator.guidance.consumed",
