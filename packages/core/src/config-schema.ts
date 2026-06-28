@@ -38,7 +38,14 @@ export function defaults(): Config {
       ask_event: "human.ask",
       ask_timeout: "5m",
     },
-    backend: { kind: "", command: "claude", timeout_ms: "300000" },
+    backend: {
+      kind: "",
+      command: "claude",
+      timeout_ms: "300000",
+      // CSV of tool names to remove from the claude-sdk agent (e.g.
+      // "WebFetch,WebSearch"). Empty = no restriction.
+      disallowed_tools: "",
+    },
     parallel: {
       enabled: "false",
       max_branches: "3",

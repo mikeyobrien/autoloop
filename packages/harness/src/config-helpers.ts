@@ -514,6 +514,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
   const templateVars: Record<string, string> = {
     STATE_DIR: loop.paths.stateDir,
     TOOL_PATH: loop.paths.toolPath,
+    // Absolute path to the preset/config dir (holds roles, scripts, hooks). Lets a
+    // role reference preset-bundled scripts by path — e.g. a bootstrap script the
+    // loop runs before any copied-in scripts exist in the work dir.
+    PRESET_DIR: absolutePath(pd),
   };
 
   const updatedTopology: topo.Topology = {
@@ -704,6 +708,11 @@ function readBackendConfig(
     "model",
     config.get(cfg, "backend.model", ""),
   );
+  // Tools the backend must NOT expose to the agent (claude-sdk only). Opt-in via
+  // `backend.disallowed_tools` (CSV); empty by default so other presets are
+  // unaffected. Used e.g. to force a preset onto a dedicated capture tool by
+  // removing the built-in WebFetch/WebSearch.
+  const disallowedTools = config.getList(cfg, "backend.disallowed_tools");
   return {
     kind,
     provider,
@@ -714,6 +723,7 @@ function readBackendConfig(
     trustAllTools,
     agent,
     model,
+    disallowedTools,
   };
 }
 

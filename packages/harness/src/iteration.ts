@@ -174,6 +174,7 @@ export async function runIteration(
       model: iter.backend.model || undefined,
       cwd: loop.paths.workDir,
       trustAllTools: iter.backend.trustAllTools,
+      disallowedTools: iter.backend.disallowedTools,
       verbose: loop.runtime.logLevel === "debug",
     });
     log(

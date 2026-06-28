@@ -138,6 +138,7 @@ describe("buildIterationContext backend resolution (slice 2)", () => {
       trustAllTools: loop.backend.trustAllTools,
       agent: "",
       model: "",
+      disallowedTools: [],
     });
     expect(iter.backendModel).toBe("");
     expect(iter.backendAgent).toBe(iter.roleAgent);
@@ -180,6 +181,7 @@ describe("resolvedFromLoopBackend", () => {
       trustAllTools: true,
       agent: "",
       model: "",
+      disallowedTools: [],
     });
     expect(resolved.args).not.toBe(loop.backend.args);
   });
