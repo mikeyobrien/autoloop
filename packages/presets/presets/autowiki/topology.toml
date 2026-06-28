@@ -1,0 +1,179 @@
+name = "autowiki"
+completion = "queue.done"
+
+# PER-ROLE MODELS (backend_model overrides the global backend.model, harness prompt.ts:67):
+#   opus   — HEAVY cognitive work: writing comprehensive pages, mining insights, synthesizing
+#            the thesis, authoring comparisons, deep health-checks.
+#   sonnet — everything else (orchestration, capture, merge, nav). Haiku was tried for the
+#            mechanical roles but mis-emitted events (cleaner echoed `queue.advance`; advance
+#            skipped the seeding scripts), so the light roles run on sonnet for reliability.
+[[role]]
+id = "advance"
+emits = ["queue.advance", "maintenance.due", "queue.done"]
+prompt_file = "roles/advance.md"
+backend_model = "sonnet"
+
+[[role]]
+id = "cleaner"
+emits = ["clean.base", "clean.tip", "clean.bad", "clean.dead", "clean.unchanged"]
+prompt_file = "roles/cleaner.md"
+backend_model = "sonnet"
+
+# Two write roles, picked by tier (the cleaner signals it via clean.base / clean.tip):
+#   foundation         — base/official sources: COMPREHENSIVE canonical coverage (the skeleton)
+#   knowledge_extractor — tip sources: MINE gold-nugget insights, compound onto the graph
+# Both commit on the source branch and hand STRAIGHT to the merger (the maintenance roles —
+# summarize/synthesize/compare/lint/indexer — no longer run per-source; see the cadence note).
+[[role]]
+id = "foundation"
+emits = ["foundation.done", "foundation.blocked"]
+prompt_file = "roles/foundation.md"
+backend_model = "opus"
+
+[[role]]
+id = "knowledge_extractor"
+emits = ["extract.done", "extract.blocked"]
+prompt_file = "roles/knowledge-extractor.md"
+backend_model = "opus"
+
+# Maintenance roles (summarize → synthesize → compare → lint → indexer). These run as a BATCH
+# on the base branch every 5 merged sources + a final pass when the queue drains (advance gates
+# the cadence and emits `maintenance.due`), NOT once per source. They operate over the WHOLE
+# wiki, not a single source's branch.
+[[role]]
+id = "summarize"
+emits = ["summary.done", "summary.blocked"]
+prompt_file = "roles/summarize.md"
+backend_model = "opus"
+
+[[role]]
+id = "synthesize"
+emits = ["synthesis.done", "synthesis.blocked"]
+prompt_file = "roles/synthesize.md"
+backend_model = "opus"
+
+[[role]]
+id = "compare"
+emits = ["compare.done", "compare.blocked"]
+prompt_file = "roles/compare.md"
+backend_model = "opus"
+
+[[role]]
+id = "lint"
+emits = ["lint.done", "lint.blocked"]
+prompt_file = "roles/lint.md"
+backend_model = "opus"
+
+[[role]]
+id = "indexer"
+emits = ["index.done", "index.blocked"]
+prompt_file = "roles/indexer.md"
+backend_model = "sonnet"
+
+[[role]]
+id = "merger"
+emits = ["merge.done", "merge.blocked"]
+prompt_file = "roles/merger.md"
+backend_model = "sonnet"
+
+# Flow is fully topology-driven — no role decides the next step. TWO interleaved chains:
+#
+#   PER-SOURCE (fast, runs for every source):
+#     clean -> {base: foundation | tip: knowledge_extractor} -> merge -> advance
+#   MAINTENANCE BATCH (heavy, runs every 5 merged sources + once when the queue drains):
+#     maintenance.due -> summarize -> synthesize -> compare -> lint -> index -> advance
+#
+# `advance` is the gate: on each merge.done it completes the task, then EITHER dispatches the
+# next source OR (every 5th merge, and on the final drain) emits `maintenance.due` to run one
+# whole-wiki maintenance batch on the base branch before continuing. This keeps the 5 heavy
+# whole-wiki passes (summarize/synthesize/compare/lint/index) off the per-source critical path
+# — they run ~N/5 times instead of N times. (Karpathy's model: Ingest is per-source; Lint is
+# periodic.) Maintenance roles run on BASE over the whole graph and commit directly there (all
+# sources in the batch are already merged), so they take no slug.
+# (Querying the built wiki is NOT in this loop — it's an interactive USER workflow shipped as
+#  the vault's .agents/ + .claude/skills. The loop only ingests + maintains.)
+#
+# Evidence gates: an emit is REJECTED unless its payload carries the required key=value.
+# clean.base / clean.tip / foundation.done / extract.done / summary.done / synthesis.done /
+# index.done require `commit=` (okf-capture.sh / okf-commit.sh print it) — the per-source roles
+# commit on the source branch, the maintenance roles commit on base; either way a no-op yields
+# `commit=none`, which still satisfies the key (no livelock). compare.done and lint.done are NOT
+# gated on `commit=`: a batch may warrant no comparison and the wiki may already be healthy, so
+# the comparator and linter can legitimately no-op and still hand off. merge.done requires
+# `merged=` — the merger runs
+# okf-source-merge.sh, which merges the whole branch to base AND emits merge.done itself (so the
+# agent has no separate emit to fabricate and no merge to do by hand). Rejection emits the
+# `.blocked` event below, routing back to the same role to retry.
+[[gate]]
+event = "clean.base"
+requires = ["commit"]
+blocked = "clean.blocked"
+
+[[gate]]
+event = "clean.tip"
+requires = ["commit"]
+blocked = "clean.blocked"
+
+# clean.dead retires an uncapturable source: the cleaner writes a `type: dead` tombstone
+# clean doc (okf-tombstone.sh) and commits it, so the queue ledger stops re-listing the URL.
+[[gate]]
+event = "clean.dead"
+requires = ["commit"]
+blocked = "clean.blocked"
+
+[[gate]]
+event = "foundation.done"
+requires = ["commit"]
+blocked = "foundation.blocked"
+
+[[gate]]
+event = "extract.done"
+requires = ["commit"]
+blocked = "extract.blocked"
+
+[[gate]]
+event = "summary.done"
+requires = ["commit"]
+blocked = "summary.blocked"
+
+[[gate]]
+event = "synthesis.done"
+requires = ["commit"]
+blocked = "synthesis.blocked"
+
+[[gate]]
+event = "index.done"
+requires = ["commit"]
+blocked = "index.blocked"
+
+[[gate]]
+event = "merge.done"
+requires = ["merged"]
+blocked = "merge.blocked"
+
+[handoff]
+"loop.start"     = ["advance"]      # entry point
+"queue.advance"  = ["cleaner"]      # source selected -> clean it
+"clean.bad"      = ["cleaner"]      # transient failure -> retry the same source
+"clean.dead"     = ["merger"]       # source is dead (tombstoned) -> merge the tombstone, move on
+"clean.unchanged" = ["advance"]     # refresh: source unchanged -> advance dispatches next (no merge)
+"clean.blocked"  = ["cleaner"]      # emitted without commit= -> cleaner retries
+"clean.base"     = ["foundation"]   # base/official source -> comprehensive canonical coverage
+"clean.tip"      = ["knowledge_extractor"] # tip source -> mine gold-nugget insights
+"foundation.blocked" = ["foundation"]       # gate/validator rejected -> foundation fixes & retries
+"foundation.done" = ["merger"]      # base written -> merge the branch (maintenance is batched later)
+"extract.blocked" = ["knowledge_extractor"] # gate/validator rejected -> extractor fixes & retries
+"extract.done"   = ["merger"]       # insights written -> merge the branch (maintenance is batched later)
+"merge.blocked"  = ["merger"]       # merge conflict -> merger retries
+"merge.done"     = ["advance"]      # branch merged -> advance completes task, dispatches OR triggers maintenance
+"maintenance.due" = ["summarize"]   # every-5 (or final) -> run the whole-wiki maintenance batch on base
+"summary.blocked" = ["summarize"]   # gate/validator rejected -> summarizer fixes & retries
+"summary.done"   = ["synthesize"]   # summaries refreshed -> synthesize the running thesis
+"synthesis.blocked" = ["synthesize"] # gate/validator rejected -> synthesizer fixes & retries
+"synthesis.done" = ["compare"]      # synthesized -> compare authors side-by-side pages
+"compare.blocked" = ["compare"]     # validator rejected -> comparator fixes & retries
+"compare.done"   = ["lint"]         # compared -> lint health-checks the wiki
+"lint.blocked"   = ["lint"]         # validator rejected -> linter fixes & retries
+"lint.done"      = ["indexer"]      # linted -> indexer refreshes index/log/overview
+"index.blocked"  = ["indexer"]      # gate/validator rejected -> indexer fixes & retries
+"index.done"     = ["advance"]      # maintenance batch done -> advance resumes (dispatch next OR finish)

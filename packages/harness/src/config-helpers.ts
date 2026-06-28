@@ -583,10 +583,25 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     },
     parallel,
     hooks: {
-      preRun: config.get(cfg, "hooks.pre_run", ""),
-      preIteration: config.get(cfg, "hooks.pre_iteration", ""),
-      postIteration: config.get(cfg, "hooks.post_iteration", ""),
-      postRun: config.get(cfg, "hooks.post_run", ""),
+      // Hook commands get the same template vars as role prompts ({{PRESET_DIR}},
+      // {{TOOL_PATH}}, {{STATE_DIR}}) so a hook can reference preset-bundled scripts by
+      // path — e.g. a deterministic bootstrap (okf-init) run before any agent turn.
+      preRun: expandTemplatePlaceholders(
+        config.get(cfg, "hooks.pre_run", ""),
+        templateVars,
+      ),
+      preIteration: expandTemplatePlaceholders(
+        config.get(cfg, "hooks.pre_iteration", ""),
+        templateVars,
+      ),
+      postIteration: expandTemplatePlaceholders(
+        config.get(cfg, "hooks.post_iteration", ""),
+        templateVars,
+      ),
+      postRun: expandTemplatePlaceholders(
+        config.get(cfg, "hooks.post_run", ""),
+        templateVars,
+      ),
       strict: config.get(cfg, "hooks.strict", "false") === "true",
     },
     memory: {

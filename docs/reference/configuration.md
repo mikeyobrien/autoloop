@@ -85,6 +85,7 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | `backend.trust_all_tools` | bool | `true` | Auto-approve tool permission requests. For `kind = "claude-sdk"`, maps to the SDK's `bypassPermissions` mode (the session equivalent of `--dangerously-skip-permissions`). For ACP, applies when the provider supports it. |
 | `backend.agent` | string | `""` | ACP session mode/agent to set via `setSessionMode` when the provider supports it. |
 | `backend.model` | string | `""` | Model ID. For `kind = "claude-sdk"`, passed as the SDK `model` option. For ACP, set via `unstable_setSessionModel` when the provider supports it. |
+| `backend.disallowed_tools` | list (CSV) | `""` | **`claude-sdk` only.** Comma-separated tool names to remove from the agent entirely (e.g. `"WebFetch,WebSearch"`). A hard block that applies even under `bypassPermissions` (unlike deny rules). Empty by default, so other presets are unaffected. Used to force a preset onto a dedicated capture tool by removing the built-ins. |
 
 Kind auto-detection: if `kind` is empty, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); then whether it is or ends with `claude` with no custom `args` (→ `"claude-sdk"`); otherwise `"command"`. Pin `kind = "command"` to force the legacy `claude -p` shell path. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b claude-sdk`, `-b kiro`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`.
 
@@ -252,9 +253,12 @@ backend.kind = "claude-sdk"
 backend.command = "claude"          # optional custom Claude Code executable path
 # backend.model = "claude-opus-4-6" # passed as the SDK model option
 backend.timeout_ms = 300000
+# backend.disallowed_tools = "WebFetch,WebSearch"  # hard-remove tools from the agent
 ```
 
 `backend.trust_all_tools = true` (the default) maps to the SDK's `bypassPermissions` mode — the session equivalent of the `--dangerously-skip-permissions` flag the shell path injects. The session loads the Claude Code system prompt and project settings (CLAUDE.md), matching `claude -p` behavior.
+
+`backend.disallowed_tools` (CSV) hard-removes the named tools from the session. Because `bypassPermissions` auto-approves everything, permission *deny* rules don't apply under it — `disallowed_tools` is the way to keep a tool out of the agent's hands entirely. The `autowiki` preset uses this to drop the built-in `WebFetch`/`WebSearch` so all source capture goes through its dedicated cleaner tooling.
 
 Live control: `interrupt` requests call the SDK's `interrupt()`, cancelling the in-flight turn without killing the session, and `guide` requests are additionally steered into the live turn as a queued user message — delivered at the agent's next safe boundary, on top of the journal-durable copy that reaches the next iteration prompt.
 

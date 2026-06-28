@@ -1,7 +1,31 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- **`autowiki` preset — OKF LLM-wiki pipeline.** A bundled preset that ingests a queue of
+  hand-curated source URLs into an OKF-conformant LLM wiki of cross-linked markdown concept
+  pages (Karpathy "LLM Wiki" pattern; openable in Obsidian). One task = one source URL, each
+  flowing clean → write → summarize → synthesize → compare → lint → index → merge on its own
+  branch. The vault is scaffolded by the loop itself (`okf-init.sh`), and querying/maintaining
+  the built wiki ship as agent-neutral user skills (`query-wiki`, `maintain-wiki`). See
+  `packages/presets/presets/autowiki/README.md`.
+- **`backend.disallowed_tools` (claude-sdk).** Comma-separated tool names to remove from the
+  agent entirely — a hard block that applies even under `bypassPermissions`, where permission
+  deny rules don't. Empty by default. `autowiki` uses it to drop the built-in
+  `WebFetch`/`WebSearch` so all source capture goes through its dedicated cleaner tooling.
+- **`{{PRESET_DIR}}` template placeholder + hook template expansion.** `{{PRESET_DIR}}`
+  resolves to the absolute preset/config dir (holding `roles/`, `scripts/`, `hooks/`), letting
+  a role or hook reference preset-bundled files by path. The `hooks.*` commands (`pre_run`,
+  `pre_iteration`, `post_iteration`, `post_run`) now receive the same placeholder expansion as
+  role prompts, so a hook can invoke a preset-bundled script (e.g. a deterministic `pre_run`
+  bootstrap) without hardcoding paths.
+
 ### Fixed
+- **`backend.usage`/`hook.output` no longer clobber event routing.** These per-iteration
+  telemetry/observability emits were being treated as routing events, overwriting the routing
+  position every cycle — collapsing topology backpressure to all-roles freedom after the first
+  iteration and letting the agent self-route past required intermediate steps. They are now
+  excluded from routing so topology-driven flows (e.g. `autowiki`) stay gated.
 - **`--chain` now roots at the target project dir instead of the bundled presets dir.**
   `looksLikeProjectDir` used CommonJS `require("node:fs")` inside the ESM build, so every
   call threw `ReferenceError: require is not defined`, the `catch` returned `false`, and the
