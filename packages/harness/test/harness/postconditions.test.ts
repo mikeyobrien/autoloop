@@ -129,7 +129,9 @@ describe("runPostconditionGuards", () => {
     // `postcondition.start` into .autoloop, which must not count as a dirty
     // project tree.
     git(workDir, ["-c", "core.excludesfile=/dev/null", "add", "-A", "-f"]);
-    git(workDir, ["commit", "-qm", "track-state-dir"]);
+    // --allow-empty: the baseline may already track .autoloop (CI, no global
+    // excludesfile), in which case there is nothing new to stage here.
+    git(workDir, ["commit", "--allow-empty", "-qm", "track-state-dir"]);
     const ok = runPostconditionGuards(loopWith({ assertCleanTree: true }), 2);
     expect(ok.passed).toBe(true);
     expect(ok.violations).toEqual([]);
