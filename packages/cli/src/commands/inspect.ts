@@ -173,20 +173,27 @@ function parseInspectArgs(args: string[]): InspectSpec {
   }
 
   const needsSelector = artifact === "prompt" || artifact === "output";
+  // Run-scoped views take the run-id positionally (matching `diff`), resolving
+  // the project dir from the runtime — so `inspect progress <run>` reads the run
+  // instead of silently treating the run-id as a project dir.
+  const runPositional = artifact === "progress" || artifact === "usage";
   const selector =
     needsSelector || artifact === "metrics" ? (positionals[0] ?? "") : "";
   const projectDir = needsSelector
     ? (positionals[1] ?? resolveRuntimeProjectDir())
-    : artifact === "metrics" && positionals.length > 1
-      ? positionals[1]
-      : (positionals[0] ?? resolveRuntimeProjectDir());
+    : runPositional
+      ? resolveRuntimeProjectDir()
+      : artifact === "metrics" && positionals.length > 1
+        ? positionals[1]
+        : (positionals[0] ?? resolveRuntimeProjectDir());
+  const resolvedRun = run ?? (runPositional ? positionals[0] : undefined);
 
   return {
     artifact,
     selector,
     projectDir,
     format,
-    run,
+    run: resolvedRun,
     topics: topics.length > 0 ? topics : undefined,
     iterFilter,
     allRuns,

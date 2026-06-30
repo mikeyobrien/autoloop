@@ -94,4 +94,14 @@ describe("dispatchVerify", () => {
     expect(process.exitCode).toBe(1);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("gives a next-step hint when there is no completed run to verify", () => {
+    const dir = mkdtempSync(join(tmpdir(), "autoloop-verify-empty-"));
+    mkdirSync(join(dir, ".autoloop"), { recursive: true });
+    const out = capture(() => dispatchVerify([dir]));
+    expect(out).toContain("No completed run to verify");
+    expect(out).toContain("or pass a run-id");
+    expect(process.exitCode).toBe(1);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

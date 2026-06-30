@@ -34,7 +34,7 @@ export function dispatchVerify(args: string[]): void {
     console.error(
       runIdArg
         ? `No run "${runIdArg}" in ${projectDir}.`
-        : `No completed run to verify in ${projectDir}.`,
+        : `No completed run to verify in ${projectDir}. Run one to completion, or pass a run-id: autoloop verify ${projectDir} <run-id>.`,
     );
     process.exitCode = 1;
     return;

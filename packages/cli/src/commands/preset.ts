@@ -41,8 +41,18 @@ function promote(args: string[]): boolean {
     return true;
   }
 
-  // Validate before promoting — never enshrine a dead topology.
-  const topology = topo.loadTopologyFromFile(source);
+  // Validate before promoting — never enshrine a dead topology. A malformed
+  // TOML source surfaces as a clean one-line error, not a raw parser stack.
+  let topology: ReturnType<typeof topo.loadTopologyFromFile>;
+  try {
+    topology = topo.loadTopologyFromFile(source);
+  } catch (err) {
+    const msg = (err instanceof Error ? err.message : String(err)).split(
+      "\n",
+    )[0];
+    fail([`error: invalid TOML in ${source}: ${msg}`]);
+    return true;
+  }
   const warnings = topo.validateTopology(topology, { singleFile: true });
   if (warnings.length > 0) {
     fail([

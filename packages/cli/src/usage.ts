@@ -214,7 +214,13 @@ export function printInspectUsage(): void {
     "  metrics        [run_id]      md, terminal, csv, json terminal",
   );
   console.log(
-    "  usage          [--run]       terminal, json          terminal",
+    "  usage          [run_id]      terminal, json          terminal",
+  );
+  console.log(
+    "  progress       [run_id]      terminal, json          terminal",
+  );
+  console.log(
+    "  diff           <run> <a> <b> terminal, json          terminal",
   );
   console.log(
     "  profiles       —             terminal                terminal",
