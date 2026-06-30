@@ -114,5 +114,8 @@ function fieldValue(
 export function stopReasonToStatus(reason: string): RegistryStatus {
   if (reason === "backend_failed") return "failed";
   if (reason === "backend_timeout") return "timed_out";
+  // Auth/quota won't self-resolve on retry — surface as failures. Rate-limit
+  // and transient outages are availability stops (retryable), not failures.
+  if (reason === "auth_failed" || reason === "quota_exhausted") return "failed";
   return "stopped";
 }

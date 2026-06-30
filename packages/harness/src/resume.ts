@@ -118,10 +118,16 @@ export function buildResumeContext(
   // Recompute config-anchored paths exactly as buildLoopContext does, but
   // rooted in this run's existing state dir rather than a freshly-created one.
   const stateDirName = basename(stateDir);
-  const cfg = config.loadProject(projectDir, {
-    presetName: record.preset || basename(projectDir),
-    workDir,
-  });
+  const presetFile = record.preset_file || "";
+  const cfg = presetFile
+    ? config.loadProjectFromFile(presetFile, {
+        presetName: record.preset || basename(projectDir),
+        workDir,
+      })
+    : config.loadProject(projectDir, {
+        presetName: record.preset || basename(projectDir),
+        workDir,
+      });
   const memoryRel = config.get(
     cfg,
     "core.memory_file",
@@ -205,6 +211,7 @@ export function buildResumeContext(
       trigger: record.trigger || "cli",
       createdAt: record.created_at || new Date().toISOString(),
       parentRunId: record.parent_run_id || "",
+      presetFile,
     },
     profiles: {
       active: [] as string[],

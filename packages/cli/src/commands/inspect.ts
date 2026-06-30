@@ -22,6 +22,8 @@ const INSPECT_TARGETS = [
   "chain",
   "metrics",
   "usage",
+  "progress",
+  "diff",
   "profiles",
   "topology",
 ];
@@ -40,6 +42,13 @@ interface InspectSpec {
 export function dispatchInspect(args: string[]): boolean {
   if (!args[0] || args[0] === "--help" || args[0] === "-h") {
     printInspectUsage();
+    return true;
+  }
+
+  // `inspect diff <run> <iterA> <iterB>` has its own positional shape; handle
+  // it before the generic spec parse.
+  if (args[0] === "diff") {
+    render.renderIterationDiffInspect(args.slice(1));
     return true;
   }
 
@@ -82,6 +91,9 @@ export function dispatchInspect(args: string[]): boolean {
       return true;
     case "usage":
       render.renderUsage(projectDir, format, spec.run);
+      return true;
+    case "progress":
+      render.renderProgress(projectDir, format, spec.run);
       return true;
     case "chain":
       console.log(chains.renderChainState(projectDir));
@@ -161,20 +173,27 @@ function parseInspectArgs(args: string[]): InspectSpec {
   }
 
   const needsSelector = artifact === "prompt" || artifact === "output";
+  // Run-scoped views take the run-id positionally (matching `diff`), resolving
+  // the project dir from the runtime — so `inspect progress <run>` reads the run
+  // instead of silently treating the run-id as a project dir.
+  const runPositional = artifact === "progress" || artifact === "usage";
   const selector =
     needsSelector || artifact === "metrics" ? (positionals[0] ?? "") : "";
   const projectDir = needsSelector
     ? (positionals[1] ?? resolveRuntimeProjectDir())
-    : artifact === "metrics" && positionals.length > 1
-      ? positionals[1]
-      : (positionals[0] ?? resolveRuntimeProjectDir());
+    : runPositional
+      ? resolveRuntimeProjectDir()
+      : artifact === "metrics" && positionals.length > 1
+        ? positionals[1]
+        : (positionals[0] ?? resolveRuntimeProjectDir());
+  const resolvedRun = run ?? (runPositional ? positionals[0] : undefined);
 
   return {
     artifact,
     selector,
     projectDir,
     format,
-    run,
+    run: resolvedRun,
     topics: topics.length > 0 ? topics : undefined,
     iterFilter,
     allRuns,

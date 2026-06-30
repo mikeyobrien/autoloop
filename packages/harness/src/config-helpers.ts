@@ -43,7 +43,7 @@ import {
   tryResolveGitRoot,
 } from "@mobrienv/autoloop-core/worktree";
 import { emitToolScript, piAdapterScript } from "./tools.js";
-import type { LoopContext, RunOptions } from "./types.js";
+import type { LoopContext, ReviewOnError, RunOptions } from "./types.js";
 
 const DEFAULT_PROMPT =
   "Do the task and publish the completion event when finished.";
@@ -313,14 +313,22 @@ export function buildLoopContext(
 ): LoopContext {
   const resolvedProjectDir = absolutePath(projectDir);
   const resolvedWorkDir = absolutePath(runOptions.workDir || ".");
-  const currentPresetName = basename(resolvedProjectDir);
+  const presetFile = runOptions.presetFile
+    ? absolutePath(runOptions.presetFile)
+    : "";
+  const currentPresetName = presetFile
+    ? basename(presetFile, ".toml")
+    : basename(resolvedProjectDir);
   const configWorkDir = tryResolveGitRoot(resolvedWorkDir) ?? resolvedWorkDir;
   const configOverride = runOptions.configOverride || {};
-  const cfg = config.loadProject(resolvedProjectDir, {
+  const loadOptions = {
     presetName: currentPresetName,
     workDir: configWorkDir,
     cliOverride: configOverride,
-  });
+  };
+  const cfg = presetFile
+    ? config.loadProjectFromFile(presetFile, loadOptions)
+    : config.loadProject(resolvedProjectDir, loadOptions);
   const stateDirAnchor = configWorkDir;
   const stateDir = join(
     stateDirAnchor,
@@ -452,10 +460,11 @@ export function buildLoopContext(
       isolationMode: isolation.mode,
     },
     launch: {
-      preset: basename(resolvedProjectDir),
+      preset: currentPresetName,
       trigger: runOptions.trigger ?? "cli",
       createdAt: new Date().toISOString(),
       parentRunId: runOptions.parentRunId ?? "",
+      presetFile,
     },
     profiles: {
       active: activeProfiles,
@@ -470,12 +479,18 @@ export function buildLoopContext(
 export function reloadLoop(loop: LoopContext): LoopContext {
   const pd = loop.paths.projectDir;
   const wd = loop.paths.workDir;
-  const cfg = config.loadProject(pd, {
+  const presetFile = loop.launch.presetFile ?? "";
+  const loadOptions = {
     presetName: loop.launch.preset,
     workDir: loop.paths.configWorkDir || wd,
     cliOverride: loop.runtime.configOverride,
-  });
-  const topoData = topo.loadTopology(pd);
+  };
+  const cfg = presetFile
+    ? config.loadProjectFromFile(presetFile, loadOptions)
+    : config.loadProject(pd, loadOptions);
+  const topoData = presetFile
+    ? topo.loadTopologyFromFile(presetFile)
+    : topo.loadTopology(pd);
 
   const backend = readBackendConfig(cfg, loop.runtime.backendOverride);
   const review = readReviewConfig(cfg, topoData, pd, backend);
@@ -550,6 +565,26 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       maxCostUsd: config.getFloat(cfg, "event_loop.max_cost_usd", 0),
       maxIterationRuntimeMs,
       maxRuntimeMs: config.getDuration(cfg, "event_loop.max_runtime", 0),
+      transientMaxPauses: config.getInt(
+        cfg,
+        "event_loop.transient_max_pauses",
+        3,
+      ),
+      transientPauseMs: config.getDuration(
+        cfg,
+        "event_loop.transient_pause",
+        5000,
+      ),
+      transientBackoffCapMs: config.getDuration(
+        cfg,
+        "event_loop.transient_backoff_cap",
+        30000,
+      ),
+      prematureMaxRearms: config.getInt(
+        cfg,
+        "event_loop.premature_max_rearms",
+        1,
+      ),
     },
     completion: {
       promise: config.get(
@@ -562,6 +597,33 @@ export function reloadLoop(loop: LoopContext): LoopContext {
         config.get(cfg, "event_loop.completion_event", "task.complete"),
       ),
       requiredEvents: config.getList(cfg, "event_loop.required_events"),
+    },
+    acceptance: {
+      // Accept either a single `verify_cmd` or a `verify_cmds` list; merge both.
+      verifyCmds: [
+        ...config.getList(cfg, "acceptance.verify_cmds"),
+        ...(() => {
+          const single = config.get(cfg, "acceptance.verify_cmd", "").trim();
+          return single ? [single] : [];
+        })(),
+      ],
+      timeoutMs: config.getDuration(cfg, "acceptance.timeout", 300000),
+      assertNoTodo: truthySetting(
+        config.get(cfg, "acceptance.assert_no_todo", "false"),
+      ),
+      assertNoSkippedTests: truthySetting(
+        config.get(cfg, "acceptance.assert_no_skipped_tests", "false"),
+      ),
+      assertNoSecrets: truthySetting(
+        config.get(cfg, "acceptance.assert_no_secrets", "false"),
+      ),
+      assertCleanTree: truthySetting(
+        config.get(cfg, "acceptance.assert_clean_tree", "false"),
+      ),
+      screenTestTamper: truthySetting(
+        config.get(cfg, "acceptance.screen_test_tamper", "false"),
+      ),
+      criteria: config.getList(cfg, "acceptance.criteria"),
     },
     ask: {
       event: config.get(cfg, "event_loop.ask_event", "human.ask"),
@@ -609,6 +671,11 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     },
     tasks: {
       budgetChars: config.getInt(cfg, "tasks.prompt_budget_chars", 4000),
+    },
+    progress: {
+      metricCmd: config.get(cfg, "progress.metric_cmd", ""),
+      name: config.get(cfg, "progress.name", "progress"),
+      timeoutMs: config.getDuration(cfg, "progress.timeout", 60000),
     },
     harness: {
       instructions: (() => {
@@ -777,7 +844,18 @@ function readReviewConfig(
       ) !== "false",
     agent: config.get(cfg, "review.agent", backend.agent),
     model: config.get(cfg, "review.model", backend.model),
+    onError: normalizeReviewOnError(config.get(cfg, "review.on_error", "hold")),
+    minConfidence: config.getFloat(cfg, "review.min_confidence", 0.5),
   };
+}
+
+/**
+ * Coerce the `review.on_error` setting to a known mode, defaulting to the
+ * fail-closed `hold` for unset or unrecognized values.
+ */
+function normalizeReviewOnError(raw: string): ReviewOnError {
+  const v = raw.trim().toLowerCase();
+  return v === "exit" || v === "continue" ? v : "hold";
 }
 
 function readParallelConfig(cfg: config.Config): LoopContext["parallel"] {

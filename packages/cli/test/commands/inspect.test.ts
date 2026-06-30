@@ -12,6 +12,8 @@ vi.mock("../../src/cli/render.js", () => ({
   renderScratchpadFormat: vi.fn(),
   renderCoordinationFormat: vi.fn(),
   renderMetrics: vi.fn(),
+  renderProgress: vi.fn(),
+  renderUsage: vi.fn(),
   renderPromptFormat: vi.fn(),
   renderOutput: vi.fn(),
 }));
@@ -116,6 +118,33 @@ describe("dispatchInspect journal", () => {
       expect.any(String),
       "json",
       "run-xyz",
+    );
+  });
+
+  it("treats a bare positional as the run-id for 'inspect progress' (not a project dir)", () => {
+    dispatchInspect(["progress", "run-abc"]);
+    expect(render.renderProgress).toHaveBeenCalledWith(
+      expect.any(String),
+      "terminal",
+      "run-abc",
+    );
+  });
+
+  it("treats a bare positional as the run-id for 'inspect usage'", () => {
+    dispatchInspect(["usage", "run-abc", "--json"]);
+    expect(render.renderUsage).toHaveBeenCalledWith(
+      expect.any(String),
+      "json",
+      "run-abc",
+    );
+  });
+
+  it("still resolves the latest run for 'inspect progress' with no positional", () => {
+    dispatchInspect(["progress"]);
+    expect(render.renderProgress).toHaveBeenCalledWith(
+      expect.any(String),
+      "terminal",
+      undefined,
     );
   });
 });

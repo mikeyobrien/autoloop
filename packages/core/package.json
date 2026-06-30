@@ -23,6 +23,14 @@
       "types": "./dist/topology.d.ts",
       "default": "./dist/topology.js"
     },
+    "./fanout": {
+      "types": "./dist/fanout.d.ts",
+      "default": "./dist/fanout.js"
+    },
+    "./concurrency": {
+      "types": "./dist/concurrency.d.ts",
+      "default": "./dist/concurrency.js"
+    },
     "./config-schema": {
       "types": "./dist/config-schema.d.ts",
       "default": "./dist/config-schema.js"

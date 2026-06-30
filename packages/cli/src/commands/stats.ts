@@ -18,10 +18,14 @@ export interface PresetStats {
   completed: number;
   failed: number;
   stopped: number;
+  /** Runs whose persisted outcome is gate-verified (q6p.2). */
+  verified: number;
   successRate: number | null;
   avgIterations: number | null;
   avgDurationS: number | null;
   costUsd: number;
+  /** Cost per verified outcome (cost-per-outcome, not cost-per-run). */
+  costPerVerified: number | null;
 }
 
 export function dispatchStats(args: string[]): void {
@@ -72,10 +76,18 @@ export function computeStats(
     );
     const stopped = runs.filter((r) => r.status === "stopped");
     const finished = runs.length - running.length;
+    // A run is gate-verified when its persisted outcome says so; fall back to
+    // `status === "completed"` for records written before the outcome ledger.
+    const verified = runs.filter((r) =>
+      r.outcome ? r.outcome === "verified" : r.status === "completed",
+    );
     let costUsd = 0;
     for (const run of runs) {
-      const lines = journalForRun(run.run_id);
-      costUsd += collectUsage(lines, run.run_id).totals.costUsd;
+      // Prefer the persisted cost; re-derive from the journal for old records.
+      costUsd +=
+        typeof run.cost_usd === "number"
+          ? run.cost_usd
+          : collectUsage(journalForRun(run.run_id), run.run_id).totals.costUsd;
     }
     const finishedRuns = runs.filter((r) => r.status !== "running");
     stats.push({
@@ -85,6 +97,7 @@ export function computeStats(
       completed: completed.length,
       failed: failed.length,
       stopped: stopped.length,
+      verified: verified.length,
       successRate: finished > 0 ? completed.length / finished : null,
       avgIterations: average(finishedRuns.map((r) => r.iteration)),
       avgDurationS: average(
@@ -93,6 +106,10 @@ export function computeStats(
           .filter((d): d is number => d !== null),
       ),
       costUsd: Math.round(costUsd * 1e6) / 1e6,
+      costPerVerified:
+        verified.length > 0
+          ? Math.round((costUsd / verified.length) * 1e6) / 1e6
+          : null,
     });
   }
   stats.sort((a, b) => b.runs - a.runs || a.preset.localeCompare(b.preset));
@@ -107,6 +124,7 @@ export function renderStats(projectDir: string, stats: PresetStats[]): string {
     "preset",
     "runs",
     "ok",
+    "verified",
     "fail",
     "stop",
     "live",
@@ -114,11 +132,13 @@ export function renderStats(projectDir: string, stats: PresetStats[]): string {
     "avg_iters",
     "avg_secs",
     "cost_usd",
+    "cost/verified",
   ];
   const rows = stats.map((s) => [
     s.preset,
     String(s.runs),
     String(s.completed),
+    String(s.verified),
     String(s.failed),
     String(s.stopped),
     String(s.running),
@@ -126,6 +146,7 @@ export function renderStats(projectDir: string, stats: PresetStats[]): string {
     s.avgIterations === null ? "-" : s.avgIterations.toFixed(1),
     s.avgDurationS === null ? "-" : String(Math.round(s.avgDurationS)),
     s.costUsd > 0 ? s.costUsd.toFixed(4) : "-",
+    s.costPerVerified === null ? "-" : s.costPerVerified.toFixed(4),
   ]);
   const totalRuns = stats.reduce((acc, s) => acc + s.runs, 0);
   const totalCost = stats.reduce((acc, s) => acc + s.costUsd, 0);

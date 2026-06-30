@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import {
+  classifyBackendError,
   runAcpIteration,
   runClaudeSdkIteration,
   runPiIteration,
@@ -29,7 +30,14 @@ import {
   extractTopic,
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
+import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
+import { reinjectAcceptanceFailure, runAcceptanceGate } from "./acceptance.js";
 import { awaitHumanResponse } from "./ask.js";
+import {
+  backoffDelayMs,
+  circuitDecision,
+  countTransientPauses,
+} from "./circuit-breaker.js";
 import { log } from "./display.js";
 import {
   appendInvalidEvent,
@@ -39,6 +47,7 @@ import {
 } from "./emit.js";
 import { loopStartMs } from "./guards.js";
 import { buildHookEnv, captureGitSha, runHook } from "./hooks.js";
+import { reinjectIntentFailure, runIntentCriteria } from "./intent.js";
 import {
   appendBackendFinish,
   appendBackendStart,
@@ -47,15 +56,29 @@ import {
   buildBackendCommand,
   runProcess,
 } from "./parallel.js";
+import {
+  reinjectPostconditionFailure,
+  runPostconditionGuards,
+} from "./postconditions.js";
+import { runProgressMetric } from "./progress.js";
 import type { IterationContext } from "./prompt.js";
 import { buildIterationContext } from "./prompt.js";
+import {
+  consumeHumanAck,
+  enterProvisional,
+  holdProvisional,
+  releaseProvisional,
+  resolveProvisional,
+} from "./provisional.js";
 import { registryProgress } from "./registry-bridge.js";
 import {
   completeLoop,
+  stopBackendErrorClass,
   stopBackendFailed,
   stopBackendTimeout,
   stopMaxRuntime,
 } from "./stop.js";
+import { reinjectTamperFailure, runTamperScreen } from "./tamper.js";
 import type { LoopContext, RunSummary } from "./types.js";
 import {
   continueAfterParallelJoin,
@@ -198,6 +221,8 @@ export async function runIteration(
     String(iteration),
   );
   registryProgress(loop, iteration);
+  // Capture the preset-declared progress scalar each iteration (drift signal).
+  runProgressMetric(loop, iteration);
   log(loop, "debug", `iteration ${iteration} finish exit_code=${exitCode}`);
   loop.onEvent?.({
     type: "iteration.footer",
@@ -218,8 +243,66 @@ export async function runIteration(
     );
   }
   if (timedOut) return stopBackendTimeout(loop, iteration, output);
-  if (exitCode !== 0) return stopBackendFailed(loop, iteration, output);
+  if (exitCode !== 0) {
+    return handleBackendFailure(loop, iteration, output, iterate);
+  }
   return finishIteration(loop, iter, output, iterate);
+}
+
+/**
+ * Classify a non-zero backend exit. A typed transient/rate-limit/auth/quota
+ * error is handled by the circuit breaker — retryable classes pause-and-retry
+ * (rather than fast-failing into a laundered verdict or generic death) until
+ * the breaker opens; non-retryable classes stop with a typed reason. Anything
+ * unclassified is a plain backend failure.
+ */
+async function handleBackendFailure(
+  loop: LoopContext,
+  iteration: number,
+  output: string,
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+): Promise<RunSummary> {
+  const errorClass = classifyBackendError(output);
+  if (errorClass === "none") return stopBackendFailed(loop, iteration, output);
+
+  const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
+  const pauses = countTransientPauses(runLines);
+  const decision = circuitDecision(
+    errorClass,
+    pauses,
+    loop.limits.transientMaxPauses ?? 3,
+  );
+  if (decision.action === "stop") {
+    return stopBackendErrorClass(loop, iteration, decision.reason, output);
+  }
+  // Pause-and-retry with exponential backoff: a transient blip becomes a retry
+  // instead of run-death. The Nth retry waits base*2^(N-1), capped.
+  const attempt = pauses + 1;
+  const pauseMs = backoffDelayMs(
+    attempt,
+    loop.limits.transientPauseMs ?? 5000,
+    loop.limits.transientBackoffCapMs ?? 30000,
+  );
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iteration),
+    "backend.transient",
+    jsonField("error_class", errorClass) +
+      ", " +
+      jsonField("pause_count", String(attempt)) +
+      ", " +
+      jsonFieldRaw("backoff_ms", String(pauseMs)) +
+      ", " +
+      jsonField("output_tail", output.slice(-500)),
+  );
+  log(
+    loop,
+    "warn",
+    `transient backend error (${errorClass}); retry ${attempt}/${loop.limits.transientMaxPauses ?? 3} after ${pauseMs}ms backoff`,
+  );
+  if (pauseMs > 0) await new Promise((r) => setTimeout(r, pauseMs));
+  return iterate(loop, iteration + 1);
 }
 
 async function runBackendIteration(
@@ -425,6 +508,13 @@ export async function finishIteration(
     );
   }
 
+  // Open-task gate for the completion-promise path. Mirror the event-path gate
+  // in emit.ts (same store via loop.paths.tasksFile, soft tasks are advisory)
+  // so a stdout promise can't bypass the requirement the emitted event honors.
+  const hasBlockingTasks = materializeOpenFrom(loop.paths.tasksFile).some(
+    (t) => t.soft !== true,
+  );
+
   const resolved = resolveOutcome({
     emittedTopic: emitted.topic,
     allTopics,
@@ -433,14 +523,72 @@ export async function finishIteration(
     completionEvent: loop.completion.event,
     requiredEvents: loop.completion.requiredEvents,
     completionPromise: loop.completion.promise,
+    hasBlockingTasks,
   });
 
   progress(emitted.topic, resolved.outcome);
 
-  if (resolved.action === "complete_event")
-    return completeLoop(loop, iter.iteration, "completion_event");
-  if (resolved.action === "complete_promise")
-    return completeLoop(loop, iter.iteration, "completion_promise");
+  if (
+    resolved.action === "complete_event" ||
+    resolved.action === "complete_promise"
+  ) {
+    const reason =
+      resolved.action === "complete_event"
+        ? "completion_event"
+        : "completion_promise";
+    // Provisional-done hold: a self-asserted done-claim parks in
+    // `awaiting_acceptance` before any irreversible action and is released only
+    // when the deterministic gates pass (or an operator acknowledges).
+    enterProvisional(loop, iter.iteration, reason);
+    // Out-of-band acceptance gate: the harness runs deterministic verify
+    // commands on the done-claim.
+    const gate = runAcceptanceGate(loop, iter.iteration);
+    // Required-absence guards: catch reward-hacks (leftover TODO, skipped
+    // tests, secrets, dirty tree) the verify commands and LLM gates may miss.
+    // Only run when the acceptance gate passed (the run is already held
+    // otherwise).
+    const guards = gate.passed
+      ? runPostconditionGuards(loop, iter.iteration)
+      : { ran: false, passed: false, violations: [] };
+    // Anti-reward-hack screen: under bypassPermissions the maker can edit the
+    // very tests that gate it, so a test-backed "done" is screened for test
+    // tampering before release.
+    const tamper = gate.passed
+      ? runTamperScreen(loop, iter.iteration)
+      : { ran: false, passed: false, violations: [] };
+    // Intent-binding: the build must satisfy the stated acceptance criteria,
+    // not just pass its tests.
+    const intent = gate.passed
+      ? runIntentCriteria(loop, iter.iteration)
+      : { ran: false, passed: false, failures: [] };
+    const humanAck = consumeHumanAck(loop);
+    const state = resolveProvisional({
+      acceptancePassed: gate.passed,
+      postconditionsPassed: guards.passed && tamper.passed && intent.passed,
+      humanAck,
+    });
+    if (state === "accepted") {
+      releaseProvisional(loop, iter.iteration, humanAck);
+      return completeLoop(loop, iter.iteration, reason);
+    }
+    // Held: re-inject the most specific failure and route back to rework.
+    let cause = "acceptance";
+    if (!gate.passed) {
+      reinjectAcceptanceFailure(loop, iter.iteration, gate);
+    } else if (!guards.passed) {
+      reinjectPostconditionFailure(loop, iter.iteration, guards);
+      cause = "postcondition";
+    } else if (!tamper.passed) {
+      reinjectTamperFailure(loop, iter.iteration, tamper);
+      cause = "tamper";
+    } else {
+      reinjectIntentFailure(loop, iter.iteration, intent);
+      cause = "intent";
+    }
+    holdProvisional(loop, iter.iteration, cause);
+    progress(emitted.topic, "hold:awaiting_acceptance");
+    return iterate(loop, iter.iteration + 1);
+  }
   return iterate(loop, iter.iteration + 1);
 }
 
@@ -584,6 +732,7 @@ export function resolveOutcome(ctx: {
   completionEvent: string;
   requiredEvents: string[];
   completionPromise: string;
+  hasBlockingTasks: boolean;
 }): { action: string; outcome: string } {
   if (
     completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents)
@@ -593,8 +742,14 @@ export function resolveOutcome(ctx: {
   if (shouldContinueFromAcceptedEvent(ctx.emittedTopic, ctx.completionEvent)) {
     return { action: "continue_routed", outcome: "continue:routed_event" };
   }
+  // The stdout promise is a fallback, not a self-grade: a substring match alone
+  // must never finish a run. It is accepted only when the run also clears the
+  // same gates the completion event must clear — no invalid events this turn,
+  // every required event seen, and no open blocking tasks.
   if (
     !ctx.hadInvalidEvents &&
+    !ctx.hasBlockingTasks &&
+    requiredEventsSatisfied(ctx.allTopics, ctx.requiredEvents) &&
     completedViaPromise(ctx.output, ctx.completionPromise)
   ) {
     return {
@@ -618,13 +773,21 @@ function latestAgentEventRecord(lines: string[]): {
   return { topic: "", payload: "" };
 }
 
+/** Every required-evidence event has been seen in the run so far. */
+function requiredEventsSatisfied(
+  topics: string[],
+  requiredEvents: string[],
+): boolean {
+  return requiredEvents.every((e) => topics.includes(e));
+}
+
 function completedViaEvent(
   topics: string[],
   completionEvent: string,
   requiredEvents: string[],
 ): boolean {
   if (!topics.includes(completionEvent)) return false;
-  return requiredEvents.every((e) => topics.includes(e));
+  return requiredEventsSatisfied(topics, requiredEvents);
 }
 
 function completedViaPromise(output: string, promise: string): boolean {

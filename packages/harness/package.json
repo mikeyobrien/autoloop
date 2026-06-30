@@ -55,9 +55,61 @@
       "types": "./dist/metareview.d.ts",
       "default": "./dist/metareview.js"
     },
+    "./acceptance": {
+      "types": "./dist/acceptance.d.ts",
+      "default": "./dist/acceptance.js"
+    },
+    "./postconditions": {
+      "types": "./dist/postconditions.d.ts",
+      "default": "./dist/postconditions.js"
+    },
+    "./provisional": {
+      "types": "./dist/provisional.d.ts",
+      "default": "./dist/provisional.js"
+    },
+    "./tamper": {
+      "types": "./dist/tamper.d.ts",
+      "default": "./dist/tamper.js"
+    },
+    "./git-diff": {
+      "types": "./dist/git-diff.d.ts",
+      "default": "./dist/git-diff.js"
+    },
+    "./circuit-breaker": {
+      "types": "./dist/circuit-breaker.d.ts",
+      "default": "./dist/circuit-breaker.js"
+    },
+    "./intent": {
+      "types": "./dist/intent.d.ts",
+      "default": "./dist/intent.js"
+    },
+    "./premature-quit": {
+      "types": "./dist/premature-quit.d.ts",
+      "default": "./dist/premature-quit.js"
+    },
+    "./progress": {
+      "types": "./dist/progress.d.ts",
+      "default": "./dist/progress.js"
+    },
+    "./postfire-verify": {
+      "types": "./dist/postfire-verify.d.ts",
+      "default": "./dist/postfire-verify.js"
+    },
+    "./completion-lint": {
+      "types": "./dist/completion-lint.d.ts",
+      "default": "./dist/completion-lint.js"
+    },
+    "./iteration-diff": {
+      "types": "./dist/iteration-diff.d.ts",
+      "default": "./dist/iteration-diff.js"
+    },
     "./parallel": {
       "types": "./dist/parallel.d.ts",
       "default": "./dist/parallel.js"
+    },
+    "./fanout-runner": {
+      "types": "./dist/fanout-runner.d.ts",
+      "default": "./dist/fanout-runner.js"
     },
     "./iteration": {
       "types": "./dist/iteration.d.ts",

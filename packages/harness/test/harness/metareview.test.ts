@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import {
+  parseVerdict,
   runMetareviewReview,
   shouldRunMetareview,
 } from "@mobrienv/autoloop-harness/metareview";
@@ -119,6 +120,8 @@ function makeAcpReviewLoop(): LoopContext {
       trustAllTools: true,
       agent: "reviewer",
       model: "sonnet",
+      onError: "hold",
+      minConfidence: 0.5,
     },
     paths: {
       projectDir: workDir,
@@ -190,6 +193,68 @@ function makePiReviewLoop(): LoopContext {
   };
   return loop;
 }
+
+describe("parseVerdict (fail-closed)", () => {
+  const block = (obj: Record<string, unknown>) =>
+    "```json\n" + JSON.stringify(obj) + "\n```";
+
+  it("returns a well-formed verdict verbatim", () => {
+    const v = parseVerdict(
+      block({ verdict: "EXIT", confidence: 0.9, reasoning: "done" }),
+    );
+    expect(v.verdict).toBe("EXIT");
+    expect(v.confidence).toBe(0.9);
+  });
+
+  it("fails closed to UNKNOWN on empty output", () => {
+    expect(parseVerdict("").verdict).toBe("UNKNOWN");
+    expect(parseVerdict("   \n ").verdict).toBe("UNKNOWN");
+  });
+
+  it("fails closed to UNKNOWN when no verdict block is present", () => {
+    expect(parseVerdict("just some prose, no json").verdict).toBe("UNKNOWN");
+  });
+
+  it("fails closed to UNKNOWN on malformed JSON", () => {
+    expect(parseVerdict("```json\n{ not valid json }\n```").verdict).toBe(
+      "UNKNOWN",
+    );
+  });
+
+  it("fails closed to UNKNOWN on an unrecognized verdict kind", () => {
+    expect(
+      parseVerdict(block({ verdict: "MAYBE", confidence: 1 })).verdict,
+    ).toBe("UNKNOWN");
+  });
+
+  it("fails closed to UNKNOWN when the verdict field is missing", () => {
+    expect(parseVerdict(block({ confidence: 1, reasoning: "x" })).verdict).toBe(
+      "UNKNOWN",
+    );
+  });
+
+  it("downgrades a below-threshold verdict to UNKNOWN", () => {
+    const v = parseVerdict(
+      block({ verdict: "CONTINUE", confidence: 0.2, reasoning: "meh" }),
+      0.5,
+    );
+    expect(v.verdict).toBe("UNKNOWN");
+    expect(v.confidence).toBe(0.2);
+  });
+
+  it("keeps an at-or-above-threshold verdict", () => {
+    expect(
+      parseVerdict(block({ verdict: "CONTINUE", confidence: 0.5 }), 0.5)
+        .verdict,
+    ).toBe("CONTINUE");
+  });
+
+  it("does not gate on confidence when threshold is 0", () => {
+    expect(
+      parseVerdict(block({ verdict: "CONTINUE", confidence: 0 }), 0).verdict,
+    ).toBe("CONTINUE");
+  });
+});
 
 describe("shouldRunMetareview", () => {
   it("returns false when review is disabled", () => {
@@ -323,6 +388,37 @@ describe("runMetareviewReview", () => {
     );
   });
 
+  it("quarantines a verdict produced under a transient (429) reviewer error", async () => {
+    const loop = makeAcpReviewLoop();
+    mockAcpReviewRun();
+    // The reviewer hit a rate limit and exited non-zero — never fold an outage
+    // into a confident verdict.
+    backendMocks.runAcpIteration.mockResolvedValue({
+      output: "HTTP 429 Too Many Requests: rate limit exceeded",
+      exitCode: 1,
+      timedOut: false,
+    });
+
+    const verdict = await runMetareviewReview(loop, 2);
+    expect(verdict.verdict).toBe("UNKNOWN");
+  });
+
+  it("does not quarantine an ordinary non-zero reviewer exit with a valid verdict", async () => {
+    const loop = makeAcpReviewLoop();
+    mockAcpReviewRun();
+    // Non-zero exit but the output is a clean, confident verdict (no transient
+    // signature) → parsed normally, not quarantined.
+    backendMocks.runAcpIteration.mockResolvedValue({
+      output:
+        '```json\n{"verdict":"EXIT","confidence":0.9,"reasoning":"done"}\n```',
+      exitCode: 1,
+      timedOut: false,
+    });
+
+    const verdict = await runMetareviewReview(loop, 2);
+    expect(verdict.verdict).toBe("EXIT");
+  });
+
   function mockPiReviewRun(): PiSession {
     const reviewSession = { process: { pid: 8 } } as unknown as PiSession;
     backendMocks.initPiSession.mockReset();
@@ -379,5 +475,50 @@ describe("runMetareviewReview", () => {
 
     await expect(runMetareviewReview(loop, 2)).rejects.toThrow("boom");
     expect(backendMocks.terminatePiSession).toHaveBeenCalledWith(reviewSession);
+  });
+
+  it("fails closed to UNKNOWN when the review times out (never CONTINUE)", async () => {
+    const loop = makeAcpReviewLoop();
+    mockAcpReviewRun();
+    backendMocks.runAcpIteration.mockResolvedValue({
+      output:
+        '```json\n{"verdict":"CONTINUE","confidence":0.9,"reasoning":"partial"}\n```',
+      exitCode: 0,
+      timedOut: true,
+    });
+
+    const verdict = await runMetareviewReview(loop, 2);
+
+    expect(verdict.verdict).toBe("UNKNOWN");
+  });
+
+  it("fails closed to UNKNOWN on malformed review output (never CONTINUE)", async () => {
+    const loop = makeAcpReviewLoop();
+    mockAcpReviewRun();
+    backendMocks.runAcpIteration.mockResolvedValue({
+      output: "no structured verdict here",
+      exitCode: 0,
+      timedOut: false,
+    });
+
+    const verdict = await runMetareviewReview(loop, 2);
+
+    expect(verdict.verdict).toBe("UNKNOWN");
+  });
+
+  it("downgrades a below-threshold review verdict to UNKNOWN", async () => {
+    const loop = makeAcpReviewLoop();
+    loop.review.minConfidence = 0.7;
+    mockAcpReviewRun();
+    backendMocks.runAcpIteration.mockResolvedValue({
+      output:
+        '```json\n{"verdict":"EXIT","confidence":0.3,"reasoning":"unsure"}\n```',
+      exitCode: 0,
+      timedOut: false,
+    });
+
+    const verdict = await runMetareviewReview(loop, 2);
+
+    expect(verdict.verdict).toBe("UNKNOWN");
   });
 });
