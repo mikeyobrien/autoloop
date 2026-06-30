@@ -1,3 +1,4 @@
+import { dirname, relative, sep } from "node:path";
 import { jsonBool, jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
 import {
   appendEvent,
@@ -113,7 +114,16 @@ export function runPostconditionGuards(
   }
 
   if (a.assertCleanTree && inRepo) {
-    const dirty = porcelainStatus(workDir);
+    // The harness writes its own journal/state during this very guard, so a
+    // tracked `.autoloop/` would make the guard trip on its own bookkeeping.
+    // clean_tree asserts the agent left the *project* clean — exclude the
+    // autoloop state dir from the assessment.
+    const stateRel = relative(workDir, dirname(loop.paths.journalFile));
+    const dirty = porcelainStatus(workDir).filter((line) => {
+      if (!stateRel || stateRel.startsWith("..")) return true;
+      const path = line.slice(3); // strip the `XY ` porcelain status prefix
+      return path !== stateRel && !path.startsWith(`${stateRel}${sep}`);
+    });
     if (dirty.length)
       violations.push({
         id: "clean_tree",

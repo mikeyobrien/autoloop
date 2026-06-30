@@ -123,6 +123,18 @@ describe("runPostconditionGuards", () => {
     expect(ok.passed).toBe(true);
   });
 
+  it("clean_tree ignores the harness's own state-dir writes when .autoloop is tracked", () => {
+    // Mimic CI / any repo that does NOT gitignore the autoloop state dir: track
+    // it (bypassing a dev machine's global excludesfile). The guard journals
+    // `postcondition.start` into .autoloop, which must not count as a dirty
+    // project tree.
+    git(workDir, ["-c", "core.excludesfile=/dev/null", "add", "-A", "-f"]);
+    git(workDir, ["commit", "-qm", "track-state-dir"]);
+    const ok = runPostconditionGuards(loopWith({ assertCleanTree: true }), 2);
+    expect(ok.passed).toBe(true);
+    expect(ok.violations).toEqual([]);
+  });
+
   it("aggregates multiple violations", () => {
     appendToTracked("// TODO: x\nit.only('y', () => {});");
     const result = runPostconditionGuards(
