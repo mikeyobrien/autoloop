@@ -1,7 +1,7 @@
 ---
 name: autoloop-acp
 description: Drive autoloop over the Agent Client Protocol (ACP) — connect an external editor, harness, or agent to `autoloop acp` over stdio, send prompts/slash commands that map to autoloop verbs, and stream loop runs as tool calls. Use when wiring up or operating an ACP connection to autoloop from another system.
-argument-hint: [connect|run|<slash-command>] [args...]
+argument-hint: "[connect|run|<slash-command>] [args...]"
 ---
 
 # Autoloop over ACP

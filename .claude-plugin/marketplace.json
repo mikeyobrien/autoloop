@@ -1,0 +1,5 @@
+{
+  "name": "autoloop",
+  "owner": { "name": "mikeyobrien" },
+  "plugins": [{ "name": "autoloop", "source": "./plugins/autoloop" }]
+}
