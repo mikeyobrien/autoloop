@@ -11,6 +11,7 @@ import { MAX_TIMER_MS, parseDurationMs } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readRegistry } from "@mobrienv/autoloop-core/registry/read";
 import { listWorktreeMetas } from "@mobrienv/autoloop-core/worktree";
+import { lintCompletionContract } from "@mobrienv/autoloop-harness/completion-lint";
 
 export type DoctorStatus = "ok" | "warn" | "fail";
 
@@ -48,6 +49,7 @@ export function runDoctorChecks(projectDir: string): DoctorCheck[] {
   checks.push(checkGit(projectDir));
   checks.push(checkBackendCommand(projectDir));
   checks.push(checkRuntimeLimits(projectDir));
+  checks.push(checkCompletionContract(projectDir));
   checks.push(checkStateDir(stateDir));
   if (existsSync(stateDir)) {
     checks.push(checkRegistry(stateDir));
@@ -130,6 +132,47 @@ function checkBackendCommand(projectDir: string): DoctorCheck {
     name: "backend",
     status: "warn",
     detail: `configured backend command \`${executable}\` not found on PATH`,
+  };
+}
+
+function checkCompletionContract(projectDir: string): DoctorCheck {
+  let findings: ReturnType<typeof lintCompletionContract> = [];
+  try {
+    const cfg = config.loadProject(projectDir);
+    const single = config.get(cfg, "acceptance.verify_cmd", "").trim();
+    findings = lintCompletionContract({
+      promise: config.get(
+        cfg,
+        "event_loop.completion_promise",
+        "LOOP_COMPLETE",
+      ),
+      event: config.get(cfg, "event_loop.completion_event", "task.complete"),
+      requiredEvents: config.getList(cfg, "event_loop.required_events"),
+      verifyCmds: [
+        ...config.getList(cfg, "acceptance.verify_cmds"),
+        ...(single ? [single] : []),
+      ],
+      criteria: config.getList(cfg, "acceptance.criteria"),
+    });
+  } catch {
+    /* no config → nothing to lint */
+  }
+  const warns = findings.filter((f) => f.level === "warn");
+  if (warns.length > 0) {
+    return {
+      name: "completion-contract",
+      status: "warn",
+      detail: warns.map((f) => `${f.rule}: ${f.message}`).join("; "),
+    };
+  }
+  const infos = findings.filter((f) => f.level === "info");
+  return {
+    name: "completion-contract",
+    status: "ok",
+    detail:
+      infos.length > 0
+        ? infos.map((f) => `${f.rule}: ${f.message}`).join("; ")
+        : "falsifiable: completion has a deterministic check",
   };
 }
 

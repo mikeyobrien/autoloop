@@ -77,6 +77,41 @@ describe("computeStats", () => {
     expect(stats[0].failed).toBe(1);
   });
 
+  it("counts gate-verified outcomes and computes cost-per-verified", () => {
+    const records = [
+      // Verified via persisted outcome, with persisted cost.
+      record({ run_id: "a", outcome: "verified", cost_usd: 0.3 }),
+      // Completed status but held outcome → not verified.
+      record({
+        run_id: "b",
+        status: "completed",
+        outcome: "held",
+        cost_usd: 0.1,
+      }),
+    ];
+    const stats = computeStats(records, () => []);
+    expect(stats[0].verified).toBe(1);
+    expect(stats[0].costUsd).toBeCloseTo(0.4, 6);
+    expect(stats[0].costPerVerified).toBeCloseTo(0.4, 6);
+  });
+
+  it("falls back to status and journal cost for pre-ledger records", () => {
+    // No outcome / cost_usd fields (old record) → status drives verified,
+    // journal drives cost.
+    const stats = computeStats(
+      [record({ run_id: "a", status: "completed" })],
+      () => [usageLine("a", "0.2")],
+    );
+    expect(stats[0].verified).toBe(1);
+    expect(stats[0].costUsd).toBeCloseTo(0.2, 6);
+  });
+
+  it("reports null cost-per-verified when nothing is verified", () => {
+    const stats = computeStats([record({ status: "failed" })], () => []);
+    expect(stats[0].verified).toBe(0);
+    expect(stats[0].costPerVerified).toBeNull();
+  });
+
   it("skips unparseable durations", () => {
     const stats = computeStats(
       [record({ created_at: "garbage", updated_at: "garbage" })],

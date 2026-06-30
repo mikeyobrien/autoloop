@@ -33,7 +33,13 @@ export type StopReasonClass = "completed" | "failed" | "stopped";
 export function classifyStopReason(stopReason: string): StopReasonClass {
   if (stopReason === "completed" || stopReason.startsWith("completion"))
     return "completed";
-  if (stopReason === "backend_failed" || stopReason === "backend_timeout")
+  if (
+    stopReason === "backend_failed" ||
+    stopReason === "backend_timeout" ||
+    // A held loop (UNKNOWN metareview verdict) needs human attention, so it
+    // rides the same notify class as a failure rather than a quiet stop.
+    stopReason === "review_unknown"
+  )
     return "failed";
   return "stopped";
 }

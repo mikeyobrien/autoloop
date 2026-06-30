@@ -73,10 +73,23 @@ export function commandCapabilities(): CommandCapability[] {
       mutating: false,
     },
     {
+      name: "verify",
+      summary:
+        "Independently re-run a completed run's deterministic acceptance checks",
+      json: true,
+      mutating: false,
+    },
+    {
       name: "doctor",
       summary: "Environment and state diagnostics",
       json: true,
       mutating: false,
+    },
+    {
+      name: "preset",
+      summary: "Promote a single-file preset into a named user preset",
+      json: false,
+      mutating: true,
     },
     {
       name: "memory",

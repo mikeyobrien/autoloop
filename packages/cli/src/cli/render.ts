@@ -31,10 +31,16 @@ import {
 } from "@mobrienv/autoloop-harness/display";
 import { resolveEmitJournalFile } from "@mobrienv/autoloop-harness/emit";
 import {
+  diffIterations,
+  renderIterationDiff,
+} from "@mobrienv/autoloop-harness/iteration-diff";
+import {
   collectMetricsRows,
   formatMetrics,
 } from "@mobrienv/autoloop-harness/metrics";
+import { readProgressMetrics } from "@mobrienv/autoloop-harness/progress";
 import { renderRunScratchpadFull } from "@mobrienv/autoloop-harness/scratchpad";
+import { EXIT_ENV, fail } from "./fail.js";
 
 export function renderScratchpadFormat(
   projectDir: string,
@@ -153,6 +159,67 @@ export function renderUsage(
   const lines = readRunLines(journalFile, runId);
   const usage = collectUsage(lines);
   printProjectedText(formatUsage(usage, format), format);
+}
+
+export function renderProgress(
+  projectDir: string,
+  format: string,
+  runIdOverride?: string,
+): void {
+  const { journalFile, runId } = resolveJournalAndRun(
+    projectDir,
+    runIdOverride,
+  );
+  const metrics = readProgressMetrics(readRunLines(journalFile, runId));
+  if (format === "json") {
+    printProjectedText(JSON.stringify(metrics, null, 2), format);
+    return;
+  }
+  if (metrics.length === 0) {
+    printProjectedText("No progress metric recorded for this run.", format);
+    return;
+  }
+  const name = metrics[0].name;
+  const lines = [
+    `## Progress: ${name} — ${runId}`,
+    "",
+    ...metrics.map((m) => `iter ${m.iteration}: ${m.value}`),
+  ];
+  printProjectedText(lines.join("\n"), format);
+}
+
+export function renderIterationDiffInspect(args: string[]): void {
+  let json = false;
+  const positionals: string[] = [];
+  for (const a of args) {
+    if (a === "--json") json = true;
+    else if (a === "--format") {
+      /* next token is the format; skip handling, terminal default */
+    } else positionals.push(a);
+  }
+  const [runArg, iterAArg, iterBArg] = positionals;
+  if (!runArg || iterAArg === undefined || iterBArg === undefined) {
+    fail([
+      "error: inspect diff requires a run-id and two iterations",
+      "Usage: autoloop inspect diff <run-id> <iterA> <iterB> [--json]",
+    ]);
+    return;
+  }
+  const projectDir = process.env.AUTOLOOP_PROJECT_DIR || ".";
+  const { journalFile, runId } = resolveJournalFileForRun(projectDir, runArg);
+  const lines = readRunLines(journalFile, runId);
+  if (lines.length === 0) {
+    // A run with no journal events doesn't exist; report it instead of a
+    // misleading "identical (0→0)" success.
+    fail(`error: run \`${runArg}\` not found in ${projectDir}`, EXIT_ENV);
+    return;
+  }
+  const diff = diffIterations(lines, Number(iterAArg), Number(iterBArg));
+  if (json) {
+    console.log(JSON.stringify({ run_id: runId, ...diff }, null, 2));
+  } else {
+    console.log(renderIterationDiff(runId, diff));
+  }
 }
 
 export function renderJournalTimeline(

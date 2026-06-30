@@ -3,10 +3,26 @@ import { stopReasonToStatus } from "@mobrienv/autoloop-core/registry/derive";
 import { getRun } from "@mobrienv/autoloop-core/registry/read";
 import type {
   RegistryStatus,
+  RunOutcome,
   RunRecord,
 } from "@mobrienv/autoloop-core/registry/types";
 import { appendRegistryEntry } from "@mobrienv/autoloop-core/registry/update";
+import { runCostUsd } from "./display.js";
 import type { LoopContext } from "./types.js";
+
+/**
+ * Map a terminal status + stop reason to the verified outcome. `completed`
+ * implies the run cleared the gate chain (completeLoop fires only after
+ * provisional release), so it is `verified`. A metareview-UNKNOWN stop is a
+ * `held` run that needs attention.
+ */
+function deriveOutcome(status: RegistryStatus, stopReason: string): RunOutcome {
+  if (status === "completed") return "verified";
+  if (status === "running") return "running";
+  if (stopReason === "review_unknown") return "held";
+  if (status === "failed" || status === "timed_out") return "failed";
+  return "stopped";
+}
 
 function registryPath(loop: LoopContext): string {
   return loop.paths.registryFile;
@@ -24,6 +40,7 @@ function baseRecord(loop: LoopContext): RunRecord {
     run_id: loop.runtime.runId,
     status: "running",
     preset: loop.launch.preset,
+    preset_file: loop.launch.presetFile || undefined,
     objective: loop.objective,
     trigger: loop.launch.trigger,
     project_dir: loop.paths.projectDir,
@@ -75,6 +92,12 @@ export function registryTerminal(
   record.stop_reason = stopReason;
   record.updated_at = new Date().toISOString();
   record.latest_event = latestEvent;
+  // Verified-outcome ledger: persist the gate-verified outcome facts so ROI /
+  // A-B / regression analytics read a real numerator, not a re-derived one.
+  record.outcome = deriveOutcome(status, stopReason);
+  record.acceptance_verified = status === "completed";
+  record.verdict = loop.lastVerdict?.verdict ?? "";
+  record.cost_usd = runCostUsd(loop);
   appendRegistryEntry(path, record);
 }
 

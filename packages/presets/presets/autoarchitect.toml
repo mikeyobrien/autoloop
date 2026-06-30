@@ -1,0 +1,109 @@
+# autoarchitect — a single-file preset that DESIGNS a single-file preset.
+#
+# Given an objective (and an intensity/budget directive), it inspects the repo,
+# composes a bespoke single-file preset purpose-built for the objective, and
+# statically validates it. The generated preset is written to
+# `{{STATE_DIR}}/generated-preset.toml`; `autoloop run --architect "<objective>"`
+# then chains into running it.
+#
+# This file dogfoods the single-file preset format it teaches the designer to
+# emit: config tables + topology tables + inline role prompts, one document.
+name = "autoarchitect"
+completion = "task.complete"
+
+[event_loop]
+max_iterations = 24
+completion_event = "task.complete"
+completion_promise = "ARCHITECT_DONE"
+required_events = ["preset.valid"]
+
+[backend]
+kind = "command"
+command = "claude"
+timeout_ms = 1800000
+
+[memory]
+prompt_budget_chars = 8000
+
+[[role]]
+id = "inspector"
+emits = ["context.ready"]
+prompt = """
+You are the inspector. Read the objective and the design directive (intensity,
+budget) from the loop objective.
+
+Inspect THIS repository enough to design a workflow for the objective:
+- project type / languages, how it builds, whether and how tests run,
+- the relevant subsystems the objective touches, and local conventions.
+
+Write a concise findings note to `{{STATE_DIR}}/architect-context.md` covering
+what a generated workflow should account for (e.g. include a test-running
+verifier only if tests exist). Then emit `context.ready`.
+Do not design the preset yourself — that is the designer's job.
+"""
+
+[[role]]
+id = "designer"
+emits = ["preset.drafted", "design.blocked"]
+prompt = """
+You are the designer. Read `{{STATE_DIR}}/architect-context.md` and the
+objective + design directive.
+
+Compose ONE single-file preset (merged TOML: config tables + topology tables +
+inline role prompts) purpose-built for the objective, and write it to the EXACT
+absolute path given in the design directive ("Generated preset path: ..."). Use
+that path verbatim — the runner reads the generated preset from there.
+
+Rules for the preset you emit:
+- Config tables: [event_loop] (set completion_event, a sensible max_iterations),
+  [backend] (kind = "command", command = "claude").
+- Topology: top-level name + completion; [[role]] blocks with INLINE `prompt`
+  (never prompt_file); a complete [handoff] map where every emitted event routes
+  somewhere or is the completion event; the completion event MUST be emitted by
+  some role.
+- Compose from known patterns expressed as SEQUENTIAL roles: planner -> builder
+  -> critic -> finalizer for build work; surveyor -> writer -> reviewer for
+  review work. Encode verification as a dedicated critic/reviewer role with an
+  evidence [[gate]] (requires keys) rather than a fan-out stage.
+- Do NOT emit [[stage]] fan-out blocks: stage execution is not yet wired into the
+  run loop, and the validator will reject a single-file preset that defines them.
+  Size depth/iterations to the intensity and budget directive instead (ultra =
+  more critic passes, stricter gates, higher iteration ceilings).
+
+If you cannot design a coherent preset, emit `design.blocked` with the reason.
+Otherwise emit `preset.drafted`.
+"""
+
+[[role]]
+id = "validator"
+emits = ["preset.valid", "preset.rejected"]
+prompt = """
+You are the validator. You did not write the preset — fresh eyes.
+
+Run `autoloop inspect topology <generated preset path> --format json` against the
+path from the design directive. This loads and statically validates the generated
+single-file preset.
+
+- If the `warnings` array is non-empty, emit `preset.rejected` and list the exact
+  warnings so the designer can fix them.
+- If there are zero warnings AND the preset faithfully serves the objective,
+  emit `preset.valid`.
+Default to rejection when evidence is incomplete.
+"""
+
+[[role]]
+id = "finalizer"
+emits = ["task.complete"]
+prompt = """
+You are the finalizer. Confirm the generated preset (at the path from the design
+directive) exists and passed validation. State the generated preset path and a
+one-line summary of the workflow it encodes, then emit `task.complete`.
+"""
+
+[handoff]
+"loop.start" = ["inspector"]
+"context.ready" = ["designer"]
+"preset.drafted" = ["validator"]
+"design.blocked" = ["inspector"]
+"preset.rejected" = ["designer"]
+"preset.valid" = ["finalizer"]

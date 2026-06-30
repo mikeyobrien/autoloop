@@ -79,6 +79,43 @@ export function stopBackendFailed(
   return { iterations: iteration, stopReason: "backend_failed" };
 }
 
+/**
+ * Stop with a typed backend-error reason (rate_limited / quota_exhausted /
+ * auth_failed / transient_error) instead of a generic backend_failed, so the
+ * disposition reflects an availability/auth/quota issue rather than an agent
+ * failure — and downstream (retry ladder, quarantine) can key off it.
+ */
+export function stopBackendErrorClass(
+  loop: LoopContext,
+  iteration: number,
+  reason: string,
+  output: string,
+): RunSummary {
+  log(loop, "error", `loop stop reason=${reason} iteration=${iteration}`);
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: `stop:${reason}`,
+  });
+  loop.onEvent?.({ type: "failure.diagnostic", output, stopReason: reason });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iteration),
+    "loop.stop",
+    jsonField("reason", reason) +
+      ", " +
+      jsonField("iteration", String(iteration)) +
+      ", " +
+      jsonField("output_tail", lastNChars(output, 500)),
+  );
+  registryStop(loop, iteration, reason);
+  return { iterations: iteration, stopReason: reason };
+}
+
 export function stopBackendTimeout(
   loop: LoopContext,
   iteration: number,
@@ -223,6 +260,93 @@ export function stopMaxRuntime(
   );
   registryStop(loop, completed, "max_runtime");
   return { iterations: completed, stopReason: "max_runtime" };
+}
+
+/**
+ * Fail-closed stop for an UNKNOWN metareview verdict under `on_error = hold`.
+ * The reviewer gave no trustworthy signal, so the loop halts and raises
+ * attention (failure.diagnostic + notify-class "failed") instead of silently
+ * advancing — a human decides whether to resume.
+ */
+export function stopReviewUnknown(
+  loop: LoopContext,
+  iteration: number,
+  reasoning: string,
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=review_unknown iteration=${iteration} detail=${reasoning}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:review_unknown",
+  });
+  loop.onEvent?.({
+    type: "failure.diagnostic",
+    output: `Metareview returned UNKNOWN and held the loop: ${reasoning}`,
+    stopReason: "review_unknown",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iteration),
+    "loop.stop",
+    jsonField("reason", "review_unknown") +
+      ", " +
+      jsonField("iteration", String(iteration)) +
+      ", " +
+      jsonField("detail", reasoning),
+  );
+  registryStop(loop, iteration, "review_unknown");
+  return { iterations: iteration, stopReason: "review_unknown" };
+}
+
+/**
+ * Escalate a premature quit that exhausted its re-arm budget: stop with a
+ * distinct reason and raise attention rather than silently accepting a
+ * false-finish that left authorized work undone.
+ */
+export function stopPrematureQuit(
+  loop: LoopContext,
+  completed: number,
+  reasons: string[],
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=premature_quit completed_iterations=${completed} remaining=${reasons.join("; ")}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration: completed,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:premature_quit",
+  });
+  loop.onEvent?.({
+    type: "failure.diagnostic",
+    output: `Premature quit: authorized work remained with no blocker and the re-arm budget was exhausted.\nRemaining:\n- ${reasons.join("\n- ")}`,
+    stopReason: "premature_quit",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    "",
+    "loop.stop",
+    jsonField("reason", "premature_quit") +
+      ", " +
+      jsonField("completed_iterations", String(completed)) +
+      ", " +
+      jsonField("remaining", reasons.join("; ")),
+  );
+  registryStop(loop, completed, "premature_quit");
+  return { iterations: completed, stopReason: "premature_quit" };
 }
 
 export function completeLoop(
