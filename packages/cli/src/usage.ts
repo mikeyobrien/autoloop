@@ -40,6 +40,7 @@ export function printUsage(): void {
   console.log("  autoloop config <show|set|unset|path> [args]");
   console.log("  autoloop dashboard [--port <port>]");
   console.log("  autoloop kanban [--port <port>]");
+  console.log("  autoloop acp [--project-dir <dir>]");
   console.log("");
   console.log("Agent / automation surfaces:");
   console.log(

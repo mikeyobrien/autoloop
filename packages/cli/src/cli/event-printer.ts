@@ -20,6 +20,7 @@ import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 export function cliPrintEvent(event: LoopEvent): void {
   switch (event.type) {
     case "log":
+    case "loop.start":
     case "iteration.start":
     case "loop.finish":
       // Already handled (log → stderr in display.ts) or SDK-only markers.

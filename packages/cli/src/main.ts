@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import * as harness from "@mobrienv/autoloop-harness";
 import * as chains from "./chains.js";
 import { cliPrintEvent } from "./cli/event-printer.js";
+import { dispatchAcp } from "./commands/acp.js";
 import { fail } from "./cli/fail.js";
 import { editDistance, suggestClosest } from "./cli/suggest.js";
 import { cliVersion, dispatchCapabilities } from "./commands/capabilities.js";
@@ -154,6 +155,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "dashboard":
       dispatchDashboard(args.slice(1), bundleRoot, selfCmd);
       return;
+    case "acp":
+      await dispatchAcp(args.slice(1), bundleRoot, selfCmd);
+      return;
     case "kanban":
       dispatchKanban(args.slice(1), bundleRoot, selfCmd);
       return;
@@ -236,6 +240,7 @@ const CLI_COMMANDS = [
   "kanban",
   "capabilities",
   "robot-docs",
+  "acp",
   "help",
   "version",
 ];
