@@ -1,7 +1,7 @@
 ---
 name: autoloop
 description: Run and operate autoloops — start runs, monitor progress, inject guidance, manage worktrees, inspect artifacts, and clean up. Use when the user asks to run an autoloop, check loop status, merge/clean worktrees, or operate on runs.
-argument-hint: [run|status|guide|merge|clean|inspect] [args...]
+argument-hint: "[run|status|guide|merge|clean|inspect] [args...]"
 ---
 
 # Autoloop Operations
