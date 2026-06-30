@@ -132,6 +132,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    disallowedTools: string[];
   };
   review: {
     enabled: boolean;

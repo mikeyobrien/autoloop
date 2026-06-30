@@ -136,6 +136,9 @@ Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` in harness instructions, role prompts, a
 |---|---|---|
 | `{{STATE_DIR}}` | The loop's state directory (e.g. `.autoloop`) | `{{STATE_DIR}}/progress.md` |
 | `{{TOOL_PATH}}` | The full event tool path (e.g. `./.autoloop/autoloops`) | `{{TOOL_PATH}} emit review.ready "done"` |
+| `{{PRESET_DIR}}` | Absolute path to the preset/config dir (holds `roles/`, `scripts/`, `hooks/`) | `sh {{PRESET_DIR}}/scripts/okf-init.sh` |
+
+`{{PRESET_DIR}}` lets a role or hook reference preset-bundled files by path — e.g. a bootstrap script the loop runs before any scripts have been copied into the work dir. The same placeholders are also expanded in the `hooks.*` commands (`pre_run`, `pre_iteration`, `post_iteration`, `post_run`), so a hook can invoke a preset-bundled script (e.g. a deterministic `pre_run` bootstrap) without hardcoding paths.
 
 **Why placeholders?** The concrete state directory can vary — worktrees, chains, and nested loops all change the path. Placeholders let the harness inject the correct path at runtime so presets stay portable.
 

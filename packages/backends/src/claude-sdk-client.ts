@@ -20,6 +20,8 @@ export interface ClaudeSdkClientOptions {
   model?: string;
   cwd: string;
   trustAllTools: boolean;
+  /** Tool names to remove from the agent entirely (hard block, even under bypassPermissions). */
+  disallowedTools?: string[];
   verbose?: boolean;
   /** Deadline for the SDK init handshake (default 30s). */
   handshakeTimeoutMs?: number;
@@ -171,6 +173,10 @@ export async function initClaudeSdkSession(
     // Parity with the injected --dangerously-skip-permissions of the shell path.
     options.permissionMode = "bypassPermissions";
     options.allowDangerouslySkipPermissions = true;
+  }
+  // Hard tool removal — applies even under bypassPermissions (deny rules do not).
+  if (opts.disallowedTools && opts.disallowedTools.length > 0) {
+    options.disallowedTools = opts.disallowedTools;
   }
   // Harness-owned hard-deny floor. A PreToolUse hook runs before permission
   // resolution, so it denies catastrophic commands even under
