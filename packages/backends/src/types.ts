@@ -8,6 +8,8 @@ export interface BackendSpec {
   trustAllTools?: boolean;
   agent?: string;
   model?: string;
+  /** Provider-side agent profile (Hermes: launches as `--profile <p> acp`). */
+  profile?: string;
 }
 
 export interface BackendRunResult {

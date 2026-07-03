@@ -132,6 +132,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
     disallowedTools: string[];
   };
   review: {
@@ -148,6 +149,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
     /**
      * Fail-closed routing for an UNKNOWN verdict (malformed/empty/timed-out
      * review, or confidence below `minConfidence`). Default `hold`: stop the

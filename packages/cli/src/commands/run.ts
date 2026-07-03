@@ -608,6 +608,14 @@ export function backendOverrideSpec(backend: string): Record<string, unknown> {
       "@agentclientprotocol/claude-agent-acp",
     ]);
   }
+  if (backend === "hermes" || backend.startsWith("hermes:")) {
+    const profile = backend.startsWith("hermes:")
+      ? backend.slice("hermes:".length)
+      : "";
+    const spec = acpBackendOverride("hermes", "hermes", ["acp"]);
+    if (profile) spec["profile"] = profile;
+    return spec;
+  }
   if (backend.startsWith("acp:")) {
     const [, provider, ...commandParts] = backend.split(":");
     const command = commandParts.join(":");

@@ -10,6 +10,7 @@ import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
+import { providerLaunchArgs } from "@mobrienv/autoloop-backends/acp-providers";
 import {
   getClaudeSdkUsage,
   initClaudeSdkSession,
@@ -156,7 +157,11 @@ export async function runIteration(
     const acpOpts: AcpClientOptions = {
       provider: iter.backend.provider,
       command: iter.backend.command,
-      args: iter.backend.args,
+      args: providerLaunchArgs(
+        iter.backend.provider,
+        iter.backend.profile,
+        iter.backend.args,
+      ),
       cwd: loop.paths.workDir,
       trustAllTools: iter.backend.trustAllTools,
       agentName: iter.backend.agent || undefined,

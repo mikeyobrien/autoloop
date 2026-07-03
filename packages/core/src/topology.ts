@@ -22,6 +22,7 @@ export interface Role {
   backendTimeoutMs?: number;
   backendAgent?: string;
   backendModel?: string;
+  backendProfile?: string;
 }
 
 /**
@@ -337,6 +338,9 @@ function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
   if (typeof r.backend_model === "string" && r.backend_model !== "") {
     out.backendModel = r.backend_model;
   }
+  if (typeof r.backend_profile === "string" && r.backend_profile !== "") {
+    out.backendProfile = r.backend_profile;
+  }
   return out;
 }
 
@@ -349,7 +353,8 @@ export function roleHasBackendOverride(role: Role): boolean {
     role.backendPromptMode !== undefined ||
     role.backendTimeoutMs !== undefined ||
     role.backendAgent !== undefined ||
-    role.backendModel !== undefined
+    role.backendModel !== undefined ||
+    role.backendProfile !== undefined
   );
 }
 
@@ -379,6 +384,9 @@ function renderRoleBackendLines(role: Role, indent: string): string[] {
   }
   if (role.backendModel !== undefined) {
     lines.push(`${indent}backend_model: ${role.backendModel}`);
+  }
+  if (role.backendProfile !== undefined) {
+    lines.push(`${indent}backend_profile: ${role.backendProfile}`);
   }
   return lines;
 }
@@ -700,6 +708,8 @@ function roleBackendJson(role: Role): Record<string, unknown> {
     out.backend_timeout_ms = role.backendTimeoutMs;
   if (role.backendAgent !== undefined) out.backend_agent = role.backendAgent;
   if (role.backendModel !== undefined) out.backend_model = role.backendModel;
+  if (role.backendProfile !== undefined)
+    out.backend_profile = role.backendProfile;
   return out;
 }
 
