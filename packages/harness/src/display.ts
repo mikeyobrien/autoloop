@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
-import { lineSep, listText } from "@mobrienv/autoloop-core";
+import { collectUsage, lineSep, listText } from "@mobrienv/autoloop-core";
+import { readRunLines } from "@mobrienv/autoloop-core/journal";
 import type { IterationContext } from "./prompt.js";
 import type { LoopContext, RunSummary } from "./types.js";
 
@@ -11,6 +12,7 @@ export function printSummary(summary: RunSummary, loop: LoopContext): void {
     `run_id: ${loop.runtime.runId}`,
     `iterations: ${summary.iterations}`,
     `stop_reason: ${summary.stopReason}`,
+    `cost_usd: ${runCostUsd(loop).toFixed(6)}`,
     `journal: ${loop.paths.journalFile}`,
     `memory: ${loop.paths.memoryFile}`,
     `review_every: ${loop.review.every}`,
@@ -18,6 +20,20 @@ export function printSummary(summary: RunSummary, loop: LoopContext): void {
     ...hint,
   ];
   for (const l of lines) console.log(l);
+}
+
+/**
+ * Cumulative run cost in USD, summed from journaled `backend.usage` events.
+ * Returns 0 when no usage was recorded (e.g. the `command`/`acp` backends, or a
+ * torn journal) so the summary always carries a parseable `cost_usd` field.
+ */
+export function runCostUsd(loop: LoopContext): number {
+  try {
+    const lines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
+    return collectUsage(lines, loop.runtime.runId).totals.costUsd;
+  } catch {
+    return 0;
+  }
 }
 
 function stopReasonHint(reason: string): string[] {
@@ -157,6 +173,30 @@ export function printFailureDiagnostic(
   console.log(header);
   console.log(tail);
   console.log("──────────────────────────────────────");
+}
+
+export function printHookOutput(
+  name: string,
+  exitCode: number,
+  output: string,
+  failed: boolean,
+): void {
+  const lines = output.split(lineSep());
+  const body = lines.slice(-15).join(lineSep());
+  // Silent successful hooks (no output) print nothing; failures always show.
+  if (!failed && !body.trim()) return;
+  const header = failed
+    ? `── hook: ${name} failed (exit ${exitCode}) ──`
+    : `── hook: ${name} (exit ${exitCode}) ──`;
+  console.log("");
+  console.log(header);
+  if (lines.length > 15) {
+    console.log(`… (${lines.length - 15} earlier lines in journal)`);
+  }
+  if (body.trim()) console.log(body);
+  if (decorativeOutputEnabled()) {
+    console.log("──────────────────────────────────────");
+  }
 }
 
 export function terminalWidth(): number {

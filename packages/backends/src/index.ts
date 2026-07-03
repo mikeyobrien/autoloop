@@ -23,6 +23,16 @@ export {
   isAcpBackendKind,
   resolveAcpProvider,
 } from "./acp-providers.js";
+export type { CommandRisk } from "./command-risk.js";
+export {
+  classifyCommandRisk,
+  commandFloorDecision,
+  extractCommandFromToolInput,
+  isCommandBearingTool,
+  readSafetyAllowlist,
+} from "./command-risk.js";
+export type { BackendErrorClass } from "./error-class.js";
+export { classifyBackendError, isRetryableErrorClass } from "./error-class.js";
 export type {
   BackendCommandContext,
   BackendPaths,

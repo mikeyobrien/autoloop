@@ -1,0 +1,14 @@
+{
+  "_comment": "Place this at ~/.linear/coding-tools.json. See https://linear.app/docs/open-issues-with-custom-scripts. Replace the path with the output of `which autoloop-linear-open`. Linear injects the listed LINEAR_* env vars when you choose 'open in coding tool' on an issue; autoloop-linear-open reads them, checks out the issue's branch, and launches an autoloop run that syncs back to Linear.",
+  "openIssue": {
+    "path": "/Users/sauhsoj/.bun/bin/autoloop-linear-open",
+    "args": [],
+    "env": [
+      "LINEAR_PROMPT",
+      "LINEAR_ISSUE_IDENTIFIER",
+      "LINEAR_ISSUE_BRANCH_NAME",
+      "LINEAR_WORK_DIR",
+      "LINEAR_PROJECT_NAME"
+    ]
+  }
+}

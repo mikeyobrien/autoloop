@@ -440,13 +440,17 @@ export function renderReviewPromptText(
     "```json\n" +
     "{\n" +
     '  "verdict": "CONTINUE | REDIRECT | TAKEOVER | EXIT",\n' +
-    '  "confidence": 0.0,\n' +
+    '  "confidence": 0.85,\n' +
     '  "reasoning": "One paragraph explaining the decision",\n' +
     '  "redirect_prompt": "New/amended task prompt (REDIRECT only)",\n' +
     '  "takeover_output": "Direct solution content (TAKEOVER only)",\n' +
     '  "suggestions": ["Optional list of specific improvements for CONTINUE"]\n' +
     "}\n" +
-    "```\n";
+    "```\n" +
+    "Set `confidence` (0.0-1.0) to your actual certainty. A verdict below the " +
+    "loop's confidence threshold, or a missing/malformed block, is treated as " +
+    "UNKNOWN and holds the loop for human review — so emit a real, well-formed " +
+    "verdict.\n";
 
   return (
     adversarialPreamble +

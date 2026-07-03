@@ -6,6 +6,7 @@ import * as chains from "./chains.js";
 import { cliPrintEvent } from "./cli/event-printer.js";
 import { fail } from "./cli/fail.js";
 import { editDistance, suggestClosest } from "./cli/suggest.js";
+import { dispatchAcp } from "./commands/acp.js";
 import { cliVersion, dispatchCapabilities } from "./commands/capabilities.js";
 import { dispatchChain } from "./commands/chain.js";
 import { dispatchConfig } from "./commands/config.js";
@@ -20,12 +21,15 @@ import { dispatchList } from "./commands/list.js";
 import { dispatchLoops } from "./commands/loops.js";
 import { dispatchMemory } from "./commands/memory.js";
 import { dispatchPiAdapter } from "./commands/pi-adapter.js";
+import { dispatchPreset } from "./commands/preset.js";
+import { dispatchResume } from "./commands/resume.js";
 import { dispatchRobotDocs } from "./commands/robot-docs.js";
 import { dispatchRun } from "./commands/run.js";
 import { dispatchRuns } from "./commands/runs.js";
 import { dispatchStats } from "./commands/stats.js";
 import { dispatchTask } from "./commands/task.js";
 import { dispatchTriage } from "./commands/triage.js";
+import { dispatchVerify } from "./commands/verify.js";
 import { dispatchWorktree } from "./commands/worktree.js";
 import { printEmitUsage, printUsage } from "./usage.js";
 
@@ -75,6 +79,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "run":
       await dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
       return;
+    case "resume":
+      await dispatchResume(args.slice(1));
+      return;
     case "emit": {
       if (!args[1] || args[1] === "--help" || args[1] === "-h") {
         printEmitUsage();
@@ -103,6 +110,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "inspect":
       dispatchInspect(args.slice(1));
       return;
+    case "preset":
+      dispatchPreset(args.slice(1));
+      return;
     case "pi-adapter":
       dispatchPiAdapter(args.slice(1));
       return;
@@ -129,6 +139,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "stats":
       dispatchStats(args.slice(1));
       return;
+    case "verify":
+      dispatchVerify(args.slice(1));
+      return;
     case "doctor":
       dispatchDoctor(args.slice(1));
       return;
@@ -149,6 +162,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
       return;
     case "dashboard":
       dispatchDashboard(args.slice(1), bundleRoot, selfCmd);
+      return;
+    case "acp":
+      await dispatchAcp(args.slice(1), bundleRoot, selfCmd);
       return;
     case "kanban":
       dispatchKanban(args.slice(1), bundleRoot, selfCmd);
@@ -209,6 +225,7 @@ function runtimeArgv(argv: string[]): string[] {
 
 const CLI_COMMANDS = [
   "run",
+  "resume",
   "emit",
   "inspect",
   "memory",
@@ -231,6 +248,7 @@ const CLI_COMMANDS = [
   "kanban",
   "capabilities",
   "robot-docs",
+  "acp",
   "help",
   "version",
 ];

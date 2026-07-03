@@ -13,6 +13,13 @@ export interface LaunchMetadata {
   trigger: TriggerSource;
   createdAt: string;
   parentRunId: string;
+  /**
+   * Absolute path to a single-file (`.toml`) preset, when the run was launched
+   * from one. Config and topology are loaded from this file instead of the
+   * `projectDir`'s `autoloops.toml` + `topology.toml`. Empty for directory
+   * presets.
+   */
+  presetFile?: string;
 }
 
 export interface ProfileInfo {
@@ -21,7 +28,18 @@ export interface ProfileInfo {
   warnings: string[];
 }
 
-export type VerdictKind = "CONTINUE" | "REDIRECT" | "TAKEOVER" | "EXIT";
+export type VerdictKind =
+  | "CONTINUE"
+  | "REDIRECT"
+  | "TAKEOVER"
+  | "EXIT"
+  // Fail-closed sentinel: the reviewer produced no usable signal (malformed /
+  // empty output, timeout, or below-threshold confidence). Never advances the
+  // loop on its own — routed by `[review].on_error` to hold or exit.
+  | "UNKNOWN";
+
+/** What to do when a metareview yields an UNKNOWN verdict. */
+export type ReviewOnError = "hold" | "exit" | "continue";
 
 export interface Verdict {
   verdict: VerdictKind;
@@ -45,8 +63,65 @@ export interface LoopContext {
     maxIterationRuntimeMs?: number;
     /** Loop wall-clock budget in ms (0 = disabled). */
     maxRuntimeMs?: number;
+    /**
+     * Circuit-breaker: max transient/rate-limit pauses before the breaker opens
+     * and the run stops with a typed reason. Default 3.
+     */
+    transientMaxPauses?: number;
+    /** Base backoff (ms) for the transient retry ladder. Default 5000. */
+    transientPauseMs?: number;
+    /** Upper bound (ms) on the exponential transient backoff. Default 30000. */
+    transientBackoffCapMs?: number;
+    /**
+     * Max times a premature quit (stall with authorized work remaining and no
+     * blocker) is re-armed before it escalates to attention. Default 1.
+     */
+    prematureMaxRearms?: number;
   };
   completion: { promise: string; event: string; requiredEvents: string[] };
+  /**
+   * Out-of-band acceptance gate. On a done-claim the HARNESS (not the agent's
+   * session) runs every `verifyCmds` entry in a clean shell; completion is
+   * accepted only when all exit 0. A failing command blocks completion and
+   * re-injects its output. Empty `verifyCmds` disables the gate.
+   */
+  acceptance: {
+    verifyCmds: string[];
+    timeoutMs: number;
+    /**
+     * Declarative required-absence guards evaluated at the acceptance gate
+     * regardless of agent claims. Each defaults off (opt-in per preset) so
+     * existing loops are unaffected. They catch reward-hacks the LLM gates miss:
+     * leftover TODO/FIXME, skipped/only/xfail tests, committed secrets, and a
+     * dirty/untracked working tree.
+     */
+    assertNoTodo: boolean;
+    assertNoSkippedTests: boolean;
+    assertNoSecrets: boolean;
+    assertCleanTree: boolean;
+    /**
+     * Anti-reward-hack screen: under bypassPermissions the maker can edit the
+     * very tests that gate it. When on, a test-backed done-claim is blocked if
+     * the run modified test files or inserted tamper patterns (skip/only/xfail,
+     * early exit, tautological assertions) on test paths. Default off.
+     */
+    screenTestTamper: boolean;
+    /**
+     * Intent-binding acceptance criteria captured at loop start (the contract
+     * between what was asked and what is accepted). Sourced from
+     * `[acceptance].criteria` and an "Acceptance criteria" section of the
+     * objective. A criterion may bind a deterministic check with ` :: <shell
+     * cmd>`; checked criteria gate completion, unchecked ones are advisory.
+     */
+    criteria: string[];
+  };
+  /**
+   * Human-in-the-loop. When an agent emits `ask.event`, the loop blocks until
+   * an operator responds (via the `respond` control verb) or `timeoutMs`
+   * elapses, then injects the answer into the next prompt as guidance.
+   * Disabled when `enabled` is false (ask.event is empty).
+   */
+  ask: { enabled: boolean; event: string; timeoutMs: number; pollMs: number };
   backend: {
     kind: string;
     provider: string;
@@ -58,6 +133,7 @@ export interface LoopContext {
     agent: string;
     model: string;
     profile?: string;
+    disallowedTools: string[];
   };
   review: {
     enabled: boolean;
@@ -74,11 +150,35 @@ export interface LoopContext {
     agent: string;
     model: string;
     profile?: string;
+    /**
+     * Fail-closed routing for an UNKNOWN verdict (malformed/empty/timed-out
+     * review, or confidence below `minConfidence`). Default `hold`: stop the
+     * loop and raise attention rather than silently continuing.
+     */
+    onError: ReviewOnError;
+    /**
+     * A parsed verdict whose confidence is below this threshold is downgraded
+     * to UNKNOWN. Default 0.5. Set 0 to disable confidence gating.
+     */
+    minConfidence: number;
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
+  hooks: {
+    preRun: string;
+    preIteration: string;
+    postIteration: string;
+    postRun: string;
+    strict: boolean;
+  };
   memory: { budgetChars: number };
   tasks: { budgetChars: number };
   harness: { instructions: string };
+  /**
+   * Preset-declared progress metric: a command whose numeric stdout is the
+   * scalar (tests passing, coverage, tasks closed, ...) journaled per iteration
+   * to enable drift/convergence detection. Disabled when `metricCmd` is "".
+   */
+  progress?: { metricCmd: string; name: string; timeoutMs: number };
   profiles: ProfileInfo;
   paths: {
     projectDir: string;
@@ -133,10 +233,18 @@ export interface LoopContext {
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;
   controlAdapter?: LiveControlAdapter;
+  /** Abort signal for the run; consulted while blocking on a human ask. */
+  signal?: AbortSignal;
 }
 
 export interface RunOptions {
   workDir?: string;
+  /**
+   * Absolute path to a single-file (`.toml`) preset. When set, config and
+   * topology are loaded from this file rather than from `projectDir`'s
+   * `autoloops.toml` + `topology.toml`.
+   */
+  presetFile?: string;
   backendOverride?: Record<string, unknown>;
   configOverride?: Record<string, unknown>;
   logLevel?: string | null;

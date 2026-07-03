@@ -1,5 +1,7 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { normalizeBackendLabel } from "@mobrienv/autoloop-backends";
+import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import {
   abortClaudeSdkTurn,
@@ -12,7 +14,11 @@ import {
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import * as config from "@mobrienv/autoloop-core/config";
-import { readIfExists, readRunLines } from "@mobrienv/autoloop-core/journal";
+import {
+  quarantineJournal,
+  readIfExists,
+  readRunLines,
+} from "@mobrienv/autoloop-core/journal";
 import {
   cleanWorktrees,
   mergeWorktree,
@@ -36,9 +42,11 @@ import {
   publishCapabilities,
 } from "./control/dispatch.js";
 import { piControlAdapter } from "./control/pi-adapter.js";
-import { log } from "./display.js";
+import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
+import { buildHookEnv, runHook } from "./hooks.js";
+import { journalAcceptanceContract } from "./intent.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
 import { runFinishNotification } from "./notify.js";
@@ -51,12 +59,19 @@ import {
   seedBranchContext,
   writeParallelBranchSummary,
 } from "./parallel.js";
+import {
+  countRearms,
+  detectPrematureQuit,
+  rearmPrematureQuit,
+} from "./premature-quit.js";
 import { registryStart, registryStop } from "./registry-bridge.js";
 import {
   completeLoop,
   stopCostBudget,
   stopMaxIterations,
   stopMaxRuntime,
+  stopPrematureQuit,
+  stopReviewUnknown,
   stopStalled,
 } from "./stop.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
@@ -76,16 +91,44 @@ export async function run(
     runOptions,
   );
   loop.onEvent = runOptions.onEvent;
+  loop.signal = runOptions.signal;
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
+  // Self-heal a journal poisoned by a prior crash (torn last record) before we
+  // append to it — quarantine corrupt lines so they cannot wedge this run.
+  try {
+    quarantineJournal(loop.paths.journalFile);
+  } catch {
+    /* best-effort: readLines already skips corrupt lines, so this is belt-and-suspenders */
+  }
   installRuntimeTools(loop);
   appendLoopStart(loop);
+  // Bind the acceptance contract (intent) at loop start so the deterministic
+  // gate keys its criteria off what was asked.
+  journalAcceptanceContract(loop);
+  runHook(loop, "pre_run", loop.hooks.preRun, buildHookEnv(loop));
   registryStart(loop);
   loop.controlAdapter = buildControlAdapter(loop);
   if (loop.controlAdapter) {
     publishCapabilities(loop.paths.stateDir, loop.controlAdapter);
   }
 
+  return driveLoop(loop, runOptions, 1);
+}
+
+/**
+ * Drive the iteration loop for an already-built, already-registered
+ * LoopContext, starting at `startIteration`. Owns abort/teardown wiring,
+ * the tracked-iterate recursion, session cleanup, post-run worktree
+ * lifecycle, and finish notifications. Shared by `run()` and `resume()` so
+ * both paths exercise identical signal handlers, stop handlers, and
+ * registry/journal behavior.
+ */
+export async function driveLoop(
+  loop: LoopContext,
+  runOptions: RunOptions,
+  startIteration: number,
+): Promise<RunSummary> {
   // Track current iteration for abort handler (must be mutable)
   let currentIteration = 0;
   let aborted = false;
@@ -164,6 +207,19 @@ export async function run(
     `loop start run_id=${loop.runtime.runId} max_iterations=${loop.limits.maxIterations}`,
   );
 
+  loop.onEvent?.({
+    type: "loop.start",
+    runId: loop.runtime.runId,
+    prompt: loop.objective,
+    workDir: loop.paths.workDir,
+    projectDir: loop.paths.projectDir,
+    preset: loop.launch.preset,
+    backend: normalizeBackendLabel(loop.backend.command),
+    maxIterations: loop.limits.maxIterations,
+    completionEvent: loop.completion.event,
+    completionPromise: loop.completion.promise,
+  });
+
   let summary: RunSummary;
   const trackedIterate = async (
     ctx: LoopContext,
@@ -175,6 +231,9 @@ export async function run(
         stopReason: "interrupted",
         runId: ctx.runtime.runId,
       };
+    if (iter > ctx.limits.maxIterations) {
+      return stopMaxIterations(ctx, iter);
+    }
     currentIteration = iter;
     ctx.onEvent?.({
       type: "iteration.start",
@@ -185,7 +244,21 @@ export async function run(
     return iterateWith(ctx, iter, trackedIterate);
   };
   try {
-    summary = await trackedIterate(loop, 1);
+    summary = await trackedIterate(loop, startIteration);
+  } catch (err: unknown) {
+    // An unexpected throw (e.g. init/store failure outside per-iteration error
+    // handling) must still produce a terminal event so an external --events
+    // consumer always learns the run ended, instead of waiting forever for a
+    // loop.finish. Data already written is flushed (synchronous appends); we
+    // emit the terminal marker and re-raise.
+    loop.onEvent?.({
+      type: "loop.finish",
+      iterations: currentIteration > 0 ? currentIteration - 1 : 0,
+      stopReason: "error",
+      runId: loop.runtime.runId,
+      costUsd: runCostUsd(loop),
+    });
+    throw err;
   } finally {
     if (loop.acpSession.current) {
       try {
@@ -283,6 +356,12 @@ export async function run(
     }
   }
 
+  runHook(
+    loop,
+    "post_run",
+    loop.hooks.postRun,
+    buildHookEnv(loop, { stopReason: summary.stopReason }),
+  );
   runFinishNotification({
     projectDir: loop.paths.mainProjectDir,
     journalFile: loop.paths.journalFile,
@@ -292,11 +371,13 @@ export async function run(
     iterations: summary.iterations,
   });
 
+  const costUsd = runCostUsd(loop);
   loop.onEvent?.({
     type: "summary",
     runId: loop.runtime.runId,
     iterations: summary.iterations,
     stopReason: summary.stopReason,
+    costUsd,
     journalFile: loop.paths.journalFile,
     memoryFile: loop.paths.memoryFile,
     reviewEvery: loop.review.every,
@@ -307,10 +388,18 @@ export async function run(
     iterations: summary.iterations,
     stopReason: summary.stopReason,
     runId: loop.runtime.runId,
+    costUsd,
   });
   return { ...summary, runId: loop.runtime.runId };
 }
 
+export {
+  buildResumeContext,
+  determineResumeIteration,
+  type ResumeOptions,
+  type ResumeResult,
+  resume,
+} from "./resume.js";
 export { emitCmd as emit };
 
 export async function runParallelBranchCli(
@@ -435,6 +524,16 @@ async function runReviewThenIterate(
   const verdict = reviewed.lastVerdict;
 
   if (verdict) {
+    // Fail-closed: an UNKNOWN verdict carries no trustworthy signal. Never let
+    // it advance the loop like CONTINUE — route it by on_error.
+    if (
+      verdict.verdict === "UNKNOWN" &&
+      reviewed.review.onError !== "continue"
+    ) {
+      if (reviewed.review.onError === "exit")
+        return completeLoop(reviewed, iteration, "verdict_unknown");
+      return stopReviewUnknown(reviewed, iteration, verdict.reasoning);
+    }
     if (verdict.verdict === "EXIT")
       return completeLoop(reviewed, iteration, "verdict_exit");
     if (verdict.verdict === "TAKEOVER")
@@ -464,6 +563,17 @@ async function runReviewThenIterate(
     );
     const stall = detectStall(runLines, reviewed.limits.stallIterations ?? 0);
     if (stall.stalled) {
+      // A stall with authorized work remaining and no blocker is a premature
+      // quit (announce-then-halt / drift-stop), not a legitimate stop. Re-arm
+      // it (bounded) with a nudge, then escalate to attention if it persists.
+      const pq = detectPrematureQuit(reviewed, runLines);
+      if (pq.premature) {
+        if (countRearms(runLines) < (reviewed.limits.prematureMaxRearms ?? 1)) {
+          rearmPrematureQuit(reviewed, iteration - 1, pq);
+          return runIteration(reviewed, iteration, recurse);
+        }
+        return stopPrematureQuit(reviewed, iteration - 1, pq.reasons);
+      }
       return stopStalled(reviewed, iteration - 1, stall.repeats);
     }
     const budget = checkCostBudget(runLines, reviewed.limits.maxCostUsd ?? 0);
@@ -495,7 +605,7 @@ function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
   return iterateWith(loop, iteration, iterate);
 }
 
-function buildControlAdapter(
+export function buildControlAdapter(
   loop: LoopContext,
 ): LiveControlAdapter | undefined {
   if (loop.backend.kind === "acp") {

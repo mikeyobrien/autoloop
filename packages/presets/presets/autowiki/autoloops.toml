@@ -1,0 +1,54 @@
+# OKF Wiki Pipeline — autoloop preset
+# Per-unit chain (topology-driven): each source goes clean -> write -> summarize ->
+# synthesize -> compare -> lint -> index -> merge; after sources drain, each query goes
+# query -> index -> merge. `advance` keeps the queue and is the real stop (open-tasks gate).
+
+event_loop.max_iterations = 400          # generous; the open-tasks gate is the real stop
+event_loop.completion_event = "queue.done"
+event_loop.completion_promise = "LOOP_COMPLETE"
+# No `required_events`: synthesis is already forced per source by the topology, and a
+# query-only / nothing-pending re-run legitimately completes without one (don't deadlock it).
+
+# claude-sdk backend = fresh session per role = free context isolation
+# (cleaner's noisy raw content never reaches the write role's window).
+backend.kind = "claude-sdk"
+backend.command = "claude"
+backend.model = "sonnet"                 # loop runs on Sonnet
+backend.trust_all_tools = true           # needs git/clone/browser tools
+backend.timeout_ms = 3000000
+# Remove the built-in web tools so the cleaner MUST use agent-browser (real Chrome)
+# for capture. A prompt alone doesn't stop the agent reaching for WebFetch; this
+# takes the tool away entirely (hard block, even under trust_all_tools).
+backend.disallowed_tools = "WebFetch, WebSearch"
+
+# The topology drives the whole per-unit chain; disable autoloop's built-in metareview so it
+# doesn't splice an extra critic pass into the loop.
+review.enabled = false
+
+memory.prompt_budget_chars = 8000
+harness.instructions_file = "harness.md"
+
+# DETERMINISTIC BOOTSTRAP: run okf-init.sh ONCE before the loop, every run. It creates/refreshes
+# the git repo, OKF folders, queue files, pre-commit hook, the agent skills, AND the vault's copy
+# of the okf-*.sh scripts — so an updated preset (new/changed scripts) always lands, even on a
+# resume of an existing vault. This was previously the advance role's job, but the agent would
+# sometimes SKIP it on a built vault (leaving stale scripts → e.g. refresh mode silently no-op'd).
+# A hook is deterministic; with strict=true a missing env var (AUTOWIKI_NAME / a queue file)
+# aborts the run with okf-init's error instead of limping on. {{PRESET_DIR}} resolves to the
+# installed preset dir; the hook runs in the vault (work dir) with the AUTOWIKI_* env passed through.
+hooks.pre_run = "sh {{PRESET_DIR}}/scripts/okf-init.sh"
+hooks.strict = true
+
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
+
+# NOTE: no `post_iteration` hook. A post_iteration hook writes a `hook.output`
+# event every iteration, which the router treats as a routing emit and rejects —
+# resetting routing to loop.start and wedging an event-driven loop. So the cleaner
+# deletes its own GitHub clone (under {{STATE_DIR}}/scratch/repo) at the end of its
+# turn instead of relying on a hook.
+
+# Your OKF wiki validator runs as a git pre-commit hook in the wiki repo itself —
+# that's the hard shell gate on every role's commit. autoloop events handle flow;
+# the git hook handles the must-pass check.

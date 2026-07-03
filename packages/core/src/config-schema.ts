@@ -32,12 +32,31 @@ export function defaults(): Config {
       max_iteration_runtime: "0",
       // Loop wall-clock budget ("12h", "3d", or ms int; 0 = disabled).
       max_runtime: "0",
+      // Human-in-the-loop: when an agent emits this event, the loop blocks for
+      // an operator response (via the `respond` control verb) up to ask_timeout,
+      // then injects the answer into the next prompt. Empty ask_event disables.
+      ask_event: "human.ask",
+      ask_timeout: "5m",
     },
-    backend: { kind: "", command: "claude", timeout_ms: "300000" },
+    backend: {
+      kind: "",
+      command: "claude",
+      timeout_ms: "300000",
+      // CSV of tool names to remove from the claude-sdk agent (e.g.
+      // "WebFetch,WebSearch"). Empty = no restriction.
+      disallowed_tools: "",
+    },
     parallel: {
       enabled: "false",
       max_branches: "3",
       branch_timeout_ms: "180000",
+    },
+    hooks: {
+      pre_run: "",
+      pre_iteration: "",
+      post_iteration: "",
+      post_run: "",
+      strict: "false",
     },
     memory: { prompt_budget_chars: "8000" },
     core: {

@@ -127,4 +127,45 @@ describe("runInlineChain option propagation", () => {
 
     expect(runOptions.noWorktree).toBe(true);
   });
+
+  it("forwards --events onEvent sink through to chains.runChain", async () => {
+    await dispatchRun(
+      [
+        "--chain",
+        "autocode,autoqa",
+        "--events",
+        "/tmp/al-chain-events.ndjson",
+        ".",
+      ],
+      [],
+      ".",
+      "autoloop",
+    );
+
+    expect(chains.runChain).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(chains.runChain).mock.calls[0];
+    const runOptions = callArgs[3];
+
+    // The sink is threaded as onEvent so chain steps also land on the stream.
+    expect(typeof runOptions.onEvent).toBe("function");
+  });
+
+  it("forwards --events onEvent sink through the --automerge chain", async () => {
+    await dispatchRun(
+      [
+        "autocode",
+        "--automerge",
+        "--events",
+        "/tmp/al-automerge-events.ndjson",
+      ],
+      [],
+      ".",
+      "autoloop",
+    );
+
+    expect(chains.runChain).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(chains.runChain).mock.calls[0];
+    const runOptions = callArgs[3];
+    expect(typeof runOptions.onEvent).toBe("function");
+  });
 });

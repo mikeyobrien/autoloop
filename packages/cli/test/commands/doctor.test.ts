@@ -49,6 +49,25 @@ describe("doctor", () => {
     expect(check("worktrees").status).toBe("ok");
   });
 
+  it("flags a trivial/un-falsifiable completion contract", () => {
+    // No verify_cmds, no required_events, trivial promise → un-falsifiable.
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      '[event_loop]\ncompletion_promise = "done"\n',
+    );
+    const c = check("completion-contract");
+    expect(c.status).toBe("warn");
+    expect(c.detail).toContain("unfalsifiable_completion");
+  });
+
+  it("passes a well-formed completion contract (deterministic check)", () => {
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      '[acceptance]\nverify_cmd = "npm test"\n',
+    );
+    expect(check("completion-contract").status).toBe("ok");
+  });
+
   it("warns when the state dir does not exist yet", () => {
     rmSync(stateDir, { recursive: true, force: true });
     const checks = runDoctorChecks(projectDir);

@@ -8,6 +8,12 @@ const CORE = resolve(import.meta.dirname, "packages/core/src");
 const HARNESS = resolve(import.meta.dirname, "packages/harness/src");
 const BACKENDS = resolve(import.meta.dirname, "packages/backends/src");
 const DASHBOARD = resolve(import.meta.dirname, "packages/dashboard/src");
+const ISSUE_SYNC_CORE = resolve(
+  import.meta.dirname,
+  "packages/issue-sync-core/src",
+);
+const GH_SYNC = resolve(import.meta.dirname, "packages/gh-sync/src");
+const LINEAR_SYNC = resolve(import.meta.dirname, "packages/linear-sync/src");
 
 export default defineConfig({
   resolve: {
@@ -23,6 +29,8 @@ export default defineConfig({
       "@mobrienv/autoloop-core/journal-format": `${CORE}/journal-format.ts`,
       "@mobrienv/autoloop-core/journal": `${CORE}/journal.ts`,
       "@mobrienv/autoloop-core/topology": `${CORE}/topology.ts`,
+      "@mobrienv/autoloop-core/fanout": `${CORE}/fanout.ts`,
+      "@mobrienv/autoloop-core/concurrency": `${CORE}/concurrency.ts`,
       "@mobrienv/autoloop-core/registry/discover": `${CORE}/registry/discover.ts`,
       "@mobrienv/autoloop-core/registry/read": `${CORE}/registry/read.ts`,
       "@mobrienv/autoloop-core/registry/types": `${CORE}/registry/types.ts`,
@@ -51,9 +59,20 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/wave/parse-objectives": `${HARNESS}/wave/parse-objectives.ts`,
       "@mobrienv/autoloop-harness/registry-bridge": `${HARNESS}/registry-bridge.ts`,
       "@mobrienv/autoloop-harness/pi-adapter": `${HARNESS}/pi-adapter.ts`,
+      "@mobrienv/autoloop-harness/control/render": `${HARNESS}/control/render.ts`,
+      "@mobrienv/autoloop-harness/control/types": `${HARNESS}/control/types.ts`,
+      "@mobrienv/autoloop-harness/control/queue": `${HARNESS}/control/queue.ts`,
+      "@mobrienv/autoloop-harness/control/capabilities": `${HARNESS}/control/capabilities.ts`,
+      "@mobrienv/autoloop-harness/control/dispatch": `${HARNESS}/control/dispatch.ts`,
+      "@mobrienv/autoloop-harness/control/paths": `${HARNESS}/control/paths.ts`,
+      "@mobrienv/autoloop-harness/control/adapter": `${HARNESS}/control/adapter.ts`,
+      "@mobrienv/autoloop-harness/control/kiro-adapter": `${HARNESS}/control/kiro-adapter.ts`,
+      "@mobrienv/autoloop-harness/control/pi-adapter": `${HARNESS}/control/pi-adapter.ts`,
+      "@mobrienv/autoloop-harness/control": `${HARNESS}/control/index.ts`,
       "@mobrienv/autoloop-harness/types": `${HARNESS}/types.ts`,
       "@mobrienv/autoloop-harness/events": `${HARNESS}/events.ts`,
       "@mobrienv/autoloop-harness/emit": `${HARNESS}/emit.ts`,
+      "@mobrienv/autoloop-harness/ask": `${HARNESS}/ask.ts`,
       "@mobrienv/autoloop-harness/artifacts": `${HARNESS}/artifacts.ts`,
       "@mobrienv/autoloop-harness/config-helpers": `${HARNESS}/config-helpers.ts`,
       "@mobrienv/autoloop-harness/coordination": `${HARNESS}/coordination.ts`,
@@ -62,15 +81,35 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/guards": `${HARNESS}/guards.ts`,
       "@mobrienv/autoloop-harness/scratchpad": `${HARNESS}/scratchpad.ts`,
       "@mobrienv/autoloop-harness/metareview": `${HARNESS}/metareview.ts`,
+      "@mobrienv/autoloop-harness/acceptance": `${HARNESS}/acceptance.ts`,
+      "@mobrienv/autoloop-harness/postconditions": `${HARNESS}/postconditions.ts`,
+      "@mobrienv/autoloop-harness/provisional": `${HARNESS}/provisional.ts`,
+      "@mobrienv/autoloop-harness/tamper": `${HARNESS}/tamper.ts`,
+      "@mobrienv/autoloop-harness/git-diff": `${HARNESS}/git-diff.ts`,
+      "@mobrienv/autoloop-harness/circuit-breaker": `${HARNESS}/circuit-breaker.ts`,
+      "@mobrienv/autoloop-harness/intent": `${HARNESS}/intent.ts`,
+      "@mobrienv/autoloop-harness/premature-quit": `${HARNESS}/premature-quit.ts`,
+      "@mobrienv/autoloop-harness/progress": `${HARNESS}/progress.ts`,
+      "@mobrienv/autoloop-harness/postfire-verify": `${HARNESS}/postfire-verify.ts`,
+      "@mobrienv/autoloop-harness/completion-lint": `${HARNESS}/completion-lint.ts`,
+      "@mobrienv/autoloop-harness/iteration-diff": `${HARNESS}/iteration-diff.ts`,
       "@mobrienv/autoloop-harness/parallel": `${HARNESS}/parallel.ts`,
+      "@mobrienv/autoloop-harness/fanout-runner": `${HARNESS}/fanout-runner.ts`,
       "@mobrienv/autoloop-harness/iteration": `${HARNESS}/iteration.ts`,
       "@mobrienv/autoloop-harness/tools": `${HARNESS}/tools.ts`,
       "@mobrienv/autoloop-harness/prompt": `${HARNESS}/prompt.ts`,
       "@mobrienv/autoloop-harness": `${HARNESS}/index.ts`,
+      "@mobrienv/autoloop-issue-sync-core": `${ISSUE_SYNC_CORE}/index.ts`,
+      "@mobrienv/autoloop-gh-sync": `${GH_SYNC}/index.ts`,
+      "@mobrienv/autoloop-linear-sync": `${LINEAR_SYNC}/index.ts`,
     },
   },
   test: {
     include: ["test/**/*.test.ts", "packages/*/test/**/*.test.ts"],
+    // Hermetic env: isolate from the developer's global autoloop config + local TZ
+    // so the suite is reproducible (see test/setup/hermetic-env.ts).
+    setupFiles: ["./test/setup/hermetic-env.ts"],
+    env: { TZ: "UTC" },
     // Integration tests under test/worktree and test/integration spawn git/node
     // subprocesses. Cap worker pool so subprocess-heavy tests don't starve each
     // other; bump testTimeout to absorb spiky CI/load.

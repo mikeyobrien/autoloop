@@ -20,6 +20,7 @@ import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 export function cliPrintEvent(event: LoopEvent): void {
   switch (event.type) {
     case "log":
+    case "loop.start":
     case "iteration.start":
     case "loop.finish":
       // Already handled (log → stderr in display.ts) or SDK-only markers.
@@ -56,6 +57,15 @@ export function cliPrintEvent(event: LoopEvent): void {
       return;
     case "review.banner":
       printReviewBanner(event.iteration);
+      return;
+    case "ask.pending":
+      process.stderr.write(
+        `\n[ask] waiting for a human response (id=${event.questionId}): ${event.question}\n` +
+          `      respond with: autoloop control respond ${event.runId} ${event.questionId} "<answer>"\n\n`,
+      );
+      return;
+    case "ask.answered":
+      // SDK-only marker; the answer is injected into the next prompt.
       return;
     case "backend.output":
       printBackendOutputTail(event.output, event.maxLines);

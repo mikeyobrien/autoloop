@@ -57,9 +57,12 @@ vi.mock("../../src/registry-bridge.js", () => ({
 import { run } from "@mobrienv/autoloop-harness";
 import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 
-function makeProject(): string {
+function makeProject(maxIterations?: number): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-events-test-"));
-  writeFileSync(join(dir, "autoloops.toml"), '[backend]\ncommand = "echo"\n');
+  writeFileSync(
+    join(dir, "autoloops.toml"),
+    `${maxIterations === undefined ? "" : `[event_loop]\nmax_iterations = ${maxIterations}\n\n`}[backend]\ncommand = "echo"\n`,
+  );
   writeFileSync(join(dir, "topology.toml"), '[[role]]\nname = "builder"\n');
   mkdirSync(join(dir, ".autoloop"), { recursive: true });
   return dir;
@@ -80,6 +83,55 @@ describe("harness.run onEvent (1.3)", () => {
     expect(types).toContain("loop.finish");
     const finish = events.find((e) => e.type === "loop.finish");
     expect(finish).toMatchObject({ stopReason: "completed", iterations: 1 });
+  });
+
+  it("emits a loop.start event with the resolved run parameters", async () => {
+    const events: LoopEvent[] = [];
+    await run(makeProject(), "build the thing", "autoloop", {
+      onEvent: (e) => events.push(e),
+    });
+    const start = events.find((e) => e.type === "loop.start");
+    expect(start).toBeDefined();
+    expect(start).toMatchObject({
+      type: "loop.start",
+      prompt: "build the thing",
+      backend: "echo",
+      preset: expect.any(String),
+      maxIterations: expect.any(Number),
+    });
+    // runId and workDir are resolved, non-empty strings.
+    if (start?.type === "loop.start") {
+      expect(start.runId.length).toBeGreaterThan(0);
+      expect(start.workDir.length).toBeGreaterThan(0);
+    }
+    // loop.start must precede the first iteration.start.
+    const startIdx = events.findIndex((e) => e.type === "loop.start");
+    const iterIdx = events.findIndex((e) => e.type === "iteration.start");
+    expect(startIdx).toBeGreaterThanOrEqual(0);
+    expect(startIdx).toBeLessThan(iterIdx);
+  });
+
+  it("does not emit iteration.start past max_iterations", async () => {
+    runIteration.mockImplementationOnce((_loop, _iter, recurse) =>
+      recurse(_loop, 2),
+    );
+
+    const events: LoopEvent[] = [];
+    await run(makeProject(1), "prompt", "autoloop", {
+      onEvent: (e) => events.push(e),
+    });
+
+    const starts = events.filter((e) => e.type === "iteration.start");
+    expect(starts).toHaveLength(1);
+    expect(starts[0]).toMatchObject({ iteration: 1, maxIterations: 1 });
+    expect(events).not.toContainEqual(
+      expect.objectContaining({ type: "iteration.start", iteration: 2 }),
+    );
+    const finish = events.find((e) => e.type === "loop.finish");
+    expect(finish).toMatchObject({
+      stopReason: "max_iterations",
+      iterations: 1,
+    });
   });
 
   it("emits log events with the message and level", async () => {

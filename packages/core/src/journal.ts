@@ -1,11 +1,16 @@
 import {
-  appendFileSync,
+  closeSync,
   existsSync,
+  fsyncSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
+  renameSync,
+  writeSync,
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { decodeEvent } from "./events/decode.js";
 import { encodeEvent } from "./events/encode.js";
 import {
   extractField as jsonExtractField,
@@ -102,12 +107,27 @@ function parsedFieldsRaw(fieldsJson: string): Record<string, unknown> {
   }
 }
 
+/**
+ * A line is a well-formed journal record iff it parses as a JSON object (the
+ * journal contract). A torn write (crash mid-append) yields invalid JSON, so
+ * this is the integrity check used to quarantine corruption on read.
+ */
+export function isValidJournalLine(line: string): boolean {
+  return decodeEvent(line) !== null;
+}
+
+/**
+ * Validate-on-read: malformed/torn lines (e.g. a partial last record after a
+ * `kill -9`) are skipped rather than allowed to poison consumers. This keeps a
+ * corrupt journal non-fatal; `quarantineJournal` physically sets the bad lines
+ * aside for recovery.
+ */
 export function readLines(path: string): string[] {
   const text = readIfExists(path);
   return text
     .split(lineSep())
     .map((l) => l.trim())
-    .filter((l) => l !== "");
+    .filter((l) => l !== "" && isValidJournalLine(l));
 }
 
 export function readRunLines(path: string, runId: string): string[] {
@@ -242,10 +262,73 @@ function extractTimestamp(line: string): string {
   return extractField(line, "timestamp") || extractField(line, "ts") || "";
 }
 
+/**
+ * Durable append: write the record and fsync it to disk before returning, so a
+ * crash immediately after the call cannot lose an acknowledged record. Each
+ * `appendEvent` writes exactly one newline-terminated line; fsync makes that
+ * line durable. fsync is best-effort — some filesystems reject it on a regular
+ * file fd, in which case the write has still landed in the page cache.
+ */
 export function appendText(path: string, content: string): void {
   const dir = dirname(path);
   mkdirSync(dir, { recursive: true });
-  appendFileSync(path, content, "utf-8");
+  const fd = openSync(path, "a");
+  try {
+    writeSync(fd, content);
+    try {
+      fsyncSync(fd);
+    } catch {
+      /* fsync unsupported on this fd/FS; the write itself still succeeded */
+    }
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Atomically replace a file's contents: write a sibling temp file, fsync it,
+ * then rename over the target (rename is atomic on POSIX). A crash leaves
+ * either the old file or the new one, never a half-written target.
+ */
+export function atomicWriteFile(path: string, content: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp`;
+  const fd = openSync(tmp, "w");
+  try {
+    writeSync(fd, content);
+    try {
+      fsyncSync(fd);
+    } catch {
+      /* best-effort durability */
+    }
+  } finally {
+    closeSync(fd);
+  }
+  renameSync(tmp, path);
+}
+
+/**
+ * Move torn/malformed lines out of the journal into `<path>.quarantine` and
+ * atomically rewrite the journal with only the valid records. Idempotent: a
+ * clean journal is left untouched (no rewrite, no quarantine file). Returns the
+ * number of quarantined lines. Use at run start and from `doctor --repair` so a
+ * poisoned journal self-heals instead of wedging the run.
+ */
+export function quarantineJournal(path: string): { quarantined: number } {
+  if (!existsSync(path)) return { quarantined: 0 };
+  const lines = readIfExists(path).split(lineSep());
+  const valid: string[] = [];
+  const corrupt: string[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line === "") continue;
+    if (isValidJournalLine(line)) valid.push(line);
+    else corrupt.push(line);
+  }
+  if (corrupt.length === 0) return { quarantined: 0 };
+  appendText(`${path}.quarantine`, `${corrupt.join("\n")}\n`);
+  atomicWriteFile(path, valid.length ? `${valid.join("\n")}\n` : "");
+  return { quarantined: corrupt.length };
 }
 
 export function readIfExists(path: string): string {

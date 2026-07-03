@@ -33,7 +33,13 @@ export type StopReasonClass = "completed" | "failed" | "stopped";
 export function classifyStopReason(stopReason: string): StopReasonClass {
   if (stopReason === "completed" || stopReason.startsWith("completion"))
     return "completed";
-  if (stopReason === "backend_failed" || stopReason === "backend_timeout")
+  if (
+    stopReason === "backend_failed" ||
+    stopReason === "backend_timeout" ||
+    // A held loop (UNKNOWN metareview verdict) needs human attention, so it
+    // rides the same notify class as a failure rather than a quiet stop.
+    stopReason === "review_unknown"
+  )
     return "failed";
   return "stopped";
 }
@@ -80,9 +86,12 @@ export function runFinishNotification(
     });
 
     if (result.error || result.status !== 0) {
-      const detail = result.error
-        ? result.error.message
-        : `exit ${result.status ?? `signal ${result.signal}`}: ${result.stderr?.toString() ?? ""}`;
+      const detail =
+        result.status !== null
+          ? `exit ${result.status}: ${result.stderr?.toString() ?? ""}`
+          : result.error
+            ? result.error.message
+            : `signal ${result.signal}: ${result.stderr?.toString() ?? ""}`;
       journalFailed(opts, command, detail);
       return { status: "failed", detail: tail(detail, 200) };
     }

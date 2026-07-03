@@ -233,6 +233,7 @@ Bundled presets give you opinionated starting points for common workflows like c
 | `autospec` | Research, clarify, design, plan, and critique specifications |
 | `automerge` | Merge a completed worktree branch back into its base branch |
 | `autopr` | Turn the current branch into a reviewable pull request |
+| `autowiki` | Ingest a queue of source URLs into an OKF-conformant LLM wiki of cross-linked concept pages |
 
 ## Creating custom presets
 

@@ -10,6 +10,22 @@ export type LoopEvent =
   // Structural — SDK consumers care about these.
   | { type: "log"; level: string; message: string }
   | {
+      // Emitted once, before the first iteration, carrying the resolved run
+      // identity and launch parameters. SDK consumers (e.g. the ACP bridge)
+      // use it to render a "this is what we're doing" header and to name the
+      // session/tool call after the run id.
+      type: "loop.start";
+      runId: string;
+      prompt: string;
+      workDir: string;
+      projectDir: string;
+      preset: string;
+      backend: string;
+      maxIterations: number;
+      completionEvent: string;
+      completionPromise: string;
+    }
+  | {
       type: "iteration.start";
       iteration: number;
       maxIterations: number;
@@ -20,6 +36,7 @@ export type LoopEvent =
       iterations: number;
       stopReason: string;
       runId: string;
+      costUsd: number;
     }
   // Display-requested — the harness asks the caller to render something.
   | {
@@ -42,6 +59,21 @@ export type LoopEvent =
       outcome: string;
     }
   | { type: "review.banner"; iteration: number }
+  // Human-in-the-loop: the loop is paused on a question / has received an answer.
+  | {
+      type: "ask.pending";
+      runId: string;
+      iteration: number;
+      questionId: string;
+      question: string;
+    }
+  | {
+      type: "ask.answered";
+      runId: string;
+      iteration: number;
+      questionId: string;
+      answer: string;
+    }
   | { type: "backend.output"; output: string; maxLines?: number }
   | { type: "failure.diagnostic"; output: string; stopReason: string }
   | {
@@ -49,6 +81,7 @@ export type LoopEvent =
       runId: string;
       iterations: number;
       stopReason: string;
+      costUsd: number;
       journalFile: string;
       memoryFile: string;
       reviewEvery: number;

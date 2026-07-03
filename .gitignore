@@ -4,6 +4,7 @@ agents.toml
 dist/
 *.tsbuildinfo
 .autoloop/
+.understand-anything/
 .tonic/
 .agents/
 test-results/
@@ -14,3 +15,4 @@ kiro-loop.sh
 docs/.vitepress/dist
 docs/.vitepress/cache
 .hermes/
+.beads/

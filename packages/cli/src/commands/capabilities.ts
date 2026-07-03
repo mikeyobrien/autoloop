@@ -6,6 +6,7 @@
 // Output is JSON-only and deterministic (no timestamps, stable ordering).
 
 import { createRequire } from "node:module";
+import { JOURNAL_CONTRACT_VERSION } from "@mobrienv/autoloop-core";
 import { EXIT_ENV, EXIT_OK, EXIT_USAGE } from "../cli/fail.js";
 
 export const CONTRACT_VERSION = 1;
@@ -72,10 +73,23 @@ export function commandCapabilities(): CommandCapability[] {
       mutating: false,
     },
     {
+      name: "verify",
+      summary:
+        "Independently re-run a completed run's deterministic acceptance checks",
+      json: true,
+      mutating: false,
+    },
+    {
       name: "doctor",
       summary: "Environment and state diagnostics",
       json: true,
       mutating: false,
+    },
+    {
+      name: "preset",
+      summary: "Promote a single-file preset into a named user preset",
+      json: false,
+      mutating: true,
     },
     {
       name: "memory",
@@ -164,6 +178,7 @@ export function capabilitiesJson(): string {
       name: "autoloop",
       version: cliVersion(),
       contract_version: CONTRACT_VERSION,
+      journal_contract_version: JOURNAL_CONTRACT_VERSION,
       exit_codes: {
         [String(EXIT_OK)]: "success",
         [String(EXIT_USAGE)]:
@@ -181,6 +196,8 @@ export function capabilitiesJson(): string {
         stderr: "diagnostics, warnings, and errors",
         json_flag:
           "--json on: list, loops, loops health, stats, doctor, chain run, config show, triage",
+        events_stream:
+          "run --events <path>: NDJSON LoopEvent stream (incl. progress + final loop.finish/summary)",
       },
       commands: commandCapabilities(),
     },

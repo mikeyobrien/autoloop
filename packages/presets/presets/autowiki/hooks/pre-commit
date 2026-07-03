@@ -1,0 +1,102 @@
+#!/bin/sh
+# OKF wiki pre-commit gate (POSIX sh + awk — no Node / module-type dependency).
+#
+# THE rule (per OKF): every staged Markdown file must have YAML frontmatter with a
+# non-empty `type`. OKF is otherwise permissive — extra fields are fine, and we don't
+# check for broken links. The ONE style gate beyond `type`: no Obsidian `[[wikilinks]]`
+# in wiki content (this vault standardizes on relative md links for portability — they
+# render outside Obsidian too, e.g. on GitHub). Agents kept defaulting to wikilinks, so
+# it's enforced deterministically here rather than left to prompts.
+#
+# `sources/raw/` is exempt: those are verbatim original captures (provenance), not OKF docs,
+# and may be Markdown without frontmatter. The agent-tooling files are exempt too — they use
+# skill `name`/`description` frontmatter (or none), not OKF `type`: `AGENTS.md`, the
+# `.agents/` workflow docs, and `.claude/` (whose SKILL.md files symlink into `.agents/`).
+# Everything else — the wiki and `sources/clean/` — must conform.
+#
+# Install into your wiki repo (one of):
+#   cp hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# or, to keep it tracked:
+#   mkdir -p .githooks && cp hooks/pre-commit .githooks/ && chmod +x .githooks/pre-commit
+#   git config core.hooksPath .githooks
+#
+# Validates the STAGED blob (`git show :path`), not the working tree — that's what
+# the commit will actually contain. Covers Added/Copied/Modified/Renamed files.
+
+set -u
+fail=0
+
+# Staged Markdown files, NUL-separated (safe for spaces), one per line after tr.
+files=$(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
+
+OLDIFS=$IFS
+IFS='
+'
+for f in $files; do
+  # Markdown only.
+  case "$f" in
+    *.md | *.MD | *.md~) : ;;
+    *.[Mm][Dd]) : ;;
+    *) continue ;;
+  esac
+  # Exempt raw captures and agent tooling (skills/workflow docs are not OKF wiki docs).
+  case "$f" in
+    sources/raw/*) continue ;;
+    AGENTS.md) continue ;;
+    .agents/*) continue ;;
+    .claude/*) continue ;;
+  esac
+
+  # \047 = single quote, \042 = double quote — octal escapes keep the awk program
+  # free of literal quotes (no sh-quoting pain).
+  problem=$(git show ":$f" 2>/dev/null | awk '
+    BEGIN { state = 0; found = 0; bad = "" }
+    NR == 1 {
+      if ($0 ~ /^---[\r]?$/) { state = 1; next }
+      bad = "no YAML frontmatter (file must start with a --- line)"
+    }
+    state == 1 && $0 ~ /^---[\r]?$/ { state = 2; next }
+    state == 1 {
+      if ($0 ~ /^type:/) {
+        v = $0
+        sub(/^type:[ \t]*/, "", v)
+        gsub(/[\047\042]/, "", v)     # strip surrounding quotes
+        sub(/[ \t\r]+$/, "", v)
+        sub(/^[ \t]+/, "", v)
+        if (v != "") found = 1
+      }
+    }
+    END {
+      if (bad != "") { print bad; exit }
+      if (NR == 0) { print "empty file"; exit }
+      if (state == 1) { print "unterminated frontmatter (no closing ---)"; exit }
+      if (!found) { print "missing or empty `type` in frontmatter"; exit }
+    }
+  ')
+
+  if [ -n "$problem" ]; then
+    echo "  $f: $problem" >&2
+    fail=1
+  fi
+
+  # Reject Obsidian [[wikilinks]] in wiki content — OKF/portability wants relative md links
+  # (`[text](../dir/name.md)`). The `[^ ]` after `[[` avoids false-flagging bash test syntax
+  # `[[ -n "$x" ]]` (which always has a space after `[[`), so code examples about hooks pass.
+  wl=$(git show ":$f" 2>/dev/null | grep -nE '\[\[[^ ]' | head -1)
+  if [ -n "$wl" ]; then
+    echo "  $f: [[wikilink]] not allowed — use a relative link [text](../dir/name.md). First at line $wl" >&2
+    fail=1
+  fi
+done
+IFS=$OLDIFS
+
+if [ "$fail" -ne 0 ]; then
+  echo "OKF pre-commit gate failed — fix frontmatter before committing." >&2
+  echo "Every Markdown file (except sources/raw/) needs YAML frontmatter with a" >&2
+  echo "non-empty \`type\`, e.g.:" >&2
+  echo "  ---" >&2
+  echo "  type: concept" >&2
+  echo "  ---" >&2
+  exit 1
+fi
+exit 0

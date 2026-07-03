@@ -168,6 +168,11 @@ describe("registryComplete", () => {
     expect(r.stop_reason).toBe("task.complete");
     expect(r.latest_event).toBe("loop.complete");
     expect(r.iteration).toBe(5);
+    // Verified-outcome ledger: a completed run is gate-verified.
+    expect(r.outcome).toBe("verified");
+    expect(r.acceptance_verified).toBe(true);
+    expect(typeof r.cost_usd).toBe("number");
+    expect(r.verdict).toBe("");
   });
 });
 
@@ -198,5 +203,23 @@ describe("registryStop", () => {
     const r = readLines()[1];
     expect(r.status).toBe("stopped");
     expect(r.stop_reason).toBe("max_iterations");
+    expect(r.outcome).toBe("stopped");
+    expect(r.acceptance_verified).toBe(false);
+  });
+
+  it("records a held outcome for a review_unknown stop", () => {
+    const loop = makeLoopContext();
+    registryStart(loop);
+    registryStop(loop, 3, "review_unknown");
+    const r = readLines()[1];
+    expect(r.outcome).toBe("held");
+    expect(r.acceptance_verified).toBe(false);
+  });
+
+  it("records a failed outcome for backend failures", () => {
+    const loop = makeLoopContext();
+    registryStart(loop);
+    registryStop(loop, 2, "backend_failed");
+    expect(readLines()[1].outcome).toBe("failed");
   });
 });

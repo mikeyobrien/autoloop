@@ -40,6 +40,7 @@ vi.mock("../../src/metareview.js", () => ({
 vi.mock("../../src/display.js", () => ({
   printSummary: vi.fn(),
   log: vi.fn(),
+  runCostUsd: vi.fn(() => 0),
   printProjectedMarkdown: vi.fn(),
   printProjectedText: vi.fn(),
 }));

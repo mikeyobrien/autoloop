@@ -1,6 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  classifyBackendError,
+  isRetryableErrorClass,
   runAcpIteration,
   runClaudeSdkIteration,
   runPiIteration,
@@ -27,37 +29,63 @@ import type { LoopContext, Verdict, VerdictKind } from "./types.js";
 
 export type { Verdict, VerdictKind };
 
-const DEFAULT_VERDICT: Verdict = {
-  verdict: "CONTINUE",
-  confidence: 0,
-  reasoning: "No structured verdict found; defaulting to CONTINUE",
-};
+/**
+ * Fail-closed default. A reviewer that produces no parseable verdict must never
+ * silently green-light CONTINUE — a transient reviewer outage would otherwise
+ * keep the loop burning tokens with no human signal. UNKNOWN is routed by
+ * `[review].on_error` (hold | exit | continue) instead.
+ */
+function unknownVerdict(reasoning: string, confidence = 0): Verdict {
+  return { verdict: "UNKNOWN", confidence, reasoning };
+}
 
-export function parseVerdict(output: string): Verdict {
+/**
+ * Parse a reviewer's structured verdict, failing closed to UNKNOWN.
+ *
+ * Returns UNKNOWN on empty output, a missing/malformed JSON block, an
+ * unrecognized verdict kind, or — when `minConfidence > 0` — a parsed verdict
+ * whose confidence falls below the threshold. Only a well-formed, sufficiently
+ * confident verdict is returned verbatim.
+ */
+export function parseVerdict(output: string, minConfidence = 0): Verdict {
+  if (!output || !output.trim())
+    return unknownVerdict("Empty review output; failing closed to UNKNOWN");
   const match = output.match(/```(?:json)?\s*\n(\{[\s\S]*?\})\s*\n```/);
-  if (!match) return DEFAULT_VERDICT;
+  if (!match)
+    return unknownVerdict(
+      "No structured verdict block found; failing closed to UNKNOWN",
+    );
+  let parsed: Record<string, unknown>;
   try {
-    const parsed = JSON.parse(match[1]) as Record<string, unknown>;
-    const v = String(parsed.verdict || "").toUpperCase();
-    if (!["CONTINUE", "REDIRECT", "TAKEOVER", "EXIT"].includes(v))
-      return DEFAULT_VERDICT;
-    return {
-      verdict: v as VerdictKind,
-      confidence: Number(parsed.confidence) || 0,
-      reasoning: String(parsed.reasoning || ""),
-      redirect_prompt: parsed.redirect_prompt
-        ? String(parsed.redirect_prompt)
-        : undefined,
-      takeover_output: parsed.takeover_output
-        ? String(parsed.takeover_output)
-        : undefined,
-      suggestions: Array.isArray(parsed.suggestions)
-        ? parsed.suggestions.map(String)
-        : undefined,
-    };
+    parsed = JSON.parse(match[1]) as Record<string, unknown>;
   } catch {
-    return DEFAULT_VERDICT;
+    return unknownVerdict("Malformed verdict JSON; failing closed to UNKNOWN");
   }
+  const v = String(parsed.verdict || "").toUpperCase();
+  if (!["CONTINUE", "REDIRECT", "TAKEOVER", "EXIT"].includes(v))
+    return unknownVerdict(
+      `Unrecognized verdict "${v || "(missing)"}"; failing closed to UNKNOWN`,
+    );
+  const confidence = Number(parsed.confidence) || 0;
+  if (minConfidence > 0 && confidence < minConfidence)
+    return unknownVerdict(
+      `Verdict ${v} confidence ${confidence} below min_confidence ${minConfidence}; downgraded to UNKNOWN`,
+      confidence,
+    );
+  return {
+    verdict: v as VerdictKind,
+    confidence,
+    reasoning: String(parsed.reasoning || ""),
+    redirect_prompt: parsed.redirect_prompt
+      ? String(parsed.redirect_prompt)
+      : undefined,
+    takeover_output: parsed.takeover_output
+      ? String(parsed.takeover_output)
+      : undefined,
+    suggestions: Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.map(String)
+      : undefined,
+  };
 }
 
 export async function maybeRunMetareview(
@@ -138,7 +166,31 @@ export async function runMetareviewReview(
       jsonField("output", output),
   );
 
-  const verdict = parseVerdict(output);
+  // Transient-error quarantine: a verdict produced under an outage (timeout /
+  // 429 / 5xx) carries no trustworthy signal — quarantine it as UNKNOWN
+  // ("could not verify") rather than folding an outage into a confident verdict.
+  // A timeout, or a non-zero reviewer exit whose output classifies as a
+  // retryable transient/rate-limit error, is quarantined; everything else is
+  // parsed normally.
+  const transientClass =
+    !timedOut && exitCode !== 0 ? classifyBackendError(output) : "none";
+  const verdict = timedOut
+    ? unknownVerdict("Review timed out; could not verify (UNKNOWN)")
+    : isRetryableErrorClass(transientClass)
+      ? unknownVerdict(
+          `Review hit a transient ${transientClass} error; could not verify (UNKNOWN)`,
+        )
+      : parseVerdict(output, loop.review.minConfidence);
+
+  if (timedOut || isRetryableErrorClass(transientClass)) {
+    appendEvent(
+      loop.paths.journalFile,
+      loop.runtime.runId,
+      String(iteration),
+      "review.quarantine",
+      jsonField("error_class", timedOut ? "timeout" : transientClass),
+    );
+  }
 
   appendEvent(
     loop.paths.journalFile,
@@ -152,7 +204,17 @@ export async function runMetareviewReview(
       jsonField("reasoning", verdict.reasoning),
   );
 
-  if (verdict.verdict === "REDIRECT" && verdict.redirect_prompt) {
+  if (verdict.verdict === "UNKNOWN") {
+    appendEvent(
+      loop.paths.journalFile,
+      loop.runtime.runId,
+      String(iteration),
+      "review.unknown",
+      jsonField("on_error", loop.review.onError) +
+        ", " +
+        jsonField("reason", verdict.reasoning),
+    );
+  } else if (verdict.verdict === "REDIRECT" && verdict.redirect_prompt) {
     writeFileSync(
       join(loop.paths.stateDir, "redirect.md"),
       verdict.redirect_prompt,

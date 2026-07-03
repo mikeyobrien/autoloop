@@ -51,6 +51,10 @@ describe("classifyStopReason", () => {
     expect(classifyStopReason("backend_timeout")).toBe("failed");
   });
 
+  it("classifies a held UNKNOWN-verdict loop as failed so it surfaces", () => {
+    expect(classifyStopReason("review_unknown")).toBe("failed");
+  });
+
   it("classifies everything else as stopped", () => {
     expect(classifyStopReason("max_iterations")).toBe("stopped");
     expect(classifyStopReason("interrupted")).toBe("stopped");
