@@ -20,6 +20,7 @@ export default defineConfig({
     alias: {
       "@mobrienv/autoloop-core/config-schema": `${CORE}/config-schema.ts`,
       "@mobrienv/autoloop-core/config": `${CORE}/config.ts`,
+      "@mobrienv/autoloop-core/hooks-schema": `${CORE}/hooks-schema.ts`,
       "@mobrienv/autoloop-core/agent-map": `${CORE}/agent-map.ts`,
       "@mobrienv/autoloop-core/profiles": `${CORE}/profiles.ts`,
       "@mobrienv/autoloop-core/tasks-render": `${CORE}/tasks-render.ts`,
@@ -63,6 +64,8 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/wave/types": `${HARNESS}/wave/types.ts`,
       "@mobrienv/autoloop-harness/wave": `${HARNESS}/wave.ts`,
       "@mobrienv/autoloop-harness/registry-bridge": `${HARNESS}/registry-bridge.ts`,
+      "@mobrienv/autoloop-harness/suspend-state": `${HARNESS}/suspend-state.ts`,
+      "@mobrienv/autoloop-harness/hooks": `${HARNESS}/hooks.ts`,
       "@mobrienv/autoloop-harness/pi-adapter": `${HARNESS}/pi-adapter.ts`,
       "@mobrienv/autoloop-harness/control/render": `${HARNESS}/control/render.ts`,
       "@mobrienv/autoloop-harness/control/types": `${HARNESS}/control/types.ts`,

@@ -20,6 +20,7 @@ import {
 } from "@mobrienv/autoloop-core";
 import { loadAgentMap } from "@mobrienv/autoloop-core/agent-map";
 import * as config from "@mobrienv/autoloop-core/config";
+import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import {
   presetCategory,
   resolveIsolationMode,
@@ -673,6 +674,12 @@ export function reloadLoop(loop: LoopContext): LoopContext {
         templateVars,
       ),
       strict: config.get(cfg, "hooks.strict", "false") === "true",
+      specs: expandHookSpecCommands(
+        presetFile
+          ? config.loadHookSpecsFromFile(presetFile)
+          : config.loadHookSpecs(pd),
+        templateVars,
+      ),
     },
     memory: {
       budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
@@ -916,6 +923,18 @@ export function applyRuntimeModeOverrides(loop: LoopContext): LoopContext {
       ),
     },
   };
+}
+
+/** Apply the same template-placeholder expansion legacy hook fields get to
+ * every structured hook spec's command (e.g. `{{PRESET_DIR}}`, `{{TOOL_PATH}}`). */
+function expandHookSpecCommands(
+  specs: HookSpec[],
+  templateVars: Record<string, string>,
+): HookSpec[] {
+  return specs.map((spec) => ({
+    ...spec,
+    command: expandTemplatePlaceholders(spec.command, templateVars),
+  }));
 }
 
 export function initStore(loop: LoopContext): LoopContext {

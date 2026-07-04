@@ -3,7 +3,7 @@
 //
 // 1. A `switch` over every literal, with a `never`-typed `default` — this
 //    makes it a *compile-time* error (caught by `tsc` / vitest's type
-//    checking) to add a 24th literal to `StopReason` without updating the
+//    checking) to add a 25th literal to `StopReason` without updating the
 //    switch here.
 // 2. A source-scan regression test over the known producer files (stop.ts,
 //    index.ts, iteration.ts, provisional.ts, circuit-breaker.ts,
@@ -56,21 +56,22 @@ function isKnownStopReason(reason: StopReason): true {
     case "verdict_takeover":
     case "verdict_unknown":
     case "completion_held":
+    case "suspended":
     case "parallel_wave_timeout":
     case "parallel_wave_failed":
     case "parallel_wave_invalid":
     case "error":
       return true;
     default:
-      // If a 24th literal is ever added to StopReason without a case here,
+      // If a 25th literal is ever added to StopReason without a case here,
       // this line fails to *compile* (never-typed exhaustiveness check).
       return assertExhaustive(reason);
   }
 }
 
 describe("StopReason exhaustiveness", () => {
-  it("has exactly the 24 documented literals (23 from the issue + parallel_wave_invalid)", () => {
-    expect(STOP_REASONS.length).toBe(24);
+  it("has exactly the 25 documented literals (23 from the issue + parallel_wave_invalid + suspended from lifecycle hooks)", () => {
+    expect(STOP_REASONS.length).toBe(25);
     expect(new Set(STOP_REASONS).size).toBe(STOP_REASONS.length);
   });
 

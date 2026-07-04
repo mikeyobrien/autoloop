@@ -45,7 +45,7 @@ import { piControlAdapter } from "./control/pi-adapter.js";
 import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
-import { buildHookEnv, runHook } from "./hooks.js";
+import { buildHookEnv, runPhaseHooks } from "./hooks.js";
 import { journalAcceptanceContract } from "./intent.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
@@ -73,7 +73,9 @@ import {
   stopPrematureQuit,
   stopReviewUnknown,
   stopStalled,
+  stopSuspended,
 } from "./stop.js";
+import { readSuspendState, resumeRequested } from "./suspend-state.js";
 import type {
   LoopContext,
   RunOptions,
@@ -108,11 +110,37 @@ export async function run(
     /* best-effort: readLines already skips corrupt lines, so this is belt-and-suspenders */
   }
   installRuntimeTools(loop);
+
+  // A durable suspend from a prior run still pending (no resume-requested
+  // signal dropped yet) must block a fresh `run` from starting over the same
+  // state dir — the operator needs to resolve it first via `autoloop resume`
+  // or `autoloop hooks clear-suspend`.
+  const pendingSuspend = readSuspendState(loop.paths.stateDir);
+  if (pendingSuspend && !resumeRequested(loop.paths.stateDir)) {
+    throw new Error(
+      `run suspended (phase=${pendingSuspend.phase}, reason=${pendingSuspend.reason}); ` +
+        "resolve with `autoloop resume` or clear it with `autoloop hooks clear-suspend` before starting a new run",
+    );
+  }
+
   appendLoopStart(loop);
   // Bind the acceptance contract (intent) at loop start so the deterministic
   // gate keys its criteria off what was asked.
   journalAcceptanceContract(loop);
-  runHook(loop, "pre_run", loop.hooks.preRun, buildHookEnv(loop));
+  const preRunResult = await runPhaseHooks(loop, "pre_run", buildHookEnv(loop));
+  if (preRunResult.blocked) {
+    throw new Error(
+      `Aborting run: ${preRunResult.blockedMessage ?? "pre_run hook blocked"}`,
+    );
+  }
+  if (preRunResult.suspended) {
+    const summary = stopSuspended(
+      loop,
+      0,
+      preRunResult.blockedMessage ?? "pre_run hook suspended the run",
+    );
+    return summary;
+  }
   registryStart(loop);
   loop.controlAdapter = buildControlAdapter(loop);
   if (loop.controlAdapter) {
@@ -362,12 +390,16 @@ export async function driveLoop(
     }
   }
 
-  runHook(
+  const postRunResult = await runPhaseHooks(
     loop,
     "post_run",
-    loop.hooks.postRun,
     buildHookEnv(loop, { stopReason: summary.stopReason }),
   );
+  if (postRunResult.blocked) {
+    throw new Error(
+      `post_run hook failed: ${postRunResult.blockedMessage ?? "post_run hook blocked"}`,
+    );
+  }
   runFinishNotification({
     projectDir: loop.paths.mainProjectDir,
     journalFile: loop.paths.journalFile,

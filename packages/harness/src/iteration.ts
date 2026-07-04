@@ -48,7 +48,7 @@ import {
   systemTopic,
 } from "./emit.js";
 import { loopStartMs } from "./guards.js";
-import { buildHookEnv, captureGitSha, runHook } from "./hooks.js";
+import { buildHookEnv, captureGitSha, runPhaseHooks } from "./hooks.js";
 import { reinjectIntentFailure, runIntentCriteria } from "./intent.js";
 import {
   appendBackendFinish,
@@ -79,7 +79,9 @@ import {
   stopBackendFailed,
   stopBackendTimeout,
   stopMaxRuntime,
+  stopSuspended,
 } from "./stop.js";
+import { readSuspendState, resumeRequested } from "./suspend-state.js";
 import { reinjectTamperFailure, runTamperScreen } from "./tamper.js";
 import type { LoopContext, RunSummary } from "./types.js";
 import {
@@ -94,6 +96,21 @@ export async function runIteration(
   iteration: number,
   iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
 ): Promise<RunSummary> {
+  // Out-of-process pre_emit/post_emit `suspend` hooks (run in the `emit`
+  // subprocess — see emit.ts:runEmitPhaseHooks) can't block the harness loop
+  // directly; they write durable suspend state instead. Detect it here, at
+  // the next iteration boundary, and halt the loop rather than silently
+  // continuing past a pending suspend.
+  const pendingEmitSuspend = readSuspendState(loop.paths.stateDir);
+  if (
+    pendingEmitSuspend &&
+    (pendingEmitSuspend.phase === "pre_emit" ||
+      pendingEmitSuspend.phase === "post_emit") &&
+    !resumeRequested(loop.paths.stateDir)
+  ) {
+    return stopSuspended(loop, iteration, pendingEmitSuspend.reason);
+  }
+
   let iter = buildIterationContext(loop, iteration);
 
   // Clamp the iteration timeout to the remaining loop wall-clock budget so a
@@ -137,13 +154,30 @@ export async function runIteration(
 
   const startEpoch = Math.floor(Date.now() / 1000);
   const gitShaBefore = captureGitSha(loop.paths.workDir);
-  runHook(
+  const preIterResult = await runPhaseHooks(
     loop,
     "pre_iteration",
-    loop.hooks.preIteration,
     buildHookEnv(loop, { iteration, gitShaBefore }),
-    String(iteration),
+    { iteration, gitShaBefore },
   );
+  if (preIterResult.blocked) {
+    throw new Error(
+      `Aborting run: ${preIterResult.blockedMessage ?? "pre_iteration hook blocked"}`,
+    );
+  }
+  if (preIterResult.suspended) {
+    return stopSuspended(
+      loop,
+      iteration,
+      preIterResult.blockedMessage ?? "pre_iteration hook suspended the run",
+    );
+  }
+  // Mutation seam: applied after buildIterationContext but before the backend
+  // command is built, so a mutated prompt survives the loop-budget timeout
+  // clamp's `iter = {...iter, backend:{...}}` reassignment above.
+  if (preIterResult.mutatedPrompt !== undefined) {
+    iter = { ...iter, prompt: preIterResult.mutatedPrompt };
+  }
 
   // Fresh ACP session per iteration — ensures each role (researcher, critic,
   // etc.) starts with a clean context window for truly independent review.
@@ -220,13 +254,24 @@ export async function runIteration(
   appendBackendFinish(loop, iter, output, exitCode, timedOut);
   appendIterationFinish(loop, iter, output, exitCode, timedOut, elapsedS);
   const gitShaAfter = captureGitSha(loop.paths.workDir);
-  runHook(
+  const postIterResult = await runPhaseHooks(
     loop,
     "post_iteration",
-    loop.hooks.postIteration,
     buildHookEnv(loop, { iteration, gitShaBefore, gitShaAfter }),
-    String(iteration),
+    { iteration, gitShaBefore, gitShaAfter },
   );
+  if (postIterResult.blocked) {
+    throw new Error(
+      `Aborting run: ${postIterResult.blockedMessage ?? "post_iteration hook blocked"}`,
+    );
+  }
+  if (postIterResult.suspended) {
+    return stopSuspended(
+      loop,
+      iteration,
+      postIterResult.blockedMessage ?? "post_iteration hook suspended the run",
+    );
+  }
   registryProgress(loop, iteration);
   // Capture the preset-declared progress scalar each iteration (drift signal).
   runProgressMetric(loop, iteration);
