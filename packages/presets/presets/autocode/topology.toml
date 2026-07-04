@@ -21,6 +21,17 @@ id = "finalizer"
 emits = ["queue.advance", "finalization.failed", "task.complete"]
 prompt_file = "roles/finalizer.md"
 
+[[gate]]
+event = "review.passed"
+blocked = "review.evidence.blocked"
+failed = "review.rejected"
+evidence = [
+  { key = "tests", type = "test" },
+  { key = "lint", type = "lint" },
+  { key = "typecheck", type = "typecheck" },
+  { key = "coverage", type = "coverage", min = 80 },
+]
+
 [handoff]
 "loop.start" = ["planner"]
 "queue.advance" = ["planner"]
@@ -28,5 +39,6 @@ prompt_file = "roles/finalizer.md"
 "tasks.ready" = ["builder"]
 "review.ready" = ["critic"]
 "review.rejected" = ["builder"]
+"review.evidence.blocked" = ["critic"]
 "review.passed" = ["finalizer"]
 "finalization.failed" = ["builder"]

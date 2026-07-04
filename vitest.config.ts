@@ -28,6 +28,7 @@ export default defineConfig({
       "@mobrienv/autoloop-core/memory": `${CORE}/memory.ts`,
       "@mobrienv/autoloop-core/journal-format": `${CORE}/journal-format.ts`,
       "@mobrienv/autoloop-core/journal": `${CORE}/journal.ts`,
+      "@mobrienv/autoloop-core/evidence": `${CORE}/evidence.ts`,
       "@mobrienv/autoloop-core/topology": `${CORE}/topology.ts`,
       "@mobrienv/autoloop-core/fanout": `${CORE}/fanout.ts`,
       "@mobrienv/autoloop-core/concurrency": `${CORE}/concurrency.ts`,

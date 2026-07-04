@@ -334,13 +334,107 @@ it back to a role that can supply the missing evidence:
 "verify.blocked" = ["builder"]
 ```
 
+### Typed evidence
+
+`requires` is presence-only: it just checks the key carries *some*
+machine-checkable value. Typed evidence goes further — it validates the value
+against a schema (test/lint/typecheck pass-status, coverage/mutation numeric
+thresholds), and gates can route a failed check to a *different* event than a
+missing one. Declare it as an `evidence` array of inline tables on the gate:
+
+```toml
+[[gate]]
+event = "review.passed"
+blocked = "review.evidence.blocked"   # evidence never supplied -> soft retry
+failed = "review.rejected"            # evidence supplied but failed -> hard stop
+evidence = [
+  { key = "tests", type = "test" },
+  { key = "lint", type = "lint" },
+  { key = "typecheck", type = "typecheck" },
+  { key = "coverage", type = "coverage", min = 80 },
+]
+```
+
+Five evidence types are supported:
+
+| `type`       | validated as                                              | payload example |
+|--------------|------------------------------------------------------------|------------------|
+| `test`       | presence, plus pass/fail status if a status word is present | `tests=42 passed` / `{"tests": {"value": "42", "status": "passed"}}` |
+| `lint`       | same as `test`                                              | `lint=clean passed` / `{"lint": {"value": "0 issues", "status": "passed"}}` |
+| `typecheck`  | same as `test`                                              | `typecheck=0 errors passed` |
+| `coverage`   | presence, plus numeric `min`/`max` bounds if a number is present | `coverage=87%` / `{"coverage": 87}`, with `min = 80` |
+| `mutation`   | same as `coverage`                                          | `mutation=62` / `{"mutation": 62}`, with `min = 50` |
+| `generic` (default, or `requires`) | presence only                                | any `key=value` |
+
+For `test`/`lint`/`typecheck`, the status word (one of `passed`, `failed`,
+`passing`, `failing`) is optional in the payload — if present, it must match
+`status` (default `"passed"`); if you don't emit a status word at all, presence
+alone satisfies the rule. For `coverage`/`mutation`, `min`/`max` are inclusive
+bounds checked only when a numeric value can be parsed from the payload (a
+trailing `%` is stripped automatically).
+
+**`.blocked` vs `.failed`**: a gate's typed evidence check classifies every
+shortfall as either `"missing"` (the key was never supplied at all) or
+`"threshold"`/`"status"` (the key was supplied but did not clear the bar). Any
+`"missing"` shortfall always routes to `blocked` — soft retry, since the same
+role can simply supply the evidence next time. A `"threshold"`/`"status"`
+shortfall routes to `failed` if configured — hard stop, since evidence that
+was actually measured and failed usually means the underlying work needs
+fixing, not just re-reporting — falling back to `blocked` if `failed` is
+omitted. If a gate mixes missing and failed evidence in one payload, `blocked`
+wins (get the missing evidence first).
+
+Worked example — `presets/autocode/topology.toml` gates the critic's
+`review.passed`:
+
+```toml
+[[gate]]
+event = "review.passed"
+blocked = "review.evidence.blocked"
+failed = "review.rejected"
+evidence = [
+  { key = "tests", type = "test" },
+  { key = "lint", type = "lint" },
+  { key = "typecheck", type = "typecheck" },
+  { key = "coverage", type = "coverage", min = 80 },
+]
+
+[handoff]
+"review.evidence.blocked" = ["critic"]  # missing evidence: critic re-checks and re-reports
+"review.rejected" = ["builder"]         # evidence failed: back to the role that can fix it
+```
+
+`presets/autofix/topology.toml` mirrors this on the verifier's `fix.verified`,
+reusing the existing `fix.failed -> fixer` route as the hard-stop target:
+
+```toml
+[[gate]]
+event = "fix.verified"
+blocked = "fix.verify.blocked"
+failed = "fix.failed"
+evidence = [
+  { key = "tests", type = "test" },
+  { key = "coverage", type = "coverage", min = 80 },
+]
+```
+
+The journaled `blocked`/`failed` event carries `gated_event`,
+`missing_evidence` (keys with reason `"missing"`), `evidence_type` (the
+distinct types touched), `required_evidence` (every declared evidence key),
+`threshold_failure` (present only when a `"threshold"`/`"status"` shortfall
+occurred, as `key:detail` pairs), and `summary` (the original payload) — so
+both an observer and the next iteration's prompt see exactly what evidence is
+still needed.
+
 ## Examples
 
 Every `auto*` preset in `presets/` includes a `topology.toml`. See:
 
-- `presets/autocode/topology.toml` — 4-role build loop with rejection
+- `presets/autocode/topology.toml` — 4-role build loop with rejection, plus a
+  typed evidence gate on `review.passed` (test/lint/typecheck/coverage)
 - `presets/autospec/topology.toml` — clarify → research → design → task → critique spec loop
 - `presets/autodoc/topology.toml` — audit → write → check → publish cycle
 - `presets/autoresearch/topology.toml` — hypothesis → implement → measure → evaluate
 - `presets/autosec/topology.toml` — scan → analyze → harden → report
-- `presets/autofix/topology.toml` — diagnose → fix → verify → close with re-open support
+- `presets/autofix/topology.toml` — diagnose → fix → verify → close with
+  re-open support, plus a typed evidence gate on `fix.verified` (test/coverage)
