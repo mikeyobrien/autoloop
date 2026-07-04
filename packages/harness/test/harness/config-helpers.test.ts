@@ -251,6 +251,34 @@ describe("buildLoopContext", () => {
     });
   });
 
+  it("defaults completion.mustBeLast and policy.fileModAudit to false", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.completion.mustBeLast).toBe(false);
+    expect(loop.policy.fileModAudit).toBe(false);
+  });
+
+  it("reads event_loop.completion_must_be_last and event_loop.audit_file_mods from TOML", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        "event_loop.completion_must_be_last = true",
+        "event_loop.audit_file_mods = true",
+      ].join("\n"),
+    );
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.completion.mustBeLast).toBe(true);
+    expect(loop.policy.fileModAudit).toBe(true);
+  });
+
   it("normalizes legacy kiro backend config to the ACP kiro provider", () => {
     const projectDir = makeProject(
       [

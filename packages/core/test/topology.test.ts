@@ -143,6 +143,35 @@ backend_model = "opus"
       backendModel: "opus",
     });
   });
+
+  it("parses role disallowed_tools and read_only permissions", () => {
+    const dir = tmpDir("role-permissions");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "critic"
+prompt = "Review."
+emits = ["review.ready"]
+disallowed_tools = ["Edit", "Write"]
+read_only = true
+
+[[role]]
+id = "builder"
+prompt = "Build."
+emits = ["review.ready"]
+`,
+    );
+
+    const topo = loadTopology(dir);
+
+    expect(topo.roles[0]).toMatchObject({
+      disallowedTools: ["Edit", "Write"],
+      readOnly: true,
+    });
+    expect(topo.roles[1].disallowedTools).toBeUndefined();
+    expect(topo.roles[1].readOnly).toBeUndefined();
+  });
 });
 
 describe("suggestedRoles", () => {

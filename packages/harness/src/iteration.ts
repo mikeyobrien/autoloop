@@ -45,6 +45,7 @@ import {
   parallelTriggerTopic,
   systemTopic,
 } from "./emit.js";
+import { runFileModAudit } from "./file-mod-audit.js";
 import { loopStartMs } from "./guards.js";
 import { buildHookEnv, captureGitSha, runHook } from "./hooks.js";
 import { reinjectIntentFailure, runIntentCriteria } from "./intent.js";
@@ -223,6 +224,10 @@ export async function runIteration(
   registryProgress(loop, iteration);
   // Capture the preset-declared progress scalar each iteration (drift signal).
   runProgressMetric(loop, iteration);
+  // Emit-boundary file-mod audit (opt-in): flag file writes by a role with
+  // disallowed_tools/read_only. Purely observational — journals/emits a typed
+  // event for parent orchestrators; never alters control flow itself.
+  runFileModAudit(loop, iter, iteration);
   log(loop, "debug", `iteration ${iteration} finish exit_code=${exitCode}`);
   loop.onEvent?.({
     type: "iteration.footer",
@@ -524,6 +529,8 @@ export async function finishIteration(
     requiredEvents: loop.completion.requiredEvents,
     completionPromise: loop.completion.promise,
     hasBlockingTasks,
+    mustBeLast: loop.completion.mustBeLast,
+    completionOrderOk: completionEmittedLast(runLines, loop.completion.event),
   });
 
   progress(emitted.topic, resolved.outcome);
@@ -733,9 +740,20 @@ export function resolveOutcome(ctx: {
   requiredEvents: string[];
   completionPromise: string;
   hasBlockingTasks: boolean;
+  /**
+   * Ralph-parity ordering policy. When true, a completion claim is rejected
+   * (falls through to the routed/promise/continue branches) unless
+   * `completionOrderOk` confirms no other event followed completionEvent in
+   * its own turn. Optional/false = order-insensitive set-membership check
+   * (unchanged default behavior).
+   */
+  mustBeLast?: boolean;
+  /** Precomputed by the caller from full journal ordering (see completionEmittedLast). */
+  completionOrderOk?: boolean;
 }): { action: string; outcome: string } {
   if (
-    completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents)
+    completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents) &&
+    (!ctx.mustBeLast || ctx.completionOrderOk)
   ) {
     return { action: "complete_event", outcome: "complete:completion_event" };
   }
@@ -771,6 +789,32 @@ function latestAgentEventRecord(lines: string[]): {
     }
   }
   return { topic: "", payload: "" };
+}
+
+/**
+ * True iff `completionEvent`, wherever it was last emitted in the run, was
+ * the last non-system topic emitted in that same turn (iteration). Used to
+ * enforce `completion.must_be_last`: ralph rejects completion if other
+ * events follow it within the same turn, rather than autoloop's default
+ * order-insensitive set-membership check. Returns true (not applicable) if
+ * the completion event has not been emitted at all.
+ */
+export function completionEmittedLast(
+  runLines: string[],
+  completionEvent: string,
+): boolean {
+  let completionIteration: string | null = null;
+  for (const line of runLines) {
+    if (extractTopic(line) === completionEvent) {
+      completionIteration = extractIteration(line);
+    }
+  }
+  if (completionIteration === null) return true;
+  const turnTopics = runLines
+    .filter((line) => extractIteration(line) === completionIteration)
+    .map(extractTopic)
+    .filter((topic) => topic !== "" && !systemTopic(topic));
+  return turnTopics.lastIndexOf(completionEvent) === turnTopics.length - 1;
 }
 
 /** Every required-evidence event has been seen in the run so far. */

@@ -37,6 +37,13 @@ export function defaults(): Config {
       // then injects the answer into the next prompt. Empty ask_event disables.
       ask_event: "human.ask",
       ask_timeout: "5m",
+      // Ralph-parity ordering guard (opt-in): reject completion if any other
+      // event is emitted after completion_event within the same turn.
+      completion_must_be_last: "false",
+      // Ralph-parity emit-boundary audit (opt-in): after every iteration, diff
+      // the working tree against HEAD and emit a policy.file_modification_violation
+      // event if the acting role has disallowed_tools/read_only and files changed.
+      audit_file_mods: "false",
     },
     backend: {
       kind: "",
