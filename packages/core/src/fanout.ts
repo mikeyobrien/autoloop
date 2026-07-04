@@ -236,6 +236,15 @@ export type JoinKind =
 export interface FanoutStage {
   id: string;
   kind: FanoutKind;
+  /**
+   * The routing event that fires this stage (its entry point). It is a plain
+   * declared event — some upstream role must emit it, and it routes through
+   * `[handoff]` like any other event — the harness simply intercepts it before
+   * ordinary role dispatch, the way a `.parallel` dispatch topic is intercepted.
+   * Empty means the stage has no entry point; the validator flags this since
+   * such a stage can never run.
+   */
+  trigger: string;
   branches: number;
   role: string;
   roles: string[];

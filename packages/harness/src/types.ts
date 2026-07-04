@@ -208,6 +208,16 @@ export interface LoopContext {
       timeoutMs: number;
     };
   };
+  /**
+   * Fan-out `[[stage]]` execution knobs. `concurrency` bounds how many stage
+   * branches run at once run-wide (defaults to `defaultConcurrency()`, the
+   * same core/os-derived ceiling waves use); `branchTimeoutMs` bounds one
+   * branch's wall-clock time.
+   */
+  stage: {
+    concurrency: number;
+    branchTimeoutMs: number;
+  };
   hooks: {
     preRun: string;
     preIteration: string;
@@ -259,6 +269,13 @@ export interface LoopContext {
     logLevel: string;
     branchMode: boolean;
     isolationMode: string;
+    /**
+     * Forces every fan-out stage branch to relaunch rather than reuse a
+     * journaled `stage.branch.finish` record from an interrupted prior
+     * attempt (`run --no-resume` / `resume --no-resume`). Lives on `runtime`
+     * (not config-derived `stage`) because it survives `reloadLoop`.
+     */
+    noResume?: boolean;
   };
   launch: LaunchMetadata;
   store: Record<string, unknown>;
@@ -320,6 +337,11 @@ export interface RunOptions {
   mergeStrategy?: string;
   automerge?: boolean;
   keepWorktree?: boolean;
+  /**
+   * Force every fan-out stage branch to relaunch rather than reuse a
+   * journaled `stage.branch.finish` record from an interrupted prior attempt.
+   */
+  noResume?: boolean;
   /**
    * Optional abort signal. When provided, the CLI (or SDK caller) owns
    * process signal handling; the harness only listens to this signal for

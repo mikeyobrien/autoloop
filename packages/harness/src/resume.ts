@@ -44,6 +44,11 @@ export interface ResumeOptions {
   signal?: AbortSignal;
   /** Structured-event listener. */
   onEvent?: RunOptions["onEvent"];
+  /**
+   * Force every fan-out stage branch to relaunch rather than reuse a
+   * journaled `stage.branch.finish` record from an interrupted prior attempt.
+   */
+  noResume?: boolean;
 }
 
 export interface ResumeResult extends RunSummary {
@@ -217,6 +222,7 @@ export function buildResumeContext(
       logLevel,
       branchMode: false,
       isolationMode,
+      noResume: options.noResume ?? false,
     },
     launch: {
       preset: record.preset || basename(projectDir),

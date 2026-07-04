@@ -19,6 +19,7 @@ import {
   uniqueGeneratedId,
 } from "@mobrienv/autoloop-core";
 import { loadAgentMap } from "@mobrienv/autoloop-core/agent-map";
+import * as concurrency from "@mobrienv/autoloop-core/concurrency";
 import * as config from "@mobrienv/autoloop-core/config";
 import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import {
@@ -467,6 +468,7 @@ export function buildLoopContext(
       logLevel,
       branchMode: false,
       isolationMode: isolation.mode,
+      noResume: runOptions.noResume ?? false,
     },
     launch: {
       preset: currentPresetName,
@@ -661,6 +663,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       })(),
     },
     parallel,
+    stage: readStageConfig(cfg),
     hooks: {
       // Hook commands get the same template vars as role prompts ({{PRESET_DIR}},
       // {{TOOL_PATH}}, {{STATE_DIR}}) so a hook can reference preset-bundled scripts by
@@ -923,6 +926,17 @@ function normalizeAggregateMode(
   raw: string,
 ): "wait_for_all" | "first_success" | "timeout" {
   return raw === "first_success" || raw === "timeout" ? raw : "wait_for_all";
+}
+
+function readStageConfig(cfg: config.Config): LoopContext["stage"] {
+  return {
+    concurrency: config.getInt(
+      cfg,
+      "stage.concurrency",
+      concurrency.defaultConcurrency(),
+    ),
+    branchTimeoutMs: config.getInt(cfg, "stage.branch_timeout_ms", 180000),
+  };
 }
 
 export function applyRuntimeModeOverrides(loop: LoopContext): LoopContext {

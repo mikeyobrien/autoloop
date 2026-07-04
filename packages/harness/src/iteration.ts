@@ -76,6 +76,7 @@ import {
   resolveProvisional,
 } from "./provisional.js";
 import { registryProgress } from "./registry-bridge.js";
+import { finishStageIteration } from "./stage.js";
 import {
   completeLoop,
   stopBackendErrorClass,
@@ -676,6 +677,18 @@ export async function finishIteration(
         progress,
       );
     }
+  }
+
+  // Fan-out `[[stage]]` dispatch: a stage's `trigger` is a plain declared
+  // event (already passed the invalid-event check above like any other
+  // event), but the harness intercepts it here instead of ordinary role
+  // dispatch — launch the stage's branches, reduce, and route at the
+  // reducer's onPass/onFail event, exactly as a `.parallel` wave intercepts
+  // its dispatch topic above.
+  const stage = topology.stageForTrigger(loop.topology, emitted.topic);
+  if (stage) {
+    progress(emitted.topic, "stage:dispatched");
+    return finishStageIteration(loop, iter, stage, emitted.topic, iterate);
   }
 
   // Open-task gate for the completion-promise path. Mirror the event-path gate

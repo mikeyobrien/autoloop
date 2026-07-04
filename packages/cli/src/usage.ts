@@ -166,6 +166,32 @@ export function printRunUsage(): void {
     "  --events <path>        Append the NDJSON LoopEvent stream to <path>",
   );
   console.log("");
+  console.log("Dynamic workflows (architect-generated presets):");
+  console.log(
+    "  --architect, --dynamic Route an objective (no preset name) through the",
+  );
+  console.log(
+    "                         autoarchitect preset, which designs a bespoke",
+  );
+  console.log(
+    "                         single-file preset and auto-chains into running it",
+  );
+  console.log(
+    "  --ultra                --architect at maximum intensity (exhaustive fan-out)",
+  );
+  console.log(
+    "  --budget <usd>         Advisory cost target for the architect; also sets",
+  );
+  console.log(
+    "                         the hard event_loop.max_cost_usd ceiling",
+  );
+  console.log(
+    "  --no-resume            Relaunch every fan-out stage branch instead of",
+  );
+  console.log(
+    "                         reusing journaled branch results from a prior attempt",
+  );
+  console.log("");
   console.log("Examples:");
   console.log("  autoloop run autocode");
   console.log('  autoloop run autocode "Fix the login bug"');
@@ -179,6 +205,9 @@ export function printRunUsage(): void {
   console.log('  autoloop run . "Run from current directory"');
   console.log(
     '  autoloop run --preset-file ./preset.toml "objective"  # single-file preset',
+  );
+  console.log(
+    '  autoloop run --ultra "Add rate limiting to the API" --budget 5',
   );
   console.log("");
   console.log("Run 'autoloop list' to see all available presets.");

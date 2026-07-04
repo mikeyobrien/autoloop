@@ -241,7 +241,14 @@ function cancelRemaining(
   }
 }
 
-function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
+/**
+ * Write the `launch.json` a `branch-run` subprocess reads to drive one
+ * isolated branch iteration. Exported so the fan-out stage runner
+ * (`wave/stage-branch-runner.ts`) can launch stage branches through the exact
+ * same supervisor/`branch-run` spawn machinery as parallel-wave branches,
+ * rather than a second bespoke spawner.
+ */
+export function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
   const fields =
     jsonField("branch_id", spec.branchId) +
     ", " +
