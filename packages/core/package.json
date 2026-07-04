@@ -23,6 +23,10 @@
       "types": "./dist/topology.d.ts",
       "default": "./dist/topology.js"
     },
+    "./evidence": {
+      "types": "./dist/evidence.d.ts",
+      "default": "./dist/evidence.js"
+    },
     "./fanout": {
       "types": "./dist/fanout.d.ts",
       "default": "./dist/fanout.js"

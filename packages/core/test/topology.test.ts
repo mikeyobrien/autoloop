@@ -358,6 +358,175 @@ emits = []
   });
 });
 
+describe("typed evidence gates", () => {
+  it("parses the evidence array with type/min/max/status", () => {
+    const dir = tmpDir("gate-typed-parse");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+name = "typed-gate-test"
+
+[[gate]]
+event = "review.passed"
+blocked = "review.evidence.blocked"
+failed = "review.rejected"
+evidence = [
+  { key = "tests", type = "test" },
+  { key = "coverage", type = "coverage", min = 80, max = 100 },
+  { key = "lint", type = "lint", status = "clean" },
+  { key = "legacy" },
+]
+`,
+    );
+    const topo = loadTopology(dir);
+    expect(topo.gates).toHaveLength(1);
+    const gate = topo.gates[0];
+    expect(gate.failed).toBe("review.rejected");
+    expect(gate.evidence).toEqual([
+      { key: "tests", type: "test" },
+      { key: "coverage", type: "coverage", min: 80, max: 100 },
+      { key: "lint", type: "lint", status: "clean" },
+      { key: "legacy", type: "generic" },
+    ]);
+  });
+
+  it("defaults an unrecognized type to generic", () => {
+    const dir = tmpDir("gate-typed-unknown-type");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+name = "typed-gate-unknown"
+
+[[gate]]
+event = "review.passed"
+evidence = [ { key = "commit", type = "bogus" } ]
+`,
+    );
+    const topo = loadTopology(dir);
+    expect(topo.gates[0].evidence).toEqual([
+      { key: "commit", type: "generic" },
+    ]);
+  });
+
+  it("defaults evidence/failed to empty/undefined for gates without them", () => {
+    const dir = tmpDir("gate-legacy-defaults");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+name = "legacy-gate"
+
+[[gate]]
+event = "verify.passed"
+requires = ["tests"]
+`,
+    );
+    const topo = loadTopology(dir);
+    expect(topo.gates[0].evidence).toEqual([]);
+    expect(topo.gates[0].failed).toBeUndefined();
+  });
+
+  it("warns when the failed topic is unroutable", () => {
+    const dir = tmpDir("gate-failed-unroutable");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+name = "failed-unroutable"
+completion = "task.complete"
+
+[[role]]
+id = "worker"
+prompt = "W"
+emits = ["review.passed", "task.complete"]
+
+[[gate]]
+event = "review.passed"
+blocked = "review.blocked"
+failed = "review.dead.failed"
+evidence = [ { key = "tests", type = "test" } ]
+
+[handoff]
+"start" = ["worker"]
+"review.blocked" = ["worker"]
+`,
+    );
+    const topo = loadTopology(dir);
+    const warnings = validateTopology(topo);
+    expect(
+      warnings.some(
+        (w) =>
+          w.kind === "gate-failed-unroutable" &&
+          w.message.includes("review.dead.failed"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not warn when the failed topic routes via handoff", () => {
+    const dir = tmpDir("gate-failed-routable");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+name = "failed-routable"
+completion = "task.complete"
+
+[[role]]
+id = "worker"
+prompt = "W"
+emits = ["review.passed", "task.complete"]
+
+[[gate]]
+event = "review.passed"
+blocked = "review.blocked"
+failed = "review.rejected"
+evidence = [ { key = "tests", type = "test" } ]
+
+[handoff]
+"start" = ["worker"]
+"review.blocked" = ["worker"]
+"review.rejected" = ["worker"]
+`,
+    );
+    const topo = loadTopology(dir);
+    const warnings = validateTopology(topo);
+    expect(warnings.some((w) => w.kind === "gate-failed-unroutable")).toBe(
+      false,
+    );
+  });
+
+  it("warns when an evidence threshold has min > max", () => {
+    const dir = tmpDir("gate-invalid-threshold");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+name = "invalid-threshold"
+completion = "task.complete"
+
+[[role]]
+id = "worker"
+prompt = "W"
+emits = ["review.passed", "task.complete"]
+
+[[gate]]
+event = "review.passed"
+blocked = "review.blocked"
+evidence = [ { key = "coverage", type = "coverage", min = 90, max = 50 } ]
+
+[handoff]
+"start" = ["worker"]
+"review.blocked" = ["worker"]
+`,
+    );
+    const topo = loadTopology(dir);
+    const warnings = validateTopology(topo);
+    expect(
+      warnings.some(
+        (w) =>
+          w.kind === "gate-evidence-invalid-threshold" &&
+          w.message.includes("coverage"),
+      ),
+    ).toBe(true);
+  });
+});
+
 describe("renderTopologyInspect", () => {
   it("renders terminal format", () => {
     const dir = tmpDir("inspect-terminal");

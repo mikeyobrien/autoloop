@@ -21,6 +21,13 @@ Autocode is not an approval machine.
 
 Success is evidence-based, not prose-based. Only the finalizer may emit `task.complete`.
 
+`topology.toml` enforces this with a typed evidence gate on `review.passed`:
+the critic's payload must carry `tests`/`lint`/`typecheck` pass status and a
+`coverage` value at or above 80, or the emit is rejected and rerouted — missing
+evidence sends the critic back to re-check (`review.evidence.blocked`), while
+evidence that was supplied but failed the bar sends the slice back to the
+builder (`review.rejected`). See [Evidence gates](../../../../docs/reference/topology.md#evidence-gates).
+
 ## Files
 
 - `autoloops.toml` — loop + backend config

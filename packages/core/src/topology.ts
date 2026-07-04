@@ -25,11 +25,63 @@ export interface Role {
 }
 
 /**
+ * The typed evidence classes a `[[gate]] evidence` entry may declare. `generic`
+ * is the default when `type` is omitted or unrecognized: presence-only, same
+ * semantics as a legacy `requires` key. The typed classes add validation on
+ * top of presence:
+ *
+ * - `test` / `lint` / `typecheck`: presence, plus (if a status word is present
+ *   in the evidence value) it must match `status` (default `"passed"`).
+ * - `coverage` / `mutation`: presence, plus (if a numeric value is present) it
+ *   must satisfy `min`/`max` bounds.
+ */
+export type EvidenceType =
+  | "generic"
+  | "test"
+  | "lint"
+  | "typecheck"
+  | "coverage"
+  | "mutation";
+
+const EVIDENCE_TYPES: EvidenceType[] = [
+  "generic",
+  "test",
+  "lint",
+  "typecheck",
+  "coverage",
+  "mutation",
+];
+
+/**
+ * A single typed-evidence rule within a `[[gate]]`. Declared as an inline
+ * table inside the `evidence` array:
+ *
+ *   evidence = [
+ *     { key = "tests", type = "test" },
+ *     { key = "coverage", type = "coverage", min = 80 },
+ *   ]
+ */
+export interface EvidenceRequirement {
+  key: string;
+  type: EvidenceType;
+  min?: number;
+  max?: number;
+  status?: string;
+}
+
+/**
  * An evidence gate (opt-in). When an agent emits `event`, its payload must
  * carry every key in `requires` (as `key=value` / `key: value` tokens or a JSON
  * object, with a non-empty value). If any are missing, the emit is rejected and
  * the typed `blocked` event is journaled instead — preserving an evidence-bearing
  * quality gate over a topology that otherwise only checks allowed-event routing.
+ *
+ * `evidence` extends this with typed, threshold-validated rules (see
+ * `EvidenceRequirement`). A rule that is missing entirely routes to `blocked`
+ * (soft retry — same role can supply it next time); a rule whose evidence WAS
+ * supplied but failed a threshold/status check routes to `failed` if
+ * configured (hard stop — route to whoever can fix the root cause), falling
+ * back to `blocked` when `failed` is unset (back-compat safety net).
  *
  * Declared in topology.toml as array-of-tables (parsed raw, so the structure
  * survives — unlike the stringified autoloops.toml config layer):
@@ -38,11 +90,18 @@ export interface Role {
  *   event = "verify.passed"
  *   requires = ["tests", "coverage"]
  *   blocked = "verify.blocked"   # optional; defaults to <prefix>.blocked
+ *   failed = "verify.rejected"   # optional; hard-stop target for threshold/status failures
+ *   evidence = [
+ *     { key = "tests", type = "test" },
+ *     { key = "coverage", type = "coverage", min = 80 },
+ *   ]
  */
 export interface Gate {
   event: string;
   requires: string[];
+  evidence: EvidenceRequirement[];
   blocked: string;
+  failed?: string;
 }
 
 export interface Topology {
@@ -253,7 +312,12 @@ export function buildTopology(
         typeof g.blocked === "string" && g.blocked !== ""
           ? g.blocked
           : deriveBlockedTopic(event);
-      return { event, requires, blocked };
+      const failed =
+        typeof g.failed === "string" && g.failed !== "" ? g.failed : undefined;
+      const evidence = Array.isArray(g.evidence)
+        ? g.evidence.map(parseEvidenceRequirement).filter((e) => e.key !== "")
+        : [];
+      return { event, requires, evidence, blocked, failed };
     });
 
   const rawStages = (parsed.stage ?? []) as Array<Record<string, unknown>>;
@@ -270,6 +334,26 @@ function str(value: unknown, fallback: string): string {
 
 function num(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function parseEvidenceRequirement(e: unknown): EvidenceRequirement {
+  const rec = (e ?? {}) as Record<string, unknown>;
+  const key = typeof rec.key === "string" ? rec.key : "";
+  const rawType = typeof rec.type === "string" ? rec.type : "generic";
+  const type = (EVIDENCE_TYPES as string[]).includes(rawType)
+    ? (rawType as EvidenceType)
+    : "generic";
+  const out: EvidenceRequirement = { key, type };
+  if (typeof rec.min === "number" && Number.isFinite(rec.min)) {
+    out.min = rec.min;
+  }
+  if (typeof rec.max === "number" && Number.isFinite(rec.max)) {
+    out.max = rec.max;
+  }
+  if (typeof rec.status === "string" && rec.status !== "") {
+    out.status = rec.status;
+  }
+  return out;
 }
 
 function parseStage(s: Record<string, unknown>): FanoutStage {
@@ -475,6 +559,8 @@ export interface TopologyWarning {
     | "completion-unreachable"
     | "gate-dead-event"
     | "gate-blocked-unroutable"
+    | "gate-failed-unroutable"
+    | "gate-evidence-invalid-threshold"
     | "prompt-file-in-single-file"
     | "stage-unknown-role"
     | "stage-event-unroutable"
@@ -559,6 +645,24 @@ export function validateTopology(
         kind: "gate-blocked-unroutable",
         message: `gate blocked topic \`${gate.blocked}\` has no matching handoff rule and is not the completion event`,
       });
+    }
+    if (
+      gate.failed !== undefined &&
+      !eventMatchesAny(gate.failed, topology.handoffKeys) &&
+      gate.failed !== topology.completion
+    ) {
+      warnings.push({
+        kind: "gate-failed-unroutable",
+        message: `gate failed topic \`${gate.failed}\` has no matching handoff rule and is not the completion event`,
+      });
+    }
+    for (const req of gate.evidence) {
+      if (req.min !== undefined && req.max !== undefined && req.min > req.max) {
+        warnings.push({
+          kind: "gate-evidence-invalid-threshold",
+          message: `gate \`${gate.event}\` evidence \`${req.key}\` has min (${req.min}) greater than max (${req.max})`,
+        });
+      }
     }
   }
 
