@@ -22,6 +22,21 @@ export interface Role {
   backendTimeoutMs?: number;
   backendAgent?: string;
   backendModel?: string;
+  /**
+   * Declarative per-role concurrency (ralph v3 style). `0` (or absent) means
+   * the current agent-triggered behavior: waves only start when the agent
+   * emits a `.parallel` topic. `N > 0` means the harness auto-launches N
+   * concurrent branches whenever this role is routed to via `[handoff]`,
+   * without requiring an agent emit.
+   */
+  concurrency?: number;
+  /** Optional wave-completion strategy override for this role's declarative waves. */
+  aggregate?: RoleAggregate;
+}
+
+export interface RoleAggregate {
+  mode: "wait_for_all" | "first_success" | "timeout";
+  timeoutMs: number;
 }
 
 /**
@@ -229,6 +244,7 @@ export function buildTopology(
         promptFile: typeof r.prompt_file === "string" ? r.prompt_file : "",
         emits: Array.isArray(r.emits) ? r.emits.map(String) : [],
         ...parseRoleBackend(r),
+        ...parseRoleConcurrency(r),
       };
       return { ...role, prompt: rolePrompt(role, projectDir) };
     });
@@ -338,6 +354,61 @@ function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
     out.backendModel = r.backend_model;
   }
   return out;
+}
+
+/**
+ * Parse the optional declarative-concurrency fields on a `[[role]]` table:
+ * `concurrency = N` (integer >= 0; negative/NaN/non-number values are ignored
+ * and default to 0 = agent-triggered only) and an inline `[role.aggregate]`
+ * sub-table (`mode`, `timeout_ms`) overriding the loop-level wave completion
+ * strategy for this role's declarative waves.
+ */
+function parseRoleConcurrency(r: Record<string, unknown>): Partial<Role> {
+  const out: Partial<Role> = {};
+  if (typeof r.concurrency === "number" && Number.isFinite(r.concurrency)) {
+    const n = Math.trunc(r.concurrency);
+    if (n > 0) out.concurrency = n;
+  }
+  const rawAggregate = r.aggregate;
+  if (
+    rawAggregate &&
+    typeof rawAggregate === "object" &&
+    !Array.isArray(rawAggregate)
+  ) {
+    const agg = rawAggregate as Record<string, unknown>;
+    out.aggregate = {
+      mode: normalizeAggregateMode(agg.mode),
+      timeoutMs: num(agg.timeout_ms, 0),
+    };
+  }
+  return out;
+}
+
+export function normalizeAggregateMode(
+  value: unknown,
+): "wait_for_all" | "first_success" | "timeout" {
+  if (value === "first_success" || value === "timeout") return value;
+  return "wait_for_all";
+}
+
+/** Roles whose declarative `concurrency` is > 0. */
+export function rolesWithConcurrency(topology: Topology): Role[] {
+  return topology.roles.filter((r) => (r.concurrency ?? 0) > 0);
+}
+
+/**
+ * Roles that `event` routes to (via `[handoff]`) AND that declare a
+ * declarative `concurrency > 0`. Used by the harness to auto-launch
+ * concurrent waves without requiring an agent `.parallel` emit.
+ */
+export function concurrentRolesForEvent(
+  topology: Topology,
+  event: string,
+): Role[] {
+  const matched = new Set(collectMatchingRoles(topology, event));
+  return topology.roles.filter(
+    (r) => matched.has(r.id) && (r.concurrency ?? 0) > 0,
+  );
 }
 
 export function roleHasBackendOverride(role: Role): boolean {
@@ -450,6 +521,9 @@ function renderRoles(roles: Role[]): string {
     for (const line of renderRoleBackendLines(role, "  ")) {
       result += `${line}\n`;
     }
+    if (role.concurrency !== undefined) {
+      result += `  concurrency: ${role.concurrency}\n`;
+    }
     result += `  prompt: ${promptSummary(role.prompt)}\n`;
   }
   return result;
@@ -480,7 +554,8 @@ export interface TopologyWarning {
     | "stage-event-unroutable"
     | "stage-empty"
     | "stage-schema-incoherent"
-    | "stage-not-executed";
+    | "stage-not-executed"
+    | "concurrency-on-unrouted-role";
   message: string;
 }
 
@@ -516,6 +591,14 @@ export function validateTopology(
       warnings.push({
         kind: "prompt-file-in-single-file",
         message: `role \`${role.id}\` uses prompt_file \`${role.promptFile}\`, unsupported in single-file presets; use an inline prompt`,
+      });
+    }
+    // A declarative concurrency>0 role that no handoff rule ever routes to can
+    // never auto-trigger a wave; flag it so the config is not silently dead.
+    if ((role.concurrency ?? 0) > 0 && !targetedRoleIds.includes(role.id)) {
+      warnings.push({
+        kind: "concurrency-on-unrouted-role",
+        message: `role \`${role.id}\` declares concurrency=${role.concurrency} but is not targeted by any handoff rule, so it can never auto-trigger a declarative wave`,
       });
     }
   }
@@ -678,6 +761,7 @@ function renderTopologyJson(topology: Topology, singleFile: boolean): void {
       emits: r.emits,
       prompt: promptSummary(r.prompt),
       ...roleBackendJson(r),
+      ...roleConcurrencyJson(r),
     })),
     handoff: topology.handoff,
     warnings: warnings.map((w) => ({ kind: w.kind, message: w.message })),
@@ -700,6 +784,18 @@ function roleBackendJson(role: Role): Record<string, unknown> {
     out.backend_timeout_ms = role.backendTimeoutMs;
   if (role.backendAgent !== undefined) out.backend_agent = role.backendAgent;
   if (role.backendModel !== undefined) out.backend_model = role.backendModel;
+  return out;
+}
+
+function roleConcurrencyJson(role: Role): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (role.concurrency !== undefined) out.concurrency = role.concurrency;
+  if (role.aggregate !== undefined) {
+    out.aggregate = {
+      mode: role.aggregate.mode,
+      timeout_ms: role.aggregate.timeoutMs,
+    };
+  }
   return out;
 }
 
@@ -732,6 +828,9 @@ function renderTopologyTerminal(topology: Topology, singleFile: boolean): void {
     lines.push(`- \`${role.id}\` — emits: ${listText(role.emits)}`);
     for (const line of renderRoleBackendLines(role, "  ")) {
       lines.push(line);
+    }
+    if (role.concurrency !== undefined) {
+      lines.push(`  concurrency: ${role.concurrency}`);
     }
     lines.push(`  prompt: ${promptSummary(role.prompt)}`);
   }

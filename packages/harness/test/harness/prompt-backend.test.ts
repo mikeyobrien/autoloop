@@ -78,7 +78,12 @@ function makeBackendLoop(
       agent: "",
       model: "",
     },
-    parallel: { enabled: false, maxBranches: 0, branchTimeoutMs: 0 },
+    parallel: {
+      enabled: false,
+      maxBranches: 0,
+      branchTimeoutMs: 0,
+      aggregate: { mode: "wait_for_all", timeoutMs: 0 },
+    },
     memory: { budgetChars: 1000 },
     tasks: { budgetChars: 1000 },
     harness: { instructions: "" },

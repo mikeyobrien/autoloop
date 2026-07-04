@@ -31,6 +31,7 @@ import {
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
 import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
+import * as topology from "@mobrienv/autoloop-core/topology";
 import { reinjectAcceptanceFailure, runAcceptanceGate } from "./acceptance.js";
 import { awaitHumanResponse } from "./ask.js";
 import {
@@ -82,6 +83,7 @@ import { reinjectTamperFailure, runTamperScreen } from "./tamper.js";
 import type { LoopContext, RunSummary } from "./types.js";
 import {
   continueAfterParallelJoin,
+  executeDeclarativeWave,
   executeParallelWave,
   stopAfterParallelWave,
 } from "./wave.js";
@@ -508,6 +510,35 @@ export async function finishIteration(
     );
   }
 
+  // Declarative concurrency (ralph v3 style): if the just-emitted event
+  // routes (via [handoff]) to a role that declares `concurrency > 0`, the
+  // harness auto-launches N concurrent branches for that role — no agent
+  // `.parallel` emit required. This takes precedence over ordinary routing
+  // for that event; agent-triggered `.parallel` (handled above) is
+  // unaffected and remains fully backward compatible. Synthetic wave/joined
+  // topics (`wave.*`, `*.parallel.joined`) never re-enter this path since
+  // `emitted.topic` is always an agent-emitted, non-system event here.
+  if (loop.parallel.enabled) {
+    const concurrentRoles = topology.concurrentRolesForEvent(
+      loop.topology,
+      emitted.topic,
+    );
+    if (concurrentRoles.length > 0) {
+      // Execution is synchronous (one wave resolves per iteration); when an
+      // event routes to more than one concurrency role, the first declared
+      // role's wave runs this iteration — the routing event still applies
+      // (via the resume topic) on subsequent iterations for any others.
+      return finishDeclarativeIteration(
+        loop,
+        iter,
+        emitted.topic,
+        concurrentRoles[0],
+        iterate,
+        progress,
+      );
+    }
+  }
+
   // Open-task gate for the completion-promise path. Mirror the event-path gate
   // in emit.ts (same store via loop.paths.tasksFile, soft tasks are advisory)
   // so a stdout promise can't bypass the requirement the emitted event honors.
@@ -721,6 +752,39 @@ async function finishParallelIteration(
     );
   }
   progress(emittedTopic, `parallel:stop:${result.reason}`);
+  return stopAfterParallelWave(loop, iter, result.reason, result.waveId);
+}
+
+/**
+ * Declarative-wave counterpart of `finishParallelIteration`: the routing
+ * event itself (not an agent `.parallel` emit) triggers N concurrent
+ * branches for `role`, per its topology `concurrency` declaration. Join/stop
+ * handling mirrors the agent-triggered path so downstream resume routing
+ * (`continueAfterParallelJoin`/`stopAfterParallelWave`) behaves identically.
+ */
+async function finishDeclarativeIteration(
+  loop: LoopContext,
+  iter: IterationContext,
+  routingEvent: string,
+  role: topology.Role,
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+  progress: (topic: string, outcome: string) => void,
+): Promise<RunSummary> {
+  const result = executeDeclarativeWave(loop, iter, role, routingEvent);
+  const syntheticTopic = `${routingEvent}.parallel`;
+
+  if (result.reason === "parallel_wave_complete") {
+    progress(syntheticTopic, "parallel:joined");
+    return continueAfterParallelJoin(
+      loop,
+      iter,
+      result.waveId,
+      syntheticTopic,
+      result.elapsedMs,
+      iterate,
+    );
+  }
+  progress(syntheticTopic, `parallel:stop:${result.reason}`);
   return stopAfterParallelWave(loop, iter, result.reason, result.waveId);
 }
 

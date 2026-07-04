@@ -50,6 +50,13 @@ export function defaults(): Config {
       enabled: "false",
       max_branches: "3",
       branch_timeout_ms: "180000",
+      // Wave completion strategy: wait_for_all (default) | first_success |
+      // timeout. timeout_ms bounds the whole wave's wall clock (0 = disabled;
+      // only meaningful for mode=timeout).
+      aggregate: {
+        mode: "wait_for_all",
+        timeout_ms: "0",
+      },
     },
     hooks: {
       pre_run: "",
