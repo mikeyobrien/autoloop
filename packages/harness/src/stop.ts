@@ -2,7 +2,7 @@ import { jsonField } from "@mobrienv/autoloop-core";
 import { appendEvent } from "@mobrienv/autoloop-core/journal";
 import { lastNChars, log } from "./display.js";
 import { registryComplete, registryStop } from "./registry-bridge.js";
-import type { LoopContext, RunSummary } from "./types.js";
+import type { LoopContext, RunSummary, StopReason } from "./types.js";
 
 export function stopMaxIterations(
   loop: LoopContext,
@@ -88,7 +88,7 @@ export function stopBackendFailed(
 export function stopBackendErrorClass(
   loop: LoopContext,
   iteration: number,
-  reason: string,
+  reason: StopReason,
   output: string,
 ): RunSummary {
   log(loop, "error", `loop stop reason=${reason} iteration=${iteration}`);
@@ -352,7 +352,7 @@ export function stopPrematureQuit(
 export function completeLoop(
   loop: LoopContext,
   iteration: number,
-  reason: string,
+  reason: StopReason,
 ): RunSummary {
   log(loop, "info", `loop complete reason=${reason}`);
   appendEvent(

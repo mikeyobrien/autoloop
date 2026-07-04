@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { appendEvent } from "@mobrienv/autoloop-core/journal";
 import { log, printHookOutput } from "./display.js";
-import type { LoopContext } from "./types.js";
+import type { LoopContext, StopReason } from "./types.js";
 
 export interface HookEnv {
   AUTOLOOP_PROJECT_DIR: string;
@@ -21,7 +21,7 @@ export function buildHookEnv(
     iteration?: number;
     gitShaBefore?: string;
     gitShaAfter?: string;
-    stopReason?: string;
+    stopReason?: StopReason;
   },
 ): HookEnv {
   const env: HookEnv = {
