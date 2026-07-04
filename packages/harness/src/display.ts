@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { collectUsage, lineSep, listText } from "@mobrienv/autoloop-core";
 import { readRunLines } from "@mobrienv/autoloop-core/journal";
 import type { IterationContext } from "./prompt.js";
-import type { LoopContext, RunSummary } from "./types.js";
+import type { LoopContext, RunSummary, StopReason } from "./types.js";
 
 export function printSummary(summary: RunSummary, loop: LoopContext): void {
   const hint = stopReasonHint(summary.stopReason);
@@ -36,7 +36,7 @@ export function runCostUsd(loop: LoopContext): number {
   }
 }
 
-function stopReasonHint(reason: string): string[] {
+function stopReasonHint(reason: StopReason): string[] {
   switch (reason) {
     case "backend_failed":
       return [
@@ -161,7 +161,7 @@ export function printBackendOutputTail(
 
 export function printFailureDiagnostic(
   output: string,
-  stopReason: string,
+  stopReason: StopReason,
 ): void {
   const lines = output.split(lineSep());
   const tail = lines.slice(-15).join(lineSep());

@@ -74,9 +74,15 @@ import {
   stopReviewUnknown,
   stopStalled,
 } from "./stop.js";
-import type { LoopContext, RunOptions, RunSummary } from "./types.js";
+import type {
+  LoopContext,
+  RunOptions,
+  RunSummary,
+  StopReason,
+} from "./types.js";
 
-export type { LoopContext, RunOptions, RunSummary };
+export { STOP_REASONS } from "./types.js";
+export type { LoopContext, RunOptions, RunSummary, StopReason };
 
 export async function run(
   projectDir: string,

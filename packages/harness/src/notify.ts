@@ -13,13 +13,14 @@ import { spawnSync } from "node:child_process";
 import { jsonField } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { appendEvent } from "@mobrienv/autoloop-core/journal";
+import type { StopReason } from "./types.js";
 
 export interface FinishNotificationOptions {
   projectDir: string;
   journalFile: string;
   runId: string;
   preset: string;
-  stopReason: string;
+  stopReason: StopReason;
   iterations: number;
 }
 
@@ -30,7 +31,13 @@ export interface FinishNotificationResult {
 
 export type StopReasonClass = "completed" | "failed" | "stopped";
 
-export function classifyStopReason(stopReason: string): StopReasonClass {
+/**
+ * The `startsWith("completion")` check relies on the `completion_*` naming
+ * convention holding across the `StopReason` union — if a future literal is
+ * added that starts with "completion" but is not a success case, this
+ * classifier will misclassify it as `"completed"`.
+ */
+export function classifyStopReason(stopReason: StopReason): StopReasonClass {
   if (stopReason === "completed" || stopReason.startsWith("completion"))
     return "completed";
   if (

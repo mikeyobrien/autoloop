@@ -6,15 +6,15 @@ import {
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { parallelDispatchBase, parallelJoinedTopic } from "../emit.js";
 import type { IterationContext } from "../prompt.js";
-import type { LoopContext, RunSummary } from "../types.js";
-import type { BranchResult, IterateFn } from "./types.js";
+import type { LoopContext, RunSummary, StopReason } from "../types.js";
+import type { BranchResult, IterateFn, WaveJoinReason } from "./types.js";
 
 export function finalizeParallelWave(
   loop: LoopContext,
   iter: IterationContext,
   waveId: string,
   results: BranchResult[],
-): { reason: string; waveId: string } {
+): { reason: WaveJoinReason; waveId: string } {
   const timedOut = results
     .filter((r) => r.stopReason === "backend_timeout")
     .map((r) => r.branchId);
@@ -86,7 +86,7 @@ export async function continueAfterParallelJoin(
 export function stopAfterParallelWave(
   loop: LoopContext,
   iter: IterationContext,
-  reason: string,
+  reason: StopReason,
   waveId: string,
 ): RunSummary {
   const fields =

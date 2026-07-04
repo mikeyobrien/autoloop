@@ -272,8 +272,102 @@ export interface RunOptions {
   onEvent?: LoopEventEmitter;
 }
 
+/**
+ * Versioned, exhaustive set of terminal `RunSummary.stopReason` values.
+ * Every literal string ever assigned to `RunSummary.stopReason` anywhere in
+ * this package must appear here. Consumers (e.g. ralph v3) can rely on this
+ * being a closed set instead of an unbounded `string`, and can use
+ * {@link STOP_REASONS} to validate values arriving over an untrusted
+ * boundary (e.g. a persisted journal or IPC payload) at runtime.
+ *
+ * Emission sites (see the enforcement test in
+ * `packages/harness/test/harness/stop-reason.test.ts`):
+ * - `stop.ts` — `max_iterations`, `backend_failed`, `backend_timeout`,
+ *   `stalled`, `cost_budget`, `max_runtime`, `review_unknown`,
+ *   `premature_quit`, and `completeLoop()` which echoes the
+ *   `completion_event`/`completion_promise`/`verdict_*` literals its
+ *   callers pass in.
+ * - `index.ts` — `interrupted`, `error`, and `verdict_unknown` /
+ *   `verdict_exit` / `verdict_takeover` (via `completeLoop`).
+ * - `iteration.ts` — `completion_event`, `completion_promise` (via
+ *   `completeLoop`), and a direct `interrupted` result.
+ * - `provisional.ts` — `completion_held` (non-terminal `failure.diagnostic`
+ *   event emitted while a done-claim is parked in `awaiting_acceptance`).
+ * - `circuit-breaker.ts` — `auth_failed`, `quota_exhausted`, `rate_limited`,
+ *   `transient_error`, `backend_failed` (consumed by
+ *   `stopBackendErrorClass` in `stop.ts`).
+ * - `wave.ts` / `wave/finalize-wave.ts` — `parallel_wave_timeout`,
+ *   `parallel_wave_failed` (terminal, via `stopAfterParallelWave`), and
+ *   `parallel_wave_invalid` (terminal — `wave.ts` rejects a dispatch while
+ *   another wave is already active, or an unparsable payload, and that
+ *   rejection is *also* routed through `stopAfterParallelWave`, ending the
+ *   run). Note: `parallel_wave_complete` is a distinct, non-terminal
+ *   internal value used only to trigger `continueAfterParallelJoin`; it
+ *   never reaches `RunSummary` and is intentionally **not** part of this
+ *   union.
+ *
+ * Categories (23 values enumerated by the originating issue, plus one
+ * additional real terminal literal — `parallel_wave_invalid` — discovered
+ * during implementation; see the parallel-wave note above):
+ * - success (3): `completed`, `completion_event`, `completion_promise`
+ * - failures (7): `backend_failed`, `backend_timeout`, `auth_failed`,
+ *   `quota_exhausted`, `rate_limited`, `transient_error`, `review_unknown`
+ * - stops (6): `max_iterations`, `stalled`, `cost_budget`, `max_runtime`,
+ *   `premature_quit`, `interrupted`
+ * - verdicts (3): `verdict_exit`, `verdict_takeover`, `verdict_unknown`
+ * - held (1): `completion_held`
+ * - parallel (3): `parallel_wave_timeout`, `parallel_wave_failed`,
+ *   `parallel_wave_invalid`
+ * - error handling (1): `error`
+ *
+ * Naming-collision warning: `stopReason` is also a field name on the ACP
+ * per-turn protocol (`"end_turn" | "cancelled" | "refusal"`, see
+ * `packages/cli/src/acp/*.ts` and `packages/backends/src/acp-client.ts`) and
+ * on the wave-branch-parsing domain (`BranchResult.stopReason`,
+ * `WaveResult.reason` in `wave/types.ts`, which additionally include the
+ * synthetic `"branch_process_failed"` value parsed from untrusted
+ * subprocess stdout). Those are unrelated, wider domains — do not widen
+ * this union to cover them, and do not narrow them to this union.
+ */
+export const STOP_REASONS = [
+  // success (3)
+  "completed",
+  "completion_event",
+  "completion_promise",
+  // failures (7)
+  "backend_failed",
+  "backend_timeout",
+  "auth_failed",
+  "quota_exhausted",
+  "rate_limited",
+  "transient_error",
+  "review_unknown",
+  // stops (6)
+  "max_iterations",
+  "stalled",
+  "cost_budget",
+  "max_runtime",
+  "premature_quit",
+  "interrupted",
+  // verdicts (3)
+  "verdict_exit",
+  "verdict_takeover",
+  "verdict_unknown",
+  // held (1)
+  "completion_held",
+  // parallel (3)
+  "parallel_wave_timeout",
+  "parallel_wave_failed",
+  "parallel_wave_invalid",
+  // error handling (1)
+  "error",
+] as const;
+
+/** See {@link STOP_REASONS} for documentation of every literal. */
+export type StopReason = (typeof STOP_REASONS)[number];
+
 export interface RunSummary {
   iterations: number;
-  stopReason: string;
+  stopReason: StopReason;
   runId?: string;
 }
