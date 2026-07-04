@@ -11,7 +11,9 @@ export function printUsage(): void {
   console.log(
     "  autoloop resume <run-id> [--add-iterations N] [-b <backend>] [-v]",
   );
-  console.log("  autoloop init [--preset <name>] [dir]");
+  console.log(
+    "  autoloop init [--preset <name>|--single-file <file.toml>] [dir]",
+  );
   console.log("  autoloop emit <topic> [summary]");
   console.log(
     "  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]",
@@ -88,6 +90,9 @@ export function printUsage(): void {
     "  -p, --preset     Resolve a bundled preset name or custom preset dir",
   );
   console.log(
+    "  --preset-file <path>  Run from an explicit single-file (.toml) preset",
+  );
+  console.log(
     "  --chain          Run an inline chain (comma-separated presets)",
   );
   console.log(
@@ -132,6 +137,9 @@ export function printRunUsage(): void {
     "  -p, --preset     Resolve a bundled preset name or custom preset dir",
   );
   console.log(
+    "  --preset-file <path>  Run from an explicit single-file (.toml) preset",
+  );
+  console.log(
     "  --chain          Run an inline chain (comma-separated presets)",
   );
   console.log(
@@ -166,6 +174,9 @@ export function printRunUsage(): void {
   );
   console.log('  autoloop run presets/autoqa "QA recent changes"');
   console.log('  autoloop run . "Run from current directory"');
+  console.log(
+    '  autoloop run --preset-file ./preset.toml "objective"  # single-file preset',
+  );
   console.log("");
   console.log("Run 'autoloop list' to see all available presets.");
 }
