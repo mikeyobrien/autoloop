@@ -78,6 +78,16 @@ export type LoopEvent =
     }
   | { type: "backend.output"; output: string; maxLines?: number }
   | { type: "failure.diagnostic"; output: string; stopReason: StopReason }
+  // Emit-boundary file-mod audit (ralph parity): the acting role modified
+  // files while under disallowed_tools/read_only restrictions.
+  | {
+      type: "policy.file_modification_violation";
+      runId: string;
+      iteration: number;
+      role: string;
+      files: string[];
+      reason: "disallowed_tools" | "read_only";
+    }
   | {
       type: "summary";
       runId: string;

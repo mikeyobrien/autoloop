@@ -79,7 +79,31 @@ export interface LoopContext {
      */
     prematureMaxRearms?: number;
   };
-  completion: { promise: string; event: string; requiredEvents: string[] };
+  completion: {
+    promise: string;
+    event: string;
+    requiredEvents: string[];
+    /**
+     * Ralph-parity ordering policy (opt-in, default false). When true, a
+     * completion claim via `event` is rejected if any other event was
+     * emitted after it within the same turn — set-membership alone is not
+     * enough. Order-insensitive behavior (unchanged) when false.
+     */
+    mustBeLast: boolean;
+  };
+  /**
+   * Permission-enforcement policies (orthogonal to completion gating).
+   */
+  policy: {
+    /**
+     * Ralph-parity emit-boundary audit (opt-in, default false). After every
+     * iteration, diffs the working tree against HEAD; if the acting role has
+     * `disallowedTools`/`readOnly` and files changed, emits
+     * `policy.file_modification_violation` with the role + file list. Purely
+     * observational — never alters loop control flow on its own.
+     */
+    fileModAudit: boolean;
+  };
   /**
    * Out-of-band acceptance gate. On a done-claim the HARNESS (not the agent's
    * session) runs every `verifyCmds` entry in a clean shell; completion is

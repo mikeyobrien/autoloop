@@ -93,6 +93,7 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/postconditions": `${HARNESS}/postconditions.ts`,
       "@mobrienv/autoloop-harness/provisional": `${HARNESS}/provisional.ts`,
       "@mobrienv/autoloop-harness/tamper": `${HARNESS}/tamper.ts`,
+      "@mobrienv/autoloop-harness/file-mod-audit": `${HARNESS}/file-mod-audit.ts`,
       "@mobrienv/autoloop-harness/git-diff": `${HARNESS}/git-diff.ts`,
       "@mobrienv/autoloop-harness/circuit-breaker": `${HARNESS}/circuit-breaker.ts`,
       "@mobrienv/autoloop-harness/intent": `${HARNESS}/intent.ts`,

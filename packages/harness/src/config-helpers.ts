@@ -606,6 +606,14 @@ export function reloadLoop(loop: LoopContext): LoopContext {
         config.get(cfg, "event_loop.completion_event", "task.complete"),
       ),
       requiredEvents: config.getList(cfg, "event_loop.required_events"),
+      mustBeLast: truthySetting(
+        config.get(cfg, "event_loop.completion_must_be_last", "false"),
+      ),
+    },
+    policy: {
+      fileModAudit: truthySetting(
+        config.get(cfg, "event_loop.audit_file_mods", "false"),
+      ),
     },
     acceptance: {
       // Accept either a single `verify_cmd` or a `verify_cmds` list; merge both.
