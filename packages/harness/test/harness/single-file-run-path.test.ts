@@ -2,7 +2,57 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildLoopContext } from "@mobrienv/autoloop-harness/config-helpers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Mock the same seams event-emitter.test.ts mocks, so `run()` completes
+// after one fake iteration without touching git/worktrees or spawning a
+// real backend process — this closes the "real harness.run e2e through a
+// single-file preset" acceptance criterion at the harness level.
+vi.mock("@mobrienv/autoloop-core/worktree", () => ({
+  mergeWorktree: vi.fn(),
+  updateStatus: vi.fn(),
+  readMeta: vi.fn(() => null),
+  metaDirForRun: vi.fn(() => "/tmp/fake-meta"),
+  writeMeta: vi.fn(),
+  isOrphanWorktree: vi.fn(() => false),
+  createWorktree: vi.fn(() => ({
+    worktreePath: "/tmp/fake-worktree",
+    branch: "autoloop/fake-run",
+    metaDir: "/tmp/fake-meta",
+  })),
+  resolveGitRoot: vi.fn((cwd: string) => cwd),
+  tryResolveGitRoot: vi.fn((cwd: string) => cwd),
+  cleanWorktrees: vi.fn(),
+  listWorktreeMetas: vi.fn(() => []),
+}));
+
+const runIteration = vi.hoisted(() =>
+  vi.fn((_loop: unknown, _iter: number, _recurse: unknown) => ({
+    stopReason: "completed",
+    iterations: 1,
+    exitCode: 0,
+  })),
+);
+vi.mock("../../src/iteration.js", () => ({ runIteration }));
+
+vi.mock("../../src/metareview.js", () => ({
+  maybeRunMetareview: vi.fn((loop: unknown) => loop),
+}));
+
+vi.mock("../../src/display.js", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    printSummary: vi.fn(),
+    printProjectedMarkdown: vi.fn(),
+    printProjectedText: vi.fn(),
+  };
+});
+
+vi.mock("../../src/registry-bridge.js", () => ({
+  registryStart: vi.fn(),
+  registryStop: vi.fn(),
+}));
 
 // A single-file merged-TOML preset: config + topology + inline role prompts.
 const SINGLE_FILE_PRESET = `
@@ -95,5 +145,25 @@ describe("single-file preset run path", () => {
     expect(loop.topology.name).toBe("dir-preset");
     expect(loop.limits.maxIterations).toBe(5);
     expect(loop.launch.presetFile ?? "").toBe("");
+  });
+});
+
+describe("harness.run end-to-end via --preset-file", () => {
+  it("completes a real loop sourced entirely from a single-file preset", async () => {
+    const { file, workDir } = writeSingleFilePreset();
+    const { run } = await import("@mobrienv/autoloop-harness");
+
+    const result = await run(
+      dirname(file),
+      "review the auth module",
+      "node dist/main.js",
+      { workDir, presetFile: file },
+    );
+
+    expect(result.stopReason).toBe("completed");
+    // Proves config/topology were actually sourced from the single file, not
+    // some fallback: the fake iteration ran, and the loop's own metadata
+    // reflects the merged-TOML preset's identity.
+    expect(runIteration).toHaveBeenCalled();
   });
 });

@@ -325,6 +325,26 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
       i += 2;
       continue;
     }
+    if (token === "--preset-file") {
+      const path = args[i + 1];
+      if (!path) {
+        console.log(`missing path after ${token}`);
+        options.usageError = true;
+        return options;
+      }
+      if (!config.pathIsSingleFilePreset(path)) {
+        console.log(
+          `--preset-file expects a path to an existing .toml file: ${path}`,
+        );
+        options.usageError = true;
+        return options;
+      }
+      options.presetFile = resolve(path);
+      options.projectDir = dirname(resolve(path));
+      options.presetExplicit = true;
+      i += 2;
+      continue;
+    }
     if (token === "--chain") {
       const chainVal = args[i + 1];
       if (!chainVal) {
