@@ -19,6 +19,7 @@ import {
   uniqueGeneratedId,
 } from "@mobrienv/autoloop-core";
 import { loadAgentMap } from "@mobrienv/autoloop-core/agent-map";
+import * as concurrency from "@mobrienv/autoloop-core/concurrency";
 import * as config from "@mobrienv/autoloop-core/config";
 import {
   presetCategory,
@@ -458,6 +459,7 @@ export function buildLoopContext(
       logLevel,
       branchMode: false,
       isolationMode: isolation.mode,
+      noResume: runOptions.noResume ?? false,
     },
     launch: {
       preset: currentPresetName,
@@ -644,6 +646,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       })(),
     },
     parallel,
+    stage: readStageConfig(cfg),
     hooks: {
       // Hook commands get the same template vars as role prompts ({{PRESET_DIR}},
       // {{TOOL_PATH}}, {{STATE_DIR}}) so a hook can reference preset-bundled scripts by
@@ -863,6 +866,17 @@ function readParallelConfig(cfg: config.Config): LoopContext["parallel"] {
     enabled: truthySetting(config.get(cfg, "parallel.enabled", "false")),
     maxBranches: config.getInt(cfg, "parallel.max_branches", 3),
     branchTimeoutMs: config.getInt(cfg, "parallel.branch_timeout_ms", 180000),
+  };
+}
+
+function readStageConfig(cfg: config.Config): LoopContext["stage"] {
+  return {
+    concurrency: config.getInt(
+      cfg,
+      "stage.concurrency",
+      concurrency.defaultConcurrency(),
+    ),
+    branchTimeoutMs: config.getInt(cfg, "stage.branch_timeout_ms", 180000),
   };
 }
 

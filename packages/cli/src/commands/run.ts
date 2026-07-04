@@ -47,6 +47,8 @@ interface RunOptions {
   architectObjective?: string;
   /** Path the architect must write the generated preset to (CLI-controlled). */
   architectOutputPath?: string;
+  /** Force every fan-out stage branch to relaunch rather than resume. */
+  noResume?: boolean;
 }
 
 export async function dispatchRun(
@@ -380,6 +382,11 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     }
     if (token === "--keep-worktree") {
       options.keepWorktree = true;
+      i++;
+      continue;
+    }
+    if (token === "--no-resume") {
+      options.noResume = true;
       i++;
       continue;
     }

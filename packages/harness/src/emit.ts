@@ -183,6 +183,33 @@ function isEvidenceValue(v: unknown): boolean {
 }
 
 /**
+ * Parse `payload` as a JSON object, returning its fields if (and only if) the
+ * whole payload is a well-formed JSON object literal. This is the ONE
+ * definition of "structured branch output": the evidence-gate keys check
+ * (`payloadEvidenceKeys`) and the fan-out stage branch runner both parse
+ * through this function, so "a branch emitted structured data" means the same
+ * thing everywhere. A branch whose payload does not parse as a JSON object
+ * (free prose, a bare string, an array, ...) is not structured — callers treat
+ * that as a dead/schema-invalid branch rather than guessing at fields.
+ */
+export function parseJsonObjectPayload(
+  payload: string,
+): Record<string, unknown> | undefined {
+  if (!payload) return undefined;
+  const trimmed = payload.trim();
+  if (!trimmed.startsWith("{")) return undefined;
+  try {
+    const obj = JSON.parse(trimmed) as unknown;
+    if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+      return undefined;
+    }
+    return obj as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Evidence keys present in a payload. A key is "present" only when it carries a
  * *machine-checkable* value:
  *
@@ -200,15 +227,10 @@ export function payloadEvidenceKeys(payload: string): Set<string> {
   if (!payload) return present;
 
   // JSON object payloads: top-level keys with a non-empty scalar value.
-  const trimmed = payload.trim();
-  if (trimmed.startsWith("{")) {
-    try {
-      const obj = JSON.parse(trimmed) as Record<string, unknown>;
-      for (const [k, v] of Object.entries(obj)) {
-        if (isEvidenceValue(v)) present.add(k);
-      }
-    } catch {
-      // not JSON — fall through to token scan
+  const obj = parseJsonObjectPayload(payload);
+  if (obj) {
+    for (const [k, v] of Object.entries(obj)) {
+      if (isEvidenceValue(v)) present.add(k);
     }
   }
 

@@ -20,16 +20,18 @@ completion = "task.complete"
 [[role]]
 id = "verifier"
 prompt = "verify"
-emits = ["verify.passed", "verify.blocked"]
+emits = ["verify.panel", "verify.passed", "verify.blocked"]
 
 [handoff]
 "loop.start" = ["verifier"]
+"verify.panel" = []
 "verify.passed" = ["verifier"]
 "verify.blocked" = ["verifier"]
 
 [[stage]]
 id = "verify"
 kind = "verdict"
+trigger = "verify.panel"
 branches = 3
 role = "verifier"
 join = "majority-vote"
@@ -43,6 +45,7 @@ on_fail = "verify.blocked"
     const s = topo.stages[0];
     expect(s.id).toBe("verify");
     expect(s.kind).toBe("verdict");
+    expect(s.trigger).toBe("verify.panel");
     expect(s.branches).toBe(3);
     expect(s.role).toBe("verifier");
     expect(s.join).toBe("majority-vote");
@@ -63,6 +66,7 @@ emits = ["find.done"]
 
 [[stage]]
 id = "find"
+trigger = "find.done"
 roles = ["finder"]
 `);
     const s = topo.stages[0];
@@ -71,6 +75,24 @@ roles = ["finder"]
     expect(s.onPass).toBe("find.passed");
     expect(s.onFail).toBe("find.blocked");
     expect(s.roles).toEqual(["finder"]);
+  });
+
+  it("parses trigger from the `on` alias", () => {
+    const topo = topoFrom(`
+name = "p"
+[[role]]
+id = "finder"
+prompt = "find"
+emits = ["find.go"]
+[handoff]
+"loop.start" = ["finder"]
+
+[[stage]]
+id = "find"
+on = "find.go"
+roles = ["finder"]
+`);
+    expect(topo.stages[0].trigger).toBe("find.go");
   });
 });
 
@@ -82,12 +104,14 @@ completion = "task.complete"
 [[role]]
 id = "real"
 prompt = "x"
-emits = ["task.complete"]
+emits = ["s.trigger", "task.complete"]
 [handoff]
 "loop.start" = ["real"]
+"s.trigger" = []
 
 [[stage]]
 id = "s"
+trigger = "s.trigger"
 role = "ghost"
 branches = 2
 on_pass = "task.complete"
@@ -108,12 +132,14 @@ completion = "task.complete"
 [[role]]
 id = "v"
 prompt = "x"
-emits = ["task.complete"]
+emits = ["s.trigger", "task.complete"]
 [handoff]
 "loop.start" = ["v"]
+"s.trigger" = []
 
 [[stage]]
 id = "s"
+trigger = "s.trigger"
 role = "v"
 branches = 2
 on_pass = "nowhere.event"
@@ -136,12 +162,14 @@ completion = "task.complete"
 [[role]]
 id = "v"
 prompt = "x"
-emits = ["task.complete"]
+emits = ["s.trigger", "task.complete"]
 [handoff]
 "loop.start" = ["v"]
+"s.trigger" = []
 
 [[stage]]
 id = "s"
+trigger = "s.trigger"
 on_pass = "task.complete"
 on_fail = "task.complete"
 `);
@@ -149,37 +177,7 @@ on_fail = "task.complete"
     expect(w.some((x) => x.kind === "stage-empty")).toBe(true);
   });
 
-  it("flags schema incoherence when the vote field is not required", () => {
-    const topo = topoFrom(`
-name = "p"
-completion = "task.complete"
-[[role]]
-id = "v"
-prompt = "x"
-emits = ["task.complete"]
-[handoff]
-"loop.start" = ["v"]
-
-[[stage]]
-id = "s"
-role = "v"
-branches = 3
-join = "majority-vote"
-requires = ["reason"]
-vote_field = "affirm"
-on_pass = "task.complete"
-on_fail = "task.complete"
-`);
-    const w = validateTopology(topo);
-    expect(
-      w.some(
-        (x) =>
-          x.kind === "stage-schema-incoherent" && x.message.includes("affirm"),
-      ),
-    ).toBe(true);
-  });
-
-  it("flags defined-but-inert stages on the single-file (runnable) path", () => {
+  it("flags a stage with no trigger", () => {
     const topo = topoFrom(`
 name = "p"
 completion = "task.complete"
@@ -197,38 +195,93 @@ branches = 2
 on_pass = "task.complete"
 on_fail = "task.complete"
 `);
-    // Default (directory) validation does not flag execution-readiness...
+    const w = validateTopology(topo);
+    expect(w.some((x) => x.kind === "stage-trigger-missing")).toBe(true);
+  });
+
+  it("flags a stage whose trigger is never emitted", () => {
+    const topo = topoFrom(`
+name = "p"
+completion = "task.complete"
+[[role]]
+id = "v"
+prompt = "x"
+emits = ["task.complete"]
+[handoff]
+"loop.start" = ["v"]
+
+[[stage]]
+id = "s"
+trigger = "ghost.trigger"
+role = "v"
+branches = 2
+on_pass = "task.complete"
+on_fail = "task.complete"
+`);
+    const w = validateTopology(topo);
     expect(
-      validateTopology(topo).some((w) => w.kind === "stage-not-executed"),
-    ).toBe(false);
-    // ...but single-file (the runnable auto-chain path) refuses inert stages.
-    expect(
-      validateTopology(topo, { singleFile: true }).some(
-        (w) => w.kind === "stage-not-executed",
+      w.some(
+        (x) =>
+          x.kind === "stage-trigger-dead" &&
+          x.message.includes("ghost.trigger"),
       ),
     ).toBe(true);
   });
 
-  it("a well-formed stage produces no stage warnings", () => {
+  it("flags schema incoherence when the vote field is not required", () => {
+    const topo = topoFrom(`
+name = "p"
+completion = "task.complete"
+[[role]]
+id = "v"
+prompt = "x"
+emits = ["s.trigger", "task.complete"]
+[handoff]
+"loop.start" = ["v"]
+"s.trigger" = []
+
+[[stage]]
+id = "s"
+trigger = "s.trigger"
+role = "v"
+branches = 3
+join = "majority-vote"
+requires = ["reason"]
+vote_field = "affirm"
+on_pass = "task.complete"
+on_fail = "task.complete"
+`);
+    const w = validateTopology(topo);
+    expect(
+      w.some(
+        (x) =>
+          x.kind === "stage-schema-incoherent" && x.message.includes("affirm"),
+      ),
+    ).toBe(true);
+  });
+
+  it("a well-formed single-file stage produces no stage warnings", () => {
     const topo = topoFrom(`
 name = "p"
 completion = "task.complete"
 [[role]]
 id = "verifier"
 prompt = "x"
-emits = ["verify.passed", "verify.blocked"]
+emits = ["verify.panel", "verify.passed", "verify.blocked"]
 [[role]]
 id = "done"
 prompt = "x"
 emits = ["task.complete"]
 [handoff]
 "loop.start" = ["verifier"]
+"verify.panel" = []
 "verify.passed" = ["done"]
 "verify.blocked" = ["verifier"]
 
 [[stage]]
 id = "verify"
 kind = "verdict"
+trigger = "verify.panel"
 role = "verifier"
 branches = 3
 join = "majority-vote"
@@ -237,8 +290,8 @@ vote_field = "affirm"
 on_pass = "verify.passed"
 on_fail = "verify.blocked"
 `);
-    const stageWarnings = validateTopology(topo).filter((w) =>
-      w.kind.startsWith("stage-"),
+    const stageWarnings = validateTopology(topo, { singleFile: true }).filter(
+      (w) => w.kind.startsWith("stage-"),
     );
     expect(stageWarnings).toEqual([]);
   });
