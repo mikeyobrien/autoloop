@@ -12,6 +12,7 @@ export interface ResolvedIterationBackend {
   model: string;
   profile: string;
   disallowedTools: string[];
+  usageFrom: string;
 }
 
 export function resolvedFromLoopBackend(
@@ -29,5 +30,6 @@ export function resolvedFromLoopBackend(
     model: loop.backend.model,
     profile: loop.backend.profile ?? "",
     disallowedTools: [...(loop.backend.disallowedTools ?? [])],
+    usageFrom: loop.backend.usageFrom ?? "",
   };
 }

@@ -721,6 +721,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     acpSession: loop.acpSession ?? { current: undefined },
     piSession: loop.piSession ?? { current: undefined },
     claudeSdkSession: loop.claudeSdkSession ?? { current: undefined },
+    commandSession: loop.commandSession ?? { current: undefined },
     onEvent: loop.onEvent,
     signal: loop.signal,
   };
@@ -830,6 +831,13 @@ function readBackendConfig(
   // unaffected. Used e.g. to force a preset onto a dedicated capture tool by
   // removing the built-in WebFetch/WebSearch.
   const disallowedTools = config.getList(cfg, "backend.disallowed_tools");
+  // Opt-in cost-telemetry convention for `command`-kind backends. See
+  // `usage_from` in config-schema.ts for the contract.
+  const usageFrom = processStringOverride(
+    bo,
+    "usage_from",
+    config.get(cfg, "backend.usage_from", ""),
+  );
   return {
     kind,
     provider,
@@ -842,6 +850,7 @@ function readBackendConfig(
     model,
     profile,
     disallowedTools,
+    usageFrom,
   };
 }
 

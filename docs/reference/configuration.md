@@ -89,12 +89,27 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | `backend.model` | string | `""` | Model ID. For `kind = "claude-sdk"`, passed as the SDK `model` option. For ACP, set via `unstable_setSessionModel` when the provider supports it. |
 | `backend.profile` | string | `""` | Provider-side agent profile. For `provider = "hermes"`, launches as `hermes --profile <name> acp` to select which Hermes Agent profile runs the iteration. Empty means the Hermes default profile. Has no effect on other providers. |
 | `backend.disallowed_tools` | list (CSV) | `""` | **`claude-sdk` only.** Comma-separated tool names to remove from the agent entirely (e.g. `"WebFetch,WebSearch"`). A hard block that applies even under `bypassPermissions` (unlike deny rules). Empty by default, so other presets are unaffected. Used to force a preset onto a dedicated capture tool by removing the built-ins. |
+| `backend.usage_from` | string | `""` | **`command` only.** Opt-in cost-telemetry convention. Set to `"file"` to have the harness read a JSON usage object the wrapped command writes to `$AUTOLOOP_USAGE_FILE` before exiting. Empty (default) skips extraction entirely — no behavior change for existing presets. See [The `command` backend: cost telemetry and live control](#the-command-backend-cost-telemetry-and-live-control) below. |
 
 Kind auto-detection: if `kind` is empty, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); then whether it is or ends with `claude` with no custom `args` (→ `"claude-sdk"`); otherwise `"command"`. Pin `kind = "command"` to force the legacy `claude -p` shell path. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b claude-sdk`, `-b kiro`, `-b hermes[:profile]`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`.
 
 The `claude-sdk` backend runs each iteration as a fresh Claude Agent SDK streaming session: live control is fully supported (`autoloop control interrupt` cancels the in-flight turn; `autoloop control guide` steers it mid-turn), per-iteration token/cost telemetry is journaled as `backend.usage` (feeding `event_loop.max_cost_usd` and `autoloop inspect usage`), and the raw SDK message stream is persisted to `claude-stream.<iteration>.jsonl` in the run state dir.
 
 **Per-role overrides.** Any of `backend.kind`, `backend.provider`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.trust_all_tools`, `backend.agent`, `backend.model`, `backend.profile` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
+
+#### The `command` backend: cost telemetry and live control
+
+`kind = "command"` wraps an arbitrary CLI/adapter as a one-shot process per iteration (no persistent session, unlike `pi`/`claude-sdk`/`acp`). It supports the same cross-process cost budgeting and live control as the other backends, both opt-in and additive:
+
+- **Cost telemetry (`backend.usage_from = "file"`).** The harness exports `AUTOLOOP_USAGE_FILE=<state-dir>/usage.<iteration>.json` into every `command` iteration's environment. A cooperating command may write a JSON object there before it exits:
+
+  ```json
+  {"cost_usd": 0.0123, "input_tokens": 1000, "output_tokens": 200, "cache_read_tokens": 0, "cache_write_tokens": 0}
+  ```
+
+  All fields are optional (missing = `0`; `total_tokens` is derived from the token fields if not given). After the iteration completes, the harness reads and deletes the file, journaling a `backend.usage` event with the same field names `pi`/`claude-sdk` use — feeding `event_loop.max_cost_usd` and `autoloop inspect usage` unchanged. If the command doesn't write the file (or `usage_from` is left at its default `""`), the iteration proceeds with zero cost — never an error.
+
+- **Live control (`autoloop control interrupt` / `guide`).** `commandControlAdapter` publishes `interrupt` and `guidance` capabilities for every `command` run. `interrupt` sends `SIGUSR1` to the in-flight iteration's process, escalating to `SIGTERM` then `SIGKILL` (5s grace each) if it doesn't exit. A cooperating command should trap `SIGUSR1` and cancel gracefully; an uncooperative one is simply terminated like a normal interrupt. `guide` is always journal-durable (applied to the *next* iteration's prompt) since one-shot command processes have no mid-turn session to steer live — pass `--no-interrupt` to skip cancelling the current iteration.
 
 ### Review (metareview)
 
