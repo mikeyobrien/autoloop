@@ -40,6 +40,9 @@ export function printUsage(): void {
   console.log("  autoloop preset promote <source.toml> <name>");
   console.log("  autoloop worktree <list|show|diff|merge|clean> [args]");
   console.log("  autoloop config <show|set|unset|path> [args]");
+  console.log(
+    "  autoloop hooks <list|show|validate|clear-suspend> [project-dir] [--json]",
+  );
   console.log("  autoloop dashboard [--port <port>]");
   console.log("  autoloop kanban [--port <port>]");
   console.log("  autoloop acp [--project-dir <dir>]");
