@@ -391,6 +391,49 @@ describe("buildLoopContext", () => {
   });
 });
 
+describe("buildLoopContext parallel.aggregate config", () => {
+  it("defaults to wait_for_all with no timeout", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+    expect(loop.parallel.aggregate).toEqual({
+      mode: "wait_for_all",
+      timeoutMs: 0,
+    });
+  });
+
+  it("reads a configured first_success mode and timeout", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'parallel.aggregate.mode = "first_success"',
+        "parallel.aggregate.timeout_ms = 45000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+    expect(loop.parallel.aggregate).toEqual({
+      mode: "first_success",
+      timeoutMs: 45000,
+    });
+  });
+
+  it("falls back to wait_for_all for an unrecognized mode", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'parallel.aggregate.mode = "bogus"',
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+    expect(loop.parallel.aggregate.mode).toBe("wait_for_all");
+  });
+});
+
 describe("buildLoopContext run-scoped isolation", () => {
   function makeProjectWithActiveRun(
     configToml?: string,

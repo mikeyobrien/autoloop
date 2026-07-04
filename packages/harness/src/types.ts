@@ -162,7 +162,16 @@ export interface LoopContext {
      */
     minConfidence: number;
   };
-  parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
+  parallel: {
+    enabled: boolean;
+    maxBranches: number;
+    branchTimeoutMs: number;
+    /** Loop-level default wave completion strategy (role `aggregate` overrides). */
+    aggregate: {
+      mode: "wait_for_all" | "first_success" | "timeout";
+      timeoutMs: number;
+    };
+  };
   hooks: {
     preRun: string;
     preIteration: string;
