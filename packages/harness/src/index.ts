@@ -37,6 +37,7 @@ import {
 import { acpControlAdapter } from "./control/acp-adapter.js";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import { claudeSdkControlAdapter } from "./control/claude-sdk-adapter.js";
+import { commandControlAdapter } from "./control/command-adapter.js";
 import {
   drainControlRequests,
   publishCapabilities,
@@ -158,6 +159,15 @@ export async function driveLoop(
       terminateClaudeSdkSession(session).catch(() => {
         /* best-effort */
       });
+    }
+    if (loop.commandSession.current) {
+      const session = loop.commandSession.current;
+      loop.commandSession.current = undefined;
+      try {
+        process.kill(session.pid, "SIGTERM");
+      } catch {
+        /* best-effort */
+      }
     }
     try {
       registryStop(loop, currentIteration, "interrupted");
@@ -283,6 +293,14 @@ export async function driveLoop(
         /* best-effort */
       }
       loop.claudeSdkSession.current = undefined;
+    }
+    if (loop.commandSession.current) {
+      try {
+        process.kill(loop.commandSession.current.pid, "SIGTERM");
+      } catch {
+        /* best-effort */
+      }
+      loop.commandSession.current = undefined;
     }
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
@@ -461,6 +479,14 @@ export async function runParallelBranchCli(
         /* best-effort */
       }
       seeded.claudeSdkSession.current = undefined;
+    }
+    if (seeded.commandSession.current) {
+      try {
+        process.kill(seeded.commandSession.current.pid, "SIGTERM");
+      } catch {
+        /* best-effort */
+      }
+      seeded.commandSession.current = undefined;
     }
   }
   const finishedMs = Date.now();
@@ -649,5 +675,44 @@ export function buildControlAdapter(
       },
     });
   }
+  if (loop.backend.kind === "command") {
+    return commandControlAdapter(loop.runtime.runId, {
+      triggerInterrupt: () => escalateCommandInterrupt(loop),
+    });
+  }
   return undefined;
+}
+
+/**
+ * SIGUSR1 → grace period → SIGTERM → grace period → SIGKILL against the
+ * in-flight `command` iteration's child. Non-blocking (setTimeout-driven) so
+ * it never stalls the harness's own control-drain or iteration loop. No-op if
+ * no `command` iteration is currently running, or if the process has already
+ * exited (each `kill` call below is best-effort and independently guarded).
+ */
+function escalateCommandInterrupt(loop: LoopContext, graceMs = 5000): void {
+  const session = loop.commandSession.current;
+  if (!session?.pid) return;
+  const stillRunning = () => loop.commandSession.current?.pid === session.pid;
+  try {
+    process.kill(session.pid, "SIGUSR1");
+  } catch {
+    return; // already exited
+  }
+  setTimeout(() => {
+    if (!stillRunning()) return;
+    try {
+      process.kill(session.pid, "SIGTERM");
+    } catch {
+      /* already exited */
+    }
+    setTimeout(() => {
+      if (!stillRunning()) return;
+      try {
+        process.kill(session.pid, "SIGKILL");
+      } catch {
+        /* already exited */
+      }
+    }, graceMs);
+  }, graceMs);
 }

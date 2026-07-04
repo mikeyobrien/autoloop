@@ -139,6 +139,7 @@ describe("buildIterationContext backend resolution (slice 2)", () => {
       agent: "",
       model: "",
       disallowedTools: [],
+      usageFrom: "",
     });
     expect(iter.backendModel).toBe("");
     expect(iter.backendAgent).toBe(iter.roleAgent);
@@ -182,6 +183,7 @@ describe("resolvedFromLoopBackend", () => {
       agent: "",
       model: "",
       disallowedTools: [],
+      usageFrom: "",
     });
     expect(resolved.args).not.toBe(loop.backend.args);
   });

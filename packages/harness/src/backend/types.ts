@@ -11,6 +11,7 @@ export interface ResolvedIterationBackend {
   agent: string;
   model: string;
   disallowedTools: string[];
+  usageFrom: string;
 }
 
 export function resolvedFromLoopBackend(
@@ -27,5 +28,6 @@ export function resolvedFromLoopBackend(
     agent: loop.backend.agent,
     model: loop.backend.model,
     disallowedTools: [...(loop.backend.disallowedTools ?? [])],
+    usageFrom: loop.backend.usageFrom ?? "",
   };
 }

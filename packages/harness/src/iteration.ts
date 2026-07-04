@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
   classifyBackendError,
@@ -54,7 +55,8 @@ import {
   appendIterationFinish,
   appendIterationStart,
   buildBackendCommand,
-  runProcess,
+  commandUsageFilePath,
+  runProcessAsync,
 } from "./parallel.js";
 import {
   reinjectPostconditionFailure,
@@ -336,10 +338,92 @@ async function runBackendIteration(
     recordClaudeSdkUsage(loop, iter);
     return result;
   }
-  return runProcess(
+  // Plain `command` backend (and any other non-session kind falling through
+  // here): async-spawned so the harness can register a live PID for
+  // interrupt signaling (commandControlAdapter) without blocking the event
+  // loop the way execSync does. Session is cleared as soon as the process
+  // exits, before usage telemetry is recorded.
+  const usesUsageFile =
+    iter.backend.kind === "command" && Boolean(iter.backend.usageFrom);
+  if (usesUsageFile) {
+    // Clear any stale usage file left by a prior iteration before invoking,
+    // so a command that forgets to (re)write it is treated as zero cost
+    // rather than reporting stale numbers.
+    removeUsageFileIfExists(commandUsageFilePath(loop, iter.iteration));
+  }
+  const result = await runProcessAsync(
     buildBackendCommand(loop, iter),
     iter.backend.timeoutMs,
     iter.backend.kind,
+    (pid) => {
+      loop.commandSession.current = { pid };
+    },
+  );
+  loop.commandSession.current = undefined;
+  if (iter.backend.kind === "command") {
+    recordCommandUsage(loop, iter);
+  }
+  return result;
+}
+
+function removeUsageFileIfExists(path: string): void {
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Journal per-iteration token/cost totals for the `command` backend, read
+ * from the opt-in `usage_from = "file"` side-file convention: the wrapped
+ * command may write a JSON object to `$AUTOLOOP_USAGE_FILE` before exiting.
+ * Best-effort and graceful: missing, empty, or unparsable files (or
+ * `usage_from` left unset) mean zero cost and no event — never an error.
+ */
+function recordCommandUsage(loop: LoopContext, iter: IterationContext): void {
+  if (iter.backend.usageFrom !== "file") return;
+  const path = commandUsageFilePath(loop, iter.iteration);
+  if (!existsSync(path)) return;
+  let parsed: Record<string, unknown>;
+  try {
+    const raw = readFileSync(path, "utf-8").trim();
+    if (!raw) return;
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  } finally {
+    removeUsageFileIfExists(path);
+  }
+  const num = (key: string): number => {
+    const v = parsed[key];
+    return typeof v === "number" && Number.isFinite(v) ? v : 0;
+  };
+  const inputTokens = num("input_tokens");
+  const outputTokens = num("output_tokens");
+  const cacheReadTokens = num("cache_read_tokens");
+  const cacheWriteTokens = num("cache_write_tokens");
+  const totalTokens =
+    parsed.total_tokens !== undefined
+      ? num("total_tokens")
+      : inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
+  const costUsd = num("cost_usd");
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iter.iteration),
+    "backend.usage",
+    jsonFieldRaw("input_tokens", String(inputTokens)) +
+      ", " +
+      jsonFieldRaw("output_tokens", String(outputTokens)) +
+      ", " +
+      jsonFieldRaw("cache_read_tokens", String(cacheReadTokens)) +
+      ", " +
+      jsonFieldRaw("cache_write_tokens", String(cacheWriteTokens)) +
+      ", " +
+      jsonFieldRaw("total_tokens", String(totalTokens)) +
+      ", " +
+      jsonFieldRaw("cost_usd", String(costUsd)),
   );
 }
 

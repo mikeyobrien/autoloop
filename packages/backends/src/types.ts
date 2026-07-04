@@ -8,6 +8,13 @@ export interface BackendSpec {
   trustAllTools?: boolean;
   agent?: string;
   model?: string;
+  /**
+   * Opt-in cost-telemetry convention for `command`-kind backends: `"file"`
+   * means the wrapped command may report usage by writing a JSON object to
+   * `$AUTOLOOP_USAGE_FILE` before exiting. Empty disables extraction (default;
+   * no breaking change for existing presets).
+   */
+  usageFrom?: string;
 }
 
 export interface BackendRunResult {
@@ -35,4 +42,11 @@ export interface BackendCommandContext {
   spec: Pick<BackendSpec, "kind" | "command" | "args" | "promptMode">;
   prompt: string;
   runtimeEnv: string;
+  /**
+   * When set, exported as `AUTOLOOP_USAGE_FILE` for the child process — the
+   * side-file convention a `command` backend can opt into to report cost
+   * telemetry. Always exported (cheap) regardless of `usage_from`; only read
+   * back by the harness when `backend.usage_from = "file"` is configured.
+   */
+  usageFilePath?: string;
 }
