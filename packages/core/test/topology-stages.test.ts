@@ -260,7 +260,7 @@ on_fail = "task.complete"
     ).toBe(true);
   });
 
-  it("a well-formed single-file stage produces no stage warnings", () => {
+  it("a well-formed single-file stage produces ZERO warnings of any kind", () => {
     const topo = topoFrom(`
 name = "p"
 completion = "task.complete"
@@ -290,9 +290,92 @@ vote_field = "affirm"
 on_pass = "verify.passed"
 on_fail = "verify.blocked"
 `);
-    const stageWarnings = validateTopology(topo, { singleFile: true }).filter(
-      (w) => w.kind.startsWith("stage-"),
-    );
-    expect(stageWarnings).toEqual([]);
+    // Assert the FULL warning set is empty — not just stage-* warnings — because
+    // the auto-chain refuses any preset with a non-empty `warnings` array.
+    expect(validateTopology(topo, { singleFile: true })).toEqual([]);
+  });
+
+  it("does not flag a dedicated branch role as orphaned (reached via the stage)", () => {
+    // `verifier` is referenced ONLY as a stage branch role — it is never a
+    // handoff-value target. Before the stage-aware orphan check it tripped a
+    // false `orphan-role` warning, which made the auto-chain reject every
+    // stage-based generated preset.
+    const topo = topoFrom(`
+name = "p"
+completion = "task.complete"
+[[role]]
+id = "coordinator"
+prompt = "x"
+emits = ["verify.panel", "task.complete"]
+[[role]]
+id = "verifier"
+prompt = "x"
+emits = ["verify.passed", "verify.blocked"]
+[handoff]
+"loop.start" = ["coordinator"]
+"verify.panel" = []
+"verify.passed" = ["coordinator"]
+"verify.blocked" = ["coordinator"]
+
+[[stage]]
+id = "verify"
+kind = "verdict"
+trigger = "verify.panel"
+role = "verifier"
+branches = 3
+join = "majority-vote"
+requires = ["affirm"]
+vote_field = "affirm"
+on_pass = "verify.passed"
+on_fail = "verify.blocked"
+`);
+    const warnings = validateTopology(topo, { singleFile: true });
+    expect(warnings.some((w) => w.kind === "orphan-role")).toBe(false);
+    expect(warnings).toEqual([]);
+  });
+
+  it("does not flag distinct multi-lens branch roles as orphaned", () => {
+    // The multi-lens (N-distinct) shape: three dedicated lens roles referenced
+    // only via `roles`, plus a synthesizer referenced only via synthesizer_role.
+    const topo = topoFrom(`
+name = "p"
+completion = "task.complete"
+[[role]]
+id = "coordinator"
+prompt = "x"
+emits = ["review.panel", "task.complete"]
+[[role]]
+id = "security_lens"
+prompt = "x"
+emits = ["review.done"]
+[[role]]
+id = "correctness_lens"
+prompt = "x"
+emits = ["review.done"]
+[[role]]
+id = "synth"
+prompt = "x"
+emits = ["review.done"]
+[handoff]
+"loop.start" = ["coordinator"]
+"review.panel" = []
+"review.done" = ["coordinator"]
+
+[[stage]]
+id = "review"
+kind = "discovery"
+trigger = "review.panel"
+roles = ["security_lens", "correctness_lens"]
+join = "synthesize"
+requires = ["findings"]
+items_field = "findings"
+key_field = "id"
+synthesizer_role = "synth"
+on_pass = "review.done"
+on_fail = "review.done"
+`);
+    const warnings = validateTopology(topo, { singleFile: true });
+    expect(warnings.some((w) => w.kind === "orphan-role")).toBe(false);
+    expect(warnings).toEqual([]);
   });
 });

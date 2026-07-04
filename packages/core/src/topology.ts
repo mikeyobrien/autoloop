@@ -109,6 +109,26 @@ export function handoffTargetIds(topology: Topology): string[] {
   return all;
 }
 
+/**
+ * Role ids referenced by a fan-out stage — as its identical-panel `role`, one of
+ * its distinct-panel `roles`, or its `synthesizerRole`. A stage is a dispatch
+ * point analogous to a `[handoff]` rule: its trigger routes to these roles even
+ * though they never appear as handoff-value targets. The orphan-role check must
+ * treat them as reached, or every dedicated branch role trips a false positive.
+ */
+export function stageReferencedRoleIds(topology: Topology): string[] {
+  const all: string[] = [];
+  const add = (id: string): void => {
+    if (id !== "" && !all.includes(id)) all.push(id);
+  };
+  for (const stage of topology.stages) {
+    add(stage.role);
+    for (const id of stage.roles) add(id);
+    add(stage.synthesizerRole);
+  }
+  return all;
+}
+
 export function loadTopology(projectDir: string): Topology {
   const path = join(projectDir, "topology.toml");
   if (!existsSync(path)) return defaultTopology();
@@ -516,7 +536,8 @@ export function validateTopology(
 ): TopologyWarning[] {
   const warnings: TopologyWarning[] = [];
 
-  const targetedRoleIds = handoffTargetIds(topology);
+  const stageRoleIds = stageReferencedRoleIds(topology);
+  const targetedRoleIds = [...handoffTargetIds(topology), ...stageRoleIds];
   for (const role of topology.roles) {
     if (!targetedRoleIds.includes(role.id)) {
       warnings.push({
