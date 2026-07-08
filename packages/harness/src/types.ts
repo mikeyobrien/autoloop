@@ -2,6 +2,7 @@ import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { ClaudeSdkSession } from "@mobrienv/autoloop-backends/claude-sdk-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
+import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import type { LoopEventEmitter } from "./events.js";
@@ -169,6 +170,13 @@ export interface LoopContext {
     postIteration: string;
     postRun: string;
     strict: boolean;
+    /**
+     * Structured per-hook specs (legacy flat keys + `[[hook]]` entries),
+     * merged and template-expanded. This is the engine's source of truth;
+     * the flat fields above remain for backward compatibility with existing
+     * callers/tests but `specs` is what `runPhaseHooks` iterates.
+     */
+    specs: HookSpec[];
   };
   memory: { budgetChars: number };
   tasks: { budgetChars: number };

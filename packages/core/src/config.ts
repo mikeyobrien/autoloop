@@ -20,6 +20,7 @@ import {
   stringifyValues,
 } from "@mobrienv/autoloop-core/config-schema";
 import { bundledPresetsRoot } from "./bundled-presets.js";
+import { type HookSpec, parseHookSpecs } from "./hooks-schema.js";
 
 export type {
   Config,
@@ -250,6 +251,45 @@ export function backendOverrideFromProject(
     override.timeout_ms = section.timeout_ms;
 
   return override;
+}
+
+/**
+ * Structured per-hook specs (legacy flat `[hooks]` keys + `[[hook]]`
+ * array-of-tables) read from raw TOML — the stringified `Config` pipeline
+ * collapses arrays to CSV and cannot represent per-hook records. Mirrors
+ * `backendOverrideFromProject`'s raw-read pattern. Directory-preset form.
+ */
+export function loadHookSpecs(projectDir: string): HookSpec[] {
+  const path = resolveConfigPath(projectDir);
+  if (!existsSync(path)) return [];
+  return parseHookSpecs(parseRawToml(readFileSync(path, "utf-8")));
+}
+
+/** Single-file (`.toml`) preset form of {@link loadHookSpecs}. */
+export function loadHookSpecsFromFile(file: string): HookSpec[] {
+  if (!existsSync(file)) return [];
+  return parseHookSpecs(parseRawToml(readFileSync(file, "utf-8")));
+}
+
+/**
+ * The raw (un-stringified) parsed TOML tree for a directory preset's project
+ * config, or `{}` when absent. Used by `autoloop hooks validate` to surface
+ * `[[hook]]` schema errors that the stringified `Config` pipeline can't see.
+ */
+export function loadRawProjectToml(
+  projectDir: string,
+): Record<string, unknown> {
+  const path = resolveConfigPath(projectDir);
+  if (!existsSync(path)) return {};
+  return parseRawToml(readFileSync(path, "utf-8"));
+}
+
+/** Single-file (`.toml`) preset form of {@link loadRawProjectToml}. */
+export function loadRawProjectTomlFromFile(
+  file: string,
+): Record<string, unknown> {
+  if (!existsSync(file)) return {};
+  return parseRawToml(readFileSync(file, "utf-8"));
 }
 
 export function projectHasConfig(projectDir: string): boolean {
