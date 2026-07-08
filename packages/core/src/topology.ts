@@ -110,6 +110,26 @@ export function handoffTargetIds(topology: Topology): string[] {
   return all;
 }
 
+/**
+ * Role ids referenced by a fan-out stage — as its identical-panel `role`, one of
+ * its distinct-panel `roles`, or its `synthesizerRole`. A stage is a dispatch
+ * point analogous to a `[handoff]` rule: its trigger routes to these roles even
+ * though they never appear as handoff-value targets. The orphan-role check must
+ * treat them as reached, or every dedicated branch role trips a false positive.
+ */
+export function stageReferencedRoleIds(topology: Topology): string[] {
+  const all: string[] = [];
+  const add = (id: string): void => {
+    if (id !== "" && !all.includes(id)) all.push(id);
+  };
+  for (const stage of topology.stages) {
+    add(stage.role);
+    for (const id of stage.roles) add(id);
+    add(stage.synthesizerRole);
+  }
+  return all;
+}
+
 export function loadTopology(projectDir: string): Topology {
   const path = join(projectDir, "topology.toml");
   if (!existsSync(path)) return defaultTopology();
@@ -141,6 +161,22 @@ export function isSingleFilePresetPath(target: string): boolean {
 
 export function completionEvent(topology: Topology, fallback: string): string {
   return topology.completion || fallback;
+}
+
+/**
+ * Find the fan-out stage (if any) whose `trigger` matches `event`. Used by the
+ * iteration loop to intercept a stage's entry-point event before ordinary role
+ * dispatch — mirrors `parallelTriggerTopic` for `.parallel` dispatch topics.
+ */
+export function stageForTrigger(
+  topology: Topology,
+  event: string,
+): FanoutStage | undefined {
+  if (!event) return undefined;
+  return topology.stages.find(
+    (stage) =>
+      stage.trigger !== "" && eventMatchesPattern(event, stage.trigger),
+  );
 }
 
 export function suggestedRoles(
@@ -287,6 +323,7 @@ function parseStage(s: Record<string, unknown>): FanoutStage {
   return {
     id,
     kind,
+    trigger: str(s.trigger, str(s.on, "")),
     branches: num(s.branches, 0),
     role: str(s.role, ""),
     roles: Array.isArray(s.roles) ? s.roles.map(String) : [],
@@ -488,7 +525,8 @@ export interface TopologyWarning {
     | "stage-event-unroutable"
     | "stage-empty"
     | "stage-schema-incoherent"
-    | "stage-not-executed";
+    | "stage-trigger-missing"
+    | "stage-trigger-dead";
   message: string;
 }
 
@@ -506,7 +544,8 @@ export function validateTopology(
 ): TopologyWarning[] {
   const warnings: TopologyWarning[] = [];
 
-  const targetedRoleIds = handoffTargetIds(topology);
+  const stageRoleIds = stageReferencedRoleIds(topology);
+  const targetedRoleIds = [...handoffTargetIds(topology), ...stageRoleIds];
   for (const role of topology.roles) {
     if (!targetedRoleIds.includes(role.id)) {
       warnings.push({
@@ -572,16 +611,6 @@ export function validateTopology(
 
   validateStages(topology, warnings);
 
-  // Fan-out stages parse and validate, but stage EXECUTION is not yet wired into
-  // the run loop. On the runnable (single-file) path, flag a preset that defines
-  // stages so the dead-topology gate refuses it rather than silently no-opping.
-  if (options.singleFile && topology.stages.length > 0) {
-    warnings.push({
-      kind: "stage-not-executed",
-      message: `topology defines ${topology.stages.length} fan-out [[stage]] block(s), but stage execution is not yet wired into the run loop; they would not run`,
-    });
-  }
-
   return warnings;
 }
 
@@ -590,8 +619,22 @@ function validateStages(topology: Topology, warnings: TopologyWarning[]): void {
   const routes = (event: string): boolean =>
     eventMatchesAny(event, topology.handoffKeys) ||
     event === topology.completion;
+  const emitted = allEmittedEvents(topology);
 
   for (const stage of topology.stages) {
+    // A stage needs an entry point: some upstream role must emit its trigger.
+    if (stage.trigger === "") {
+      warnings.push({
+        kind: "stage-trigger-missing",
+        message: `stage \`${stage.id}\` has no trigger; set trigger = "<event>" to give it an entry point`,
+      });
+    } else if (!emitted.includes(stage.trigger)) {
+      warnings.push({
+        kind: "stage-trigger-dead",
+        message: `stage \`${stage.id}\` trigger \`${stage.trigger}\` is never emitted by any role`,
+      });
+    }
+
     // Every referenced role must exist.
     const referenced = [
       ...(stage.role ? [stage.role] : []),
