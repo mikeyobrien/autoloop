@@ -32,8 +32,8 @@ vi.mock("../../src/wave/launch-branches.js", () => ({
     _iter: unknown,
     _waveId: string,
     pending: WaveBranchSpec[],
-  ) =>
-    pending.map((spec) => ({
+  ) => ({
+    results: pending.map((spec) => ({
       branchId: spec.branchId,
       objective: spec.objective,
       stopReason: scriptedResult.stopReason,
@@ -45,6 +45,8 @@ vi.mock("../../src/wave/launch-branches.js", () => ({
       elapsedMs: scriptedResult.elapsedMs,
       finishedAtMs: Date.now(),
     })),
+    aggregateOutcome: { mode: "wait_for_all", aggregateTimedOut: false },
+  }),
 }));
 
 import type { BranchSpec as StageSpec } from "../../src/fanout-runner.js";
