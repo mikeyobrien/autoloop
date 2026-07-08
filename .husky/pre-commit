@@ -1,2 +1,5 @@
-npx lint-staged
+# Avoid lint-staged's git-stash backup path when a commit replaces a
+# directory with a symlink; the backup step fails on paths below the new
+# symlink before tasks can run. Tasks still run and update the index.
+npx lint-staged --no-stash
 npx tsc --noEmit

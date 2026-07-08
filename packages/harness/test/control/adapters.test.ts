@@ -4,6 +4,7 @@ import {
   kiroControlAdapter,
 } from "../../src/control/acp-adapter.js";
 import { claudeSdkControlAdapter } from "../../src/control/claude-sdk-adapter.js";
+import { commandControlAdapter } from "../../src/control/command-adapter.js";
 import { piControlAdapter } from "../../src/control/pi-adapter.js";
 import { buildRequest } from "../../src/control/queue.js";
 
@@ -277,5 +278,78 @@ describe("claudeSdkControlAdapter", () => {
     const ack = adapter.onRequest(buildRequest("run-1", "interrupt", {}));
     expect(ack.state).toBe("rejected");
     expect(ack.detail).toContain("query gone");
+  });
+});
+
+describe("commandControlAdapter", () => {
+  function makeHooks() {
+    return { triggerInterrupt: vi.fn() };
+  }
+
+  it("reports interrupt supported and no live-steering guidance", () => {
+    const adapter = commandControlAdapter("run-1", makeHooks());
+    const caps = adapter.capabilities();
+    expect(caps.backend).toBe("command");
+    expect(caps.interrupt.supported).toBe(true);
+    expect(caps.interrupt.detail).toContain("SIGUSR1");
+    expect(caps.guidance.supported).toBe(true);
+    expect(caps.guidance.detail).toContain("journal-durable");
+    expect(caps.inspect.supported).toBe(true);
+  });
+
+  it("invokes triggerInterrupt on interrupt verb", () => {
+    const hooks = makeHooks();
+    const adapter = commandControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(buildRequest("run-1", "interrupt", {}));
+    expect(hooks.triggerInterrupt).toHaveBeenCalledTimes(1);
+    expect(ack.state).toBe("applied");
+    expect(ack.detail).toContain("signal sent");
+  });
+
+  it("invokes interrupt when guide payload requests it", () => {
+    const hooks = makeHooks();
+    const adapter = commandControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "guide", {
+        message: "pivot",
+        interrupt: true,
+      }),
+    );
+    expect(hooks.triggerInterrupt).toHaveBeenCalledTimes(1);
+    expect(ack.state).toBe("applied");
+    expect(ack.detail).toContain("guidance-driven");
+  });
+
+  it("acks journal-durable guidance without interrupting when not requested", () => {
+    const hooks = makeHooks();
+    const adapter = commandControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "guide", {
+        message: "later",
+        interrupt: false,
+      }),
+    );
+    expect(hooks.triggerInterrupt).not.toHaveBeenCalled();
+    expect(ack.state).toBe("applied");
+    expect(ack.detail).toContain("guidance appended");
+  });
+
+  it("ignores unknown verbs", () => {
+    const adapter = commandControlAdapter("run-1", makeHooks());
+    const ack = adapter.onRequest(
+      buildRequest("run-1", "inspect" as never, {}),
+    );
+    expect(ack.state).toBe("ignored");
+  });
+
+  it("reports rejected when the interrupt hook throws", () => {
+    const hooks = makeHooks();
+    hooks.triggerInterrupt.mockImplementation(() => {
+      throw new Error("no pid");
+    });
+    const adapter = commandControlAdapter("run-1", hooks);
+    const ack = adapter.onRequest(buildRequest("run-1", "interrupt", {}));
+    expect(ack.state).toBe("rejected");
+    expect(ack.detail).toContain("no pid");
   });
 });

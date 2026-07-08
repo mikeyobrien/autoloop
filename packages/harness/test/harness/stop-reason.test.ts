@@ -52,6 +52,7 @@ function isKnownStopReason(reason: StopReason): true {
     case "max_runtime":
     case "premature_quit":
     case "interrupted":
+    case "suspended":
     case "verdict_exit":
     case "verdict_takeover":
     case "verdict_unknown":
@@ -62,15 +63,15 @@ function isKnownStopReason(reason: StopReason): true {
     case "error":
       return true;
     default:
-      // If a 24th literal is ever added to StopReason without a case here,
+      // If another literal is ever added to StopReason without a case here,
       // this line fails to *compile* (never-typed exhaustiveness check).
       return assertExhaustive(reason);
   }
 }
 
 describe("StopReason exhaustiveness", () => {
-  it("has exactly the 24 documented literals (23 from the issue + parallel_wave_invalid)", () => {
-    expect(STOP_REASONS.length).toBe(24);
+  it("has exactly the 25 documented literals (23 from the issue + parallel_wave_invalid + suspended)", () => {
+    expect(STOP_REASONS.length).toBe(25);
     expect(new Set(STOP_REASONS).size).toBe(STOP_REASONS.length);
   });
 

@@ -251,6 +251,34 @@ describe("buildLoopContext", () => {
     });
   });
 
+  it("defaults completion.mustBeLast and policy.fileModAudit to false", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.completion.mustBeLast).toBe(false);
+    expect(loop.policy.fileModAudit).toBe(false);
+  });
+
+  it("reads event_loop.completion_must_be_last and event_loop.audit_file_mods from TOML", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        "event_loop.completion_must_be_last = true",
+        "event_loop.audit_file_mods = true",
+      ].join("\n"),
+    );
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.completion.mustBeLast).toBe(true);
+    expect(loop.policy.fileModAudit).toBe(true);
+  });
+
   it("normalizes legacy kiro backend config to the ACP kiro provider", () => {
     const projectDir = makeProject(
       [
@@ -388,6 +416,49 @@ describe("buildLoopContext", () => {
     });
 
     expect(loop.runtime.runId).toMatch(/^run-[0-9a-z]+-[0-9a-f]{4}$/);
+  });
+});
+
+describe("buildLoopContext parallel.aggregate config", () => {
+  it("defaults to wait_for_all with no timeout", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+    expect(loop.parallel.aggregate).toEqual({
+      mode: "wait_for_all",
+      timeoutMs: 0,
+    });
+  });
+
+  it("reads a configured first_success mode and timeout", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'parallel.aggregate.mode = "first_success"',
+        "parallel.aggregate.timeout_ms = 45000",
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+    expect(loop.parallel.aggregate).toEqual({
+      mode: "first_success",
+      timeoutMs: 45000,
+    });
+  });
+
+  it("falls back to wait_for_all for an unrecognized mode", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'parallel.aggregate.mode = "bogus"',
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+    expect(loop.parallel.aggregate.mode).toBe("wait_for_all");
   });
 });
 

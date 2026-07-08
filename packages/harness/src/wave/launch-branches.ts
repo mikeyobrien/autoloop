@@ -22,7 +22,13 @@ import {
 } from "../parallel.js";
 import type { IterationContext } from "../prompt.js";
 import type { LoopContext } from "../types.js";
-import type { BranchResult, BranchSpec } from "./types.js";
+import { branchSuccessStatus } from "./finalize-wave.js";
+import type {
+  AggregateConfig,
+  AggregateOutcome,
+  BranchResult,
+  BranchSpec,
+} from "./types.js";
 
 export function prepareParallelBranches(
   loop: LoopContext,
@@ -114,14 +120,34 @@ function launchBranch(loop: LoopContext, spec: BranchSpec): BranchSpec {
   return launched;
 }
 
+export interface JoinResult {
+  results: BranchResult[];
+  aggregateOutcome: AggregateOutcome;
+}
+
+/**
+ * Poll all branches to completion. The default `wait_for_all` aggregate mode
+ * blocks until every branch has a result (unchanged from prior behavior). Two
+ * additional modes let a wave resolve early:
+ *  - `first_success`: return as soon as one branch succeeds, terminating the
+ *    remaining pending branches (their results are synthesized as cancelled).
+ *  - `timeout`: bound the whole wave's wall clock; branches still pending at
+ *    the deadline are terminated and synthesized as timed out.
+ */
 export function joinParallelBranches(
   loop: LoopContext,
   iter: IterationContext,
   waveId: string,
   pending: BranchSpec[],
-): BranchResult[] {
+  aggregate: AggregateConfig,
+  waveStartMs: number,
+): JoinResult {
   const results: BranchResult[] = [];
   let remaining = [...pending];
+  const aggregateOutcome: AggregateOutcome = {
+    mode: aggregate.mode,
+    aggregateTimedOut: false,
+  };
 
   while (remaining.length > 0) {
     const ready: BranchResult[] = [];
@@ -141,6 +167,40 @@ export function joinParallelBranches(
     }
 
     remaining = stillPending;
+
+    if (aggregate.mode === "first_success") {
+      const satisfied = ready.find((r) => branchSuccessStatus(r.stopReason));
+      if (satisfied) {
+        aggregateOutcome.satisfiedByBranchId = satisfied.branchId;
+        cancelRemaining(
+          loop,
+          iter,
+          waveId,
+          remaining,
+          results,
+          "wave_cancelled_first_success",
+        );
+        remaining = [];
+        break;
+      }
+    }
+
+    if (aggregate.mode === "timeout" && aggregate.timeoutMs > 0) {
+      if (Date.now() - waveStartMs >= aggregate.timeoutMs) {
+        aggregateOutcome.aggregateTimedOut = true;
+        cancelRemaining(
+          loop,
+          iter,
+          waveId,
+          remaining,
+          results,
+          "wave_aggregate_timeout",
+        );
+        remaining = [];
+        break;
+      }
+    }
+
     if (remaining.length > 0 && ready.length === 0) {
       try {
         execSync("sleep 0.1");
@@ -149,10 +209,46 @@ export function joinParallelBranches(
       }
     }
   }
-  return results;
+  return { results, aggregateOutcome };
 }
 
-function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
+/** Terminate still-pending branches and synthesize a result for each,
+ * appending it to `results` and journaling `wave.branch.finish`. */
+function cancelRemaining(
+  loop: LoopContext,
+  iter: IterationContext,
+  waveId: string,
+  pending: BranchSpec[],
+  results: BranchResult[],
+  stopReason: string,
+): void {
+  for (const spec of pending) {
+    terminateBranch(spec);
+    const finishedMs = Date.now();
+    const result = branchResultFromSpec(
+      spec,
+      stopReason,
+      combinedOutput(spec),
+      finishedMs - spec.launchMs,
+      finishedMs,
+    );
+    writeParallelBranchSummary(spec.branchDir, {
+      ...result,
+      branch_dir: spec.branchDir,
+    });
+    appendWaveBranchFinish(loop, iter, waveId, result.branchId, result);
+    results.push(result);
+  }
+}
+
+/**
+ * Write the `launch.json` a `branch-run` subprocess reads to drive one
+ * isolated branch iteration. Exported so the fan-out stage runner
+ * (`wave/stage-branch-runner.ts`) can launch stage branches through the exact
+ * same supervisor/`branch-run` spawn machinery as parallel-wave branches,
+ * rather than a second bespoke spawner.
+ */
+export function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
   const fields =
     jsonField("branch_id", spec.branchId) +
     ", " +

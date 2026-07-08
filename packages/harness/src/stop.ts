@@ -349,6 +349,45 @@ export function stopPrematureQuit(
   return { iterations: completed, stopReason: "premature_quit" };
 }
 
+/**
+ * Stop for a `suspend`-policy hook that fired and could not (or was not
+ * configured to) block in-process. Durable suspend state has already been
+ * written by the hooks engine (`writeSuspendState`); this only journals the
+ * typed stop reason and registry status so `autoloop resume` can pick it up.
+ */
+export function stopSuspended(
+  loop: LoopContext,
+  iteration: number,
+  reason: string,
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=suspended iteration=${iteration} detail=${reason}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:suspended",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iteration),
+    "loop.stop",
+    jsonField("reason", "suspended") +
+      ", " +
+      jsonField("iteration", String(iteration)) +
+      ", " +
+      jsonField("detail", reason),
+  );
+  registryStop(loop, iteration, "suspended");
+  return { iterations: iteration, stopReason: "suspended" };
+}
+
 export function completeLoop(
   loop: LoopContext,
   iteration: number,

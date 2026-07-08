@@ -48,7 +48,12 @@ function makeLoopContext(): LoopContext {
       prompt: "",
       timeoutMs: 1000,
     },
-    parallel: { enabled: false, maxBranches: 1, branchTimeoutMs: 1000 },
+    parallel: {
+      enabled: false,
+      maxBranches: 1,
+      branchTimeoutMs: 1000,
+      aggregate: { mode: "wait_for_all", timeoutMs: 0 },
+    },
     memory: { budgetChars: 1000 },
     harness: { instructions: "" },
     profiles: { active: [], fragments: new Map(), warnings: [] },

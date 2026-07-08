@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
   classifyBackendError,
@@ -10,6 +11,7 @@ import {
   initAcpSession,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
+import { providerLaunchArgs } from "@mobrienv/autoloop-backends/acp-providers";
 import {
   getClaudeSdkUsage,
   initClaudeSdkSession,
@@ -31,6 +33,7 @@ import {
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
 import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
+import * as topology from "@mobrienv/autoloop-core/topology";
 import { reinjectAcceptanceFailure, runAcceptanceGate } from "./acceptance.js";
 import { awaitHumanResponse } from "./ask.js";
 import {
@@ -45,8 +48,9 @@ import {
   parallelTriggerTopic,
   systemTopic,
 } from "./emit.js";
+import { runFileModAudit } from "./file-mod-audit.js";
 import { loopStartMs } from "./guards.js";
-import { buildHookEnv, captureGitSha, runHook } from "./hooks.js";
+import { buildHookEnv, captureGitSha, runPhaseHooks } from "./hooks.js";
 import { reinjectIntentFailure, runIntentCriteria } from "./intent.js";
 import {
   appendBackendFinish,
@@ -54,7 +58,8 @@ import {
   appendIterationFinish,
   appendIterationStart,
   buildBackendCommand,
-  runProcess,
+  commandUsageFilePath,
+  runProcessAsync,
 } from "./parallel.js";
 import {
   reinjectPostconditionFailure,
@@ -71,17 +76,21 @@ import {
   resolveProvisional,
 } from "./provisional.js";
 import { registryProgress } from "./registry-bridge.js";
+import { finishStageIteration } from "./stage.js";
 import {
   completeLoop,
   stopBackendErrorClass,
   stopBackendFailed,
   stopBackendTimeout,
   stopMaxRuntime,
+  stopSuspended,
 } from "./stop.js";
+import { readSuspendState, resumeRequested } from "./suspend-state.js";
 import { reinjectTamperFailure, runTamperScreen } from "./tamper.js";
 import type { LoopContext, RunSummary } from "./types.js";
 import {
   continueAfterParallelJoin,
+  executeDeclarativeWave,
   executeParallelWave,
   stopAfterParallelWave,
 } from "./wave.js";
@@ -91,6 +100,21 @@ export async function runIteration(
   iteration: number,
   iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
 ): Promise<RunSummary> {
+  // Out-of-process pre_emit/post_emit `suspend` hooks (run in the `emit`
+  // subprocess — see emit.ts:runEmitPhaseHooks) can't block the harness loop
+  // directly; they write durable suspend state instead. Detect it here, at
+  // the next iteration boundary, and halt the loop rather than silently
+  // continuing past a pending suspend.
+  const pendingEmitSuspend = readSuspendState(loop.paths.stateDir);
+  if (
+    pendingEmitSuspend &&
+    (pendingEmitSuspend.phase === "pre_emit" ||
+      pendingEmitSuspend.phase === "post_emit") &&
+    !resumeRequested(loop.paths.stateDir)
+  ) {
+    return stopSuspended(loop, iteration, pendingEmitSuspend.reason);
+  }
+
   let iter = buildIterationContext(loop, iteration);
 
   // Clamp the iteration timeout to the remaining loop wall-clock budget so a
@@ -134,13 +158,30 @@ export async function runIteration(
 
   const startEpoch = Math.floor(Date.now() / 1000);
   const gitShaBefore = captureGitSha(loop.paths.workDir);
-  runHook(
+  const preIterResult = await runPhaseHooks(
     loop,
     "pre_iteration",
-    loop.hooks.preIteration,
     buildHookEnv(loop, { iteration, gitShaBefore }),
-    String(iteration),
+    { iteration, gitShaBefore },
   );
+  if (preIterResult.blocked) {
+    throw new Error(
+      `Aborting run: ${preIterResult.blockedMessage ?? "pre_iteration hook blocked"}`,
+    );
+  }
+  if (preIterResult.suspended) {
+    return stopSuspended(
+      loop,
+      iteration,
+      preIterResult.blockedMessage ?? "pre_iteration hook suspended the run",
+    );
+  }
+  // Mutation seam: applied after buildIterationContext but before the backend
+  // command is built, so a mutated prompt survives the loop-budget timeout
+  // clamp's `iter = {...iter, backend:{...}}` reassignment above.
+  if (preIterResult.mutatedPrompt !== undefined) {
+    iter = { ...iter, prompt: preIterResult.mutatedPrompt };
+  }
 
   // Fresh ACP session per iteration — ensures each role (researcher, critic,
   // etc.) starts with a clean context window for truly independent review.
@@ -156,7 +197,11 @@ export async function runIteration(
     const acpOpts: AcpClientOptions = {
       provider: iter.backend.provider,
       command: iter.backend.command,
-      args: iter.backend.args,
+      args: providerLaunchArgs(
+        iter.backend.provider,
+        iter.backend.profile,
+        iter.backend.args,
+      ),
       cwd: loop.paths.workDir,
       trustAllTools: iter.backend.trustAllTools,
       agentName: iter.backend.agent || undefined,
@@ -213,16 +258,31 @@ export async function runIteration(
   appendBackendFinish(loop, iter, output, exitCode, timedOut);
   appendIterationFinish(loop, iter, output, exitCode, timedOut, elapsedS);
   const gitShaAfter = captureGitSha(loop.paths.workDir);
-  runHook(
+  const postIterResult = await runPhaseHooks(
     loop,
     "post_iteration",
-    loop.hooks.postIteration,
     buildHookEnv(loop, { iteration, gitShaBefore, gitShaAfter }),
-    String(iteration),
+    { iteration, gitShaBefore, gitShaAfter },
   );
+  if (postIterResult.blocked) {
+    throw new Error(
+      `Aborting run: ${postIterResult.blockedMessage ?? "post_iteration hook blocked"}`,
+    );
+  }
+  if (postIterResult.suspended) {
+    return stopSuspended(
+      loop,
+      iteration,
+      postIterResult.blockedMessage ?? "post_iteration hook suspended the run",
+    );
+  }
   registryProgress(loop, iteration);
   // Capture the preset-declared progress scalar each iteration (drift signal).
   runProgressMetric(loop, iteration);
+  // Emit-boundary file-mod audit (opt-in): flag file writes by a role with
+  // disallowed_tools/read_only. Purely observational — journals/emits a typed
+  // event for parent orchestrators; never alters control flow itself.
+  runFileModAudit(loop, iter, iteration);
   log(loop, "debug", `iteration ${iteration} finish exit_code=${exitCode}`);
   loop.onEvent?.({
     type: "iteration.footer",
@@ -336,10 +396,92 @@ async function runBackendIteration(
     recordClaudeSdkUsage(loop, iter);
     return result;
   }
-  return runProcess(
+  // Plain `command` backend (and any other non-session kind falling through
+  // here): async-spawned so the harness can register a live PID for
+  // interrupt signaling (commandControlAdapter) without blocking the event
+  // loop the way execSync does. Session is cleared as soon as the process
+  // exits, before usage telemetry is recorded.
+  const usesUsageFile =
+    iter.backend.kind === "command" && Boolean(iter.backend.usageFrom);
+  if (usesUsageFile) {
+    // Clear any stale usage file left by a prior iteration before invoking,
+    // so a command that forgets to (re)write it is treated as zero cost
+    // rather than reporting stale numbers.
+    removeUsageFileIfExists(commandUsageFilePath(loop, iter.iteration));
+  }
+  const result = await runProcessAsync(
     buildBackendCommand(loop, iter),
     iter.backend.timeoutMs,
     iter.backend.kind,
+    (pid) => {
+      loop.commandSession.current = { pid };
+    },
+  );
+  loop.commandSession.current = undefined;
+  if (iter.backend.kind === "command") {
+    recordCommandUsage(loop, iter);
+  }
+  return result;
+}
+
+function removeUsageFileIfExists(path: string): void {
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Journal per-iteration token/cost totals for the `command` backend, read
+ * from the opt-in `usage_from = "file"` side-file convention: the wrapped
+ * command may write a JSON object to `$AUTOLOOP_USAGE_FILE` before exiting.
+ * Best-effort and graceful: missing, empty, or unparsable files (or
+ * `usage_from` left unset) mean zero cost and no event — never an error.
+ */
+function recordCommandUsage(loop: LoopContext, iter: IterationContext): void {
+  if (iter.backend.usageFrom !== "file") return;
+  const path = commandUsageFilePath(loop, iter.iteration);
+  if (!existsSync(path)) return;
+  let parsed: Record<string, unknown>;
+  try {
+    const raw = readFileSync(path, "utf-8").trim();
+    if (!raw) return;
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  } finally {
+    removeUsageFileIfExists(path);
+  }
+  const num = (key: string): number => {
+    const v = parsed[key];
+    return typeof v === "number" && Number.isFinite(v) ? v : 0;
+  };
+  const inputTokens = num("input_tokens");
+  const outputTokens = num("output_tokens");
+  const cacheReadTokens = num("cache_read_tokens");
+  const cacheWriteTokens = num("cache_write_tokens");
+  const totalTokens =
+    parsed.total_tokens !== undefined
+      ? num("total_tokens")
+      : inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
+  const costUsd = num("cost_usd");
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iter.iteration),
+    "backend.usage",
+    jsonFieldRaw("input_tokens", String(inputTokens)) +
+      ", " +
+      jsonFieldRaw("output_tokens", String(outputTokens)) +
+      ", " +
+      jsonFieldRaw("cache_read_tokens", String(cacheReadTokens)) +
+      ", " +
+      jsonFieldRaw("cache_write_tokens", String(cacheWriteTokens)) +
+      ", " +
+      jsonFieldRaw("total_tokens", String(totalTokens)) +
+      ", " +
+      jsonFieldRaw("cost_usd", String(costUsd)),
   );
 }
 
@@ -508,6 +650,47 @@ export async function finishIteration(
     );
   }
 
+  // Fan-out `[[stage]]` dispatch: a stage's `trigger` is a plain declared
+  // event (already passed the invalid-event check above like any other
+  // event), but the harness intercepts it here instead of ordinary role
+  // dispatch — launch the stage's branches, reduce, and route at the
+  // reducer's onPass/onFail event, exactly as a `.parallel` wave intercepts
+  // its dispatch topic above.
+  const stage = topology.stageForTrigger(loop.topology, emitted.topic);
+  if (stage) {
+    progress(emitted.topic, "stage:dispatched");
+    return finishStageIteration(loop, iter, stage, emitted.topic, iterate);
+  }
+
+  // Declarative concurrency (ralph v3 style): if the just-emitted event
+  // routes (via [handoff]) to a role that declares `concurrency > 0`, the
+  // harness auto-launches N concurrent branches for that role — no agent
+  // `.parallel` emit required. This takes precedence over ordinary routing
+  // for that event; agent-triggered `.parallel` (handled above) is
+  // unaffected and remains fully backward compatible. Synthetic wave/joined
+  // topics (`wave.*`, `*.parallel.joined`) never re-enter this path since
+  // `emitted.topic` is always an agent-emitted, non-system event here.
+  if (loop.parallel.enabled) {
+    const concurrentRoles = topology.concurrentRolesForEvent(
+      loop.topology,
+      emitted.topic,
+    );
+    if (concurrentRoles.length > 0) {
+      // Execution is synchronous (one wave resolves per iteration); when an
+      // event routes to more than one concurrency role, the first declared
+      // role's wave runs this iteration — the routing event still applies
+      // (via the resume topic) on subsequent iterations for any others.
+      return finishDeclarativeIteration(
+        loop,
+        iter,
+        emitted.topic,
+        concurrentRoles[0],
+        iterate,
+        progress,
+      );
+    }
+  }
+
   // Open-task gate for the completion-promise path. Mirror the event-path gate
   // in emit.ts (same store via loop.paths.tasksFile, soft tasks are advisory)
   // so a stdout promise can't bypass the requirement the emitted event honors.
@@ -524,6 +707,8 @@ export async function finishIteration(
     requiredEvents: loop.completion.requiredEvents,
     completionPromise: loop.completion.promise,
     hasBlockingTasks,
+    mustBeLast: loop.completion.mustBeLast,
+    completionOrderOk: completionEmittedLast(runLines, loop.completion.event),
   });
 
   progress(emitted.topic, resolved.outcome);
@@ -724,6 +909,39 @@ async function finishParallelIteration(
   return stopAfterParallelWave(loop, iter, result.reason, result.waveId);
 }
 
+/**
+ * Declarative-wave counterpart of `finishParallelIteration`: the routing
+ * event itself (not an agent `.parallel` emit) triggers N concurrent
+ * branches for `role`, per its topology `concurrency` declaration. Join/stop
+ * handling mirrors the agent-triggered path so downstream resume routing
+ * (`continueAfterParallelJoin`/`stopAfterParallelWave`) behaves identically.
+ */
+async function finishDeclarativeIteration(
+  loop: LoopContext,
+  iter: IterationContext,
+  routingEvent: string,
+  role: topology.Role,
+  iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+  progress: (topic: string, outcome: string) => void,
+): Promise<RunSummary> {
+  const result = executeDeclarativeWave(loop, iter, role, routingEvent);
+  const syntheticTopic = `${routingEvent}.parallel`;
+
+  if (result.reason === "parallel_wave_complete") {
+    progress(syntheticTopic, "parallel:joined");
+    return continueAfterParallelJoin(
+      loop,
+      iter,
+      result.waveId,
+      syntheticTopic,
+      result.elapsedMs,
+      iterate,
+    );
+  }
+  progress(syntheticTopic, `parallel:stop:${result.reason}`);
+  return stopAfterParallelWave(loop, iter, result.reason, result.waveId);
+}
+
 export function resolveOutcome(ctx: {
   emittedTopic: string;
   allTopics: string[];
@@ -733,9 +951,20 @@ export function resolveOutcome(ctx: {
   requiredEvents: string[];
   completionPromise: string;
   hasBlockingTasks: boolean;
+  /**
+   * Ralph-parity ordering policy. When true, a completion claim is rejected
+   * (falls through to the routed/promise/continue branches) unless
+   * `completionOrderOk` confirms no other event followed completionEvent in
+   * its own turn. Optional/false = order-insensitive set-membership check
+   * (unchanged default behavior).
+   */
+  mustBeLast?: boolean;
+  /** Precomputed by the caller from full journal ordering (see completionEmittedLast). */
+  completionOrderOk?: boolean;
 }): { action: string; outcome: string } {
   if (
-    completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents)
+    completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents) &&
+    (!ctx.mustBeLast || ctx.completionOrderOk)
   ) {
     return { action: "complete_event", outcome: "complete:completion_event" };
   }
@@ -771,6 +1000,32 @@ function latestAgentEventRecord(lines: string[]): {
     }
   }
   return { topic: "", payload: "" };
+}
+
+/**
+ * True iff `completionEvent`, wherever it was last emitted in the run, was
+ * the last non-system topic emitted in that same turn (iteration). Used to
+ * enforce `completion.must_be_last`: ralph rejects completion if other
+ * events follow it within the same turn, rather than autoloop's default
+ * order-insensitive set-membership check. Returns true (not applicable) if
+ * the completion event has not been emitted at all.
+ */
+export function completionEmittedLast(
+  runLines: string[],
+  completionEvent: string,
+): boolean {
+  let completionIteration: string | null = null;
+  for (const line of runLines) {
+    if (extractTopic(line) === completionEvent) {
+      completionIteration = extractIteration(line);
+    }
+  }
+  if (completionIteration === null) return true;
+  const turnTopics = runLines
+    .filter((line) => extractIteration(line) === completionIteration)
+    .map(extractTopic)
+    .filter((topic) => topic !== "" && !systemTopic(topic));
+  return turnTopics.lastIndexOf(completionEvent) === turnTopics.length - 1;
 }
 
 /** Every required-evidence event has been seen in the run so far. */

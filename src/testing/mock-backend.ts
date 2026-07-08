@@ -11,7 +11,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 interface Fixture {
@@ -20,6 +20,18 @@ interface Fixture {
   delay_ms: number;
   emit_event?: string;
   emit_payload?: string;
+  /**
+   * Cost-telemetry test fixture: when set, written verbatim (as JSON) to
+   * $AUTOLOOP_USAGE_FILE before the process exits — exercises the
+   * `usage_from = "file"` convention documented for the `command` backend.
+   */
+  usage?: Record<string, number>;
+  /**
+   * When true, traps SIGUSR1 and exits 130 instead of the default action —
+   * exercises the `command` backend's live-control interrupt path
+   * end-to-end against a real cooperating child process.
+   */
+  trap_usr1?: boolean;
 }
 
 function fixturePathFromArgs(): string {
@@ -44,6 +56,8 @@ function loadFixture(): Fixture {
       delay_ms: parsed.delay_ms ?? 0,
       emit_event: parsed.emit_event,
       emit_payload: parsed.emit_payload,
+      usage: parsed.usage,
+      trap_usr1: parsed.trap_usr1 ?? false,
     };
   } catch (err) {
     process.stderr.write(`mock-backend: failed to load fixture: ${err}\n`);
@@ -74,6 +88,13 @@ function sleep(ms: number): Promise<void> {
 async function main(): Promise<void> {
   const fixture = loadFixture();
 
+  if (fixture.trap_usr1) {
+    process.on("SIGUSR1", () => {
+      process.stdout.write("mock-backend: interrupted by SIGUSR1\n");
+      process.exit(130);
+    });
+  }
+
   if (fixture.delay_ms > 0) {
     await sleep(fixture.delay_ms);
   }
@@ -84,6 +105,13 @@ async function main(): Promise<void> {
 
   if (fixture.output) {
     process.stdout.write(fixture.output);
+  }
+
+  if (fixture.usage) {
+    const usageFile = process.env.AUTOLOOP_USAGE_FILE;
+    if (usageFile) {
+      writeFileSync(usageFile, JSON.stringify(fixture.usage));
+    }
   }
 
   process.exitCode = fixture.exit_code;

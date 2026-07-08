@@ -93,9 +93,12 @@ export function runFinishNotification(
     });
 
     if (result.error || result.status !== 0) {
-      const detail = result.error
-        ? result.error.message
-        : `exit ${result.status ?? `signal ${result.signal}`}: ${result.stderr?.toString() ?? ""}`;
+      const detail =
+        result.status !== null
+          ? `exit ${result.status}: ${result.stderr?.toString() ?? ""}`
+          : result.error
+            ? result.error.message
+            : `signal ${result.signal}: ${result.stderr?.toString() ?? ""}`;
       journalFailed(opts, command, detail);
       return { status: "failed", detail: tail(detail, 200) };
     }

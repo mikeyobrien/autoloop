@@ -35,6 +35,23 @@ describe("load", () => {
     expect(get(cfg, "backend.command", "")).toBe("claude");
   });
 
+  it("defaults backend.usage_from to empty (opt-in, no breaking change)", () => {
+    const cfg = load("/nonexistent/path/autoloops.toml");
+    expect(get(cfg, "backend.usage_from", "unset")).toBe("");
+  });
+
+  it("parses backend.usage_from from a preset without breaking other keys", () => {
+    const dir = tmpDir("usage-from");
+    writeFileSync(
+      join(dir, "config.toml"),
+      '[backend]\nkind = "command"\ncommand = "my-tool"\nusage_from = "file"\n',
+    );
+    const cfg = load(join(dir, "config.toml"));
+    expect(get(cfg, "backend.usage_from", "")).toBe("file");
+    expect(get(cfg, "backend.command", "")).toBe("my-tool");
+    expect(get(cfg, "backend.kind", "")).toBe("command");
+  });
+
   it("parses TOML config", () => {
     const dir = tmpDir("toml");
     writeFileSync(

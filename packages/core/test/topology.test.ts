@@ -5,13 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   allEmittedEvents,
   allowedEvents,
+  buildTopology,
   completionEvent,
+  concurrentRolesForEvent,
   eventMatchesAny,
   getRoleIds,
   loadTopology,
   render,
   renderTopologyInspect,
   roleCount,
+  rolesWithConcurrency,
   suggestedRoles,
   type Topology,
   validateTopology,
@@ -142,6 +145,35 @@ backend_model = "opus"
       backendAgent: "reviewer",
       backendModel: "opus",
     });
+  });
+
+  it("parses role disallowed_tools and read_only permissions", () => {
+    const dir = tmpDir("role-permissions");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "critic"
+prompt = "Review."
+emits = ["review.ready"]
+disallowed_tools = ["Edit", "Write"]
+read_only = true
+
+[[role]]
+id = "builder"
+prompt = "Build."
+emits = ["review.ready"]
+`,
+    );
+
+    const topo = loadTopology(dir);
+
+    expect(topo.roles[0]).toMatchObject({
+      disallowedTools: ["Edit", "Write"],
+      readOnly: true,
+    });
+    expect(topo.roles[1].disallowedTools).toBeUndefined();
+    expect(topo.roles[1].readOnly).toBeUndefined();
   });
 });
 
@@ -585,6 +617,198 @@ backend_model = "gpt-5"
       expect(role.backend_kind).toBeUndefined();
       expect(role.backend_model).toBeUndefined();
     }
+    spy.mockRestore();
+  });
+});
+
+describe("declarative role concurrency", () => {
+  it("parses a positive concurrency field", () => {
+    const parsed = buildTopology(
+      {
+        role: [{ id: "reviewer", prompt: "R", emits: ["review.done"] }].map(
+          (r) => ({ ...r, concurrency: 4 }),
+        ),
+        handoff: { "gaps.identified": ["reviewer"] },
+      },
+      "/tmp",
+    );
+    expect(parsed.roles[0].concurrency).toBe(4);
+  });
+
+  it("defaults concurrency to absent (0) when not declared", () => {
+    const parsed = buildTopology(
+      {
+        role: [{ id: "reviewer", prompt: "R", emits: ["review.done"] }],
+        handoff: { "gaps.identified": ["reviewer"] },
+      },
+      "/tmp",
+    );
+    expect(parsed.roles[0].concurrency).toBeUndefined();
+  });
+
+  it("ignores a negative or non-numeric concurrency value (falls back to unset)", () => {
+    const parsedNegative = buildTopology(
+      {
+        role: [{ id: "r", prompt: "R", emits: [], concurrency: -3 }],
+        handoff: {},
+      },
+      "/tmp",
+    );
+    expect(parsedNegative.roles[0].concurrency).toBeUndefined();
+
+    const parsedNaN = buildTopology(
+      {
+        role: [{ id: "r", prompt: "R", emits: [], concurrency: "nope" }],
+        handoff: {},
+      },
+      "/tmp",
+    );
+    expect(parsedNaN.roles[0].concurrency).toBeUndefined();
+  });
+
+  it("truncates a fractional concurrency to an integer", () => {
+    const parsed = buildTopology(
+      {
+        role: [{ id: "r", prompt: "R", emits: [], concurrency: 3.9 }],
+        handoff: {},
+      },
+      "/tmp",
+    );
+    expect(parsed.roles[0].concurrency).toBe(3);
+  });
+
+  it("parses an inline [role.aggregate] override", () => {
+    const parsed = buildTopology(
+      {
+        role: [
+          {
+            id: "r",
+            prompt: "R",
+            emits: [],
+            concurrency: 2,
+            aggregate: { mode: "first_success", timeout_ms: 5000 },
+          },
+        ],
+        handoff: {},
+      },
+      "/tmp",
+    );
+    expect(parsed.roles[0].aggregate).toEqual({
+      mode: "first_success",
+      timeoutMs: 5000,
+    });
+  });
+
+  it("normalizes an unrecognized aggregate mode to wait_for_all", () => {
+    const parsed = buildTopology(
+      {
+        role: [
+          {
+            id: "r",
+            prompt: "R",
+            emits: [],
+            aggregate: { mode: "bogus" },
+          },
+        ],
+        handoff: {},
+      },
+      "/tmp",
+    );
+    expect(parsed.roles[0].aggregate?.mode).toBe("wait_for_all");
+  });
+
+  it("rolesWithConcurrency returns only roles with concurrency > 0", () => {
+    const parsed = buildTopology(
+      {
+        role: [
+          { id: "a", prompt: "A", emits: [], concurrency: 2 },
+          { id: "b", prompt: "B", emits: [] },
+        ],
+        handoff: {},
+      },
+      "/tmp",
+    );
+    expect(rolesWithConcurrency(parsed).map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("concurrentRolesForEvent matches only concurrency>0 roles routed by the event", () => {
+    const parsed = buildTopology(
+      {
+        role: [
+          { id: "reviewer", prompt: "R", emits: [], concurrency: 3 },
+          { id: "planner", prompt: "P", emits: [] },
+        ],
+        handoff: { "gaps.identified": ["reviewer", "planner"] },
+      },
+      "/tmp",
+    );
+    const roles = concurrentRolesForEvent(parsed, "gaps.identified");
+    expect(roles.map((r) => r.id)).toEqual(["reviewer"]);
+    expect(concurrentRolesForEvent(parsed, "other.event")).toEqual([]);
+  });
+
+  it("flags a concurrency role that no handoff rule ever targets", () => {
+    const parsed = buildTopology(
+      {
+        role: [
+          { id: "orphan-reviewer", prompt: "R", emits: [], concurrency: 2 },
+        ],
+        handoff: {},
+      },
+      "/tmp",
+    );
+    const warnings = validateTopology(parsed);
+    expect(
+      warnings.some(
+        (w) =>
+          w.kind === "concurrency-on-unrouted-role" &&
+          w.message.includes("orphan-reviewer"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not flag a concurrency role that IS targeted by a handoff rule", () => {
+    const parsed = buildTopology(
+      {
+        role: [{ id: "reviewer", prompt: "R", emits: [], concurrency: 2 }],
+        handoff: { "gaps.identified": ["reviewer"] },
+      },
+      "/tmp",
+    );
+    const warnings = validateTopology(parsed);
+    expect(
+      warnings.some((w) => w.kind === "concurrency-on-unrouted-role"),
+    ).toBe(false);
+  });
+
+  it("surfaces concurrency and aggregate in json inspect output", () => {
+    const dir = tmpDir("inspect-json-concurrency");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "reviewer"
+prompt = "R"
+emits = ["review.done"]
+concurrency = 3
+
+[role.aggregate]
+mode = "first_success"
+timeout_ms = 60000
+
+[handoff]
+"gaps.identified" = ["reviewer"]
+`,
+    );
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    renderTopologyInspect(dir, "json");
+    const output = spy.mock.calls.map((c) => c[0]).join("\n");
+    const parsed = JSON.parse(output);
+    expect(parsed.roles[0].concurrency).toBe(3);
+    expect(parsed.roles[0].aggregate).toEqual({
+      mode: "first_success",
+      timeout_ms: 60000,
+    });
     spy.mockRestore();
   });
 });

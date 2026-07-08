@@ -146,7 +146,12 @@ function makeAcpReviewLoop(): LoopContext {
     profiles: { active: [], fragments: new Map(), warnings: [] },
     completion: { promise: "DONE", event: "task.complete", requiredEvents: [] },
     limits: { maxIterations: 3 },
-    parallel: { enabled: false, maxBranches: 0, branchTimeoutMs: 0 },
+    parallel: {
+      enabled: false,
+      maxBranches: 0,
+      branchTimeoutMs: 0,
+      aggregate: { mode: "wait_for_all", timeoutMs: 0 },
+    },
     harness: { instructions: "" },
     runtime: {
       runId: "run-review-acp",

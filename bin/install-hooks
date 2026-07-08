@@ -6,12 +6,15 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOKS_SRC="$REPO_ROOT/hooks"
-GIT_HOOKS_DIR="$REPO_ROOT/.git/hooks"
-
-if [ ! -d "$REPO_ROOT/.git" ]; then
-  echo "error: not a git repository (no .git directory at $REPO_ROOT)" >&2
+git_common_dir="$(git -C "$REPO_ROOT" rev-parse --git-common-dir 2>/dev/null)" || {
+  echo "error: not a git repository ($REPO_ROOT)" >&2
   exit 1
-fi
+}
+case "$git_common_dir" in
+  /*) git_dir="$git_common_dir" ;;
+  *) git_dir="$REPO_ROOT/$git_common_dir" ;;
+esac
+GIT_HOOKS_DIR="$git_dir/hooks"
 
 mkdir -p "$GIT_HOOKS_DIR"
 

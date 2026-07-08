@@ -69,6 +69,8 @@ autoloop config show --preset autocode --explain
 | `event_loop.prompt_file` | string | `""` | Path to a file containing the loop objective, relative to the project directory. Used when `prompt` is empty. |
 | `event_loop.max_iteration_runtime` | duration | `0` (disabled) | Per-iteration runtime cap. Accepts a duration string (`"45s"`, `"90m"`, `"12h"`, `"3d"`, `"1h30m"`) or a bare millisecond integer. When set, it overrides `backend.timeout_ms` (per-role `backend_timeout_ms` and the branch-mode `parallel.branch_timeout_ms` clamp still win). Values are capped at ~24.8 days (the Node timer limit). |
 | `event_loop.max_runtime` | duration | `0` (disabled) | Loop wall-clock budget, same duration grammar. Derived from the journaled `loop.start` timestamp, so it survives reloads. Checked between iterations, and the running iteration's timeout is clamped to the remaining budget so the loop never overshoots. Stops with reason `max_runtime`. Not inherited by parallel branches (they have `parallel.branch_timeout_ms`). |
+| `event_loop.completion_must_be_last` | bool | `false` | Ralph-parity ordering policy (opt-in). When `true`, a completion claim via `completion_event` is rejected if any other event was emitted after it within the same turn — set-membership alone (the default) is not enough. Default `false` preserves the order-insensitive check: once the completion event and all `required_events` have appeared anywhere in the run, completion is accepted regardless of intra-turn ordering. |
+| `event_loop.audit_file_mods` | bool | `false` | Ralph-parity emit-boundary audit (opt-in). After every iteration, diffs the working tree against `HEAD`; if the single acting role (topology's `[[role]]` for the turn) declares `disallowed_tools` or `read_only = true` and files changed, journals and emits a `policy.file_modification_violation` event with the role and file list. Purely observational — never alters loop control flow on its own; parent orchestrators react to the emitted event. No-ops outside a git work tree or when the acting role is ambiguous. |
 
 Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop.prompt_file`.
 
@@ -77,7 +79,7 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `backend.kind` | string | `""` (auto) | Backend type. `"claude-sdk"` for the Claude Agent SDK session backend, `"pi"` for the Pi adapter, `"acp"` for Agent Client Protocol providers, and `"command"` for mock/test or shell-command backends. Legacy `"kiro"` is accepted as an alias for `kind = "acp"` + `provider = "kiro"`. |
-| `backend.provider` | string | `"generic"` for ACP | ACP provider preset. Built-ins: `"kiro"`, `"claude-agent-acp"`, `"generic"`. Unknown values use generic ACP behavior while preserving the label. |
+| `backend.provider` | string | `"generic"` for ACP | ACP provider preset. Built-ins: `"hermes"`, `"kiro"`, `"claude-agent-acp"`, `"generic"`. Unknown values use generic ACP behavior while preserving the label. |
 | `backend.command` | string | `"claude"` | Executable to invoke. For `kind = "claude-sdk"`, an optional custom Claude Code executable path. For `kind = "pi"`, this is the Pi binary path. For `kind = "acp"`, this is the ACP stdio server command (`kiro-cli`, `npx`, a local adapter path, etc.). For `kind = "command"`, any executable. |
 | `backend.timeout_ms` | int | `300000` | Timeout per backend invocation in milliseconds (default 5 minutes). Fallback when `event_loop.max_iteration_runtime` is unset. |
 | `backend.args` | list | provider-dependent | Backend arguments. Kiro defaults to `["acp"]`; Claude Agent ACP defaults to `["-y", "@agentclientprotocol/claude-agent-acp"]`; command backends default to `[]`. Not used by `kind = "claude-sdk"` — configuring args on a claude command keeps it on the shell path. |
@@ -85,13 +87,29 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | `backend.trust_all_tools` | bool | `true` | Auto-approve tool permission requests. For `kind = "claude-sdk"`, maps to the SDK's `bypassPermissions` mode (the session equivalent of `--dangerously-skip-permissions`). For ACP, applies when the provider supports it. |
 | `backend.agent` | string | `""` | ACP session mode/agent to set via `setSessionMode` when the provider supports it. |
 | `backend.model` | string | `""` | Model ID. For `kind = "claude-sdk"`, passed as the SDK `model` option. For ACP, set via `unstable_setSessionModel` when the provider supports it. |
+| `backend.profile` | string | `""` | Provider-side agent profile. For `provider = "hermes"`, launches as `hermes --profile <name> acp` to select which Hermes Agent profile runs the iteration. Empty means the Hermes default profile. Has no effect on other providers. |
 | `backend.disallowed_tools` | list (CSV) | `""` | **`claude-sdk` only.** Comma-separated tool names to remove from the agent entirely (e.g. `"WebFetch,WebSearch"`). A hard block that applies even under `bypassPermissions` (unlike deny rules). Empty by default, so other presets are unaffected. Used to force a preset onto a dedicated capture tool by removing the built-ins. |
+| `backend.usage_from` | string | `""` | **`command` only.** Opt-in cost-telemetry convention. Set to `"file"` to have the harness read a JSON usage object the wrapped command writes to `$AUTOLOOP_USAGE_FILE` before exiting. Empty (default) skips extraction entirely — no behavior change for existing presets. See [The `command` backend: cost telemetry and live control](#the-command-backend-cost-telemetry-and-live-control) below. |
 
-Kind auto-detection: if `kind` is empty, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); then whether it is or ends with `claude` with no custom `args` (→ `"claude-sdk"`); otherwise `"command"`. Pin `kind = "command"` to force the legacy `claude -p` shell path. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b claude-sdk`, `-b kiro`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`.
+Kind auto-detection: if `kind` is empty, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); then whether it is or ends with `claude` with no custom `args` (→ `"claude-sdk"`); otherwise `"command"`. Pin `kind = "command"` to force the legacy `claude -p` shell path. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b claude-sdk`, `-b kiro`, `-b hermes[:profile]`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`.
 
 The `claude-sdk` backend runs each iteration as a fresh Claude Agent SDK streaming session: live control is fully supported (`autoloop control interrupt` cancels the in-flight turn; `autoloop control guide` steers it mid-turn), per-iteration token/cost telemetry is journaled as `backend.usage` (feeding `event_loop.max_cost_usd` and `autoloop inspect usage`), and the raw SDK message stream is persisted to `claude-stream.<iteration>.jsonl` in the run state dir.
 
-**Per-role overrides.** Any of `backend.kind`, `backend.provider`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.trust_all_tools`, `backend.agent`, `backend.model` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
+**Per-role overrides.** Any of `backend.kind`, `backend.provider`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.trust_all_tools`, `backend.agent`, `backend.model`, `backend.profile` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
+
+#### The `command` backend: cost telemetry and live control
+
+`kind = "command"` wraps an arbitrary CLI/adapter as a one-shot process per iteration (no persistent session, unlike `pi`/`claude-sdk`/`acp`). It supports the same cross-process cost budgeting and live control as the other backends, both opt-in and additive:
+
+- **Cost telemetry (`backend.usage_from = "file"`).** The harness exports `AUTOLOOP_USAGE_FILE=<state-dir>/usage.<iteration>.json` into every `command` iteration's environment. A cooperating command may write a JSON object there before it exits:
+
+  ```json
+  {"cost_usd": 0.0123, "input_tokens": 1000, "output_tokens": 200, "cache_read_tokens": 0, "cache_write_tokens": 0}
+  ```
+
+  All fields are optional (missing = `0`; `total_tokens` is derived from the token fields if not given). After the iteration completes, the harness reads and deletes the file, journaling a `backend.usage` event with the same field names `pi`/`claude-sdk` use — feeding `event_loop.max_cost_usd` and `autoloop inspect usage` unchanged. If the command doesn't write the file (or `usage_from` is left at its default `""`), the iteration proceeds with zero cost — never an error.
+
+- **Live control (`autoloop control interrupt` / `guide`).** `commandControlAdapter` publishes `interrupt` and `guidance` capabilities for every `command` run. `interrupt` sends `SIGUSR1` to the in-flight iteration's process, escalating to `SIGTERM` then `SIGKILL` (5s grace each) if it doesn't exit. A cooperating command should trap `SIGUSR1` and cancel gracefully; an uncooperative one is simply terminated like a normal interrupt. `guide` is always journal-durable (applied to the *next* iteration's prompt) since one-shot command processes have no mid-turn session to steer live — pass `--no-interrupt` to skip cancelling the current iteration.
 
 ### Review (metareview)
 
@@ -109,7 +127,8 @@ The review pass is a separate backend invocation that runs periodically for cons
 | `review.provider` | string | *backend.provider* | ACP provider preset for reviews when `review.kind = "acp"`. |
 | `review.trust_all_tools` | bool | *backend.trust_all_tools* | Auto-approve ACP tool permission requests during reviews. |
 | `review.agent` | string | *backend.agent* | ACP session mode/agent for reviews. |
-| `review.model` | string | *backend.model* | ACP model ID for reviews. |
+| `review.model` | string | *backend.model* | Model ID for the review backend. |
+| `review.profile` | string | *backend.profile* | Hermes profile for the review backend (provider = `"hermes"`). |
 | `review.prompt` | string | `""` | Inline review prompt. If set, takes precedence over `prompt_file`. |
 | `review.prompt_file` | string | `"metareview.md"` | Path to the review prompt file, relative to the project directory. |
 
@@ -318,10 +337,24 @@ backend.command = "/path/to/agent-acp"
 backend.args = []
 ```
 
+Hermes ACP (selecting an agent profile):
+
+```toml
+backend.kind = "acp"
+backend.provider = "hermes"
+# backend.profile = "architect"   # run this role through the architect profile
+# backend.agent  = "my-agent"     # setSessionMode on top of the profile
+# backend.model  = "anthropic/claude-sonnet-4"  # unstable_setSessionModel on top
+```
+
+> **Hermes profiles vs autoloop profiles:** `backend.profile` selects which Hermes Agent profile runs each iteration (tool access, memory, cron, etc. land in that profile's home). Autoloop `--profile` flags (e.g. `--profile repo:strict-review`) inject prompt fragments into specific roles — unrelated features that compose independently.
+
 CLI aliases:
 
 ```bash
 autoloop run autocode -b kiro "Fix the login bug"
+autoloop run autocode -b hermes:architect "Fix the login bug"
+autoloop run autocode -b hermes "Fix the login bug"        # default Hermes profile
 autoloop run autocode -b claude-agent-acp "Fix the login bug"
 autoloop run autocode -b acp:my-provider:/path/to/agent-acp "Fix the login bug"
 ```
