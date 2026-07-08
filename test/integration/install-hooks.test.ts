@@ -1,10 +1,14 @@
 import { execFileSync } from "node:child_process";
 import {
+  chmodSync,
+  copyFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readlinkSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -15,9 +19,11 @@ const INSTALL_HOOKS = resolve(ROOT, "bin/install-hooks");
 const HOOKS_SRC = resolve(ROOT, "hooks");
 
 let tempDir: string;
+let fixtureInstaller: string;
+let fixtureHooksSrc: string;
 
 function runInstaller(cwd: string): string {
-  return execFileSync(INSTALL_HOOKS, [], {
+  return execFileSync(fixtureInstaller, [], {
     cwd,
     encoding: "utf-8",
     timeout: 10_000,
@@ -27,8 +33,21 @@ function runInstaller(cwd: string): string {
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "hooks-test-"));
-  // init a bare git repo structure
   execFileSync("git", ["init", tempDir], { timeout: 5_000 });
+
+  const fixtureBin = join(tempDir, "bin");
+  mkdirSync(fixtureBin, { recursive: true });
+  fixtureInstaller = join(fixtureBin, "install-hooks");
+  copyFileSync(INSTALL_HOOKS, fixtureInstaller);
+  chmodSync(fixtureInstaller, 0o755);
+
+  fixtureHooksSrc = join(tempDir, "hooks");
+  mkdirSync(fixtureHooksSrc, { recursive: true });
+  for (const name of ["pre-commit", "pre-push"]) {
+    const hookPath = join(fixtureHooksSrc, name);
+    writeFileSync(hookPath, "#!/usr/bin/env bash\nexit 0\n", "utf-8");
+    chmodSync(hookPath, 0o755);
+  }
 });
 
 afterEach(() => {
@@ -37,31 +56,29 @@ afterEach(() => {
 
 describe("bin/install-hooks", () => {
   it("creates symlinks for pre-commit and pre-push", () => {
-    // We need to point the script at the real repo hooks, but run in the temp git repo.
-    // The script uses its own dirname to find the repo root, so we create a wrapper.
-    const _gitHooksDir = join(tempDir, ".git", "hooks");
+    const out = runInstaller(tempDir);
 
-    // Run the installer from the real repo root (it resolves REPO_ROOT from its own location)
-    const out = runInstaller(ROOT);
-
-    // Verify symlinks exist in the REAL repo .git/hooks (the installer always targets its own repo)
-    const preCommitLink = resolve(ROOT, ".git/hooks/pre-commit");
-    const prePushLink = resolve(ROOT, ".git/hooks/pre-push");
+    const preCommitLink = resolve(tempDir, ".git/hooks/pre-commit");
+    const prePushLink = resolve(tempDir, ".git/hooks/pre-push");
 
     expect(existsSync(preCommitLink)).toBe(true);
     expect(existsSync(prePushLink)).toBe(true);
 
-    expect(readlinkSync(preCommitLink)).toBe(resolve(HOOKS_SRC, "pre-commit"));
-    expect(readlinkSync(prePushLink)).toBe(resolve(HOOKS_SRC, "pre-push"));
+    expect(readlinkSync(preCommitLink)).toBe(
+      resolve(fixtureHooksSrc, "pre-commit"),
+    );
+    expect(readlinkSync(prePushLink)).toBe(
+      resolve(fixtureHooksSrc, "pre-push"),
+    );
 
     expect(out).toContain("installed");
   });
 
   it("is idempotent — re-running reports already installed", () => {
     // First run
-    runInstaller(ROOT);
+    runInstaller(tempDir);
     // Second run
-    const out = runInstaller(ROOT);
+    const out = runInstaller(tempDir);
     expect(out).toContain("already installed");
   });
 

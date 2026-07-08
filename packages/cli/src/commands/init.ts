@@ -10,7 +10,7 @@
 // and reported individually so re-running init is always safe.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 export function dispatchInit(args: string[]): void {
   if (args[0] === "--help" || args[0] === "-h") {
@@ -18,6 +18,7 @@ export function dispatchInit(args: string[]): void {
     return;
   }
   let preset = "";
+  let singleFile = "";
   const positionals: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -29,12 +30,30 @@ export function dispatchInit(args: string[]): void {
         return;
       }
       preset = name;
+    } else if (arg === "--single-file") {
+      i++;
+      const path = args[i];
+      if (!path || path.startsWith("-")) {
+        fail(
+          "init: --single-file requires a destination path (e.g. --single-file preset.toml)",
+        );
+        return;
+      }
+      if (!path.endsWith(".toml")) {
+        fail(`init: --single-file destination must end in .toml: ${path}`);
+        return;
+      }
+      singleFile = path;
     } else if (arg.startsWith("-")) {
       fail(`init: unknown flag \`${arg}\` — see \`autoloop init --help\``);
       return;
     } else {
       positionals.push(arg);
     }
+  }
+  if (preset !== "" && singleFile !== "") {
+    fail("init: --preset and --single-file are mutually exclusive");
+    return;
   }
   if (positionals.length > 1) {
     fail(
@@ -43,7 +62,9 @@ export function dispatchInit(args: string[]): void {
     return;
   }
   const dir = positionals[0] ?? ".";
-  if (preset !== "") {
+  if (singleFile !== "") {
+    initSingleFilePreset(join(dir, singleFile));
+  } else if (preset !== "") {
     initPreset(dir, preset);
   } else {
     initProject(dir);
@@ -79,6 +100,108 @@ export function initPreset(dir: string, name: string): void {
   console.log("");
   console.log("Run it with:");
   console.log(`  autoloop run ./presets/${name} "describe your objective"`);
+}
+
+/**
+ * Scaffold a single merged-TOML preset: config tables and topology tables
+ * (with inline role prompts, never `prompt_file`) in one file, matching the
+ * builder → critic shape of `initPreset` but serialized as one document.
+ * Suitable for ad hoc / one-off / generated presets — see
+ * docs/guides/creating-presets.md.
+ */
+export function initSingleFilePreset(destPath: string): void {
+  const name = basename(destPath, ".toml");
+  const dir = dirname(destPath);
+  mkdirSync(dir, { recursive: true });
+  writeIfMissing(dir, basename(destPath), singleFilePreset(name));
+  console.log("");
+  console.log("Run it with:");
+  console.log(
+    `  autoloop run --preset-file ${destPath} "describe your objective"`,
+  );
+  console.log("");
+  console.log("Promote it to a permanent named preset with:");
+  console.log(`  autoloop preset promote ${destPath} <name>`);
+}
+
+function singleFilePreset(name: string): string {
+  return `# ${name} — single-file builder -> critic preset scaffolded by \`autoloop init --single-file\`.
+# Everything lives in this one merged TOML document: config tables
+# ([event_loop], [backend], [memory], ...) and topology tables (name,
+# completion, [[role]], [handoff]). Role prompts must be inline \`prompt\`
+# strings here -- \`prompt_file\` is not supported in single-file mode.
+
+name = "${name}"
+completion = "task.complete"
+
+[event_loop]
+max_iterations = 25
+completion_event = "task.complete"
+completion_promise = "LOOP_COMPLETE"
+# Stop after N consecutive identical backend outputs (0 = disabled).
+stall_iterations = 0
+# Stop once journaled run cost reaches this USD budget (0 = disabled).
+max_cost_usd = 0
+
+[backend]
+kind = "command"
+command = "claude"
+args = ["-p", "--dangerously-skip-permissions"]
+prompt_mode = "file"
+timeout_ms = 300000
+
+[memory]
+prompt_budget_chars = 8000
+
+[[role]]
+id = "builder"
+emits = ["review.ready", "build.blocked"]
+prompt = """
+You are the builder.
+
+Do not review your own work -- that is the critic's job.
+
+Your job:
+1. Read {{STATE_DIR}}/progress.md (if it exists) and the objective.
+2. Implement the next small, verifiable slice of work.
+3. Verify it (build, test, or run as appropriate) and record the evidence
+   in {{STATE_DIR}}/progress.md.
+4. Emit review.ready with a summary of what changed and how it was verified.
+
+On review.rejected reactivation:
+- Read the critic's concerns in {{STATE_DIR}}/progress.md and address them.
+- Emit review.ready again.
+
+If you cannot make progress, emit build.blocked explaining what is missing.
+"""
+
+[[role]]
+id = "critic"
+emits = ["review.rejected", "task.complete"]
+prompt = """
+You are the critic.
+
+Do not build -- that is the builder's job.
+
+Your job:
+1. Read {{STATE_DIR}}/progress.md and the builder's summary.
+2. Independently verify the work: rerun the cited commands, inspect the
+   changed files, and look for gaps or regressions.
+3. Decide:
+   - Work is incomplete, unverified, or wrong -> emit review.rejected
+     with specific, actionable concerns recorded in {{STATE_DIR}}/progress.md.
+   - The whole objective is met and verified -> emit task.complete
+     with a closing summary.
+
+Start skeptical: missing evidence means rejection, not benefit of the doubt.
+"""
+
+[handoff]
+"loop.start" = ["builder"]
+"review.ready" = ["critic"]
+"review.rejected" = ["builder"]
+"build.blocked" = ["builder"]
+`;
 }
 
 /** Append `.autoloop/` to .gitignore when `dir` is a git repo (no duplicates). */
@@ -271,6 +394,7 @@ autoloop run ./presets/${name} "describe your objective"
 function printInitUsage(): void {
   console.log("Usage: autoloop init [dir]");
   console.log("       autoloop init --preset <name> [dir]");
+  console.log("       autoloop init --single-file <file.toml> [dir]");
   console.log("");
   console.log("Scaffold autoloop files into a project (default dir: `.`).");
   console.log("");
@@ -280,6 +404,10 @@ function printInitUsage(): void {
   console.log("  autoloop init --preset x  scaffold a custom preset at");
   console.log("                            <dir>/presets/x/ (autoloops.toml,");
   console.log("                            harness.md, topology.toml, roles/)");
+  console.log("  autoloop init --single-file p.toml");
+  console.log("                            scaffold one merged-TOML preset");
+  console.log("                            file at <dir>/p.toml with inline");
+  console.log("                            role prompts (no prompt_file)");
   console.log("");
   console.log("Existing files are never overwritten.");
 }

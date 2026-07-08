@@ -20,6 +20,11 @@ import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
 import { registryStart } from "./registry-bridge.js";
+import {
+  clearResumeRequest,
+  clearSuspendState,
+  readSuspendState,
+} from "./suspend-state.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export interface ResumeOptions {
@@ -153,12 +158,19 @@ export function buildResumeContext(
   const logLevel =
     options.logLevel || config.get(cfg, "core.log_level", "info");
 
-  const resumeIteration = determineResumeIteration(
-    journalFile,
-    record.run_id,
-    record.stop_reason,
-    record.iteration,
-  );
+  // A durable suspend (written by a `suspend`-policy hook) carries its own
+  // recorded resume point — prefer it over the stop-reason heuristic, since
+  // it reflects exactly where the hook engine intended to resume rather than
+  // a best-effort guess from the journal.
+  const suspendState = readSuspendState(stateDir);
+  const resumeIteration = suspendState
+    ? suspendState.resumeIteration
+    : determineResumeIteration(
+        journalFile,
+        record.run_id,
+        record.stop_reason,
+        record.iteration,
+      );
 
   // Budget is additive from the resume point. Default add-iterations to the
   // run's original max_iterations (so a max_iterations stop, by default, grants
@@ -295,6 +307,12 @@ export async function resume(
   if (loop.controlAdapter) {
     publishCapabilities(loop.paths.stateDir, loop.controlAdapter);
   }
+
+  // Clear durable suspend markers now that we're re-entering the loop at the
+  // recorded resume point — a stale suspend-state.json would otherwise make
+  // the next `run()` (or this resume, if invoked again) refuse to start.
+  clearSuspendState(loop.paths.stateDir);
+  clearResumeRequest(loop.paths.stateDir);
 
   log(
     loop,
