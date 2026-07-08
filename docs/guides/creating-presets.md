@@ -54,7 +54,7 @@ prompt_file = "roles/verifier.md"
 
 **Key rules:**
 
-- Every role needs an `id`, an `emits` list, and either `prompt_file` or `prompt` (inline string).
+- Every role needs an `id`, an `emits` list, and either `prompt_file` or `prompt` (inline string) — that flexibility applies to **directory presets**. A [single-file preset](#single-file-presets) supports inline `prompt` only.
 - `prompt_file` paths are relative to the preset directory.
 - The `[handoff]` section maps events to the roles that should handle them. An event not listed in the handoff map causes all roles to be suggested (no routing preference).
 - `completion` sets the topology-level completion event. It can also be set in `autoloops.toml` via `event_loop.completion_event` — the topology value takes precedence, with the config value used as a fallback.
@@ -274,3 +274,92 @@ Before running a new preset:
 - [ ] `harness.md` exists (or `harness.instructions_file` points to the correct file).
 - [ ] Shared working file names are consistent between `harness.md` and role prompts.
 - [ ] Use `{{STATE_DIR}}` and `{{TOOL_PATH}}` placeholders instead of hardcoded `.autoloop/` paths in harness and role prompts.
+
+## Single-file presets
+
+Everything above describes a **directory preset**: `autoloops.toml` + `topology.toml` + `harness.md` + `roles/*.md`, spread across several files. For anything ad hoc, one-off, or machine-generated, autoloop also supports a **single-file preset** — one merged TOML document that carries both the config tables and the topology tables, with role prompts inlined.
+
+**When to use which:**
+
+- **Directory preset** — a preset you'll reuse, iterate on, and check into a repo. Long role prompts read and diff better as separate markdown files; `harness.md`/`README.md` give it a home.
+- **Single-file preset** — a preset generated on the fly (e.g. by the `autoarchitect` workflow, which writes one for every run), sketched quickly at the command line, or handed to someone as a single file to copy-paste. No directory structure to scaffold, no `roles/` to keep in sync.
+
+### Format
+
+A single-file preset is one `.toml` file containing:
+
+- The usual config tables: `[event_loop]`, `[backend]`, `[memory]`, `[core]`, `[hooks]`, `[review]`, etc. — same keys as `autoloops.toml`.
+- The topology tables in the same document: top-level `name` and `completion`, `[[role]]` entries, `[handoff]`, and optional `[[gate]]` entries.
+
+```toml
+name = "autoreview"
+completion = "task.complete"
+
+[event_loop]
+max_iterations = 25
+completion_event = "task.complete"
+
+[backend]
+kind = "command"
+command = "claude"
+timeout_ms = 600000
+
+[memory]
+prompt_budget_chars = 4000
+
+[[role]]
+id = "planner"
+prompt = "You are the planner. Break the objective into review targets."
+emits = ["targets.ready"]
+
+[[role]]
+id = "reviewer"
+prompt = "You are the reviewer. Review each target and emit findings."
+emits = ["review.ready", "review.blocked"]
+
+[[role]]
+id = "finalizer"
+prompt = "You are the finalizer. Confirm the review is complete."
+emits = ["task.complete"]
+
+[handoff]
+"loop.start" = ["planner"]
+"targets.ready" = ["reviewer"]
+"review.ready" = ["finalizer"]
+"review.blocked" = ["planner"]
+```
+
+**`prompt_file` is not supported in single-file mode** — only inline `prompt = "..."` strings. `topology.validateTopology(topology, { singleFile: true })` flags any `prompt_file` reference in a single-file preset as a `prompt-file-in-single-file` warning, and both `autoloop preset promote` and the architect auto-chain refuse to run a preset with validation warnings.
+
+### Creating one
+
+```bash
+autoloop init --single-file preset.toml
+```
+
+Scaffolds a builder → critic single-file preset at `preset.toml` with inline prompts, ready to run or edit.
+
+### Running one
+
+```bash
+# Explicit, discoverable flag — hard-fails on a missing or non-.toml path
+autoloop run --preset-file ./preset.toml "objective"
+
+# -p/--preset also recognizes an explicit .toml path
+autoloop run -p ./preset.toml "objective"
+
+# The bare positional form works too
+autoloop run ./preset.toml "objective"
+```
+
+`--preset-file` and `-p`/`--preset` differ slightly: `-p` is polymorphic — it accepts a bundled preset name, a preset directory, or a `.toml` file path, and falls through to bundled-preset resolution if the path doesn't otherwise resolve. `--preset-file` is a stricter, single-purpose contract — it always expects an existing `.toml` file and fails immediately with a clear error if the path isn't one, rather than silently trying other resolutions. Prefer `--preset-file` when scripting against a known file path.
+
+### Promoting to a permanent preset
+
+A single-file preset — hand-written, `init`-generated, or produced by the architect workflow — can graduate into a permanent named preset:
+
+```bash
+autoloop preset promote ./preset.toml myreview
+```
+
+This validates the source with `singleFile: true` and copies it into the user presets directory, after which `autoloop run myreview "..."` resolves it by name like any bundled preset.

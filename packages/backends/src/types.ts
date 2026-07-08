@@ -15,6 +15,8 @@ export interface BackendSpec {
    * no breaking change for existing presets).
    */
   usageFrom?: string;
+  /** Provider-side agent profile (Hermes: launches as `--profile <p> acp`). */
+  profile?: string;
 }
 
 export interface BackendRunResult {

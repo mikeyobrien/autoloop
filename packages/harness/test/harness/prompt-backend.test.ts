@@ -62,6 +62,8 @@ function makeBackendLoop(
       trustAllTools: true,
       agent: "",
       model: "",
+      profile: "",
+      disallowedTools: [],
     },
     review: {
       enabled: false,
@@ -77,6 +79,9 @@ function makeBackendLoop(
       trustAllTools: true,
       agent: "",
       model: "",
+      profile: "",
+      onError: "hold",
+      minConfidence: 0.5,
     },
     parallel: { enabled: false, maxBranches: 0, branchTimeoutMs: 0 },
     memory: { budgetChars: 1000 },
@@ -138,6 +143,7 @@ describe("buildIterationContext backend resolution (slice 2)", () => {
       trustAllTools: loop.backend.trustAllTools,
       agent: "",
       model: "",
+      profile: "",
       disallowedTools: [],
       usageFrom: "",
     });
@@ -168,6 +174,8 @@ describe("resolvedFromLoopBackend", () => {
       trustAllTools: true,
       agent: "",
       model: "",
+      profile: "",
+      disallowedTools: [],
     };
 
     const resolved = resolvedFromLoopBackend(loop);
@@ -182,6 +190,7 @@ describe("resolvedFromLoopBackend", () => {
       trustAllTools: true,
       agent: "",
       model: "",
+      profile: "",
       disallowedTools: [],
       usageFrom: "",
     });

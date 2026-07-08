@@ -2,6 +2,7 @@ import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { ClaudeSdkSession } from "@mobrienv/autoloop-backends/claude-sdk-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
+import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import type { LoopEventEmitter } from "./events.js";
@@ -137,6 +138,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
     disallowedTools: string[];
     /**
      * Opt-in cost-telemetry convention for `command`-kind backends: `"file"`
@@ -159,6 +161,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
     /**
      * Fail-closed routing for an UNKNOWN verdict (malformed/empty/timed-out
      * review, or confidence below `minConfidence`). Default `hold`: stop the
@@ -172,12 +175,29 @@ export interface LoopContext {
     minConfidence: number;
   };
   parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
+  /**
+   * Fan-out `[[stage]]` execution knobs. `concurrency` bounds how many stage
+   * branches run at once run-wide (defaults to `defaultConcurrency()`, the
+   * same core/os-derived ceiling waves use); `branchTimeoutMs` bounds one
+   * branch's wall-clock time.
+   */
+  stage: {
+    concurrency: number;
+    branchTimeoutMs: number;
+  };
   hooks: {
     preRun: string;
     preIteration: string;
     postIteration: string;
     postRun: string;
     strict: boolean;
+    /**
+     * Structured per-hook specs (legacy flat keys + `[[hook]]` entries),
+     * merged and template-expanded. This is the engine's source of truth;
+     * the flat fields above remain for backward compatibility with existing
+     * callers/tests but `specs` is what `runPhaseHooks` iterates.
+     */
+    specs: HookSpec[];
   };
   memory: { budgetChars: number };
   tasks: { budgetChars: number };
@@ -216,6 +236,13 @@ export interface LoopContext {
     logLevel: string;
     branchMode: boolean;
     isolationMode: string;
+    /**
+     * Forces every fan-out stage branch to relaunch rather than reuse a
+     * journaled `stage.branch.finish` record from an interrupted prior
+     * attempt (`run --no-resume` / `resume --no-resume`). Lives on `runtime`
+     * (not config-derived `stage`) because it survives `reloadLoop`.
+     */
+    noResume?: boolean;
   };
   launch: LaunchMetadata;
   store: Record<string, unknown>;
@@ -277,6 +304,11 @@ export interface RunOptions {
   mergeStrategy?: string;
   automerge?: boolean;
   keepWorktree?: boolean;
+  /**
+   * Force every fan-out stage branch to relaunch rather than reuse a
+   * journaled `stage.branch.finish` record from an interrupted prior attempt.
+   */
+  noResume?: boolean;
   /**
    * Optional abort signal. When provided, the CLI (or SDK caller) owns
    * process signal handling; the harness only listens to this signal for

@@ -19,7 +19,9 @@ import {
   uniqueGeneratedId,
 } from "@mobrienv/autoloop-core";
 import { loadAgentMap } from "@mobrienv/autoloop-core/agent-map";
+import * as concurrency from "@mobrienv/autoloop-core/concurrency";
 import * as config from "@mobrienv/autoloop-core/config";
+import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import {
   presetCategory,
   resolveIsolationMode,
@@ -141,6 +143,9 @@ export function resolveProcessKind(
   if (kind === "pi" || piBinary(command)) return "pi";
   if (kind === "claude-sdk") return "claude-sdk";
   if (isAcpBackendKind(kind)) return "acp";
+  // Hermes ACP: `hermes acp` is a native ACP provider like pi. Map it to the
+  // ACP session path so providerLaunchArgs injects --profile correctly.
+  if (hermesBinary(command)) return "acp";
   // Default: a plain `claude` invocation runs through the Agent SDK session
   // backend (live interrupt/steer + cost telemetry). Custom args mean the
   // user is tailoring the CLI invocation — respect it and keep the shell
@@ -153,6 +158,11 @@ export function resolveProcessKind(
 
 function piBinary(command: string): boolean {
   return command === "pi" || command.endsWith("/pi");
+}
+
+function hermesBinary(command: string): boolean {
+  const base = command.split("/").pop() ?? "";
+  return base === "hermes";
 }
 
 export function normalizePromptMode(value: string): string {
@@ -458,6 +468,7 @@ export function buildLoopContext(
       logLevel,
       branchMode: false,
       isolationMode: isolation.mode,
+      noResume: runOptions.noResume ?? false,
     },
     launch: {
       preset: currentPresetName,
@@ -644,6 +655,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       })(),
     },
     parallel,
+    stage: readStageConfig(cfg),
     hooks: {
       // Hook commands get the same template vars as role prompts ({{PRESET_DIR}},
       // {{TOOL_PATH}}, {{STATE_DIR}}) so a hook can reference preset-bundled scripts by
@@ -665,6 +677,12 @@ export function reloadLoop(loop: LoopContext): LoopContext {
         templateVars,
       ),
       strict: config.get(cfg, "hooks.strict", "false") === "true",
+      specs: expandHookSpecCommands(
+        presetFile
+          ? config.loadHookSpecsFromFile(presetFile)
+          : config.loadHookSpecs(pd),
+        templateVars,
+      ),
     },
     memory: {
       budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
@@ -709,7 +727,7 @@ function readBackendConfig(
   cfg: config.Config,
   bo: Record<string, unknown>,
 ): LoopContext["backend"] {
-  const rawKind = processStringOverride(
+  let rawKind = processStringOverride(
     bo,
     "kind",
     config.get(cfg, "backend.kind", ""),
@@ -732,6 +750,13 @@ function readBackendConfig(
     provider: rawProvider,
     command: explicitCommand,
   });
+  // If the config specifies an explicit provider (not a generic fallback), ensure
+  // the ACP path so that resolveProcessKind derives the right backend kind.
+  // This handles the case where `backend.provider = "hermes"` is set in config
+  // without an explicit `backend.kind`.
+  if (!rawKind && rawProvider && acpProvider.id !== "generic") {
+    rawKind = "acp";
+  }
   const commandFallback = isAcpBackendKind(rawKind)
     ? acpProvider.defaultCommand
     : "claude";
@@ -791,6 +816,11 @@ function readBackendConfig(
     "model",
     config.get(cfg, "backend.model", ""),
   );
+  const profile = processStringOverride(
+    bo,
+    "profile",
+    config.get(cfg, "backend.profile", ""),
+  );
   // Tools the backend must NOT expose to the agent (claude-sdk only). Opt-in via
   // `backend.disallowed_tools` (CSV); empty by default so other presets are
   // unaffected. Used e.g. to force a preset onto a dedicated capture tool by
@@ -813,6 +843,7 @@ function readBackendConfig(
     trustAllTools,
     agent,
     model,
+    profile,
     disallowedTools,
     usageFrom,
   };
@@ -853,6 +884,7 @@ function readReviewConfig(
       ) !== "false",
     agent: config.get(cfg, "review.agent", backend.agent),
     model: config.get(cfg, "review.model", backend.model),
+    profile: config.get(cfg, "review.profile", backend.profile ?? ""),
     onError: normalizeReviewOnError(config.get(cfg, "review.on_error", "hold")),
     minConfidence: config.getFloat(cfg, "review.min_confidence", 0.5),
   };
@@ -875,6 +907,17 @@ function readParallelConfig(cfg: config.Config): LoopContext["parallel"] {
   };
 }
 
+function readStageConfig(cfg: config.Config): LoopContext["stage"] {
+  return {
+    concurrency: config.getInt(
+      cfg,
+      "stage.concurrency",
+      concurrency.defaultConcurrency(),
+    ),
+    branchTimeoutMs: config.getInt(cfg, "stage.branch_timeout_ms", 180000),
+  };
+}
+
 export function applyRuntimeModeOverrides(loop: LoopContext): LoopContext {
   if (!loop.runtime.branchMode) return loop;
   return {
@@ -890,6 +933,18 @@ export function applyRuntimeModeOverrides(loop: LoopContext): LoopContext {
       ),
     },
   };
+}
+
+/** Apply the same template-placeholder expansion legacy hook fields get to
+ * every structured hook spec's command (e.g. `{{PRESET_DIR}}`, `{{TOOL_PATH}}`). */
+function expandHookSpecCommands(
+  specs: HookSpec[],
+  templateVars: Record<string, string>,
+): HookSpec[] {
+  return specs.map((spec) => ({
+    ...spec,
+    command: expandTemplatePlaceholders(spec.command, templateVars),
+  }));
 }
 
 export function initStore(loop: LoopContext): LoopContext {

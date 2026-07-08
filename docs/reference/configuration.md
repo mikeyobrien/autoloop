@@ -77,7 +77,7 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `backend.kind` | string | `""` (auto) | Backend type. `"claude-sdk"` for the Claude Agent SDK session backend, `"pi"` for the Pi adapter, `"acp"` for Agent Client Protocol providers, and `"command"` for mock/test or shell-command backends. Legacy `"kiro"` is accepted as an alias for `kind = "acp"` + `provider = "kiro"`. |
-| `backend.provider` | string | `"generic"` for ACP | ACP provider preset. Built-ins: `"kiro"`, `"claude-agent-acp"`, `"generic"`. Unknown values use generic ACP behavior while preserving the label. |
+| `backend.provider` | string | `"generic"` for ACP | ACP provider preset. Built-ins: `"hermes"`, `"kiro"`, `"claude-agent-acp"`, `"generic"`. Unknown values use generic ACP behavior while preserving the label. |
 | `backend.command` | string | `"claude"` | Executable to invoke. For `kind = "claude-sdk"`, an optional custom Claude Code executable path. For `kind = "pi"`, this is the Pi binary path. For `kind = "acp"`, this is the ACP stdio server command (`kiro-cli`, `npx`, a local adapter path, etc.). For `kind = "command"`, any executable. |
 | `backend.timeout_ms` | int | `300000` | Timeout per backend invocation in milliseconds (default 5 minutes). Fallback when `event_loop.max_iteration_runtime` is unset. |
 | `backend.args` | list | provider-dependent | Backend arguments. Kiro defaults to `["acp"]`; Claude Agent ACP defaults to `["-y", "@agentclientprotocol/claude-agent-acp"]`; command backends default to `[]`. Not used by `kind = "claude-sdk"` — configuring args on a claude command keeps it on the shell path. |
@@ -85,14 +85,15 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | `backend.trust_all_tools` | bool | `true` | Auto-approve tool permission requests. For `kind = "claude-sdk"`, maps to the SDK's `bypassPermissions` mode (the session equivalent of `--dangerously-skip-permissions`). For ACP, applies when the provider supports it. |
 | `backend.agent` | string | `""` | ACP session mode/agent to set via `setSessionMode` when the provider supports it. |
 | `backend.model` | string | `""` | Model ID. For `kind = "claude-sdk"`, passed as the SDK `model` option. For ACP, set via `unstable_setSessionModel` when the provider supports it. |
+| `backend.profile` | string | `""` | Provider-side agent profile. For `provider = "hermes"`, launches as `hermes --profile <name> acp` to select which Hermes Agent profile runs the iteration. Empty means the Hermes default profile. Has no effect on other providers. |
 | `backend.disallowed_tools` | list (CSV) | `""` | **`claude-sdk` only.** Comma-separated tool names to remove from the agent entirely (e.g. `"WebFetch,WebSearch"`). A hard block that applies even under `bypassPermissions` (unlike deny rules). Empty by default, so other presets are unaffected. Used to force a preset onto a dedicated capture tool by removing the built-ins. |
 | `backend.usage_from` | string | `""` | **`command` only.** Opt-in cost-telemetry convention. Set to `"file"` to have the harness read a JSON usage object the wrapped command writes to `$AUTOLOOP_USAGE_FILE` before exiting. Empty (default) skips extraction entirely — no behavior change for existing presets. See [The `command` backend: cost telemetry and live control](#the-command-backend-cost-telemetry-and-live-control) below. |
 
-Kind auto-detection: if `kind` is empty, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); then whether it is or ends with `claude` with no custom `args` (→ `"claude-sdk"`); otherwise `"command"`. Pin `kind = "command"` to force the legacy `claude -p` shell path. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b claude-sdk`, `-b kiro`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`.
+Kind auto-detection: if `kind` is empty, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); then whether it is or ends with `claude` with no custom `args` (→ `"claude-sdk"`); otherwise `"command"`. Pin `kind = "command"` to force the legacy `claude -p` shell path. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b claude-sdk`, `-b kiro`, `-b hermes[:profile]`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`.
 
 The `claude-sdk` backend runs each iteration as a fresh Claude Agent SDK streaming session: live control is fully supported (`autoloop control interrupt` cancels the in-flight turn; `autoloop control guide` steers it mid-turn), per-iteration token/cost telemetry is journaled as `backend.usage` (feeding `event_loop.max_cost_usd` and `autoloop inspect usage`), and the raw SDK message stream is persisted to `claude-stream.<iteration>.jsonl` in the run state dir.
 
-**Per-role overrides.** Any of `backend.kind`, `backend.provider`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.trust_all_tools`, `backend.agent`, `backend.model` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
+**Per-role overrides.** Any of `backend.kind`, `backend.provider`, `backend.command`, `backend.args`, `backend.prompt_mode`, `backend.timeout_ms`, `backend.trust_all_tools`, `backend.agent`, `backend.model`, `backend.profile` may be overridden per role in `topology.toml` via the corresponding `backend_*` role field. Role values take precedence; unspecified role fields fall through to the global backend. See [Per-role backend overrides](topology.md#per-role-backend-overrides).
 
 #### The `command` backend: cost telemetry and live control
 
@@ -124,7 +125,8 @@ The review pass is a separate backend invocation that runs periodically for cons
 | `review.provider` | string | *backend.provider* | ACP provider preset for reviews when `review.kind = "acp"`. |
 | `review.trust_all_tools` | bool | *backend.trust_all_tools* | Auto-approve ACP tool permission requests during reviews. |
 | `review.agent` | string | *backend.agent* | ACP session mode/agent for reviews. |
-| `review.model` | string | *backend.model* | ACP model ID for reviews. |
+| `review.model` | string | *backend.model* | Model ID for the review backend. |
+| `review.profile` | string | *backend.profile* | Hermes profile for the review backend (provider = `"hermes"`). |
 | `review.prompt` | string | `""` | Inline review prompt. If set, takes precedence over `prompt_file`. |
 | `review.prompt_file` | string | `"metareview.md"` | Path to the review prompt file, relative to the project directory. |
 
@@ -333,10 +335,24 @@ backend.command = "/path/to/agent-acp"
 backend.args = []
 ```
 
+Hermes ACP (selecting an agent profile):
+
+```toml
+backend.kind = "acp"
+backend.provider = "hermes"
+# backend.profile = "architect"   # run this role through the architect profile
+# backend.agent  = "my-agent"     # setSessionMode on top of the profile
+# backend.model  = "anthropic/claude-sonnet-4"  # unstable_setSessionModel on top
+```
+
+> **Hermes profiles vs autoloop profiles:** `backend.profile` selects which Hermes Agent profile runs each iteration (tool access, memory, cron, etc. land in that profile's home). Autoloop `--profile` flags (e.g. `--profile repo:strict-review`) inject prompt fragments into specific roles — unrelated features that compose independently.
+
 CLI aliases:
 
 ```bash
 autoloop run autocode -b kiro "Fix the login bug"
+autoloop run autocode -b hermes:architect "Fix the login bug"
+autoloop run autocode -b hermes "Fix the login bug"        # default Hermes profile
 autoloop run autocode -b claude-agent-acp "Fix the login bug"
 autoloop run autocode -b acp:my-provider:/path/to/agent-acp "Fix the login bug"
 ```
