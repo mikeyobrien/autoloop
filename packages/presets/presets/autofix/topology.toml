@@ -21,6 +21,15 @@ id = "closer"
 emits = ["bug.closed", "bug.reopened", "task.complete"]
 prompt_file = "roles/closer.md"
 
+[[gate]]
+event = "fix.verified"
+blocked = "fix.verify.blocked"
+failed = "fix.failed"
+evidence = [
+  { key = "tests", type = "test" },
+  { key = "coverage", type = "coverage", min = 80 },
+]
+
 [handoff]
 "loop.start" = ["diagnoser"]
 "cause.found" = ["fixer"]
@@ -28,6 +37,7 @@ prompt_file = "roles/closer.md"
 "fix.applied" = ["verifier"]
 "fix.blocked" = ["diagnoser"]
 "fix.verified" = ["closer"]
+"fix.verify.blocked" = ["verifier"]
 "fix.failed" = ["fixer"]
 "bug.closed" = ["diagnoser"]
 "bug.reopened" = ["diagnoser"]

@@ -8,6 +8,11 @@ import {
   splitCsv,
 } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
+import type { EvidenceShortfall } from "@mobrienv/autoloop-core/evidence";
+import {
+  classifyGateOutcome,
+  validateEvidenceRequirement,
+} from "@mobrienv/autoloop-core/evidence";
 import type { HookPhase, HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import {
   appendAgentEvent,
@@ -287,6 +292,27 @@ function emitCore(
         topic,
         gate,
         missing,
+        payload,
+        validation,
+      );
+    }
+  }
+
+  // Typed evidence gate (opt-in, additive to `requires` above): each
+  // `evidence` rule is validated for presence plus (per-type) a status/
+  // threshold check. Any shortfall rejects the emit and journals the routed
+  // typed event — `blocked` for missing evidence (soft retry), `failed` (or
+  // `blocked` as a fallback) for evidence that was supplied but did not pass.
+  if (gate && gate.evidence.length > 0) {
+    const shortfalls = gate.evidence
+      .map((req) => validateEvidenceRequirement(req, payload))
+      .filter((s): s is EvidenceShortfall => s !== null);
+    if (shortfalls.length > 0) {
+      return rejectTypedEvidenceGate(
+        journalFile,
+        topic,
+        gate,
+        shortfalls,
         payload,
         validation,
       );
@@ -712,6 +738,67 @@ function rejectEvidenceGate(
       "` instead. Include the evidence in the payload (e.g. `key=value`) and emit `" +
       topic +
       "` again.",
+  };
+}
+
+function rejectTypedEvidenceGate(
+  journalFile: string,
+  topic: string,
+  gate: topology.Gate,
+  shortfalls: EvidenceShortfall[],
+  payload: string,
+  validation: EmitValidation,
+): EmitResult {
+  const target = classifyGateOutcome(shortfalls, gate);
+  const missingKeys = shortfalls
+    .filter((s) => s.reason === "missing")
+    .map((s) => s.key);
+  const thresholdShortfalls = shortfalls.filter(
+    (s) => s.reason === "threshold" || s.reason === "status",
+  );
+  const evidenceTypes = joinCsv(
+    Array.from(new Set(shortfalls.map((s) => s.type))),
+  );
+  const requiredEvidence = joinCsv(gate.evidence.map((e) => e.key));
+
+  const fields = [
+    jsonField("gated_event", topic),
+    jsonField("missing_evidence", joinCsv(missingKeys)),
+    jsonField("evidence_type", evidenceTypes),
+    jsonField("required_evidence", requiredEvidence),
+  ];
+  if (thresholdShortfalls.length > 0) {
+    fields.push(
+      jsonField(
+        "threshold_failure",
+        joinCsv(thresholdShortfalls.map((s) => `${s.key}:${s.detail}`)),
+      ),
+    );
+  }
+  fields.push(jsonField("summary", payload));
+
+  appendEvent(
+    journalFile,
+    validation.runId,
+    validation.iteration,
+    target,
+    fields.join(", "),
+  );
+
+  const shortfallText = shortfalls
+    .map((s) => `${s.key} (${s.reason}: ${s.detail})`)
+    .join("; ");
+  return {
+    ok: false,
+    topic,
+    error:
+      "`" +
+      topic +
+      "` failed typed evidence validation: " +
+      shortfallText +
+      ". Emitted `" +
+      target +
+      "` instead.",
   };
 }
 

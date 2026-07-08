@@ -170,3 +170,163 @@ describe("evidence gate (emit)", () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe("typed evidence gate (emit)", () => {
+  let dir: string;
+  let journalFile: string;
+
+  function setupTopology(topologyToml: string): void {
+    dir = tmpProject(topologyToml);
+    journalFile = join(dir, ".autoloop/journal.jsonl");
+    appendEvent(journalFile, "run-1", "1", "loop.start", "");
+
+    vi.stubEnv("AUTOLOOP_PROJECT_DIR", dir);
+    vi.stubEnv("AUTOLOOP_JOURNAL_FILE", journalFile);
+    vi.stubEnv("AUTOLOOP_RUN_ID", "run-1");
+    vi.stubEnv("AUTOLOOP_ITERATION", "1");
+    vi.stubEnv("AUTOLOOP_ALLOWED_EVENTS", "review.passed");
+    vi.stubEnv("AUTOLOOP_RECENT_EVENT", "loop.start");
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    process.exitCode = undefined;
+  });
+
+  const TYPED_TOPO = [
+    'name = "t"',
+    "",
+    "[[gate]]",
+    'event = "review.passed"',
+    'blocked = "review.evidence.blocked"',
+    'failed = "review.rejected"',
+    "evidence = [",
+    '  { key = "tests", type = "test" },',
+    '  { key = "coverage", type = "coverage", min = 80 },',
+    "]",
+    "",
+  ].join("\n");
+
+  it("routes missing evidence to `blocked`, journaling evidence_type", () => {
+    setupTopology(TYPED_TOPO);
+    const result = emit(dir, "review.passed", "looks good to me");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("review.evidence.blocked");
+
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "review.evidence.blocked"');
+    expect(journal).toContain("evidence_type");
+    expect(journal).not.toContain('"topic": "review.passed"');
+  });
+
+  it("routes a threshold failure (evidence present but below min) to `failed`", () => {
+    setupTopology(TYPED_TOPO);
+    const result = emit(dir, "review.passed", "tests=5 passed coverage=70");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("review.rejected");
+
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "review.rejected"');
+    expect(journal).toContain("threshold_failure");
+    expect(journal).not.toContain('"topic": "review.passed"');
+    expect(journal).not.toContain('"topic": "review.evidence.blocked"');
+  });
+
+  it("falls back to `blocked` for a threshold failure when `failed` is not configured", () => {
+    setupTopology(
+      [
+        'name = "t"',
+        "",
+        "[[gate]]",
+        'event = "review.passed"',
+        'blocked = "review.evidence.blocked"',
+        "evidence = [",
+        '  { key = "coverage", type = "coverage", min = 80 },',
+        "]",
+        "",
+      ].join("\n"),
+    );
+    const result = emit(dir, "review.passed", "coverage=70");
+    expect(result.ok).toBe(false);
+
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "review.evidence.blocked"');
+  });
+
+  it("still routes to `blocked` for missing evidence even when `failed` is configured", () => {
+    setupTopology(TYPED_TOPO);
+    // coverage present and passing, but tests entirely absent -> "missing", not "threshold".
+    const result = emit(dir, "review.passed", "coverage=90");
+    expect(result.ok).toBe(false);
+
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "review.evidence.blocked"');
+    expect(journal).not.toContain('"topic": "review.rejected"');
+  });
+
+  it("accepts a JSON typed payload that satisfies all evidence rules", () => {
+    setupTopology(TYPED_TOPO);
+    const result = emit(
+      dir,
+      "review.passed",
+      '{"tests": {"value": "5", "status": "passed"}, "coverage": 87}',
+    );
+    expect(result.ok).toBe(true);
+
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "review.passed"');
+  });
+
+  it("rejects a JSON typed payload with coverage below the threshold", () => {
+    setupTopology(TYPED_TOPO);
+    const result = emit(
+      dir,
+      "review.passed",
+      '{"tests": {"value": "5", "status": "passed"}, "coverage": 65}',
+    );
+    expect(result.ok).toBe(false);
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "review.rejected"');
+  });
+
+  it("accepts once all typed evidence rules pass", () => {
+    setupTopology(TYPED_TOPO);
+    const result = emit(dir, "review.passed", "tests=5 passed coverage=90");
+    expect(result.ok).toBe(true);
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "review.passed"');
+  });
+
+  it("requires both legacy `requires` and typed `evidence` to pass on a mixed gate", () => {
+    setupTopology(
+      [
+        'name = "t"',
+        "",
+        "[[gate]]",
+        'event = "review.passed"',
+        'requires = ["commit"]',
+        'blocked = "review.evidence.blocked"',
+        "evidence = [",
+        '  { key = "coverage", type = "coverage", min = 80 },',
+        "]",
+        "",
+      ].join("\n"),
+    );
+
+    // `requires` (legacy) is checked first: missing `commit` rejects before the
+    // typed evidence check even runs.
+    const missingLegacy = emit(dir, "review.passed", "coverage=90");
+    expect(missingLegacy.ok).toBe(false);
+    expect(missingLegacy.error).toContain("requires evidence");
+
+    // Legacy requirement present, typed evidence still failing.
+    const missingTyped = emit(dir, "review.passed", "commit=abc coverage=10");
+    expect(missingTyped.ok).toBe(false);
+
+    // Both satisfied.
+    const ok = emit(dir, "review.passed", "commit=abc coverage=90");
+    expect(ok.ok).toBe(true);
+  });
+});

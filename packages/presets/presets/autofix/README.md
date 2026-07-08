@@ -26,6 +26,13 @@ AutoFix should reject weak fixes.
 3. **Verifier** reruns the original failure, then the strongest relevant regression checks.
 4. **Closer** reviews fix quality and decides whether more bugs need attention.
 
+`topology.toml` enforces the verifier's proof with a typed evidence gate on
+`fix.verified`: the payload must carry `tests` pass status and a `coverage`
+value at or above 80, or the emit is rejected and rerouted — missing evidence
+sends the verifier back to gather it (`fix.verify.blocked`), while evidence
+that was supplied but failed the bar routes through the existing
+`fix.failed -> fixer` path. See [Evidence gates](../../../../docs/reference/topology.md#evidence-gates).
+
 ## AutoFix vs AutoCode
 
 - **AutoFix** = starts from a bug. Minimal fix, regression check, no scope creep.
