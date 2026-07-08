@@ -6,6 +6,8 @@
 // harness/display.ts. SDK consumers can ignore the display variants entirely
 // or drive their own UI.
 
+import type { StopReason } from "./types.js";
+
 export type LoopEvent =
   // Structural — SDK consumers care about these.
   | { type: "log"; level: string; message: string }
@@ -34,7 +36,7 @@ export type LoopEvent =
   | {
       type: "loop.finish";
       iterations: number;
-      stopReason: string;
+      stopReason: StopReason;
       runId: string;
       costUsd: number;
     }
@@ -75,7 +77,7 @@ export type LoopEvent =
       answer: string;
     }
   | { type: "backend.output"; output: string; maxLines?: number }
-  | { type: "failure.diagnostic"; output: string; stopReason: string }
+  | { type: "failure.diagnostic"; output: string; stopReason: StopReason }
   // Emit-boundary file-mod audit (ralph parity): the acting role modified
   // files while under disallowed_tools/read_only restrictions.
   | {
@@ -90,7 +92,7 @@ export type LoopEvent =
       type: "summary";
       runId: string;
       iterations: number;
-      stopReason: string;
+      stopReason: StopReason;
       costUsd: number;
       journalFile: string;
       memoryFile: string;

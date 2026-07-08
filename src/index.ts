@@ -34,7 +34,9 @@ export type {
   LoopContext,
   RunOptions,
   RunSummary,
+  StopReason,
   TriggerSource,
   Verdict,
   VerdictKind,
 } from "@mobrienv/autoloop-harness/types";
+export { STOP_REASONS } from "@mobrienv/autoloop-harness/types";

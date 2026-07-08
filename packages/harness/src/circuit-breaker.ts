@@ -1,11 +1,22 @@
 import type { BackendErrorClass } from "@mobrienv/autoloop-backends";
 import { extractTopic } from "@mobrienv/autoloop-core/journal";
+import type { StopReason } from "./types.js";
 
 export interface CircuitDecision {
   /** `pause`: back off and retry the run; `stop`: terminate with `reason`. */
   action: "pause" | "stop";
-  /** Typed stop reason to journal (also used as the pause's error class). */
-  reason: string;
+  /**
+   * Typed stop reason to journal (also used as the pause's error class).
+   * Narrowed to the subset of `StopReason` this classifier can produce.
+   */
+  reason: Extract<
+    StopReason,
+    | "auth_failed"
+    | "quota_exhausted"
+    | "rate_limited"
+    | "transient_error"
+    | "backend_failed"
+  >;
 }
 
 /**

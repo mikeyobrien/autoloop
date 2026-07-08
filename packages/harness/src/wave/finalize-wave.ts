@@ -6,12 +6,13 @@ import {
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { parallelDispatchBase, parallelJoinedTopic } from "../emit.js";
 import type { IterationContext } from "../prompt.js";
-import type { LoopContext, RunSummary } from "../types.js";
+import type { LoopContext, RunSummary, StopReason } from "../types.js";
 import type {
   AggregateConfig,
   AggregateOutcome,
   BranchResult,
   IterateFn,
+  WaveJoinReason,
 } from "./types.js";
 
 /**
@@ -30,7 +31,7 @@ export function finalizeParallelWave(
   results: BranchResult[],
   aggregate: AggregateConfig,
   aggregateOutcome: AggregateOutcome,
-): { reason: string; waveId: string } {
+): { reason: WaveJoinReason; waveId: string } {
   appendWaveAggregate(loop, iter, waveId, aggregate, aggregateOutcome);
 
   if (aggregate.mode === "first_success") {
@@ -88,7 +89,7 @@ function finalizeNoSuccess(
   iter: IterationContext,
   waveId: string,
   results: BranchResult[],
-): { reason: string; waveId: string } {
+): { reason: WaveJoinReason; waveId: string } {
   const timedOut = results
     .filter(
       (r) =>
@@ -189,7 +190,7 @@ export async function continueAfterParallelJoin(
 export function stopAfterParallelWave(
   loop: LoopContext,
   iter: IterationContext,
-  reason: string,
+  reason: StopReason,
   waveId: string,
 ): RunSummary {
   const fields =
