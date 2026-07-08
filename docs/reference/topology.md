@@ -69,6 +69,8 @@ Each `[[role]]` table defines one role in the loop. Roles are processed in decla
 | `backend_agent` | string | No | ACP `setSessionMode` agent/mode for this role. **Subordinate to `agents.toml`** when the agent map resolves a non-empty value for the same role. |
 | `backend_model` | string | No | ACP `unstable_setSessionModel` model id for this role. |
 | `backend_profile` | string | No | Hermes agent profile (`--profile <name> acp`) for this role. Only effective when `backend_provider = "hermes"`. |
+| `disallowed_tools` | array of strings | No | Tool names this role is forbidden from using (ralph-parity permission model). Consulted by the `event_loop.audit_file_mods` emit-boundary audit: a role with a non-empty list that modifies files during its iteration is flagged with `policy.file_modification_violation`. |
+| `read_only` | bool | No | Declares this role as read-only (no file mutation expected). Consulted by `event_loop.audit_file_mods` alongside `disallowed_tools`. |
 
 If both `prompt` and `prompt_file` are set, `prompt` takes precedence. If neither is set, the role has no prompt text.
 

@@ -23,6 +23,17 @@ export interface Role {
   backendAgent?: string;
   backendModel?: string;
   backendProfile?: string;
+  /**
+   * Tool names this role is forbidden from using (ralph-parity permission
+   * model). Consulted by the emit-boundary file-mod audit: a role with a
+   * non-empty list that modifies files during its iteration is flagged.
+   */
+  disallowedTools?: string[];
+  /**
+   * Declares this role as read-only (no file mutation expected). Consulted
+   * by the emit-boundary file-mod audit alongside `disallowedTools`.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -266,6 +277,7 @@ export function buildTopology(
         promptFile: typeof r.prompt_file === "string" ? r.prompt_file : "",
         emits: Array.isArray(r.emits) ? r.emits.map(String) : [],
         ...parseRoleBackend(r),
+        ...parseRolePermissions(r),
       };
       return { ...role, prompt: rolePrompt(role, projectDir) };
     });
@@ -381,6 +393,18 @@ function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
   return out;
 }
 
+function parseRolePermissions(r: Record<string, unknown>): Partial<Role> {
+  const out: Partial<Role> = {};
+  if (Array.isArray(r.disallowed_tools)) {
+    const tools = r.disallowed_tools.map(String).filter((t) => t !== "");
+    if (tools.length > 0) out.disallowedTools = tools;
+  }
+  if (typeof r.read_only === "boolean") {
+    out.readOnly = r.read_only;
+  }
+  return out;
+}
+
 export function roleHasBackendOverride(role: Role): boolean {
   return (
     role.backendKind !== undefined ||
@@ -396,7 +420,7 @@ export function roleHasBackendOverride(role: Role): boolean {
 }
 
 function renderRoleBackendLines(role: Role, indent: string): string[] {
-  if (!roleHasBackendOverride(role)) return [];
+  if (!roleHasBackendOverride(role) && !roleHasPermissions(role)) return [];
   const lines: string[] = [];
   if (role.backendKind !== undefined) {
     lines.push(`${indent}backend_kind: ${role.backendKind}`);
@@ -425,7 +449,17 @@ function renderRoleBackendLines(role: Role, indent: string): string[] {
   if (role.backendProfile !== undefined) {
     lines.push(`${indent}backend_profile: ${role.backendProfile}`);
   }
+  if (role.disallowedTools !== undefined) {
+    lines.push(`${indent}disallowed_tools: ${listText(role.disallowedTools)}`);
+  }
+  if (role.readOnly !== undefined) {
+    lines.push(`${indent}read_only: ${role.readOnly}`);
+  }
   return lines;
+}
+
+function roleHasPermissions(role: Role): boolean {
+  return role.disallowedTools !== undefined || role.readOnly !== undefined;
 }
 
 function rolePrompt(role: Role, projectDir: string): string {
@@ -737,7 +771,7 @@ function renderTopologyJson(topology: Topology, singleFile: boolean): void {
 }
 
 function roleBackendJson(role: Role): Record<string, unknown> {
-  if (!roleHasBackendOverride(role)) return {};
+  if (!roleHasBackendOverride(role) && !roleHasPermissions(role)) return {};
   const out: Record<string, unknown> = {};
   if (role.backendKind !== undefined) out.backend_kind = role.backendKind;
   if (role.backendProvider !== undefined)
@@ -753,6 +787,9 @@ function roleBackendJson(role: Role): Record<string, unknown> {
   if (role.backendModel !== undefined) out.backend_model = role.backendModel;
   if (role.backendProfile !== undefined)
     out.backend_profile = role.backendProfile;
+  if (role.disallowedTools !== undefined)
+    out.disallowed_tools = role.disallowedTools;
+  if (role.readOnly !== undefined) out.read_only = role.readOnly;
   return out;
 }
 

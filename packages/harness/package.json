@@ -71,6 +71,10 @@
       "types": "./dist/tamper.d.ts",
       "default": "./dist/tamper.js"
     },
+    "./file-mod-audit": {
+      "types": "./dist/file-mod-audit.d.ts",
+      "default": "./dist/file-mod-audit.js"
+    },
     "./git-diff": {
       "types": "./dist/git-diff.d.ts",
       "default": "./dist/git-diff.js"
