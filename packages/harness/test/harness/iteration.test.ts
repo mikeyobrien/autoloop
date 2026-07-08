@@ -58,6 +58,7 @@ vi.mock("@mobrienv/autoloop-backends/pi-rpc-client", async (importOriginal) => {
 });
 
 import {
+  completionEmittedLast,
   resolveOutcome,
   runIteration,
 } from "@mobrienv/autoloop-harness/iteration";
@@ -139,7 +140,12 @@ function makeAcpLoop(): LoopContext {
       postRun: "",
       strict: false,
     },
-    parallel: { enabled: false, maxBranches: 0, branchTimeoutMs: 0 },
+    parallel: {
+      enabled: false,
+      maxBranches: 0,
+      branchTimeoutMs: 0,
+      aggregate: { mode: "wait_for_all", timeoutMs: 0 },
+    },
     memory: { budgetChars: 1000 },
     tasks: { budgetChars: 1000 },
     harness: { instructions: "" },
@@ -749,5 +755,112 @@ describe("resolveOutcome", () => {
       action: "continue_routed",
       outcome: "continue:routed_event",
     });
+  });
+
+  describe("completion.must_be_last", () => {
+    it("still completes when mustBeLast is true and completion was last in its turn", () => {
+      const result = resolveOutcome({
+        ...base,
+        allTopics: ["task.complete"],
+        mustBeLast: true,
+        completionOrderOk: true,
+      });
+      expect(result).toEqual({
+        action: "complete_event",
+        outcome: "complete:completion_event",
+      });
+    });
+
+    it("falls through to continue when mustBeLast is true and another event followed completion in its turn", () => {
+      const result = resolveOutcome({
+        ...base,
+        allTopics: ["task.complete"],
+        mustBeLast: true,
+        completionOrderOk: false,
+      });
+      expect(result).toEqual({ action: "continue", outcome: "continue" });
+    });
+
+    it("ignores ordering (default, back-compat) when mustBeLast is false even if order was violated", () => {
+      const result = resolveOutcome({
+        ...base,
+        allTopics: ["task.complete"],
+        mustBeLast: false,
+        completionOrderOk: false,
+      });
+      expect(result).toEqual({
+        action: "complete_event",
+        outcome: "complete:completion_event",
+      });
+    });
+
+    it("defaults to unchanged (order-insensitive) behavior when mustBeLast is omitted", () => {
+      const result = resolveOutcome({
+        ...base,
+        allTopics: ["task.complete"],
+      });
+      expect(result).toEqual({
+        action: "complete_event",
+        outcome: "complete:completion_event",
+      });
+    });
+  });
+});
+
+describe("completionEmittedLast", () => {
+  function journalLine(
+    runId: string,
+    iteration: string,
+    topic: string,
+  ): string {
+    return encodeEvent({
+      shape: "fields",
+      run: runId,
+      iteration,
+      topic,
+      fields: {},
+    });
+  }
+
+  it("returns true when the completion event has not been emitted", () => {
+    const lines = [journalLine("r1", "1", "plan.ready")];
+    expect(completionEmittedLast(lines, "task.complete")).toBe(true);
+  });
+
+  it("returns true when completion is the last non-system topic in its turn", () => {
+    const lines = [
+      journalLine("r1", "1", "plan.ready"),
+      journalLine("r1", "2", "step.done"),
+      journalLine("r1", "2", "task.complete"),
+    ];
+    expect(completionEmittedLast(lines, "task.complete")).toBe(true);
+  });
+
+  it("returns false when another event follows completion in the same turn", () => {
+    const lines = [
+      journalLine("r1", "1", "plan.ready"),
+      journalLine("r1", "2", "task.complete"),
+      journalLine("r1", "2", "step.done"),
+    ];
+    expect(completionEmittedLast(lines, "task.complete")).toBe(false);
+  });
+
+  it("ignores system topics (iteration/backend framing) when checking order", () => {
+    const lines = [
+      journalLine("r1", "2", "task.complete"),
+      journalLine("r1", "2", "iteration.finish"),
+      journalLine("r1", "2", "backend.finish"),
+    ];
+    expect(completionEmittedLast(lines, "task.complete")).toBe(true);
+  });
+
+  it("checks ordering within the turn completion was last emitted, even if required events trickle in on a later turn", () => {
+    const lines = [
+      journalLine("r1", "1", "task.complete"),
+      journalLine("r1", "1", "step.done"),
+      journalLine("r1", "2", "verify.done"),
+    ];
+    // completion was emitted in turn 1; step.done followed it in that turn.
+    expect(completionEmittedLast(lines, "task.complete")).toBe(false);
   });
 });

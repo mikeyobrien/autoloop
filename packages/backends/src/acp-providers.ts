@@ -1,4 +1,4 @@
-export type AcpProviderId = "generic" | "kiro" | "claude-agent-acp";
+export type AcpProviderId = "generic" | "kiro" | "claude-agent-acp" | "hermes";
 
 export interface AcpProvider {
   id: AcpProviderId;
@@ -54,10 +54,21 @@ export const ACP_PROVIDERS: AcpProvider[] = [
     supportsSessionMode: true,
     supportsSessionModel: true,
   },
+  {
+    id: "hermes",
+    displayName: "Hermes ACP",
+    defaultCommand: "hermes",
+    defaultArgs: ["acp"],
+    defaultPromptMode: "acp",
+    crashLabel: "hermes",
+    interruptDetail: "ACP cancel + child-process-group SIGTERM",
+    supportsSessionMode: true,
+    supportsSessionModel: true,
+  },
 ];
 
 export function isAcpBackendKind(kind: string | undefined): boolean {
-  return kind === "acp" || kind === "kiro";
+  return kind === "acp" || kind === "kiro" || kind === "hermes";
 }
 
 export function resolveAcpProvider(
@@ -66,8 +77,26 @@ export function resolveAcpProvider(
   const explicit = input.provider?.trim();
   if (explicit) return providerById(explicit) ?? providerById("generic");
   if (input.kind === "kiro") return providerById("kiro");
+  if (input.kind === "hermes") return providerById("hermes");
   if (basename(input.command ?? "") === "kiro-cli") return providerById("kiro");
+  if (basename(input.command ?? "") === "hermes") return providerById("hermes");
   return providerById("generic");
+}
+
+/**
+ * Final launch argv for an ACP provider process. Hermes selects its agent
+ * profile via a top-level `--profile <name>` flag that must precede the
+ * `acp` subcommand; other providers have no profile concept.
+ */
+export function providerLaunchArgs(
+  provider: string,
+  profile: string | undefined,
+  args: string[],
+): string[] {
+  if (provider === "hermes" && profile) {
+    return ["--profile", profile, ...args];
+  }
+  return [...args];
 }
 
 function providerById(id: string): AcpProvider {

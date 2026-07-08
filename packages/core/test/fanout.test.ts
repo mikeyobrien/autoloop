@@ -18,6 +18,7 @@ function stage(overrides: Partial<FanoutStage>): FanoutStage {
   return {
     id: "s",
     kind: "verdict",
+    trigger: "s.trigger",
     branches: 3,
     role: "verifier",
     roles: [],

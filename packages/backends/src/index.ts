@@ -10,7 +10,11 @@ import {
   sendClaudeSdkPrompt,
 } from "./claude-sdk-client.js";
 import { type PiSession, sendPiPrompt } from "./pi-rpc-client.js";
-import { buildCommandInvocation, runShellCommand } from "./run-command.js";
+import {
+  buildCommandInvocation,
+  runShellCommand,
+  spawnShellCommand,
+} from "./run-command.js";
 import type { BackendCommandContext, BackendRunResult } from "./types.js";
 
 export type {
@@ -152,12 +156,15 @@ function isMockInvocation(command: string, args: string[]): boolean {
 
 export function buildBackendShellCommand(ctx: BackendCommandContext): string {
   const promptPath = join(ctx.paths.stateDir, "active-prompt.md");
-  const envLines = promptRuntimeEnvLines(
+  let envLines = promptRuntimeEnvLines(
     ctx.spec,
     ctx.prompt,
     promptPath,
     ctx.runtimeEnv,
   );
+  if (ctx.usageFilePath) {
+    envLines += `export AUTOLOOP_USAGE_FILE=${shellQuote(ctx.usageFilePath)}\n`;
+  }
   const childCommand =
     ctx.spec.kind === "pi"
       ? shellWords([
@@ -194,6 +201,23 @@ export function runBackendCommand(
   timeoutMs: number,
 ): BackendRunResult {
   return runShellCommand(providerKind, command, timeoutMs);
+}
+
+/**
+ * Async sibling of `runBackendCommand` — used for the `command` backend's
+ * main-loop iterations so the harness can register a live PID (via `onSpawn`)
+ * for interrupt signaling and keep servicing its own control-drain handler
+ * while the child runs. See `spawnShellCommand` for the escalation contract.
+ */
+export function runBackendCommandAsync(
+  providerKind: string,
+  command: string,
+  timeoutMs: number,
+  onSpawn?: (pid: number) => void,
+): Promise<BackendRunResult> {
+  return spawnShellCommand(providerKind, command, timeoutMs, (pid) =>
+    onSpawn?.(pid),
+  );
 }
 
 export function normalizeProviderKind(spec: {
@@ -241,14 +265,31 @@ function wrapProcessInvocation(command: string): string {
     '    wait "$autoloops_child_pid" 2>/dev/null || true\n' +
     "  fi\n" +
     "}\n" +
+    // Cooperative interrupt: a SIGUSR1 delivered to this wrapper (by the
+    // harness's live-control adapter) is forwarded to the real child without
+    // tearing down the wrapper itself, so a well-behaved wrapped command can
+    // trap USR1 and cancel gracefully. If it doesn't, the harness escalates
+    // to SIGTERM/SIGKILL directly against this same wrapper pid, which the
+    // INT/TERM trap below handles identically to a normal interrupt.
     "trap 'autoloops_cleanup; exit 130' INT TERM\n" +
+    'trap \'[ -n "$autoloops_child_pid" ] && kill -USR1 "$autoloops_child_pid" 2>/dev/null || true\' USR1\n' +
     "(\n" +
     command +
     "\n) &\n" +
     "autoloops_child_pid=$!\n" +
-    'wait "$autoloops_child_pid"\n' +
-    "autoloops_status=$?\n" +
-    "trap - INT TERM\n" +
+    // `wait` returns as soon as a trapped signal fires (e.g. the USR1
+    // forward above), even though the child it was waiting on is still
+    // running — POSIX shells do not automatically resume an interrupted
+    // wait. Loop until the child has actually exited so a well-behaved
+    // command has the time it needs to shut down gracefully after USR1,
+    // instead of the wrapper exiting out from under it (which would orphan
+    // the child and hand the harness a bogus, premature exit status).
+    "autoloops_status=1\n" +
+    'while kill -0 "$autoloops_child_pid" 2>/dev/null; do\n' +
+    '  wait "$autoloops_child_pid" 2>/dev/null\n' +
+    "  autoloops_status=$?\n" +
+    "done\n" +
+    "trap - INT TERM USR1\n" +
     'exit "$autoloops_status"\n'
   );
 }

@@ -47,6 +47,8 @@ interface RunOptions {
   architectObjective?: string;
   /** Path the architect must write the generated preset to (CLI-controlled). */
   architectOutputPath?: string;
+  /** Force every fan-out stage branch to relaunch rather than resume. */
+  noResume?: boolean;
 }
 
 export async function dispatchRun(
@@ -325,6 +327,26 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
       i += 2;
       continue;
     }
+    if (token === "--preset-file") {
+      const path = args[i + 1];
+      if (!path) {
+        console.log(`missing path after ${token}`);
+        options.usageError = true;
+        return options;
+      }
+      if (!config.pathIsSingleFilePreset(path)) {
+        console.log(
+          `--preset-file expects a path to an existing .toml file: ${path}`,
+        );
+        options.usageError = true;
+        return options;
+      }
+      options.presetFile = resolve(path);
+      options.projectDir = dirname(resolve(path));
+      options.presetExplicit = true;
+      i += 2;
+      continue;
+    }
     if (token === "--chain") {
       const chainVal = args[i + 1];
       if (!chainVal) {
@@ -380,6 +402,11 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     }
     if (token === "--keep-worktree") {
       options.keepWorktree = true;
+      i++;
+      continue;
+    }
+    if (token === "--no-resume") {
+      options.noResume = true;
       i++;
       continue;
     }
@@ -607,6 +634,14 @@ export function backendOverrideSpec(backend: string): Record<string, unknown> {
       "-y",
       "@agentclientprotocol/claude-agent-acp",
     ]);
+  }
+  if (backend === "hermes" || backend.startsWith("hermes:")) {
+    const profile = backend.startsWith("hermes:")
+      ? backend.slice("hermes:".length)
+      : "";
+    const spec = acpBackendOverride("hermes", "hermes", ["acp"]);
+    if (profile) spec["profile"] = profile;
+    return spec;
   }
   if (backend.startsWith("acp:")) {
     const [, provider, ...commandParts] = backend.split(":");

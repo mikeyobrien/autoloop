@@ -32,7 +32,7 @@ describe("integration: control command", () => {
     expect(res.stdout).toContain("guide");
   });
 
-  it("control show reports 'no capabilities' for a completed command-backend run", () => {
+  it("control show reports commandControlAdapter capabilities for a completed command-backend run", () => {
     const project = makeTempProject("ctl-show");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
     runCli(["run", project, "control show test"], {
@@ -47,8 +47,13 @@ describe("integration: control command", () => {
     );
     expect(res.stdout).toContain(`Run:         ${runId}`);
     expect(res.stdout).toContain("Status:");
-    // "command" kind has no adapter -> no capabilities published
-    expect(res.stdout).toContain("(none published yet");
+    // Issue #34: the `command` backend now publishes live-control
+    // capabilities via commandControlAdapter (SIGUSR1 interrupt +
+    // journal-durable guidance), so a completed run still has a
+    // capabilities.json on disk from when the loop started.
+    expect(res.stdout).toContain("Capabilities (backend: command)");
+    expect(res.stdout).toContain("interrupt");
+    expect(res.stdout).toContain("SIGUSR1");
   });
 
   it("control capabilities surfaces backend verbs once an adapter is installed", () => {
@@ -175,7 +180,7 @@ describe("integration: control command", () => {
     expect(reqs[0].payload.interrupt).toBe(false);
   });
 
-  it("control interrupt queues a request even when backend cannot actually interrupt", () => {
+  it("control interrupt queues a request against a completed command-backend run", () => {
     const project = makeTempProject("ctl-interrupt-queue");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
     runCli(["run", project, "control interrupt test"], {
@@ -188,7 +193,10 @@ describe("integration: control command", () => {
       { AUTOLOOP_PROJECT_DIR: project },
       project,
     );
-    expect(res.stdout).toContain("Interrupt request queued");
+    // Issue #34: `command` now supports interrupt (commandControlAdapter),
+    // so the CLI reports it as requested rather than merely queued — the
+    // request is still durably written even though the run already exited.
+    expect(res.stdout).toContain("Interrupt requested");
 
     const runStateDir = join(project, ".autoloop", "runs", runId);
     const reqs = readFileSync(
@@ -216,7 +224,7 @@ describe("integration: control command", () => {
       { AUTOLOOP_PROJECT_DIR: project },
       project,
     );
-    expect(interruptRes.stdout).toContain("queued");
+    expect(interruptRes.stdout).toContain("Interrupt requested");
 
     const show = runCli(
       ["control", "show", runId],

@@ -37,6 +37,7 @@ import {
 import { acpControlAdapter } from "./control/acp-adapter.js";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import { claudeSdkControlAdapter } from "./control/claude-sdk-adapter.js";
+import { commandControlAdapter } from "./control/command-adapter.js";
 import {
   drainControlRequests,
   publishCapabilities,
@@ -45,7 +46,7 @@ import { piControlAdapter } from "./control/pi-adapter.js";
 import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
 import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
-import { buildHookEnv, runHook } from "./hooks.js";
+import { buildHookEnv, runPhaseHooks } from "./hooks.js";
 import { journalAcceptanceContract } from "./intent.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
@@ -73,7 +74,9 @@ import {
   stopPrematureQuit,
   stopReviewUnknown,
   stopStalled,
+  stopSuspended,
 } from "./stop.js";
+import { readSuspendState, resumeRequested } from "./suspend-state.js";
 import type { LoopContext, RunOptions, RunSummary } from "./types.js";
 
 export type { LoopContext, RunOptions, RunSummary };
@@ -102,11 +105,37 @@ export async function run(
     /* best-effort: readLines already skips corrupt lines, so this is belt-and-suspenders */
   }
   installRuntimeTools(loop);
+
+  // A durable suspend from a prior run still pending (no resume-requested
+  // signal dropped yet) must block a fresh `run` from starting over the same
+  // state dir — the operator needs to resolve it first via `autoloop resume`
+  // or `autoloop hooks clear-suspend`.
+  const pendingSuspend = readSuspendState(loop.paths.stateDir);
+  if (pendingSuspend && !resumeRequested(loop.paths.stateDir)) {
+    throw new Error(
+      `run suspended (phase=${pendingSuspend.phase}, reason=${pendingSuspend.reason}); ` +
+        "resolve with `autoloop resume` or clear it with `autoloop hooks clear-suspend` before starting a new run",
+    );
+  }
+
   appendLoopStart(loop);
   // Bind the acceptance contract (intent) at loop start so the deterministic
   // gate keys its criteria off what was asked.
   journalAcceptanceContract(loop);
-  runHook(loop, "pre_run", loop.hooks.preRun, buildHookEnv(loop));
+  const preRunResult = await runPhaseHooks(loop, "pre_run", buildHookEnv(loop));
+  if (preRunResult.blocked) {
+    throw new Error(
+      `Aborting run: ${preRunResult.blockedMessage ?? "pre_run hook blocked"}`,
+    );
+  }
+  if (preRunResult.suspended) {
+    const summary = stopSuspended(
+      loop,
+      0,
+      preRunResult.blockedMessage ?? "pre_run hook suspended the run",
+    );
+    return summary;
+  }
   registryStart(loop);
   loop.controlAdapter = buildControlAdapter(loop);
   if (loop.controlAdapter) {
@@ -158,6 +187,15 @@ export async function driveLoop(
       terminateClaudeSdkSession(session).catch(() => {
         /* best-effort */
       });
+    }
+    if (loop.commandSession.current) {
+      const session = loop.commandSession.current;
+      loop.commandSession.current = undefined;
+      try {
+        process.kill(session.pid, "SIGTERM");
+      } catch {
+        /* best-effort */
+      }
     }
     try {
       registryStop(loop, currentIteration, "interrupted");
@@ -284,6 +322,14 @@ export async function driveLoop(
       }
       loop.claudeSdkSession.current = undefined;
     }
+    if (loop.commandSession.current) {
+      try {
+        process.kill(loop.commandSession.current.pid, "SIGTERM");
+      } catch {
+        /* best-effort */
+      }
+      loop.commandSession.current = undefined;
+    }
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
 
@@ -356,12 +402,16 @@ export async function driveLoop(
     }
   }
 
-  runHook(
+  const postRunResult = await runPhaseHooks(
     loop,
     "post_run",
-    loop.hooks.postRun,
     buildHookEnv(loop, { stopReason: summary.stopReason }),
   );
+  if (postRunResult.blocked) {
+    throw new Error(
+      `post_run hook failed: ${postRunResult.blockedMessage ?? "post_run hook blocked"}`,
+    );
+  }
   runFinishNotification({
     projectDir: loop.paths.mainProjectDir,
     journalFile: loop.paths.journalFile,
@@ -461,6 +511,14 @@ export async function runParallelBranchCli(
         /* best-effort */
       }
       seeded.claudeSdkSession.current = undefined;
+    }
+    if (seeded.commandSession.current) {
+      try {
+        process.kill(seeded.commandSession.current.pid, "SIGTERM");
+      } catch {
+        /* best-effort */
+      }
+      seeded.commandSession.current = undefined;
     }
   }
   const finishedMs = Date.now();
@@ -649,5 +707,44 @@ export function buildControlAdapter(
       },
     });
   }
+  if (loop.backend.kind === "command") {
+    return commandControlAdapter(loop.runtime.runId, {
+      triggerInterrupt: () => escalateCommandInterrupt(loop),
+    });
+  }
   return undefined;
+}
+
+/**
+ * SIGUSR1 → grace period → SIGTERM → grace period → SIGKILL against the
+ * in-flight `command` iteration's child. Non-blocking (setTimeout-driven) so
+ * it never stalls the harness's own control-drain or iteration loop. No-op if
+ * no `command` iteration is currently running, or if the process has already
+ * exited (each `kill` call below is best-effort and independently guarded).
+ */
+function escalateCommandInterrupt(loop: LoopContext, graceMs = 5000): void {
+  const session = loop.commandSession.current;
+  if (!session?.pid) return;
+  const stillRunning = () => loop.commandSession.current?.pid === session.pid;
+  try {
+    process.kill(session.pid, "SIGUSR1");
+  } catch {
+    return; // already exited
+  }
+  setTimeout(() => {
+    if (!stillRunning()) return;
+    try {
+      process.kill(session.pid, "SIGTERM");
+    } catch {
+      /* already exited */
+    }
+    setTimeout(() => {
+      if (!stillRunning()) return;
+      try {
+        process.kill(session.pid, "SIGKILL");
+      } catch {
+        /* already exited */
+      }
+    }, graceMs);
+  }, graceMs);
 }

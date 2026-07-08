@@ -22,6 +22,33 @@ export interface Role {
   backendTimeoutMs?: number;
   backendAgent?: string;
   backendModel?: string;
+  backendProfile?: string;
+  /**
+   * Declarative per-role concurrency (ralph v3 style). `0` (or absent) means
+   * the current agent-triggered behavior: waves only start when the agent
+   * emits a `.parallel` topic. `N > 0` means the harness auto-launches N
+   * concurrent branches whenever this role is routed to via `[handoff]`,
+   * without requiring an agent emit.
+   */
+  concurrency?: number;
+  /** Optional wave-completion strategy override for this role's declarative waves. */
+  aggregate?: RoleAggregate;
+  /**
+   * Tool names this role is forbidden from using (ralph-parity permission
+   * model). Consulted by the emit-boundary file-mod audit: a role with a
+   * non-empty list that modifies files during its iteration is flagged.
+   */
+  disallowedTools?: string[];
+  /**
+   * Declares this role as read-only (no file mutation expected). Consulted
+   * by the emit-boundary file-mod audit alongside `disallowedTools`.
+   */
+  readOnly?: boolean;
+}
+
+export interface RoleAggregate {
+  mode: "wait_for_all" | "first_success" | "timeout";
+  timeoutMs: number;
 }
 
 /**
@@ -168,6 +195,26 @@ export function handoffTargetIds(topology: Topology): string[] {
   return all;
 }
 
+/**
+ * Role ids referenced by a fan-out stage — as its identical-panel `role`, one of
+ * its distinct-panel `roles`, or its `synthesizerRole`. A stage is a dispatch
+ * point analogous to a `[handoff]` rule: its trigger routes to these roles even
+ * though they never appear as handoff-value targets. The orphan-role check must
+ * treat them as reached, or every dedicated branch role trips a false positive.
+ */
+export function stageReferencedRoleIds(topology: Topology): string[] {
+  const all: string[] = [];
+  const add = (id: string): void => {
+    if (id !== "" && !all.includes(id)) all.push(id);
+  };
+  for (const stage of topology.stages) {
+    add(stage.role);
+    for (const id of stage.roles) add(id);
+    add(stage.synthesizerRole);
+  }
+  return all;
+}
+
 export function loadTopology(projectDir: string): Topology {
   const path = join(projectDir, "topology.toml");
   if (!existsSync(path)) return defaultTopology();
@@ -199,6 +246,22 @@ export function isSingleFilePresetPath(target: string): boolean {
 
 export function completionEvent(topology: Topology, fallback: string): string {
   return topology.completion || fallback;
+}
+
+/**
+ * Find the fan-out stage (if any) whose `trigger` matches `event`. Used by the
+ * iteration loop to intercept a stage's entry-point event before ordinary role
+ * dispatch — mirrors `parallelTriggerTopic` for `.parallel` dispatch topics.
+ */
+export function stageForTrigger(
+  topology: Topology,
+  event: string,
+): FanoutStage | undefined {
+  if (!event) return undefined;
+  return topology.stages.find(
+    (stage) =>
+      stage.trigger !== "" && eventMatchesPattern(event, stage.trigger),
+  );
 }
 
 export function suggestedRoles(
@@ -288,6 +351,8 @@ export function buildTopology(
         promptFile: typeof r.prompt_file === "string" ? r.prompt_file : "",
         emits: Array.isArray(r.emits) ? r.emits.map(String) : [],
         ...parseRoleBackend(r),
+        ...parseRoleConcurrency(r),
+        ...parseRolePermissions(r),
       };
       return { ...role, prompt: rolePrompt(role, projectDir) };
     });
@@ -370,6 +435,7 @@ function parseStage(s: Record<string, unknown>): FanoutStage {
   return {
     id,
     kind,
+    trigger: str(s.trigger, str(s.on, "")),
     branches: num(s.branches, 0),
     role: str(s.role, ""),
     roles: Array.isArray(s.roles) ? s.roles.map(String) : [],
@@ -421,7 +487,77 @@ function parseRoleBackend(r: Record<string, unknown>): Partial<Role> {
   if (typeof r.backend_model === "string" && r.backend_model !== "") {
     out.backendModel = r.backend_model;
   }
+  if (typeof r.backend_profile === "string" && r.backend_profile !== "") {
+    out.backendProfile = r.backend_profile;
+  }
   return out;
+}
+
+function parseRolePermissions(r: Record<string, unknown>): Partial<Role> {
+  const out: Partial<Role> = {};
+  if (Array.isArray(r.disallowed_tools)) {
+    const tools = r.disallowed_tools.map(String).filter((t) => t !== "");
+    if (tools.length > 0) out.disallowedTools = tools;
+  }
+  if (typeof r.read_only === "boolean") {
+    out.readOnly = r.read_only;
+  }
+  return out;
+}
+
+/**
+ * Parse the optional declarative-concurrency fields on a `[[role]]` table:
+ * `concurrency = N` (integer >= 0; negative/NaN/non-number values are ignored
+ * and default to 0 = agent-triggered only) and an inline `[role.aggregate]`
+ * sub-table (`mode`, `timeout_ms`) overriding the loop-level wave completion
+ * strategy for this role's declarative waves.
+ */
+function parseRoleConcurrency(r: Record<string, unknown>): Partial<Role> {
+  const out: Partial<Role> = {};
+  if (typeof r.concurrency === "number" && Number.isFinite(r.concurrency)) {
+    const n = Math.trunc(r.concurrency);
+    if (n > 0) out.concurrency = n;
+  }
+  const rawAggregate = r.aggregate;
+  if (
+    rawAggregate &&
+    typeof rawAggregate === "object" &&
+    !Array.isArray(rawAggregate)
+  ) {
+    const agg = rawAggregate as Record<string, unknown>;
+    out.aggregate = {
+      mode: normalizeAggregateMode(agg.mode),
+      timeoutMs: num(agg.timeout_ms, 0),
+    };
+  }
+  return out;
+}
+
+export function normalizeAggregateMode(
+  value: unknown,
+): "wait_for_all" | "first_success" | "timeout" {
+  if (value === "first_success" || value === "timeout") return value;
+  return "wait_for_all";
+}
+
+/** Roles whose declarative `concurrency` is > 0. */
+export function rolesWithConcurrency(topology: Topology): Role[] {
+  return topology.roles.filter((r) => (r.concurrency ?? 0) > 0);
+}
+
+/**
+ * Roles that `event` routes to (via `[handoff]`) AND that declare a
+ * declarative `concurrency > 0`. Used by the harness to auto-launch
+ * concurrent waves without requiring an agent `.parallel` emit.
+ */
+export function concurrentRolesForEvent(
+  topology: Topology,
+  event: string,
+): Role[] {
+  const matched = new Set(collectMatchingRoles(topology, event));
+  return topology.roles.filter(
+    (r) => matched.has(r.id) && (r.concurrency ?? 0) > 0,
+  );
 }
 
 export function roleHasBackendOverride(role: Role): boolean {
@@ -433,12 +569,13 @@ export function roleHasBackendOverride(role: Role): boolean {
     role.backendPromptMode !== undefined ||
     role.backendTimeoutMs !== undefined ||
     role.backendAgent !== undefined ||
-    role.backendModel !== undefined
+    role.backendModel !== undefined ||
+    role.backendProfile !== undefined
   );
 }
 
 function renderRoleBackendLines(role: Role, indent: string): string[] {
-  if (!roleHasBackendOverride(role)) return [];
+  if (!roleHasBackendOverride(role) && !roleHasPermissions(role)) return [];
   const lines: string[] = [];
   if (role.backendKind !== undefined) {
     lines.push(`${indent}backend_kind: ${role.backendKind}`);
@@ -464,7 +601,20 @@ function renderRoleBackendLines(role: Role, indent: string): string[] {
   if (role.backendModel !== undefined) {
     lines.push(`${indent}backend_model: ${role.backendModel}`);
   }
+  if (role.backendProfile !== undefined) {
+    lines.push(`${indent}backend_profile: ${role.backendProfile}`);
+  }
+  if (role.disallowedTools !== undefined) {
+    lines.push(`${indent}disallowed_tools: ${listText(role.disallowedTools)}`);
+  }
+  if (role.readOnly !== undefined) {
+    lines.push(`${indent}read_only: ${role.readOnly}`);
+  }
   return lines;
+}
+
+function roleHasPermissions(role: Role): boolean {
+  return role.disallowedTools !== undefined || role.readOnly !== undefined;
 }
 
 function rolePrompt(role: Role, projectDir: string): string {
@@ -534,6 +684,9 @@ function renderRoles(roles: Role[]): string {
     for (const line of renderRoleBackendLines(role, "  ")) {
       result += `${line}\n`;
     }
+    if (role.concurrency !== undefined) {
+      result += `  concurrency: ${role.concurrency}\n`;
+    }
     result += `  prompt: ${promptSummary(role.prompt)}\n`;
   }
   return result;
@@ -566,7 +719,9 @@ export interface TopologyWarning {
     | "stage-event-unroutable"
     | "stage-empty"
     | "stage-schema-incoherent"
-    | "stage-not-executed";
+    | "stage-trigger-missing"
+    | "stage-trigger-dead"
+    | "concurrency-on-unrouted-role";
   message: string;
 }
 
@@ -584,7 +739,8 @@ export function validateTopology(
 ): TopologyWarning[] {
   const warnings: TopologyWarning[] = [];
 
-  const targetedRoleIds = handoffTargetIds(topology);
+  const stageRoleIds = stageReferencedRoleIds(topology);
+  const targetedRoleIds = [...handoffTargetIds(topology), ...stageRoleIds];
   for (const role of topology.roles) {
     if (!targetedRoleIds.includes(role.id)) {
       warnings.push({
@@ -602,6 +758,14 @@ export function validateTopology(
       warnings.push({
         kind: "prompt-file-in-single-file",
         message: `role \`${role.id}\` uses prompt_file \`${role.promptFile}\`, unsupported in single-file presets; use an inline prompt`,
+      });
+    }
+    // A declarative concurrency>0 role that no handoff rule ever routes to can
+    // never auto-trigger a wave; flag it so the config is not silently dead.
+    if ((role.concurrency ?? 0) > 0 && !targetedRoleIds.includes(role.id)) {
+      warnings.push({
+        kind: "concurrency-on-unrouted-role",
+        message: `role \`${role.id}\` declares concurrency=${role.concurrency} but is not targeted by any handoff rule, so it can never auto-trigger a declarative wave`,
       });
     }
   }
@@ -668,16 +832,6 @@ export function validateTopology(
 
   validateStages(topology, warnings);
 
-  // Fan-out stages parse and validate, but stage EXECUTION is not yet wired into
-  // the run loop. On the runnable (single-file) path, flag a preset that defines
-  // stages so the dead-topology gate refuses it rather than silently no-opping.
-  if (options.singleFile && topology.stages.length > 0) {
-    warnings.push({
-      kind: "stage-not-executed",
-      message: `topology defines ${topology.stages.length} fan-out [[stage]] block(s), but stage execution is not yet wired into the run loop; they would not run`,
-    });
-  }
-
   return warnings;
 }
 
@@ -686,8 +840,22 @@ function validateStages(topology: Topology, warnings: TopologyWarning[]): void {
   const routes = (event: string): boolean =>
     eventMatchesAny(event, topology.handoffKeys) ||
     event === topology.completion;
+  const emitted = allEmittedEvents(topology);
 
   for (const stage of topology.stages) {
+    // A stage needs an entry point: some upstream role must emit its trigger.
+    if (stage.trigger === "") {
+      warnings.push({
+        kind: "stage-trigger-missing",
+        message: `stage \`${stage.id}\` has no trigger; set trigger = "<event>" to give it an entry point`,
+      });
+    } else if (!emitted.includes(stage.trigger)) {
+      warnings.push({
+        kind: "stage-trigger-dead",
+        message: `stage \`${stage.id}\` trigger \`${stage.trigger}\` is never emitted by any role`,
+      });
+    }
+
     // Every referenced role must exist.
     const referenced = [
       ...(stage.role ? [stage.role] : []),
@@ -782,6 +950,7 @@ function renderTopologyJson(topology: Topology, singleFile: boolean): void {
       emits: r.emits,
       prompt: promptSummary(r.prompt),
       ...roleBackendJson(r),
+      ...roleConcurrencyJson(r),
     })),
     handoff: topology.handoff,
     warnings: warnings.map((w) => ({ kind: w.kind, message: w.message })),
@@ -790,7 +959,7 @@ function renderTopologyJson(topology: Topology, singleFile: boolean): void {
 }
 
 function roleBackendJson(role: Role): Record<string, unknown> {
-  if (!roleHasBackendOverride(role)) return {};
+  if (!roleHasBackendOverride(role) && !roleHasPermissions(role)) return {};
   const out: Record<string, unknown> = {};
   if (role.backendKind !== undefined) out.backend_kind = role.backendKind;
   if (role.backendProvider !== undefined)
@@ -804,6 +973,23 @@ function roleBackendJson(role: Role): Record<string, unknown> {
     out.backend_timeout_ms = role.backendTimeoutMs;
   if (role.backendAgent !== undefined) out.backend_agent = role.backendAgent;
   if (role.backendModel !== undefined) out.backend_model = role.backendModel;
+  if (role.backendProfile !== undefined)
+    out.backend_profile = role.backendProfile;
+  if (role.disallowedTools !== undefined)
+    out.disallowed_tools = role.disallowedTools;
+  if (role.readOnly !== undefined) out.read_only = role.readOnly;
+  return out;
+}
+
+function roleConcurrencyJson(role: Role): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (role.concurrency !== undefined) out.concurrency = role.concurrency;
+  if (role.aggregate !== undefined) {
+    out.aggregate = {
+      mode: role.aggregate.mode,
+      timeout_ms: role.aggregate.timeoutMs,
+    };
+  }
   return out;
 }
 
@@ -836,6 +1022,9 @@ function renderTopologyTerminal(topology: Topology, singleFile: boolean): void {
     lines.push(`- \`${role.id}\` — emits: ${listText(role.emits)}`);
     for (const line of renderRoleBackendLines(role, "  ")) {
       lines.push(line);
+    }
+    if (role.concurrency !== undefined) {
+      lines.push(`  concurrency: ${role.concurrency}`);
     }
     lines.push(`  prompt: ${promptSummary(role.prompt)}`);
   }

@@ -11,7 +11,9 @@ export function printUsage(): void {
   console.log(
     "  autoloop resume <run-id> [--add-iterations N] [-b <backend>] [-v]",
   );
-  console.log("  autoloop init [--preset <name>] [dir]");
+  console.log(
+    "  autoloop init [--preset <name>|--single-file <file.toml>] [dir]",
+  );
   console.log("  autoloop emit <topic> [summary]");
   console.log(
     "  autoloop inspect <artifact> [selector] [project-dir] [--format <md|terminal|text|json|csv|graph>]",
@@ -40,6 +42,9 @@ export function printUsage(): void {
   console.log("  autoloop preset promote <source.toml> <name>");
   console.log("  autoloop worktree <list|show|diff|merge|clean> [args]");
   console.log("  autoloop config <show|set|unset|path> [args]");
+  console.log(
+    "  autoloop hooks <list|show|validate|clear-suspend> [project-dir] [--json]",
+  );
   console.log("  autoloop dashboard [--port <port>]");
   console.log("  autoloop kanban [--port <port>]");
   console.log("  autoloop acp [--project-dir <dir>]");
@@ -75,7 +80,7 @@ export function printUsage(): void {
   console.log("  -V, --version    Print the autoloop version");
   console.log("  -v, --verbose    Set log level to debug");
   console.log(
-    "  -b, --backend    Override backend (claude-sdk, pi, kiro, claude-agent-acp, acp:<provider>:<cmd>, or a command)",
+    "  -b, --backend    Override backend (claude-sdk, pi, kiro, hermes[:profile], claude-agent-acp, acp:<provider>:<cmd>, or a command)",
   );
   console.log(
     "  --max-iterations <n>  Override event_loop.max_iterations for this run",
@@ -86,6 +91,9 @@ export function printUsage(): void {
   );
   console.log(
     "  -p, --preset     Resolve a bundled preset name or custom preset dir",
+  );
+  console.log(
+    "  --preset-file <path>  Run from an explicit single-file (.toml) preset",
   );
   console.log(
     "  --chain          Run an inline chain (comma-separated presets)",
@@ -119,7 +127,7 @@ export function printRunUsage(): void {
   console.log("  -h, --help       Show this help");
   console.log("  -v, --verbose    Set log level to debug");
   console.log(
-    "  -b, --backend    Override backend (claude-sdk, pi, kiro, claude-agent-acp, acp:<provider>:<cmd>, or a command)",
+    "  -b, --backend    Override backend (claude-sdk, pi, kiro, hermes[:profile], claude-agent-acp, acp:<provider>:<cmd>, or a command)",
   );
   console.log(
     "  --max-iterations <n>  Override event_loop.max_iterations for this run",
@@ -130,6 +138,9 @@ export function printRunUsage(): void {
   );
   console.log(
     "  -p, --preset     Resolve a bundled preset name or custom preset dir",
+  );
+  console.log(
+    "  --preset-file <path>  Run from an explicit single-file (.toml) preset",
   );
   console.log(
     "  --chain          Run an inline chain (comma-separated presets)",
@@ -155,6 +166,32 @@ export function printRunUsage(): void {
     "  --events <path>        Append the NDJSON LoopEvent stream to <path>",
   );
   console.log("");
+  console.log("Dynamic workflows (architect-generated presets):");
+  console.log(
+    "  --architect, --dynamic Route an objective (no preset name) through the",
+  );
+  console.log(
+    "                         autoarchitect preset, which designs a bespoke",
+  );
+  console.log(
+    "                         single-file preset and auto-chains into running it",
+  );
+  console.log(
+    "  --ultra                --architect at maximum intensity (exhaustive fan-out)",
+  );
+  console.log(
+    "  --budget <usd>         Advisory cost target for the architect; also sets",
+  );
+  console.log(
+    "                         the hard event_loop.max_cost_usd ceiling",
+  );
+  console.log(
+    "  --no-resume            Relaunch every fan-out stage branch instead of",
+  );
+  console.log(
+    "                         reusing journaled branch results from a prior attempt",
+  );
+  console.log("");
   console.log("Examples:");
   console.log("  autoloop run autocode");
   console.log('  autoloop run autocode "Fix the login bug"');
@@ -166,6 +203,12 @@ export function printRunUsage(): void {
   );
   console.log('  autoloop run presets/autoqa "QA recent changes"');
   console.log('  autoloop run . "Run from current directory"');
+  console.log(
+    '  autoloop run --ultra "Add rate limiting to the API" --budget 5',
+  );
+  console.log(
+    '  autoloop run --preset-file ./preset.toml "objective"  # single-file preset',
+  );
   console.log("");
   console.log("Run 'autoloop list' to see all available presets.");
 }
