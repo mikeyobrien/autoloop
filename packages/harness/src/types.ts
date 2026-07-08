@@ -51,6 +51,11 @@ export interface Verdict {
   suggestions?: string[];
 }
 
+/** Live `command`-backend child process, tracked for signal-based interrupt. */
+export interface CommandSession {
+  pid: number;
+}
+
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
@@ -135,6 +140,12 @@ export interface LoopContext {
     model: string;
     profile?: string;
     disallowedTools: string[];
+    /**
+     * Opt-in cost-telemetry convention for `command`-kind backends: `"file"`
+     * reads a JSON usage object the wrapped command wrote to
+     * `$AUTOLOOP_USAGE_FILE`. Empty disables extraction (default).
+     */
+    usageFrom: string;
   };
   review: {
     enabled: boolean;
@@ -254,6 +265,14 @@ export interface LoopContext {
    * (interrupt/steer) always targets the in-flight session.
    */
   claudeSdkSession: { current: ClaudeSdkSession | undefined };
+  /**
+   * Live `command`-backend child process holder, aliased like the other
+   * session holders. Populated for the duration of an in-flight `command`
+   * iteration (async-spawned, not `execSync`) so `commandControlAdapter` can
+   * signal it (SIGUSR1 → SIGTERM → SIGKILL) for the `interrupt` verb. Cleared
+   * once the iteration's process exits.
+   */
+  commandSession: { current: CommandSession | undefined };
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;

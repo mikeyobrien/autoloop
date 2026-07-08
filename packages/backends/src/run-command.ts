@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { type ChildProcess, execSync, spawn } from "node:child_process";
 import { shellQuote, shellWords } from "@mobrienv/autoloop-core";
 import type { BackendRunResult } from "./types.js";
 
@@ -71,4 +71,105 @@ export function runShellCommand(
       errorCategory: "non_zero_exit",
     };
   }
+}
+
+const MAX_BUFFER_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Async, non-blocking sibling of `runShellCommand`. Unlike `execSync`, this
+ * does not block the Node event loop while the child runs, so the harness can
+ * (a) hand the caller a live PID via `onSpawn` for interrupt signaling and (b)
+ * keep servicing its own SIGUSR1 control-drain handler while a `command`
+ * backend iteration is in flight. Reproduces the same `BackendRunResult`
+ * shape (`timedOut`/`errorCategory`) as `runShellCommand` so downstream error
+ * classification in `iteration.ts` is unaffected.
+ */
+export function spawnShellCommand(
+  providerKind: string,
+  command: string,
+  timeoutMs: number,
+  onSpawn?: (pid: number, child: ChildProcess) => void,
+): Promise<BackendRunResult> {
+  return new Promise((resolve) => {
+    // `detached: true` makes the child a process-group leader, so a timeout
+    // kill can target the whole group (`-pid`) rather than only the `/bin/sh`
+    // process itself — dash (this repo's `/bin/sh`) forks rather than
+    // exec-replacing for anything but a single tail-call command, so a plain
+    // `child.kill()` can otherwise leave the real work (e.g. `sleep 30`)
+    // running as an orphaned grandchild. `onSpawn`'s pid is unaffected: the
+    // group leader's pid is the same pid callers already signal directly
+    // (e.g. the harness's SIGUSR1 interrupt path targets this same pid).
+    const child = spawn("/bin/sh", ["-c", command], {
+      stdio: ["pipe", "pipe", "inherit"],
+      detached: true,
+    });
+    if (child.pid) onSpawn?.(child.pid, child);
+
+    let stdout = "";
+    let bufferedBytes = 0;
+    let timedOut = false;
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+
+    const finish = (result: BackendRunResult) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(result);
+    };
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      if (bufferedBytes >= MAX_BUFFER_BYTES) return;
+      bufferedBytes += chunk.length;
+      stdout += chunk.toString("utf-8");
+    });
+
+    const killGroup = (signal: NodeJS.Signals) => {
+      try {
+        if (child.pid) process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch {
+        /* already exited */
+      }
+    };
+
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        timedOut = true;
+        killGroup("SIGTERM");
+        // Escalate to SIGKILL if it doesn't exit promptly.
+        setTimeout(() => killGroup("SIGKILL"), 5000);
+      }, timeoutMs);
+    }
+
+    child.on("error", (err) => {
+      finish({
+        output: stdout || `command spawn error: ${err.message}`,
+        exitCode: 1,
+        timedOut,
+        providerKind,
+        errorCategory: timedOut ? "timeout" : "non_zero_exit",
+      });
+    });
+
+    child.on("close", (code, signal) => {
+      if (timedOut || signal === "SIGTERM" || signal === "SIGKILL") {
+        finish({
+          output: stdout,
+          exitCode: code ?? 1,
+          timedOut: true,
+          providerKind,
+          errorCategory: "timeout",
+        });
+        return;
+      }
+      finish({
+        output: stdout,
+        exitCode: code ?? 0,
+        timedOut: false,
+        providerKind,
+        errorCategory: code && code !== 0 ? "non_zero_exit" : "none",
+      });
+    });
+  });
 }

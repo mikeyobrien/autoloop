@@ -4,6 +4,7 @@ import {
   buildBackendShellCommand,
   normalizeBackendLabel,
   runBackendCommand,
+  runBackendCommandAsync,
 } from "@mobrienv/autoloop-backends";
 import {
   joinCsv,
@@ -173,6 +174,42 @@ export function runProcess(
   };
 }
 
+/**
+ * Async, non-blocking sibling of `runProcess` — used for the main-loop
+ * `command` backend so the harness can register a live PID for interrupt
+ * signaling (see `commandControlAdapter`) and keep servicing its SIGUSR1
+ * control-drain handler while the child runs. `onSpawn` fires synchronously
+ * once the child is forked, before the returned promise settles.
+ */
+export function runProcessAsync(
+  command: string,
+  timeoutMs: number,
+  providerKind = "command",
+  onSpawn?: (pid: number) => void,
+): Promise<ProcessResult> {
+  return runBackendCommandAsync(providerKind, command, timeoutMs, (pid) =>
+    onSpawn?.(pid),
+  ).then((result) => ({
+    output: result.output,
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+  }));
+}
+
+/**
+ * Side-file path for the `usage_from = "file"` cost-telemetry convention:
+ * `AUTOLOOP_USAGE_FILE`, exported for the child, read back by
+ * `recordCommandUsage` once the iteration completes. Shared between
+ * `buildBackendCommand` (export) and `iteration.ts` (read-back) so both sides
+ * agree on the same path without threading it through extra state.
+ */
+export function commandUsageFilePath(
+  loop: LoopContext,
+  iteration: number,
+): string {
+  return join(loop.paths.stateDir, `usage.${iteration}.json`);
+}
+
 export function buildBackendCommand(
   loop: LoopContext,
   iter: IterationContext,
@@ -192,6 +229,10 @@ export function buildBackendCommand(
       joinCsv(iter.allowedEvents),
       "",
     ),
+    usageFilePath:
+      iter.backend.kind === "command" && iter.backend.usageFrom
+        ? commandUsageFilePath(loop, iter.iteration)
+        : undefined,
   });
 }
 
