@@ -37,6 +37,13 @@ export function defaults(): Config {
       // then injects the answer into the next prompt. Empty ask_event disables.
       ask_event: "human.ask",
       ask_timeout: "5m",
+      // Ralph-parity ordering guard (opt-in): reject completion if any other
+      // event is emitted after completion_event within the same turn.
+      completion_must_be_last: "false",
+      // Ralph-parity emit-boundary audit (opt-in): after every iteration, diff
+      // the working tree against HEAD and emit a policy.file_modification_violation
+      // event if the acting role has disallowed_tools/read_only and files changed.
+      audit_file_mods: "false",
     },
     backend: {
       kind: "",
@@ -45,6 +52,12 @@ export function defaults(): Config {
       // CSV of tool names to remove from the claude-sdk agent (e.g.
       // "WebFetch,WebSearch"). Empty = no restriction.
       disallowed_tools: "",
+      // Opt-in cost-telemetry convention for `command`-kind backends. Set to
+      // "file" to have the harness read a JSON usage object written by the
+      // wrapped command to $AUTOLOOP_USAGE_FILE (cost_usd/*_tokens fields,
+      // all optional) after each iteration. Empty = no extraction attempted
+      // (default; existing presets are unaffected).
+      usage_from: "",
     },
     parallel: {
       enabled: "false",

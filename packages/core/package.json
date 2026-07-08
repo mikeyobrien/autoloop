@@ -39,6 +39,10 @@
       "types": "./dist/config.d.ts",
       "default": "./dist/config.js"
     },
+    "./hooks-schema": {
+      "types": "./dist/hooks-schema.d.ts",
+      "default": "./dist/hooks-schema.js"
+    },
     "./agent-map": {
       "types": "./dist/agent-map.d.ts",
       "default": "./dist/agent-map.js"

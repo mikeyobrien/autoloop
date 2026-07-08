@@ -61,14 +61,67 @@ Rules for the preset you emit:
   (never prompt_file); a complete [handoff] map where every emitted event routes
   somewhere or is the completion event; the completion event MUST be emitted by
   some role.
-- Compose from known patterns expressed as SEQUENTIAL roles: planner -> builder
-  -> critic -> finalizer for build work; surveyor -> writer -> reviewer for
-  review work. Encode verification as a dedicated critic/reviewer role with an
-  evidence [[gate]] (requires keys) rather than a fan-out stage.
-- Do NOT emit [[stage]] fan-out blocks: stage execution is not yet wired into the
-  run loop, and the validator will reject a single-file preset that defines them.
-  Size depth/iterations to the intensity and budget directive instead (ultra =
-  more critic passes, stricter gates, higher iteration ceilings).
+- Compose the sequential backbone from known patterns: planner -> builder ->
+  critic -> finalizer for build work; surveyor -> writer -> reviewer for review
+  work.
+- Where the objective benefits from parallel, heterogeneous verification or
+  discovery, compose a fan-out [[stage]] block instead of a single critic role.
+  A stage's `trigger` is a plain event some upstream role emits — route it in
+  [handoff] to an EMPTY list (e.g. `"panel.judge" = []`) so it validates as
+  reachable; the harness intercepts it and launches the branches itself. Every
+  branch role's prompt must end by instructing it to respond with EXACTLY ONE
+  JSON object (no prose) carrying the fields the stage's join needs.
+
+  Judge panel (K identical verdict branches, majority vote):
+    [[stage]]
+    id = "verify"
+    kind = "verdict"
+    trigger = "verify.panel"
+    role = "verifier"              # a [[role]] whose prompt asks for a JSON
+                                    # object like {"affirm": true, "reason": "..."}
+    branches = 3
+    join = "majority-vote"
+    requires = ["affirm", "reason"]
+    vote_field = "affirm"
+    vote_threshold = "majority"     # or "supermajority" / "unanimous" for ultra
+    on_pass = "verify.passed"
+    on_fail = "verify.blocked"
+
+  Multi-lens review (N distinct heterogeneous branches, merge findings):
+    [[stage]]
+    id = "review"
+    kind = "discovery"
+    trigger = "review.panel"
+    roles = ["security_lens", "correctness_lens", "perf_lens"]  # distinct [[role]]s
+    join = "dedup-by-key"
+    requires = ["findings"]
+    items_field = "findings"
+    key_field = "id"
+    on_pass = "review.done"
+    on_fail = "review.done"        # dedup-by-key always passes; route both the same
+
+  Finder pool (discovery branches, pass only once enough distinct items found):
+    [[stage]]
+    id = "scan"
+    kind = "discovery"
+    trigger = "scan.pool"
+    role = "finder"
+    branches = 4
+    join = "count-threshold"
+    requires = ["items"]
+    items_field = "items"
+    key_field = "id"
+    count_min = 3
+    on_pass = "scan.enough"
+    on_fail = "scan.insufficient"
+
+  Bias width/depth on the intensity directive: standard = a judge panel of 3
+  with majority vote and a modest iteration ceiling; ultra = wider panels
+  (5+ branches), supermajority/unanimous thresholds, additional discovery
+  stages, and a higher iteration ceiling. Every stage's `requires` MUST include
+  every field its join reads (vote_field for majority-vote; items_field for
+  dedup-by-key/count-threshold) — the validator rejects a stage whose schema
+  doesn't guarantee the field its join reads.
 
 If you cannot design a coherent preset, emit `design.blocked` with the reason.
 Otherwise emit `preset.drafted`.

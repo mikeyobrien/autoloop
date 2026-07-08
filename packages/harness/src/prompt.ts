@@ -65,6 +65,8 @@ function resolveIterationBackend(
       resolved.timeoutMs = role.backendTimeoutMs;
     if (role.backendAgent !== undefined) resolved.agent = role.backendAgent;
     if (role.backendModel !== undefined) resolved.model = role.backendModel;
+    if (role.backendProfile !== undefined)
+      resolved.profile = role.backendProfile;
   }
   const agentOverlay = resolveRoleAgent(
     loop.agentMap,

@@ -13,6 +13,8 @@ interface ResumeArgs {
   backendOverride?: Record<string, unknown>;
   logLevel: string | null;
   usageError: boolean;
+  /** Force every fan-out stage branch to relaunch rather than resume. */
+  noResume?: boolean;
 }
 
 export async function dispatchResume(args: string[]): Promise<void> {
@@ -88,6 +90,7 @@ export async function dispatchResume(args: string[]): Promise<void> {
       baseStateDir: stateDir,
       signal: abort.signal,
       onEvent: cliPrintEvent,
+      noResume: parsed.noResume,
     });
     console.log(
       `resumed ${record.run_id} from iteration ${result.resumedFromIteration} ` +
@@ -215,6 +218,11 @@ function parseResumeArgs(args: string[]): ResumeArgs {
       i += 2;
       continue;
     }
+    if (token === "--no-resume") {
+      out.noResume = true;
+      i++;
+      continue;
+    }
     if (out.runId === null && !token.startsWith("-")) {
       out.runId = token;
       i++;
@@ -245,6 +253,12 @@ export function printResumeUsage(): void {
   );
   console.log(
     "  -b, --backend <name>  Resume with a different backend (claude-sdk, pi, ...)",
+  );
+  console.log(
+    "  --no-resume           Relaunch every fan-out stage branch instead of",
+  );
+  console.log(
+    "                        reusing journaled branch results from a prior attempt",
   );
   console.log("  -v, --verbose         Set log level to debug");
   console.log("  -h, --help            Show this help");

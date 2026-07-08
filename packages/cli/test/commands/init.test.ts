@@ -9,7 +9,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as config from "@mobrienv/autoloop-core/config";
-import { loadTopology } from "@mobrienv/autoloop-core/topology";
+import {
+  loadTopology,
+  loadTopologyFromFile,
+  validateTopology,
+} from "@mobrienv/autoloop-core/topology";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchInit } from "../../src/commands/init.js";
 
@@ -176,6 +180,76 @@ describe("init", () => {
     it("errors when --preset has no name", () => {
       dispatchInit(["--preset"]);
       expect(errors.join("\n")).toContain("--preset requires a name");
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("init --single-file", () => {
+    it("scaffolds a single merged-TOML preset that loads and validates clean", () => {
+      dispatchInit(["--single-file", "preset.toml", dir]);
+      const path = join(dir, "preset.toml");
+      expect(existsSync(path)).toBe(true);
+
+      const cfg = config.loadProjectFromFile(path);
+      expect(config.get(cfg, "event_loop.completion_event", "")).toBe(
+        "task.complete",
+      );
+      expect(config.get(cfg, "backend.command", "")).toBe("claude");
+      expect(config.get(cfg, "memory.prompt_budget_chars", "")).toBe("8000");
+
+      const topology = loadTopologyFromFile(path);
+      expect(topology.name).toBe("preset");
+      expect(topology.completion).toBe("task.complete");
+      expect(topology.roles.map((r) => r.id)).toEqual(["builder", "critic"]);
+      expect(topology.handoff["loop.start"]).toEqual(["builder"]);
+
+      // Must validate clean under single-file rules (no prompt_file warnings).
+      const warnings = validateTopology(topology, { singleFile: true });
+      expect(warnings).toEqual([]);
+
+      const out = logs.join("\n");
+      expect(out).toContain(`created ${path}`);
+      expect(out).toContain(
+        `autoloop run --preset-file ${path} "describe your objective"`,
+      );
+      expect(out).toContain(`autoloop preset promote ${path} <name>`);
+    });
+
+    it("never emits prompt_file assignments (inline prompts only)", () => {
+      dispatchInit(["--single-file", "preset.toml", dir]);
+      const text = readFileSync(join(dir, "preset.toml"), "utf-8");
+      expect(text).not.toMatch(/prompt_file\s*=/);
+      // Role prompts must be inline strings.
+      expect(text).toContain('prompt = """');
+    });
+
+    it("never overwrites an existing single-file preset", () => {
+      const path = join(dir, "preset.toml");
+      dispatchInit(["--single-file", "preset.toml", dir]);
+      writeFileSync(path, "customized\n");
+      logs.length = 0;
+      dispatchInit(["--single-file", "preset.toml", dir]);
+      expect(readFileSync(path, "utf-8")).toBe("customized\n");
+      expect(logs.join("\n")).toContain(`${path} already exists, skipped`);
+    });
+
+    it("requires a .toml destination", () => {
+      dispatchInit(["--single-file", "preset", dir]);
+      expect(errors.join("\n")).toContain("must end in .toml");
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("errors when --single-file has no path", () => {
+      dispatchInit(["--single-file"]);
+      expect(errors.join("\n")).toContain(
+        "--single-file requires a destination path",
+      );
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("rejects combining --preset and --single-file", () => {
+      dispatchInit(["--preset", "x", "--single-file", "p.toml", dir]);
+      expect(errors.join("\n")).toContain("mutually exclusive");
       expect(process.exitCode).toBe(1);
     });
   });

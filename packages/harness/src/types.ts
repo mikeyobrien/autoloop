@@ -2,6 +2,7 @@ import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { ClaudeSdkSession } from "@mobrienv/autoloop-backends/claude-sdk-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import type { AgentMap } from "@mobrienv/autoloop-core/agent-map";
+import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import type { LoopEventEmitter } from "./events.js";
@@ -50,6 +51,11 @@ export interface Verdict {
   suggestions?: string[];
 }
 
+/** Live `command`-backend child process, tracked for signal-based interrupt. */
+export interface CommandSession {
+  pid: number;
+}
+
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
@@ -78,7 +84,31 @@ export interface LoopContext {
      */
     prematureMaxRearms?: number;
   };
-  completion: { promise: string; event: string; requiredEvents: string[] };
+  completion: {
+    promise: string;
+    event: string;
+    requiredEvents: string[];
+    /**
+     * Ralph-parity ordering policy (opt-in, default false). When true, a
+     * completion claim via `event` is rejected if any other event was
+     * emitted after it within the same turn — set-membership alone is not
+     * enough. Order-insensitive behavior (unchanged) when false.
+     */
+    mustBeLast: boolean;
+  };
+  /**
+   * Permission-enforcement policies (orthogonal to completion gating).
+   */
+  policy: {
+    /**
+     * Ralph-parity emit-boundary audit (opt-in, default false). After every
+     * iteration, diffs the working tree against HEAD; if the acting role has
+     * `disallowedTools`/`readOnly` and files changed, emits
+     * `policy.file_modification_violation` with the role + file list. Purely
+     * observational — never alters loop control flow on its own.
+     */
+    fileModAudit: boolean;
+  };
   /**
    * Out-of-band acceptance gate. On a done-claim the HARNESS (not the agent's
    * session) runs every `verifyCmds` entry in a clean shell; completion is
@@ -132,7 +162,14 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
     disallowedTools: string[];
+    /**
+     * Opt-in cost-telemetry convention for `command`-kind backends: `"file"`
+     * reads a JSON usage object the wrapped command wrote to
+     * `$AUTOLOOP_USAGE_FILE`. Empty disables extraction (default).
+     */
+    usageFrom: string;
   };
   review: {
     enabled: boolean;
@@ -148,6 +185,7 @@ export interface LoopContext {
     trustAllTools: boolean;
     agent: string;
     model: string;
+    profile?: string;
     /**
      * Fail-closed routing for an UNKNOWN verdict (malformed/empty/timed-out
      * review, or confidence below `minConfidence`). Default `hold`: stop the
@@ -170,12 +208,29 @@ export interface LoopContext {
       timeoutMs: number;
     };
   };
+  /**
+   * Fan-out `[[stage]]` execution knobs. `concurrency` bounds how many stage
+   * branches run at once run-wide (defaults to `defaultConcurrency()`, the
+   * same core/os-derived ceiling waves use); `branchTimeoutMs` bounds one
+   * branch's wall-clock time.
+   */
+  stage: {
+    concurrency: number;
+    branchTimeoutMs: number;
+  };
   hooks: {
     preRun: string;
     preIteration: string;
     postIteration: string;
     postRun: string;
     strict: boolean;
+    /**
+     * Structured per-hook specs (legacy flat keys + `[[hook]]` entries),
+     * merged and template-expanded. This is the engine's source of truth;
+     * the flat fields above remain for backward compatibility with existing
+     * callers/tests but `specs` is what `runPhaseHooks` iterates.
+     */
+    specs: HookSpec[];
   };
   memory: { budgetChars: number };
   tasks: { budgetChars: number };
@@ -214,6 +269,13 @@ export interface LoopContext {
     logLevel: string;
     branchMode: boolean;
     isolationMode: string;
+    /**
+     * Forces every fan-out stage branch to relaunch rather than reuse a
+     * journaled `stage.branch.finish` record from an interrupted prior
+     * attempt (`run --no-resume` / `resume --no-resume`). Lives on `runtime`
+     * (not config-derived `stage`) because it survives `reloadLoop`.
+     */
+    noResume?: boolean;
   };
   launch: LaunchMetadata;
   store: Record<string, unknown>;
@@ -236,6 +298,14 @@ export interface LoopContext {
    * (interrupt/steer) always targets the in-flight session.
    */
   claudeSdkSession: { current: ClaudeSdkSession | undefined };
+  /**
+   * Live `command`-backend child process holder, aliased like the other
+   * session holders. Populated for the duration of an in-flight `command`
+   * iteration (async-spawned, not `execSync`) so `commandControlAdapter` can
+   * signal it (SIGUSR1 → SIGTERM → SIGKILL) for the `interrupt` verb. Cleared
+   * once the iteration's process exits.
+   */
+  commandSession: { current: CommandSession | undefined };
   lastVerdict?: Verdict;
   /** Optional structured-event emitter, forwarded from RunOptions.onEvent. */
   onEvent?: LoopEventEmitter;
@@ -267,6 +337,11 @@ export interface RunOptions {
   mergeStrategy?: string;
   automerge?: boolean;
   keepWorktree?: boolean;
+  /**
+   * Force every fan-out stage branch to relaunch rather than reuse a
+   * journaled `stage.branch.finish` record from an interrupted prior attempt.
+   */
+  noResume?: boolean;
   /**
    * Optional abort signal. When provided, the CLI (or SDK caller) owns
    * process signal handling; the harness only listens to this signal for
