@@ -25,6 +25,7 @@ const ALLOWED_BACKEND_OVERRIDE_KEYS = new Set([
   "trust_all_tools",
   "agent",
   "model",
+  "profile",
 ]);
 
 export function load(projectDir: string): ChainsConfig {

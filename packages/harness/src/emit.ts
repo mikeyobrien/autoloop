@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import {
@@ -7,6 +8,7 @@ import {
   splitCsv,
 } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
+import type { HookPhase, HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import {
   appendAgentEvent,
   appendEvent,
@@ -19,6 +21,9 @@ import {
   resolveFile,
 } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
+import { printHookOutput } from "./display.js";
+import { parseMutationDirective } from "./hooks.js";
+import { writeSuspendState } from "./suspend-state.js";
 
 const COORDINATION_TOPICS = new Set([
   "issue.discovered",
@@ -90,7 +95,152 @@ export interface EmitResult {
   error?: string;
 }
 
+interface EmitHookOutcome {
+  blocked: boolean;
+  blockedMessage?: string;
+  mutatedTopic?: string;
+  mutatedPayload?: string;
+}
+
+/**
+ * Run pre_emit/post_emit hooks. `emit()` runs out-of-process (the agent
+ * invokes the `autoloops emit` tool script, which spawns a fresh CLI process
+ * calling `harness.emit()`) so there is no live `LoopContext` to drive
+ * `runPhaseHooks` through — this is a disk/config-driven parallel
+ * implementation reading `HookSpec`s straight from the project's raw TOML.
+ *
+ * `on_error = "suspend"` is honored as `block` here (see design note: the
+ * emit subprocess cannot itself block the harness's iteration loop) but ALSO
+ * writes durable suspend state, so the harness detects it at the next
+ * iteration boundary (`runIteration` start) and halts there instead of
+ * silently continuing.
+ */
+function runEmitPhaseHooks(
+  projectDir: string,
+  journalFile: string,
+  phase: HookPhase,
+  runId: string,
+  iteration: string,
+  topic: string,
+  payload: string,
+): EmitHookOutcome {
+  const specs: HookSpec[] = config
+    .loadHookSpecs(projectDir)
+    .filter((s) => s.phase === phase);
+  const outcome: EmitHookOutcome = { blocked: false };
+
+  for (const spec of specs) {
+    if (!spec.command) continue;
+    const env: Record<string, string | undefined> = {
+      ...process.env,
+      AUTOLOOP_PROJECT_DIR: projectDir,
+      AUTOLOOP_RUN_ID: runId,
+      AUTOLOOP_ITERATION: iteration,
+      AUTOLOOP_EMIT_TOPIC: outcome.mutatedTopic ?? topic,
+      AUTOLOOP_EMIT_PAYLOAD: outcome.mutatedPayload ?? payload,
+    };
+    const result = spawnSync(spec.command, {
+      shell: true,
+      cwd: projectDir,
+      encoding: "utf-8",
+      env,
+    });
+    const combined =
+      (result.stdout ?? "") +
+      (result.stderr ? `\n[stderr]\n${result.stderr}` : "");
+    const status = result.status ?? -1;
+    const failed = status !== 0 || Boolean(result.error);
+
+    appendEvent(
+      journalFile,
+      runId,
+      iteration,
+      "hook.output",
+      `"hook": ${JSON.stringify(phase)}, "exit_code": ${status}, "output": ${JSON.stringify(combined.trim())}`,
+    );
+    printHookOutput(phase, status, combined.trim(), failed);
+
+    if (!failed && spec.mutate === "event") {
+      const directive = parseMutationDirective(
+        combined.split("\n[stderr]\n")[0],
+        "event",
+      );
+      if (directive) {
+        if (directive.topic !== undefined)
+          outcome.mutatedTopic = directive.topic;
+        if (directive.payload !== undefined)
+          outcome.mutatedPayload = directive.payload;
+      }
+    }
+
+    if (!failed) continue;
+
+    const detail =
+      (result.stderr ?? "").trim() || (result.stdout ?? "").trim() || "";
+    const msg = `hook ${phase} failed (exit ${status}): ${detail.split("\n")[0] ?? ""}`;
+
+    if (spec.onError === "warn") continue;
+
+    outcome.blocked = true;
+    outcome.blockedMessage = msg;
+    if (spec.onError === "suspend") {
+      const stateDir =
+        process.env.AUTOLOOP_STATE_DIR || config.stateDirPath(projectDir);
+      writeSuspendState(
+        stateDir,
+        {
+          runId,
+          phase,
+          iteration: Number(iteration) || 0,
+          reason: msg,
+          hookCommand: spec.command,
+          createdAt: new Date().toISOString(),
+          resumeIteration: Number(iteration) || 0,
+        },
+        journalFile,
+      );
+    }
+    return outcome;
+  }
+
+  return outcome;
+}
+
 export function emit(
+  projectDir: string,
+  topic: string,
+  payload: string,
+): EmitResult {
+  const result = emitCore(projectDir, topic, payload);
+  if (!result.ok) return result;
+
+  // post_emit hooks run after a successful accept. They cannot un-journal the
+  // already-accepted event, but a `block` policy still surfaces as a failed
+  // result (visible to the agent/CLI caller) and a `suspend` policy writes
+  // durable suspend state for the harness to catch at the next iteration
+  // boundary.
+  const journalFile = resolveEmitJournalFile(projectDir);
+  const validation = emitValidationContext(projectDir, journalFile);
+  const postEmit = runEmitPhaseHooks(
+    projectDir,
+    journalFile,
+    "post_emit",
+    validation.runId,
+    validation.iteration,
+    result.topic ?? topic,
+    payload,
+  );
+  if (postEmit.blocked) {
+    return {
+      ok: false,
+      topic: result.topic,
+      error: postEmit.blockedMessage ?? "post_emit hook blocked this event",
+    };
+  }
+  return result;
+}
+
+function emitCore(
   projectDir: string,
   topic: string,
   payload: string,
@@ -98,6 +248,28 @@ export function emit(
   const journalFile = resolveEmitJournalFile(projectDir);
   mkdirSync(dirname(journalFile), { recursive: true });
   const validation = emitValidationContext(projectDir, journalFile);
+
+  // pre_emit hooks: run before any gating so a configured mutation can steer
+  // routing/gate decisions too. Runs disk/config-driven (see
+  // `runEmitPhaseHooks`) since this call is out-of-process from the harness.
+  const preEmit = runEmitPhaseHooks(
+    projectDir,
+    journalFile,
+    "pre_emit",
+    validation.runId,
+    validation.iteration,
+    topic,
+    payload,
+  );
+  if (preEmit.mutatedTopic !== undefined) topic = preEmit.mutatedTopic;
+  if (preEmit.mutatedPayload !== undefined) payload = preEmit.mutatedPayload;
+  if (preEmit.blocked) {
+    return {
+      ok: false,
+      topic,
+      error: preEmit.blockedMessage ?? "pre_emit hook blocked this event",
+    };
+  }
 
   // Evidence gate (opt-in): applies to ANY configured event, BEFORE routing /
   // coordination / completion handling, so a declared gate is never silently
@@ -183,6 +355,33 @@ function isEvidenceValue(v: unknown): boolean {
 }
 
 /**
+ * Parse `payload` as a JSON object, returning its fields if (and only if) the
+ * whole payload is a well-formed JSON object literal. This is the ONE
+ * definition of "structured branch output": the evidence-gate keys check
+ * (`payloadEvidenceKeys`) and the fan-out stage branch runner both parse
+ * through this function, so "a branch emitted structured data" means the same
+ * thing everywhere. A branch whose payload does not parse as a JSON object
+ * (free prose, a bare string, an array, ...) is not structured — callers treat
+ * that as a dead/schema-invalid branch rather than guessing at fields.
+ */
+export function parseJsonObjectPayload(
+  payload: string,
+): Record<string, unknown> | undefined {
+  if (!payload) return undefined;
+  const trimmed = payload.trim();
+  if (!trimmed.startsWith("{")) return undefined;
+  try {
+    const obj = JSON.parse(trimmed) as unknown;
+    if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+      return undefined;
+    }
+    return obj as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Evidence keys present in a payload. A key is "present" only when it carries a
  * *machine-checkable* value:
  *
@@ -200,15 +399,10 @@ export function payloadEvidenceKeys(payload: string): Set<string> {
   if (!payload) return present;
 
   // JSON object payloads: top-level keys with a non-empty scalar value.
-  const trimmed = payload.trim();
-  if (trimmed.startsWith("{")) {
-    try {
-      const obj = JSON.parse(trimmed) as Record<string, unknown>;
-      for (const [k, v] of Object.entries(obj)) {
-        if (isEvidenceValue(v)) present.add(k);
-      }
-    } catch {
-      // not JSON — fall through to token scan
+  const obj = parseJsonObjectPayload(payload);
+  if (obj) {
+    for (const [k, v] of Object.entries(obj)) {
+      if (isEvidenceValue(v)) present.add(k);
     }
   }
 
@@ -321,6 +515,7 @@ export function routingTopic(topic: string): boolean {
     // letting the agent self-route and skip required intermediate steps.
     "backend.usage",
     "hook.output",
+    "hook.suspend",
     "event.invalid",
     "operator.guidance",
     "operator.guidance.consumed",

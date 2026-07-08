@@ -14,6 +14,7 @@ import { dispatchControl } from "./commands/control.js";
 import { dispatchDashboard } from "./commands/dashboard.js";
 import { dispatchDoctor } from "./commands/doctor.js";
 import { dispatchGuide } from "./commands/guide.js";
+import { dispatchHooks } from "./commands/hooks.js";
 import { dispatchInit } from "./commands/init.js";
 import { dispatchInspect } from "./commands/inspect.js";
 import { dispatchKanban } from "./commands/kanban.js";
@@ -157,6 +158,9 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
     case "guide":
       dispatchGuide(args.slice(1));
       return;
+    case "hooks":
+      dispatchHooks(args.slice(1));
+      return;
     case "control":
       dispatchControl(args.slice(1));
       return;
@@ -243,6 +247,7 @@ const CLI_COMMANDS = [
   "worktree",
   "config",
   "guide",
+  "hooks",
   "control",
   "dashboard",
   "kanban",

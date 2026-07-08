@@ -139,6 +139,14 @@
       "types": "./dist/registry-bridge.d.ts",
       "default": "./dist/registry-bridge.js"
     },
+    "./hooks": {
+      "types": "./dist/hooks.d.ts",
+      "default": "./dist/hooks.js"
+    },
+    "./suspend-state": {
+      "types": "./dist/suspend-state.d.ts",
+      "default": "./dist/suspend-state.js"
+    },
     "./control": {
       "types": "./dist/control/index.d.ts",
       "default": "./dist/control/index.js"

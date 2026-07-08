@@ -10,6 +10,7 @@ function stage(overrides: Partial<FanoutStage>): FanoutStage {
   return {
     id: "verify",
     kind: "verdict",
+    trigger: "verify.panel",
     branches: 3,
     role: "verifier",
     roles: [],
