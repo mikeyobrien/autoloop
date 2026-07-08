@@ -131,6 +131,22 @@
       "types": "./dist/wave/parse-objectives.d.ts",
       "default": "./dist/wave/parse-objectives.js"
     },
+    "./wave": {
+      "types": "./dist/wave.d.ts",
+      "default": "./dist/wave.js"
+    },
+    "./wave/types": {
+      "types": "./dist/wave/types.d.ts",
+      "default": "./dist/wave/types.js"
+    },
+    "./wave/launch-branches": {
+      "types": "./dist/wave/launch-branches.d.ts",
+      "default": "./dist/wave/launch-branches.js"
+    },
+    "./wave/finalize-wave": {
+      "types": "./dist/wave/finalize-wave.d.ts",
+      "default": "./dist/wave/finalize-wave.js"
+    },
     "./pi-adapter": {
       "types": "./dist/pi-adapter.d.ts",
       "default": "./dist/pi-adapter.js"

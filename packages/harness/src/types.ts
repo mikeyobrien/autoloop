@@ -198,7 +198,16 @@ export interface LoopContext {
      */
     minConfidence: number;
   };
-  parallel: { enabled: boolean; maxBranches: number; branchTimeoutMs: number };
+  parallel: {
+    enabled: boolean;
+    maxBranches: number;
+    branchTimeoutMs: number;
+    /** Loop-level default wave completion strategy (role `aggregate` overrides). */
+    aggregate: {
+      mode: "wait_for_all" | "first_success" | "timeout";
+      timeoutMs: number;
+    };
+  };
   /**
    * Fan-out `[[stage]]` execution knobs. `concurrency` bounds how many stage
    * branches run at once run-wide (defaults to `defaultConcurrency()`, the

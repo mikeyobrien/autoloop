@@ -87,7 +87,24 @@ export function buildStageBranchRunner(
     writeBranchLaunch(waveSpec, loop);
     appendStageBranchStart(loop, iter, stageId, spec);
     const [launched] = launchParallelBranches(loop, [waveSpec]);
-    const [result] = joinParallelBranches(loop, iter, stageId, [launched]);
+    const { results } = joinParallelBranches(
+      loop,
+      iter,
+      stageId,
+      [launched],
+      { mode: "wait_for_all", timeoutMs: 0 },
+      Date.now(),
+    );
+    const result = results[0];
+    if (!result) {
+      const branchResult: FanoutBranchResult = {
+        branchId: spec.branchId,
+        ok: false,
+        error: "branch produced no result",
+      };
+      appendStageBranchFinish(loop, iter, stageId, branchResult, 0);
+      return branchResult;
+    }
 
     const succeeded =
       result.stopReason === "max_iterations" ||

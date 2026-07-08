@@ -912,7 +912,20 @@ function readParallelConfig(cfg: config.Config): LoopContext["parallel"] {
     enabled: truthySetting(config.get(cfg, "parallel.enabled", "false")),
     maxBranches: config.getInt(cfg, "parallel.max_branches", 3),
     branchTimeoutMs: config.getInt(cfg, "parallel.branch_timeout_ms", 180000),
+    aggregate: {
+      mode: normalizeAggregateMode(
+        config.get(cfg, "parallel.aggregate.mode", "wait_for_all"),
+      ),
+      timeoutMs: config.getInt(cfg, "parallel.aggregate.timeout_ms", 0),
+    },
   };
+}
+
+/** Fallback-safe aggregate-mode guard: unrecognized values default to `wait_for_all`. */
+function normalizeAggregateMode(
+  raw: string,
+): "wait_for_all" | "first_success" | "timeout" {
+  return raw === "first_success" || raw === "timeout" ? raw : "wait_for_all";
 }
 
 function readStageConfig(cfg: config.Config): LoopContext["stage"] {
