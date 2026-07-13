@@ -73,31 +73,40 @@ jobs:
           "
 
       - name: Publish workspace packages to npm
-        # Publishes packages/* first so the root package resolves pinned
-        # cross-workspace deps from the registry. We loop per-workspace so
-        # that "already published at this version" is a clean skip, while
-        # any other failure aborts the job loudly. `--ignore-scripts`
-        # prevents workspace lifecycle hooks from re-triggering.
+        # Publishes the root package's transitive public workspace deps first
+        # so the root package resolves pinned cross-workspace deps from the
+        # registry. We loop per-workspace so that "already published at this
+        # version" is a clean skip, while any other failure aborts loudly.
+        # `--ignore-scripts` prevents workspace lifecycle hooks from
+        # re-triggering.
         #
         # `--provenance` requires trusted publishing to be configured on
-        # npmjs.org for every workspace package — see the README publish
-        # section for the per-package setup checklist. If you add a new
-        # workspace package, configure trusted publishing for it before
-        # the next tagged release or this step will 404.
+        # npmjs.org for every published workspace package. Packages that are
+        # not in the root install graph (for example optional sync adapters)
+        # are intentionally not included here until their npm trusted
+        # publishing records are configured.
         run: |
           set -euo pipefail
           node --input-type=module -e "
-            import { readdirSync, readFileSync, statSync } from 'node:fs';
+            import { readFileSync } from 'node:fs';
             import { join } from 'node:path';
+            const releasePackages = [
+              'backends',
+              'core',
+              'dashboard',
+              'kanban',
+              'presets',
+              'harness',
+              'cli',
+            ];
             const root = process.cwd();
-            const pkgDir = join(root, 'packages');
             const out = [];
-            for (const name of readdirSync(pkgDir)) {
-              const full = join(pkgDir, name, 'package.json');
-              try { statSync(full); } catch { continue; }
+            for (const dirName of releasePackages) {
+              const dir = join('packages', dirName);
+              const full = join(root, dir, 'package.json');
               const pkg = JSON.parse(readFileSync(full, 'utf-8'));
               if (pkg.private) continue;
-              out.push(JSON.stringify({ dir: join('packages', name), name: pkg.name, version: pkg.version }));
+              out.push(JSON.stringify({ dir, name: pkg.name, version: pkg.version }));
             }
             console.log(out.join('\n'));
           " > /tmp/workspaces.jsonl
