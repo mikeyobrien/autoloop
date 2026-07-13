@@ -2,9 +2,9 @@
 
 ## [Unreleased]
 
-## [0.9.1] - 2026-07-13
+## [0.9.2] - 2026-07-13
 
-Recovery note: `v0.9.0` was tagged and partially published before npm trusted publishing rejected newly added optional sync-adapter packages that are not in the root package install graph. The root `@mobrienv/autoloop` package and GitHub release were not published for `v0.9.0`; `v0.9.1` is the canonical public release for this feature train.
+Recovery note: `v0.9.0` was tagged and partially published before npm trusted publishing rejected newly added optional sync-adapter packages that are not in the root package install graph. `v0.9.1` published the root package, but `@mobrienv/autoloop-backends@0.9.1` had registry metadata without a fetchable tarball, so fresh installs failed. `v0.9.2` is the canonical public release for this feature train and adds registry tarball verification to the publish workflow.
 
 ### Added
 - **`autowiki` preset — OKF LLM-wiki pipeline.** A bundled preset that ingests a queue of

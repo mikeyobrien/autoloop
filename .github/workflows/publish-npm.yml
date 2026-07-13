@@ -27,9 +27,6 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
-
       - name: Install dependencies
         run: npm ci
 
@@ -118,11 +115,26 @@ jobs:
 
             if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
               echo "skip: $NAME@$VERSION already published"
-              continue
+            else
+              echo "publish: $NAME@$VERSION"
+              npm publish --access public --provenance --ignore-scripts -w "$DIR"
             fi
 
-            echo "publish: $NAME@$VERSION"
-            npm publish --access public --provenance --ignore-scripts -w "$DIR"
+            resolvable=false
+            for attempt in 1 2 3 4 5 6; do
+              if npm pack "$NAME@$VERSION" --silent >/tmp/pkg-pack-name 2>/tmp/pkg-pack-error; then
+                rm -f "$(cat /tmp/pkg-pack-name)"
+                resolvable=true
+                break
+              fi
+              echo "wait: $NAME@$VERSION tarball not fetchable yet (attempt $attempt/6), retrying in 10s"
+              cat /tmp/pkg-pack-error
+              sleep 10
+            done
+            if [ "$resolvable" != "true" ]; then
+              echo "::error::Published package $NAME@$VERSION is not pack-installable from the registry."
+              exit 1
+            fi
           done < /tmp/workspaces.jsonl
 
       - name: Verify workspace deps resolve at the new version
