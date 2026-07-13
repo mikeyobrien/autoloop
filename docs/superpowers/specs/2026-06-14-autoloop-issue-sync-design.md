@@ -208,8 +208,8 @@ queued_label = "autoloop:queued"
 Linear can launch a local command for an issue
 ([docs](https://linear.app/docs/open-issues-with-custom-scripts)) via
 `~/.linear/coding-tools.json`: an `openIssue` block with `path` (absolute path to an
-executable), optional `args` (with `{{issue.identifier}}` / `{{issue.branchName}}` /
-`{{prompt}}` / `{{project.name}}` / `{{workDir}}` templating), and `env` (the `LINEAR_*`
+executable), optional `args` (with <code v-pre>{{issue.identifier}}</code> / <code v-pre>{{issue.branchName}}</code> /
+<code v-pre>{{prompt}}</code> / <code v-pre>{{project.name}}</code> / <code v-pre>{{workDir}}</code> templating), and `env` (the `LINEAR_*`
 vars to inject: `LINEAR_PROMPT`, `LINEAR_ISSUE_IDENTIFIER`, `LINEAR_ISSUE_BRANCH_NAME`,
 `LINEAR_WORK_DIR`, `LINEAR_PROJECT_NAME`, …).
 
