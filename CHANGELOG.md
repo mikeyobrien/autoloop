@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-07-13
 ### Added
 - **`autowiki` preset — OKF LLM-wiki pipeline.** A bundled preset that ingests a queue of
   hand-curated source URLs into an OKF-conformant LLM wiki of cross-linked markdown concept
@@ -9,6 +11,28 @@
   branch. The vault is scaffolded by the loop itself (`okf-init.sh`), and querying/maintaining
   the built wiki ship as agent-neutral user skills (`query-wiki`, `maintain-wiki`). See
   `packages/presets/presets/autowiki/README.md`.
+- **Hermes ACP provider.** `provider = "hermes"` launches `hermes --profile <name> acp` per
+  iteration, with profile routing through config, topology roles, and the `-b hermes:<profile>`
+  shortcut.
+- **Issue sync packages and run hooks.** New GitHub/Linear issue-tracker sync packages can be
+  wired through run hooks for repository-local markdown issue workflows.
+- **Human-in-the-loop control.** Blocking `human.ask` events plus a respond control verb let
+  loops pause for operator input and resume deterministically.
+- **Structured events and journal contract.** The CLI can stream structured `--events` output,
+  journals now carry a versioned event contract, and run summaries include cumulative cost.
+- **Completion trust and evidence gates.** Typed evidence schemas, threshold validation,
+  completion-gate store overrides, `completion.must_be_last`, and file-modification audit
+  policies provide stronger completion verification.
+- **Declarative concurrency.** Per-role concurrency, concurrent waves, fan-out `[[stage]]`
+  blocks, and stage branch runners support more explicit multi-agent execution plans.
+- **Lifecycle hooks engine.** Structured hooks support suspend/resume durability, prompt
+  mutation, I/O mutation, and template expansion.
+- **Ad hoc and single-file presets.** The CLI accepts preset files and can scaffold/promote
+  single-file presets for lighter-weight workflows.
+- **Command backend telemetry and live control.** Command-backed runs can emit usage/cost
+  telemetry and respond to live control requests.
+- **StopReason termination contract.** Loop termination reasons are versioned and typed for
+  downstream consumers.
 - **`backend.disallowed_tools` (claude-sdk).** Comma-separated tool names to remove from the
   agent entirely — a hard block that applies even under `bypassPermissions`, where permission
   deny rules don't. Empty by default. `autowiki` uses it to drop the built-in
@@ -35,6 +59,10 @@
   state (`.autoloop/chains`, runs) into the install instead of the user's repo. Fixed by
   importing `statSync` from `node:fs` via ESM. Affects both source and npm installs
   (`@mobrienv/autoloop-cli`'s published dist carried the same bug).
+- **ACP prompt and chain success edge cases.** ACP prompts now tolerate wrappers/bare objectives,
+  and metareview `EXIT`/`TAKEOVER` verdicts count as successful chain steps.
+- **Plugin and skill packaging metadata.** Marketplace metadata, repository URLs, and symlinked
+  skills now point at the canonical `.agents/skills` sources.
 
 ## [0.8.0] - 2026-06-12
 ### Added
