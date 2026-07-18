@@ -1,3 +1,4 @@
+import { resolveAcpProvider } from "@mobrienv/autoloop-backends/acp-providers";
 import { joinCsv, listText } from "@mobrienv/autoloop-core";
 import { resolveRoleAgent } from "@mobrienv/autoloop-core/agent-map";
 import {
@@ -17,6 +18,7 @@ import {
   type ResolvedIterationBackend,
   resolvedFromLoopBackend,
 } from "./backend/types.js";
+import { resolveProcessKind } from "./config-helpers.js";
 import {
   coordinationTopic,
   coreSystemTopic,
@@ -53,7 +55,25 @@ function resolveIterationBackend(
   const backendRole = allowedRoles[0];
   const role = loop.topology.roles.find((r) => r.id === backendRole);
   if (role) {
-    if (role.backendKind !== undefined) resolved.kind = role.backendKind;
+    if (role.backendKind !== undefined) {
+      const effectiveCommand = role.backendCommand ?? resolved.command;
+      resolved.kind = resolveProcessKind(role.backendKind, effectiveCommand, {
+        hasCustomArgs:
+          role.backendArgs !== undefined && role.backendArgs.length > 0,
+        roleId: role.id,
+      });
+      if (
+        resolved.kind === "acp" &&
+        role.backendProvider === undefined &&
+        resolved.provider === ""
+      ) {
+        resolved.provider = resolveAcpProvider({
+          kind: role.backendKind,
+          provider: resolved.provider,
+          command: effectiveCommand,
+        }).id;
+      }
+    }
     if (role.backendProvider !== undefined)
       resolved.provider = role.backendProvider;
     if (role.backendCommand !== undefined)

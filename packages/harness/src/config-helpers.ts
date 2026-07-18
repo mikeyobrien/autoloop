@@ -49,6 +49,14 @@ import type { LoopContext, ReviewOnError, RunOptions } from "./types.js";
 
 const DEFAULT_PROMPT =
   "Do the task and publish the completion event when finished.";
+const VALID_PROCESS_KINDS = [
+  "command",
+  "pi",
+  "claude-sdk",
+  "acp",
+  "kiro",
+  "hermes",
+] as const;
 
 export interface ResolvePromptOptions {
   workDir?: string;
@@ -138,8 +146,22 @@ export function installRuntimeTools(loop: LoopContext): void {
 export function resolveProcessKind(
   kind: string,
   command: string,
-  opts?: { hasCustomArgs?: boolean },
+  opts?: { hasCustomArgs?: boolean; roleId?: string },
 ): string {
+  if (
+    kind !== "" &&
+    kind !== "command" &&
+    kind !== "pi" &&
+    kind !== "claude-sdk" &&
+    !isAcpBackendKind(kind)
+  ) {
+    const roleContext = opts?.roleId
+      ? ` for role ${JSON.stringify(opts.roleId)}`
+      : "";
+    throw new Error(
+      `Unrecognized backend kind ${JSON.stringify(kind)}${roleContext}. Valid kinds: ${VALID_PROCESS_KINDS.join(", ")}. (Empty/unset means auto-detect.)`,
+    );
+  }
   if (kind === "pi" || piBinary(command)) return "pi";
   if (kind === "claude-sdk") return "claude-sdk";
   if (isAcpBackendKind(kind)) return "acp";
@@ -344,11 +366,7 @@ export function buildLoopContext(
     stateDirAnchor,
     config.get(cfg, "core.state_dir", ".autoloop"),
   );
-  const journalRelPath = config.get(
-    cfg,
-    "core.journal_file",
-    config.get(cfg, "core.events_file", ".autoloop/journal.jsonl"),
-  );
+  const journalRelPath = config.journalPath(cfg);
   const journalFile = join(resolvedWorkDir, journalRelPath);
   const memoryFile = join(
     resolvedWorkDir,
@@ -502,6 +520,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
   const topoData = presetFile
     ? topo.loadTopologyFromFile(presetFile)
     : topo.loadTopology(pd);
+  validateRoleBackendKinds(topoData);
 
   const backend = readBackendConfig(cfg, loop.runtime.backendOverride);
   const review = readReviewConfig(cfg, topoData, pd, backend);
@@ -729,6 +748,17 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     signal: loop.signal,
   };
   return applyRuntimeModeOverrides(updated);
+}
+
+function validateRoleBackendKinds(topology: topo.Topology): void {
+  for (const role of topology.roles) {
+    if (role.backendKind === undefined) continue;
+    resolveProcessKind(role.backendKind, role.backendCommand ?? "", {
+      hasCustomArgs:
+        role.backendArgs !== undefined && role.backendArgs.length > 0,
+      roleId: role.id,
+    });
+  }
 }
 
 function readBackendConfig(

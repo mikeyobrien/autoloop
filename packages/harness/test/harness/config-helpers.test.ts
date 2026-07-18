@@ -63,8 +63,31 @@ function seedRegistry(stateDir: string, records: Partial<RunRecord>[]): void {
 }
 
 describe("resolveProcessKind", () => {
-  it("returns pi when kind is explicitly pi", () => {
-    expect(resolveProcessKind("pi", "pi")).toBe("pi");
+  it.each([
+    ["command", "claude", "command"],
+    ["pi", "pi", "pi"],
+    ["claude-sdk", "claude", "claude-sdk"],
+    ["acp", "agent", "acp"],
+    ["kiro", "kiro", "acp"],
+    ["hermes", "hermes", "acp"],
+  ])("resolves valid kind %s as before", (kind, command, expected) => {
+    expect(resolveProcessKind(kind, command)).toBe(expected);
+  });
+
+  it.each([
+    "clade-sdk",
+    "Acp",
+    "codex",
+  ])("rejects unrecognized non-empty kind %s", (kind) => {
+    expect(() => resolveProcessKind(kind, "claude")).toThrow(
+      `Unrecognized backend kind ${JSON.stringify(kind)}. Valid kinds: command, pi, claude-sdk, acp, kiro, hermes. (Empty/unset means auto-detect.)`,
+    );
+  });
+
+  it("rejects an unknown kind even when the command has a known heuristic", () => {
+    expect(() => resolveProcessKind("clade-sdk", "pi")).toThrow(
+      'Unrecognized backend kind "clade-sdk"',
+    );
   });
 
   it("returns pi when command is pi even if kind is command", () => {
@@ -75,35 +98,18 @@ describe("resolveProcessKind", () => {
     expect(resolveProcessKind("command", "/usr/local/bin/pi")).toBe("pi");
   });
 
-  it("returns pi when kind is empty and command is pi", () => {
+  it("keeps empty-kind auto-detection behavior", () => {
     expect(resolveProcessKind("", "pi")).toBe("pi");
-  });
-
-  it("keeps the shell path when kind is explicitly command", () => {
-    expect(resolveProcessKind("command", "claude")).toBe("command");
-  });
-
-  it("defaults a plain claude command to the claude-sdk backend", () => {
+    expect(resolveProcessKind("", "hermes")).toBe("acp");
     expect(resolveProcessKind("", "claude")).toBe("claude-sdk");
     expect(resolveProcessKind("", "/usr/local/bin/claude")).toBe("claude-sdk");
-  });
-
-  it("returns claude-sdk when kind is explicitly claude-sdk", () => {
-    expect(resolveProcessKind("claude-sdk", "claude")).toBe("claude-sdk");
+    expect(resolveProcessKind("", "codex")).toBe("command");
   });
 
   it("keeps the shell path for claude with custom args", () => {
     expect(resolveProcessKind("", "claude", { hasCustomArgs: true })).toBe(
       "command",
     );
-  });
-
-  it("returns command for non-claude commands with empty kind", () => {
-    expect(resolveProcessKind("", "codex")).toBe("command");
-  });
-
-  it("returns acp when kind is legacy kiro", () => {
-    expect(resolveProcessKind("kiro", "kiro")).toBe("acp");
   });
 });
 
@@ -136,6 +142,56 @@ describe("injectClaudePermissions", () => {
 });
 
 describe("buildLoopContext", () => {
+  it("rejects an unrecognized global backend kind", () => {
+    const projectDir = makeProject(
+      ["event_loop.max_iterations = 1", 'backend.kind = "clade-sdk"'].join(
+        "\n",
+      ),
+    );
+
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow(
+      'Unrecognized backend kind "clade-sdk". Valid kinds: command, pi, claude-sdk, acp, kiro, hermes.',
+    );
+  });
+
+  it("rejects an unrecognized backend kind override", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+        backendOverride: { kind: "codex" },
+      }),
+    ).toThrow(
+      'Unrecognized backend kind "codex". Valid kinds: command, pi, claude-sdk, acp, kiro, hermes.',
+    );
+  });
+
+  it("rejects an unrecognized per-role backend kind at startup", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n", {
+      topologyToml: [
+        "[[role]]",
+        'id = "planner"',
+        'backend_kind = "claude-sdk"',
+        "[[role]]",
+        'id = "builder"',
+        'backend_kind = "clade-sdk"',
+      ].join("\n"),
+    });
+
+    expect(() =>
+      buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow(
+      'Unrecognized backend kind "clade-sdk" for role "builder". Valid kinds: command, pi, claude-sdk, acp, kiro, hermes. (Empty/unset means auto-detect.)',
+    );
+  });
+
   it("auto-discovers PROMPT.md from the work directory when no prompt is provided", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
     const workDir = mkdtempSync(join(tmpdir(), "autoloop-ts-prompt-work-"));
@@ -769,6 +825,42 @@ describe("solo-run default run-scoping", () => {
 });
 
 describe("global journal behavior", () => {
+  it("uses events_file when the legacy alias is the only configured path", () => {
+    const projectDir = makeProject(
+      'event_loop.max_iterations = 1\n\n[core]\nevents_file = "x.jsonl"\n',
+    );
+    const originalConfig = process.env.AUTOLOOP_CONFIG;
+    process.env.AUTOLOOP_CONFIG = join(projectDir, "missing-user-config.toml");
+
+    try {
+      const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+        workDir: projectDir,
+      });
+
+      expect(loop.paths.journalFile).toBe(join(projectDir, "x.jsonl"));
+    } finally {
+      if (originalConfig === undefined) delete process.env.AUTOLOOP_CONFIG;
+      else process.env.AUTOLOOP_CONFIG = originalConfig;
+    }
+  });
+
+  it("prefers journal_file when both journal path names are configured", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        "",
+        "[core]",
+        'journal_file = "journal.jsonl"',
+        'events_file = "events.jsonl"',
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.paths.journalFile).toBe(join(projectDir, "journal.jsonl"));
+  });
+
   it("journal path is global for solo run-scoped mode", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
     const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {

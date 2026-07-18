@@ -7,12 +7,15 @@ import {
   getInt,
   getList,
   hasUserConfig,
+  journalPath,
   load,
   loadLayered,
   loadProject,
   loadUserConfig,
+  parseToml,
   projectHasConfig,
   put,
+  resolveJournalFile,
   userConfigPath,
   userPresetOverridePath,
 } from "../src/config.js";
@@ -98,6 +101,59 @@ describe("get", () => {
   it("returns value for existing key", () => {
     const cfg = load("/nonexistent");
     expect(get(cfg, "core.state_dir", "fallback")).toBe(".autoloop");
+  });
+});
+
+describe("journalPath", () => {
+  it("uses the legacy events_file alias when journal_file is unset", () => {
+    const cfg = parseToml('[core]\nevents_file = "x.jsonl"\n');
+
+    expect(journalPath(cfg)).toBe("x.jsonl");
+  });
+
+  it("prefers journal_file when both names are set", () => {
+    const cfg = parseToml(
+      '[core]\njournal_file = "journal.jsonl"\nevents_file = "events.jsonl"\n',
+    );
+
+    expect(journalPath(cfg)).toBe("journal.jsonl");
+  });
+
+  it("uses the default journal path when neither name is set", () => {
+    expect(journalPath(parseToml(""))).toBe(".autoloop/journal.jsonl");
+  });
+});
+
+describe("resolveJournalFile", () => {
+  const originalConfig = process.env.AUTOLOOP_CONFIG;
+
+  beforeEach(() => {
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "missing-user-config.toml");
+  });
+
+  afterEach(() => {
+    if (originalConfig === undefined) delete process.env.AUTOLOOP_CONFIG;
+    else process.env.AUTOLOOP_CONFIG = originalConfig;
+  });
+
+  it("resolves an events_file-only project through the legacy alias", () => {
+    const dir = tmpDir("events-file-project");
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      '[core]\nevents_file = "x.jsonl"\n',
+    );
+
+    expect(resolveJournalFile(dir)).toBe(join(dir, "x.jsonl"));
+  });
+
+  it("prefers journal_file when both names are configured", () => {
+    const dir = tmpDir("journal-file-project");
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      '[core]\njournal_file = "journal.jsonl"\nevents_file = "events.jsonl"\n',
+    );
+
+    expect(resolveJournalFile(dir)).toBe(join(dir, "journal.jsonl"));
   });
 });
 

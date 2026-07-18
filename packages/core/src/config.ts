@@ -12,6 +12,7 @@ import {
   deepMerge,
   defaults,
   get,
+  journalPath,
   type LayeredConfig,
   type Provenance,
   parseRawToml,
@@ -391,12 +392,7 @@ export function stateDirPath(projectDir: string): string {
 }
 
 function journalRelPath(projectDir: string): string {
-  const cfg = loadProject(projectDir);
-  return get(
-    cfg,
-    "core.journal_file",
-    get(cfg, "core.events_file", ".autoloop/journal.jsonl"),
-  );
+  return journalPath(loadProject(projectDir));
 }
 
 function memoryRelPath(projectDir: string): string {

@@ -9,6 +9,8 @@ import TOML from "@iarna/toml";
 import { MAX_TIMER_MS, parseDurationMs } from "./duration.js";
 import { parseStringList } from "./utils.js";
 
+const DEFAULT_JOURNAL_FILE = ".autoloop/journal.jsonl";
+
 export type Config = Record<string, unknown>;
 export type Provenance = Record<string, string>;
 
@@ -81,8 +83,8 @@ export function defaults(): Config {
     memory: { prompt_budget_chars: "8000" },
     core: {
       state_dir: ".autoloop",
-      journal_file: ".autoloop/journal.jsonl",
-      events_file: ".autoloop/journal.jsonl",
+      journal_file: "",
+      events_file: "",
       memory_file: ".autoloop/memory.jsonl",
       run_id_format: "human",
       log_level: "info",
@@ -142,11 +144,11 @@ export function put(config: Config, key: string, value: string): Config {
 }
 
 export function journalPath(config: Config): string {
-  return get(
-    config,
-    "core.journal_file",
-    get(config, "core.events_file", ".autoloop/journal.jsonl"),
-  );
+  const journalFile = get(config, "core.journal_file", "");
+  if (journalFile) return journalFile;
+
+  const eventsFile = get(config, "core.events_file", "");
+  return eventsFile || DEFAULT_JOURNAL_FILE;
 }
 
 export function parseToml(text: string): Config {

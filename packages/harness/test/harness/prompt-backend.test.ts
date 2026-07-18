@@ -230,6 +230,65 @@ describe("buildIterationContext role-level override resolution (slice 3)", () =>
     expect(iter.backend.timeoutMs).toBe(loop.backend.timeoutMs);
   });
 
+  it("rejects an unrecognized role-level backend kind with role context", () => {
+    const loop = makeBackendLoop("role-invalid-kind", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendKind: "clade-sdk",
+        },
+      ],
+    });
+
+    expect(() => buildIterationContext(loop, 1)).toThrow(
+      'Unrecognized backend kind "clade-sdk" for role "builder". Valid kinds: command, pi, claude-sdk, acp, kiro, hermes. (Empty/unset means auto-detect.)',
+    );
+  });
+
+  it("preserves a role-level pi backend kind", () => {
+    const loop = makeBackendLoop("role-pi-kind", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendKind: "pi",
+          backendCommand: "pi",
+        },
+      ],
+    });
+
+    expect(buildIterationContext(loop, 1).backend).toMatchObject({
+      kind: "pi",
+      command: "pi",
+    });
+  });
+
+  it("normalizes a role-level kiro alias and infers its ACP provider", () => {
+    const loop = makeBackendLoop("role-kiro-kind", {
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendKind: "kiro",
+          backendCommand: "kiro-cli",
+        },
+      ],
+    });
+
+    expect(buildIterationContext(loop, 1).backend).toMatchObject({
+      kind: "acp",
+      provider: "kiro",
+      command: "kiro-cli",
+    });
+  });
+
   it("role-level ACP provider, agent, and model overrides flow into iteration backend", () => {
     const loop = makeBackendLoop("role-provider", {
       roles: [
