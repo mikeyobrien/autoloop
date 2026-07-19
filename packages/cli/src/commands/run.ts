@@ -10,7 +10,7 @@ import * as chains from "../chains.js";
 import { cliPrintEvent } from "../cli/event-printer.js";
 import type { EventSink } from "../cli/events-sink.js";
 import { ndjsonEventSink, teeEvents } from "../cli/events-sink.js";
-import { EXIT_ENV } from "../cli/fail.js";
+import { EXIT_ENV, fail } from "../cli/fail.js";
 import {
   missingPresetError,
   printRunUsage,
@@ -28,6 +28,7 @@ interface RunOptions {
   presetExplicit: boolean;
   positionals: string[];
   usageError: boolean;
+  usageErrorMessage?: string;
   workDir?: string;
   profiles: string[];
   noDefaultProfiles: boolean;
@@ -51,6 +52,13 @@ interface RunOptions {
   noResume?: boolean;
 }
 
+function usageFail(options: RunOptions, message: string): RunOptions {
+  fail(message);
+  options.usageError = true;
+  options.usageErrorMessage = message;
+  return options;
+}
+
 export async function dispatchRun(
   args: string[],
   _argv: string[],
@@ -66,7 +74,33 @@ export async function dispatchRun(
     return true;
   }
   const options = parseRunArgs(args, bundleRoot);
-  if (options.usageError) return true;
+  if (options.usageError) {
+    // Parsing stops at the first invalid token, so only an --events flag parsed
+    // before the error can receive the machine-readable terminal records.
+    if (options.eventsPath) {
+      let usageErrorSink: EventSink | null = null;
+      try {
+        usageErrorSink = ndjsonEventSink(options.eventsPath);
+        usageErrorSink.onEvent({
+          type: "log",
+          level: "error",
+          message: options.usageErrorMessage ?? "usage error",
+        });
+        usageErrorSink.onEvent({
+          type: "loop.finish",
+          iterations: 0,
+          stopReason: "error",
+          runId: "",
+          costUsd: 0,
+        });
+      } catch {
+        // Best-effort only: the stderr diagnostic and usage exit code remain.
+      } finally {
+        usageErrorSink?.close();
+      }
+    }
+    return true;
+  }
 
   // Optional structured event stream: write every LoopEvent as NDJSON to
   // --events <path>, in addition to (not replacing) terminal rendering. Built
@@ -243,9 +277,7 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "-b" || token === "--backend") {
       const backend = args[i + 1];
       if (!backend) {
-        console.log(`missing backend after ${token}`);
-        options.usageError = true;
-        return options;
+        return usageFail(options, `missing backend after ${token}`);
       }
       options.backendOverride = backendOverrideSpec(backend);
       i += 2;
@@ -258,9 +290,7 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     ) {
       const value = args[i + 1];
       if (!value) {
-        console.log(`missing iteration count after ${token}`);
-        options.usageError = true;
-        return options;
+        return usageFail(options, `missing iteration count after ${token}`);
       }
       setConfigOverride(options, "event_loop.max_iterations", value);
       i += 2;
@@ -281,9 +311,10 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--budget") {
       const value = args[i + 1];
       if (!value || !isFiniteBudget(value)) {
-        console.log(`invalid --budget (expected a dollar amount): ${value}`);
-        options.usageError = true;
-        return options;
+        return usageFail(
+          options,
+          `invalid --budget (expected a dollar amount): ${value}`,
+        );
       }
       options.budgetUsd = value;
       // Opt-in hard ceiling: the advisory target also caps spend via the guard.
@@ -294,15 +325,11 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--set") {
       const assignment = args[i + 1];
       if (!assignment) {
-        console.log("missing key=value after --set");
-        options.usageError = true;
-        return options;
+        return usageFail(options, "missing key=value after --set");
       }
       const parsed = parseConfigAssignment(assignment);
       if (!parsed) {
-        console.log(`invalid --set assignment: ${assignment}`);
-        options.usageError = true;
-        return options;
+        return usageFail(options, `invalid --set assignment: ${assignment}`);
       }
       setConfigOverride(options, parsed.key, parsed.value);
       i += 2;
@@ -311,15 +338,11 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "-p" || token === "--preset") {
       const preset = args[i + 1];
       if (!preset) {
-        console.log(`missing preset after ${token}`);
-        options.usageError = true;
-        return options;
+        return usageFail(options, `missing preset after ${token}`);
       }
       const source = config.resolvePresetSource(preset, bundleRoot);
       if (!source) {
-        console.log(`preset \`${preset}\` not found`);
-        options.usageError = true;
-        return options;
+        return usageFail(options, `preset \`${preset}\` not found`);
       }
       options.projectDir = source.projectDir;
       if (source.kind === "file") options.presetFile = source.file;
@@ -330,16 +353,13 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--preset-file") {
       const path = args[i + 1];
       if (!path) {
-        console.log(`missing path after ${token}`);
-        options.usageError = true;
-        return options;
+        return usageFail(options, `missing path after ${token}`);
       }
       if (!config.pathIsSingleFilePreset(path)) {
-        console.log(
+        return usageFail(
+          options,
           `--preset-file expects a path to an existing .toml file: ${path}`,
         );
-        options.usageError = true;
-        return options;
       }
       options.presetFile = resolve(path);
       options.projectDir = dirname(resolve(path));
@@ -350,9 +370,7 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--chain") {
       const chainVal = args[i + 1];
       if (!chainVal) {
-        console.log("missing chain after --chain");
-        options.usageError = true;
-        return options;
+        return usageFail(options, "missing chain after --chain");
       }
       options.chain = chainVal;
       i += 2;
@@ -361,9 +379,7 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--profile") {
       const profile = args[i + 1];
       if (!profile) {
-        console.log("missing profile spec after --profile");
-        options.usageError = true;
-        return options;
+        return usageFail(options, "missing profile spec after --profile");
       }
       options.profiles.push(profile);
       i += 2;
@@ -387,9 +403,7 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--merge-strategy") {
       const val = args[i + 1];
       if (!val) {
-        console.log("missing strategy after --merge-strategy");
-        options.usageError = true;
-        return options;
+        return usageFail(options, "missing strategy after --merge-strategy");
       }
       options.mergeStrategy = val;
       i += 2;
@@ -413,9 +427,7 @@ export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {
     if (token === "--events") {
       const path = args[i + 1];
       if (!path) {
-        console.log("missing path after --events");
-        options.usageError = true;
-        return options;
+        return usageFail(options, "missing path after --events");
       }
       options.eventsPath = path;
       i += 2;
@@ -486,9 +498,7 @@ function finalizeArchitectRun(
 ): RunOptions {
   const source = config.resolvePresetSource("autoarchitect", bundleRoot);
   if (!source) {
-    console.log("error: autoarchitect preset not found");
-    options.usageError = true;
-    return options;
+    return usageFail(options, "error: autoarchitect preset not found");
   }
   options.projectDir = source.projectDir;
   if (source.kind === "file") options.presetFile = source.file;
@@ -529,6 +539,7 @@ function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
     }
     missingPresetError();
     options.usageError = true;
+    options.usageErrorMessage = "missing required preset argument";
     return options;
   }
 
@@ -556,6 +567,7 @@ function finalizeRunArgs(options: RunOptions, bundleRoot: string): RunOptions {
   if (!source) {
     unknownPresetError(first);
     options.usageError = true;
+    options.usageErrorMessage = `preset \`${first}\` not found`;
     return options;
   }
   options.projectDir = source.projectDir;
@@ -600,11 +612,13 @@ export async function runInlineChain(
   const stepNames = chainSpec.steps.map((s) => s.name);
   const validation = chains.validatePresetVocabulary(stepNames, projectDir);
   if (!validation.ok) {
-    console.log("error: invalid inline chain");
-    console.log("");
-    console.log(validation.reason ?? "");
-    console.log("");
-    console.log(`Known presets: ${joinCsv(chains.listKnownPresets())}`);
+    fail([
+      "error: invalid inline chain",
+      "",
+      validation.reason ?? "",
+      "",
+      `Known presets: ${joinCsv(chains.listKnownPresets())}`,
+    ]);
     return;
   }
   // Forward the structured event sink so --events also captures chain steps.
