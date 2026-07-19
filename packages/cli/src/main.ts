@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import * as harness from "@mobrienv/autoloop-harness";
 import * as chains from "./chains.js";
 import { cliPrintEvent } from "./cli/event-printer.js";
@@ -272,6 +272,13 @@ function selfCommand(argv: string[]): string {
   // tool wrapper and with it agent event emission.
   const entry = argv[1];
   if (!entry) return "autoloop";
+  // Single-binary builds (bun build --compile, Node SEA): execPath IS the
+  // CLI and argv[1] is a virtual bundle path (e.g. /$bunfs/...) that must
+  // not be passed back as an argument — re-invoke the binary bare.
+  const execBase = basename(process.execPath);
+  if (execBase !== "node" && !execBase.startsWith("node.")) {
+    return `'${process.execPath}'`;
+  }
   return `'${process.execPath}' '${resolve(entry)}'`;
 }
 
