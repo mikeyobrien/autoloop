@@ -55,6 +55,15 @@ describe("coreSystemTopic", () => {
     expect(coreSystemTopic("wave.join.finish")).toBe(true);
   });
 
+  it("recognizes harness-written hook records as system topics", () => {
+    // Regression: hook.output missing here made latestAgentEventRecord
+    // treat a post_iteration hook's record as an invalid agent emission,
+    // resetting topology routing to loop.start every iteration for any
+    // preset with lifecycle hooks configured.
+    expect(coreSystemTopic("hook.output")).toBe(true);
+    expect(coreSystemTopic("hook.suspend")).toBe(true);
+  });
+
   it("rejects non-system topics", () => {
     expect(coreSystemTopic("task.complete")).toBe(false);
     expect(coreSystemTopic("gaps.identified")).toBe(false);

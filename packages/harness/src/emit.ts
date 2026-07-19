@@ -65,6 +65,13 @@ const CORE_SYSTEM_TOPICS = new Set([
   "backend.finish",
   "backend.usage",
   "event.invalid",
+  // Harness-written hook records: never agent emissions. Omitting these
+  // made latestAgentEventRecord treat a post_iteration hook's journal
+  // record as an invalid agent emit, journaling event.invalid with
+  // recent_event=loop.start and resetting topology routing every
+  // iteration for any preset with lifecycle hooks configured.
+  "hook.output",
+  "hook.suspend",
 ]);
 
 export function coreSystemTopic(topic: string): boolean {
