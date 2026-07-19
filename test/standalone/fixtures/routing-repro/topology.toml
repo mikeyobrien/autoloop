@@ -1,0 +1,16 @@
+name = "standalone-routing-repro"
+completion = "task.complete"
+
+[[role]]
+id = "first"
+emits = ["first.done"]
+prompt = "You are the first deterministic fixture role."
+
+[[role]]
+id = "second"
+emits = ["task.complete"]
+prompt = "You are the second deterministic fixture role."
+
+[handoff]
+"loop.start" = ["first"]
+"first.done" = ["second"]

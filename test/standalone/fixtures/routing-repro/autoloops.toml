@@ -1,0 +1,18 @@
+event_loop.max_iterations = 2
+event_loop.completion_event = "task.complete"
+event_loop.completion_promise = "LOOP_COMPLETE"
+event_loop.required_events = []
+
+backend.kind = "command"
+backend.command = "sh"
+backend.args = ["preset/backend.sh"]
+backend.prompt_mode = "stdin"
+backend.timeout_ms = 10000
+
+review.enabled = false
+harness.instructions_file = "harness.md"
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
+core.tasks_file = ".autoloop/tasks.jsonl"
+core.run_id_format = "counter"
