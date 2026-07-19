@@ -4,6 +4,43 @@ import { lastNChars, log } from "./display.js";
 import { registryComplete, registryStop } from "./registry-bridge.js";
 import type { LoopContext, RunSummary, StopReason } from "./types.js";
 
+export function stopError(
+  loop: LoopContext,
+  completed: number,
+  err: unknown,
+): void {
+  const detail = err instanceof Error ? err.message : String(err);
+  try {
+    log(
+      loop,
+      "error",
+      `loop stop reason=error completed_iterations=${completed} detail=${detail}`,
+    );
+  } catch {
+    /* best-effort */
+  }
+  try {
+    appendEvent(
+      loop.paths.journalFile,
+      loop.runtime.runId,
+      "",
+      "loop.stop",
+      jsonField("reason", "error") +
+        ", " +
+        jsonField("completed_iterations", String(completed)) +
+        ", " +
+        jsonField("detail", lastNChars(detail, 500)),
+    );
+  } catch {
+    /* best-effort */
+  }
+  try {
+    registryStop(loop, completed, "error");
+  } catch {
+    /* best-effort */
+  }
+}
+
 export function stopMaxIterations(
   loop: LoopContext,
   iteration: number,
@@ -255,7 +292,7 @@ export function stopMaxRuntime(
       ", " +
       jsonField("max_runtime_ms", String(maxRuntimeMs)) +
       (outputTail !== undefined
-        ? ", " + jsonField("output_tail", lastNChars(outputTail, 500))
+        ? `, ${jsonField("output_tail", lastNChars(outputTail, 500))}`
         : ""),
   );
   registryStop(loop, completed, "max_runtime");

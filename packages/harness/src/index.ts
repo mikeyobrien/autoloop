@@ -1,7 +1,6 @@
 import { existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { normalizeBackendLabel } from "@mobrienv/autoloop-backends";
-import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import { terminateAcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import {
   abortClaudeSdkTurn,
@@ -69,6 +68,7 @@ import { registryStart, registryStop } from "./registry-bridge.js";
 import {
   completeLoop,
   stopCostBudget,
+  stopError,
   stopMaxIterations,
   stopMaxRuntime,
   stopPrematureQuit,
@@ -295,6 +295,7 @@ export async function driveLoop(
     // consumer always learns the run ended, instead of waiting forever for a
     // loop.finish. Data already written is flushed (synchronous appends); we
     // emit the terminal marker and re-raise.
+    stopError(loop, currentIteration > 0 ? currentIteration - 1 : 0, err);
     loop.onEvent?.({
       type: "loop.finish",
       iterations: currentIteration > 0 ? currentIteration - 1 : 0,
