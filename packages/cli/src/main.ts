@@ -263,8 +263,16 @@ function isCliCommand(value: string): boolean {
 }
 
 function selfCommand(argv: string[]): string {
-  // Return a command that re-invokes this program
-  return `'${resolve(argv[1] ?? "autoloop")}'`;
+  // Return a command that re-invokes this program. Always go through the
+  // running Node interpreter: argv[1] is the npm bin shim (shebang'd) on
+  // installed copies but a bare ESM file when driven as
+  // `node packages/cli/dist/main.js` from a checkout — exec'ing that
+  // directly makes /bin/sh interpret JavaScript (its `import` lines even
+  // resolve to ImageMagick's import(1)), silently breaking every generated
+  // tool wrapper and with it agent event emission.
+  const entry = argv[1];
+  if (!entry) return "autoloop";
+  return `'${process.execPath}' '${resolve(entry)}'`;
 }
 
 function resolveBundleRoot(argv: string[]): string {
