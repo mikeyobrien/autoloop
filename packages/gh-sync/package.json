@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-gh-sync",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "license": "MIT",
   "description": "GitHub issue sync adapter for autoloop (wraps gh CLI)",
   "type": "module",
@@ -27,7 +27,7 @@
     "directory": "packages/gh-sync"
   },
   "dependencies": {
-    "@mobrienv/autoloop-issue-sync-core": "0.10.0"
+    "@mobrienv/autoloop-issue-sync-core": "0.10.1"
   },
   "scripts": {
     "build": "tsc"

@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-linear-sync",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "license": "MIT",
   "description": "Linear issue sync adapter for autoloop (@linear/sdk + LINEAR_API_KEY)",
   "type": "module",
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@linear/sdk": "^33.0.0",
-    "@mobrienv/autoloop-issue-sync-core": "0.10.0"
+    "@mobrienv/autoloop-issue-sync-core": "0.10.1"
   },
   "scripts": {
     "build": "tsc"

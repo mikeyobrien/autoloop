@@ -1,6 +1,6 @@
 {
   "name": "autoloop",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Run and operate autoloops — start runs, monitor progress, inject guidance, manage worktrees, inspect artifacts, and clean up.",
   "homepage": "https://github.com/mikeyobrien/autoloop",
   "repository": "https://github.com/mikeyobrien/autoloop",

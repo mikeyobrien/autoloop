@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-issue-sync-core",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "license": "MIT",
   "description": "Tracker-agnostic issue sync core for autoloop (pull/push/release, state file, adapter interface)",
   "type": "module",
@@ -27,7 +27,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@mobrienv/autoloop-core": "0.10.0"
+    "@mobrienv/autoloop-core": "0.10.1"
   },
   "publishConfig": {
     "access": "public"
