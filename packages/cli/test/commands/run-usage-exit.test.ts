@@ -85,6 +85,32 @@ describe("run usage errors", () => {
     );
   });
 
+  it("writes a terminal error event for an invalid inline chain", () => {
+    const eventsPath = join(tempDir, "chain-events.ndjson");
+    const result = cli(
+      "run",
+      "--chain",
+      "nosuch,alsonot",
+      "--events",
+      eventsPath,
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("invalid inline chain");
+    expect(existsSync(eventsPath)).toBe(true);
+
+    const events: unknown[] = readFileSync(eventsPath, "utf-8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "loop.finish",
+        stopReason: "error",
+      }),
+    );
+  });
+
   it("prints the version and exits successfully", () => {
     const result = cli("--version");
 

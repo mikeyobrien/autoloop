@@ -619,6 +619,18 @@ export async function runInlineChain(
       "",
       `Known presets: ${joinCsv(chains.listKnownPresets())}`,
     ]);
+    onEvent?.({
+      type: "log",
+      level: "error",
+      message: `invalid inline chain: ${validation.reason ?? "unknown reason"}`,
+    });
+    onEvent?.({
+      type: "loop.finish",
+      iterations: 0,
+      stopReason: "error",
+      runId: "",
+      costUsd: 0,
+    });
     return;
   }
   // Forward the structured event sink so --events also captures chain steps.
