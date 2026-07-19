@@ -22,10 +22,11 @@ export function cliVersion(): string {
   try {
     const require = createRequire(import.meta.url);
     const pkg = require("../../package.json") as { version?: string };
-    return pkg.version ?? "unknown";
+    if (pkg.version) return pkg.version;
   } catch {
-    return "unknown";
+    // Fall through to the build-time define used by standalone binaries.
   }
+  return process.env.AUTOLOOP_BUILD_VERSION ?? "unknown";
 }
 
 export function commandCapabilities(): CommandCapability[] {
