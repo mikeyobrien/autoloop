@@ -9,7 +9,12 @@ export function stopError(
   completed: number,
   err: unknown,
 ): void {
-  const detail = err instanceof Error ? err.message : String(err);
+  let detail: string;
+  try {
+    detail = err instanceof Error ? err.message : String(err);
+  } catch {
+    detail = "unserializable error";
+  }
   try {
     log(
       loop,

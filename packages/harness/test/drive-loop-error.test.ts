@@ -240,4 +240,55 @@ describe("driveLoop unexpected errors", () => {
       normalRecord.fields.completed_iterations,
     );
   });
+
+  it("preserves an unstringifiable thrown value while recording the stop", async () => {
+    const hostile = Object.create(null);
+    runIteration.mockRejectedValueOnce(hostile);
+    const loop = makeLoopContext();
+    registryStart(loop);
+
+    await expect(driveLoop(loop, {}, 1)).rejects.toBe(hostile);
+
+    const terminalLine = readRunLines(
+      loop.paths.journalFile,
+      loop.runtime.runId,
+    ).at(-1);
+    expect(extractTopic(terminalLine ?? "")).toBe("loop.stop");
+    expect(extractField(terminalLine ?? "", "reason")).toBe("error");
+    expect(extractField(terminalLine ?? "", "detail")).toBe(
+      "unserializable error",
+    );
+    expect(getRun(loop.paths.registryFile, loop.runtime.runId)).toMatchObject({
+      status: "stopped",
+      stop_reason: "error",
+    });
+  });
+
+  it("preserves an Error whose message getter throws while recording the stop", async () => {
+    const hostile = new Error("placeholder");
+    Object.defineProperty(hostile, "message", {
+      get() {
+        throw new Error("message-getter-bomb");
+      },
+    });
+    runIteration.mockRejectedValueOnce(hostile);
+    const loop = makeLoopContext();
+    registryStart(loop);
+
+    await expect(driveLoop(loop, {}, 1)).rejects.toBe(hostile);
+
+    const terminalLine = readRunLines(
+      loop.paths.journalFile,
+      loop.runtime.runId,
+    ).at(-1);
+    expect(extractTopic(terminalLine ?? "")).toBe("loop.stop");
+    expect(extractField(terminalLine ?? "", "reason")).toBe("error");
+    expect(extractField(terminalLine ?? "", "detail")).toBe(
+      "unserializable error",
+    );
+    expect(getRun(loop.paths.registryFile, loop.runtime.runId)).toMatchObject({
+      status: "stopped",
+      stop_reason: "error",
+    });
+  });
 });
