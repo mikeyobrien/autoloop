@@ -135,11 +135,11 @@ describe("chain run --dry-run", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("does not change exit code for a missing chain without --dry-run", async () => {
+  it("sets exit code 1 for a missing chain without --dry-run", async () => {
     writeFileSync(join(projectDir, "chains.toml"), VALID_TOML);
     await dispatchChain(["run", "nope", projectDir], "autoloop");
 
     expect(logged.join("\n")).toContain("not found in chains.toml");
-    expect(process.exitCode).toBeUndefined();
+    expect(process.exitCode).toBe(1);
   });
 });

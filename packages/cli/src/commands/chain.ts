@@ -44,7 +44,7 @@ export async function dispatchChain(
       const chainSpec = chains.resolveChain(chainsData, name);
       if (!chainSpec) {
         console.log(`chain \`${name}\` not found in chains.toml`);
-        if (dryRun) process.exitCode = 1;
+        process.exitCode = 1;
         return true;
       }
       if (dryRun) {

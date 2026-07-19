@@ -111,6 +111,13 @@ describe("run usage errors", () => {
     );
   });
 
+  it("exits with the usage code for an unknown chain", () => {
+    const result = cli("chain", "run", "nosuchchain-ga3", tempDir);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("not found in chains.toml");
+  });
+
   it("prints the version and exits successfully", () => {
     const result = cli("--version");
 
