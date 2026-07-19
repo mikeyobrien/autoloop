@@ -34,7 +34,6 @@ import {
 } from "@mobrienv/autoloop-core/journal";
 import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
-import { reinjectAcceptanceFailure, runAcceptanceGate } from "./acceptance.js";
 import { awaitHumanResponse } from "./ask.js";
 import {
   backoffDelayMs,
@@ -51,7 +50,6 @@ import {
 import { runFileModAudit } from "./file-mod-audit.js";
 import { loopStartMs } from "./guards.js";
 import { buildHookEnv, captureGitSha, runPhaseHooks } from "./hooks.js";
-import { reinjectIntentFailure, runIntentCriteria } from "./intent.js";
 import {
   appendBackendFinish,
   appendBackendStart,
@@ -61,20 +59,10 @@ import {
   commandUsageFilePath,
   runProcessAsync,
 } from "./parallel.js";
-import {
-  reinjectPostconditionFailure,
-  runPostconditionGuards,
-} from "./postconditions.js";
 import { runProgressMetric } from "./progress.js";
 import type { IterationContext } from "./prompt.js";
 import { buildIterationContext } from "./prompt.js";
-import {
-  consumeHumanAck,
-  enterProvisional,
-  holdProvisional,
-  releaseProvisional,
-  resolveProvisional,
-} from "./provisional.js";
+import { enterProvisional, resolveCompletionClaim } from "./provisional.js";
 import { registryProgress } from "./registry-bridge.js";
 import { finishStageIteration } from "./stage.js";
 import {
@@ -86,7 +74,6 @@ import {
   stopSuspended,
 } from "./stop.js";
 import { readSuspendState, resumeRequested } from "./suspend-state.js";
-import { reinjectTamperFailure, runTamperScreen } from "./tamper.js";
 import type { LoopContext, RunSummary } from "./types.js";
 import {
   continueAfterParallelJoin,
@@ -725,52 +712,10 @@ export async function finishIteration(
     // `awaiting_acceptance` before any irreversible action and is released only
     // when the deterministic gates pass (or an operator acknowledges).
     enterProvisional(loop, iter.iteration, reason);
-    // Out-of-band acceptance gate: the harness runs deterministic verify
-    // commands on the done-claim.
-    const gate = runAcceptanceGate(loop, iter.iteration);
-    // Required-absence guards: catch reward-hacks (leftover TODO, skipped
-    // tests, secrets, dirty tree) the verify commands and LLM gates may miss.
-    // Only run when the acceptance gate passed (the run is already held
-    // otherwise).
-    const guards = gate.passed
-      ? runPostconditionGuards(loop, iter.iteration)
-      : { ran: false, passed: false, violations: [] };
-    // Anti-reward-hack screen: under bypassPermissions the maker can edit the
-    // very tests that gate it, so a test-backed "done" is screened for test
-    // tampering before release.
-    const tamper = gate.passed
-      ? runTamperScreen(loop, iter.iteration)
-      : { ran: false, passed: false, violations: [] };
-    // Intent-binding: the build must satisfy the stated acceptance criteria,
-    // not just pass its tests.
-    const intent = gate.passed
-      ? runIntentCriteria(loop, iter.iteration)
-      : { ran: false, passed: false, failures: [] };
-    const humanAck = consumeHumanAck(loop);
-    const state = resolveProvisional({
-      acceptancePassed: gate.passed,
-      postconditionsPassed: guards.passed && tamper.passed && intent.passed,
-      humanAck,
-    });
-    if (state === "accepted") {
-      releaseProvisional(loop, iter.iteration, humanAck);
+    const resolution = resolveCompletionClaim(loop, iter.iteration);
+    if (resolution.state === "accepted") {
       return completeLoop(loop, iter.iteration, reason);
     }
-    // Held: re-inject the most specific failure and route back to rework.
-    let cause = "acceptance";
-    if (!gate.passed) {
-      reinjectAcceptanceFailure(loop, iter.iteration, gate);
-    } else if (!guards.passed) {
-      reinjectPostconditionFailure(loop, iter.iteration, guards);
-      cause = "postcondition";
-    } else if (!tamper.passed) {
-      reinjectTamperFailure(loop, iter.iteration, tamper);
-      cause = "tamper";
-    } else {
-      reinjectIntentFailure(loop, iter.iteration, intent);
-      cause = "intent";
-    }
-    holdProvisional(loop, iter.iteration, cause);
     progress(emitted.topic, "hold:awaiting_acceptance");
     return iterate(loop, iter.iteration + 1);
   }

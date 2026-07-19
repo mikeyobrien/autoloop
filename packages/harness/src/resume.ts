@@ -19,13 +19,23 @@ import {
 import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
+import {
+  findDanglingProvisional,
+  resolveOrphanedProvisional,
+} from "./provisional.js";
 import { registryStart } from "./registry-bridge.js";
+import { completeLoop } from "./stop.js";
 import {
   clearResumeRequest,
   clearSuspendState,
   readSuspendState,
 } from "./suspend-state.js";
-import type { LoopContext, RunOptions, RunSummary } from "./types.js";
+import type {
+  LoopContext,
+  RunOptions,
+  RunSummary,
+  StopReason,
+} from "./types.js";
 
 export interface ResumeOptions {
   /** Additional iterations to grant beyond the resume point. */
@@ -313,6 +323,28 @@ export async function resume(
   // the next `run()` (or this resume, if invoked again) refuse to start.
   clearSuspendState(loop.paths.stateDir);
   clearResumeRequest(loop.paths.stateDir);
+
+  const dangling = findDanglingProvisional(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+  );
+  if (dangling) {
+    const state = resolveOrphanedProvisional(loop, dangling, {
+      registryIteration: record.iteration,
+    });
+    if (state === "accepted") {
+      const summary = completeLoop(
+        loop,
+        dangling.iteration,
+        dangling.reason as StopReason,
+      );
+      return {
+        ...summary,
+        resumedFromIteration: resumeIteration,
+        newMaxIterations: loop.limits.maxIterations,
+      };
+    }
+  }
 
   log(
     loop,
