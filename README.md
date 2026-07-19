@@ -102,6 +102,24 @@ If Ralph is the broader experimentation surface, autoloop is the cleaner runtime
 npm install -g @mobrienv/autoloop
 ```
 
+### Standalone binary (no Node required)
+
+npm remains the primary and recommended installation channel. For a Node-free
+installation, download the binary for your OS and architecture plus
+`SHA256SUMS` from the [GitHub release](https://github.com/mikeyobrien/autoloop/releases):
+
+```bash
+VERSION=v0.10.1
+TARGET=darwin-arm64 # darwin-arm64, darwin-x64, linux-arm64, or linux-x64
+curl -LO "https://github.com/mikeyobrien/autoloop/releases/download/${VERSION}/autoloop-${TARGET}"
+curl -LO "https://github.com/mikeyobrien/autoloop/releases/download/${VERSION}/SHA256SUMS"
+grep "  autoloop-${TARGET}$" SHA256SUMS > SHA256SUMS.current
+sha256sum -c SHA256SUMS.current # Linux
+# shasum -a 256 -c SHA256SUMS.current # macOS
+chmod +x "autoloop-${TARGET}"
+sudo mv "autoloop-${TARGET}" /usr/local/bin/autoloop
+```
+
 ### From source
 
 ```bash

@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Added
+- **Standalone binaries provide a Node-free installation channel.** GitHub
+  releases now attach Bun-compiled executables for macOS and Linux on arm64
+  and x64, plus a `SHA256SUMS` file. `scripts/build-standalone.sh` builds all
+  four targets (or a selected host/target) and embeds the package version at
+  compile time.
+
+### Fixed
+- **Generated tool wrappers reliably re-invoke every CLI distribution.**
+  Checkout builds now use the Node interpreter instead of asking `/bin/sh` to
+  execute the ESM entry point, while standalone builds re-invoke their binary
+  directly instead of passing Bun's virtual bundle path as a command. Agent
+  event emission and role routing now work in both environments. (`c4a0c7c`,
+  `4f1f238`)
+- **Lifecycle-hook journal records remain system topics.** `hook.output` and
+  `hook.suspend` are no longer mistaken for agent emissions, preventing
+  spurious `event.invalid` records and topology resets in presets with hooks.
+  (`d8ce604`)
+- **Resumed loops regenerate working tool wrappers.** Resume now threads the
+  CLI self-command into wrapper generation, so agents can publish handoffs and
+  completion events after a resume instead of failing with `command not
+  found`. (`f9ed201`)
+
 ## [0.10.0] - 2026-07-18
 
 Hardening release: six GA/1.0-blocker fixes from an adversarial reliability
