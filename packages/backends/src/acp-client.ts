@@ -16,7 +16,11 @@ export interface AcpClientOptions {
   agentName?: string;
   modelId?: string;
   verbose?: boolean;
+  /** Deadline for the ACP handshake (default 30s). */
+  handshakeTimeoutMs?: number;
 }
+
+const DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000;
 
 export interface AcpSession {
   provider: AcpProvider;
@@ -231,32 +235,57 @@ export async function initAcpSession(
 
   session.connection = new acp.ClientSideConnection(() => client, stream);
 
-  // Initialize
-  await session.connection.initialize({
-    protocolVersion: acp.PROTOCOL_VERSION,
-    clientCapabilities: {},
-    clientInfo: { name: "autoloop", version: "0.1.0" },
-  });
+  const handshakeTimeoutMs =
+    opts.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
 
-  // Create session
-  const result = await session.connection.newSession({
-    cwd: opts.cwd,
-    mcpServers: [],
-  });
-  session.sessionId = result.sessionId;
+  try {
+    await Promise.race([
+      (async () => {
+        // Initialize
+        await session.connection.initialize({
+          protocolVersion: acp.PROTOCOL_VERSION,
+          clientCapabilities: {},
+          clientInfo: { name: "autoloop", version: "0.1.0" },
+        });
 
-  // Optionally set mode/model
-  if (opts.agentName && provider.supportsSessionMode) {
-    await session.connection.setSessionMode({
-      sessionId: session.sessionId,
-      modeId: opts.agentName,
+        // Create session
+        const result = await session.connection.newSession({
+          cwd: opts.cwd,
+          mcpServers: [],
+        });
+        session.sessionId = result.sessionId;
+
+        // Optionally set mode/model
+        if (opts.agentName && provider.supportsSessionMode) {
+          await session.connection.setSessionMode({
+            sessionId: session.sessionId,
+            modeId: opts.agentName,
+          });
+        }
+        if (opts.modelId && provider.supportsSessionModel) {
+          await session.connection.unstable_setSessionModel({
+            sessionId: session.sessionId,
+            modelId: opts.modelId,
+          });
+        }
+      })(),
+      rejectAfter(
+        handshakeTimeoutMs,
+        `ACP handshake with "${opts.command}" timed out after ${handshakeTimeoutMs}ms`,
+      ),
+      session.closed.then(({ code, signal }) => {
+        const stderr = session.stderrBuffer.trim();
+        const detail = stderr ? `\n${stderr}` : "";
+        throw new Error(
+          `${provider.crashLabel} ("${opts.command}") exited during the ACP handshake: code=${code} signal=${signal}${detail}`,
+        );
+      }),
+    ]);
+  } catch (err) {
+    await terminateAcpSession(session).catch(() => {
+      /* best-effort */
     });
-  }
-  if (opts.modelId && provider.supportsSessionModel) {
-    await session.connection.unstable_setSessionModel({
-      sessionId: session.sessionId,
-      modelId: opts.modelId,
-    });
+    throw err;
   }
 
   return session;
@@ -349,6 +378,13 @@ async function sendAcpPromptOnce(
       error: String(err),
     };
   }
+}
+
+function rejectAfter(ms: number, message: string): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    timer.unref?.();
+  });
 }
 
 export async function terminateAcpSession(session: AcpSession): Promise<void> {

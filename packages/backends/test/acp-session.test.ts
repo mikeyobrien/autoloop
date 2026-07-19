@@ -58,7 +58,7 @@ vi.mock("@agentclientprotocol/sdk", () => ({
 describe("initAcpSession", () => {
   it("spawns child with detached: true for process group cleanup", async () => {
     const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
-    await initAcpSession({
+    const session = await initAcpSession({
       command: "kiro-cli",
       args: ["--acp"],
       cwd: "/tmp",
@@ -70,6 +70,76 @@ describe("initAcpSession", () => {
       ["--acp"],
       expect.objectContaining({ detached: true }),
     );
+    expect(session.sessionId).toBe("test-session");
+  });
+
+  it("times out a wedged handshake and reaps the child", async () => {
+    const sdk = await import("@agentclientprotocol/sdk");
+    const Connection = sdk.ClientSideConnection as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+    Connection.mockImplementationOnce(() => ({
+      initialize: vi.fn().mockImplementation(() => new Promise(() => {})),
+      cancel: vi.fn(),
+    }));
+
+    try {
+      const pending = initAcpSession({
+        command: "wedged-acp",
+        args: [],
+        cwd: "/tmp",
+        trustAllTools: true,
+        handshakeTimeoutMs: 30,
+      });
+
+      await expect(pending).rejects.toThrow(
+        'ACP handshake with "wedged-acp" timed out after 30ms',
+      );
+      const child = spawnFn.mock.results.at(-1)?.value as ChildProcess;
+      expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+      expect(child.killed).toBe(true);
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
+
+  it("rejects immediately when the child exits during the handshake", async () => {
+    const sdk = await import("@agentclientprotocol/sdk");
+    const Connection = sdk.ClientSideConnection as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+    Connection.mockImplementationOnce(() => ({
+      initialize: vi.fn().mockImplementation(() => new Promise(() => {})),
+      cancel: vi.fn(),
+    }));
+
+    try {
+      const pending = initAcpSession({
+        command: "crashing-acp",
+        args: [],
+        cwd: "/tmp",
+        trustAllTools: true,
+        handshakeTimeoutMs: 10_000,
+      });
+      const child = spawnFn.mock.results.at(-1)?.value as ChildProcess;
+      child.stderr?.push("boom: command exploded\n");
+      await new Promise((resolve) => setImmediate(resolve));
+      child.emit("close", 1, null);
+
+      const error = await pending.catch((err: unknown) => err);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain(
+        'ACP agent ("crashing-acp") exited during the ACP handshake: code=1 signal=null',
+      );
+      expect((error as Error).message).toContain("boom: command exploded");
+      expect((error as Error).message).not.toContain("timed out");
+    } finally {
+      killSpy.mockRestore();
+    }
   });
 
   it("resolves provider metadata from options and command", async () => {
