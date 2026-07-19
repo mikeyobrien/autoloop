@@ -1,6 +1,6 @@
 {
   "name": "@mobrienv/autoloop-core",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "license": "MIT",
   "description": "Pure core utilities for autoloop (events, journal, topology, config schema)",
   "type": "module",

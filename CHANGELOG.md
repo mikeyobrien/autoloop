@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-18
+
+Hardening release: six GA/1.0-blocker fixes from an adversarial reliability
+audit, all covering silent-failure and crash-recovery contract gaps.
+
+### Fixed
+- **Lifecycle-hook journal records no longer break topology routing.** `hook.output`/`hook.suspend` were misclassified as agent emissions, so any preset with a `post_iteration` hook produced a spurious `event.invalid` each iteration and reset routing to `loop.start`.
+- **Generated tool wrappers re-invoke through the Node interpreter.** Driving
+  the CLI as `node packages/cli/dist/main.js` from a checkout previously
+  produced wrappers that `/bin/sh` executed as shell (silently breaking agent
+  event emission and role routing in dev environments); published bin-shim
+  installs were unaffected.
+- **Unknown `backend.kind` values are now hard errors.** A typo (e.g. `clade-sdk`)
+  previously fell back silently to the default `claude` command backend; it now
+  fails at config resolution naming the valid kinds, at global, `--set`, and
+  per-role `backend_kind` scope. (`6931793`)
+- **`core.events_file` legacy alias works as documented.** It was permanently
+  shadowed by `core.journal_file`'s default in all three resolution sites; the
+  fallback is now consolidated into one canonical helper. (`6931793`)
+- **ACP session init can no longer hang the loop.** `initAcpSession` races the
+  handshake against a timeout and child exit (mirroring the claude-sdk/pi
+  clients) and reaps the child on failure. (`638a5e0`)
+- **CLI usage errors exit nonzero and reach the events sink.** Bad presets,
+  malformed flags, invalid inline chains, and unknown `chain`/`runs`
+  subcommands previously exited 0 with stderr-only diagnostics; they now exit
+  nonzero, and when `--events` is active a terminal error event is written so
+  external consumers get a machine-readable failure. (`1613e30`, `6c35421`,
+  `82af6c7`, `bc8db38`)
+- **Unhandled loop exceptions leave durable terminal records.** A crash inside
+  `driveLoop` now appends the terminal stop record to the journal and stops the
+  registry entry before rethrowing (previously only the ephemeral `--events`
+  stream saw the failure, leaving the registry stuck at `running`), with the
+  detail derivation guarded against unstringifiable throws. (`077936d`,
+  `bfb3639`)
+- **Resume re-resolves orphaned provisional completions.** A crash during the
+  acceptance-gate window (hung verify command, kill -9, OOM) previously caused
+  `resume` to skip past the parked `completion.provisional`, silently dropping
+  the done-claim. Resume now detects dangling provisionals and re-resolves them
+  to `accepted` or `held` (fail-closed `orphaned_crash` holds when gates cannot
+  re-run), and the recovery path is itself crash-safe. (`e9dbddf`)
+
 ## [0.9.2] - 2026-07-13
 
 Recovery note: `v0.9.0` was tagged and partially published before npm trusted publishing rejected newly added optional sync-adapter packages that are not in the root package install graph. `v0.9.1` published the root package, but `@mobrienv/autoloop-backends@0.9.1` had registry metadata without a fetchable tarball, so fresh installs failed. `v0.9.2` is the canonical public release for this feature train and adds registry tarball verification to the publish workflow.
