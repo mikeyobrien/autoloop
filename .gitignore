@@ -2,6 +2,7 @@ node_modules/
 agents.toml
 .kiro/
 dist/
+dist-bin/
 *.tsbuildinfo
 .autoloop/
 .understand-anything/
