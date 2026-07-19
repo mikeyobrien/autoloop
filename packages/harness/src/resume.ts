@@ -40,6 +40,13 @@ import type {
 export interface ResumeOptions {
   /** Additional iterations to grant beyond the resume point. */
   addIterations?: number;
+  /**
+   * Command that re-invokes the running CLI (same contract as run's
+   * selfCommand). Required for the regenerated run-dir tool wrappers: an
+   * empty value produced `if  "$@"` wrapper scripts after resume, so every
+   * post-resume emit failed with `command not found`.
+   */
+  selfCommand?: string;
   /** Backend override (parsed `-b` spec), applied via reloadLoop. */
   backendOverride?: Record<string, unknown>;
   /** Log level override (e.g. "debug" for -v). */
@@ -225,7 +232,7 @@ export function buildResumeContext(
     },
     runtime: {
       runId: record.run_id,
-      selfCommand: "",
+      selfCommand: options.selfCommand ?? "",
       promptOverride: null,
       backendOverride,
       configOverride,

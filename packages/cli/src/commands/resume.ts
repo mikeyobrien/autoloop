@@ -17,7 +17,10 @@ interface ResumeArgs {
   noResume?: boolean;
 }
 
-export async function dispatchResume(args: string[]): Promise<void> {
+export async function dispatchResume(
+  args: string[],
+  selfCmd = "",
+): Promise<void> {
   if (args.some((a) => a === "--help" || a === "-h")) {
     printResumeUsage();
     return;
@@ -85,6 +88,7 @@ export async function dispatchResume(args: string[]): Promise<void> {
   try {
     const result = await harness.resume(record, {
       addIterations: parsed.addIterations,
+      selfCommand: selfCmd,
       backendOverride: parsed.backendOverride,
       logLevel: parsed.logLevel,
       baseStateDir: stateDir,

@@ -81,7 +81,7 @@ async function dispatch(args: string[], argv: string[]): Promise<void> {
       await dispatchRun(args.slice(1), argv, bundleRoot, selfCmd);
       return;
     case "resume":
-      await dispatchResume(args.slice(1));
+      await dispatchResume(args.slice(1), selfCmd);
       return;
     case "emit": {
       if (!args[1] || args[1] === "--help" || args[1] === "-h") {
