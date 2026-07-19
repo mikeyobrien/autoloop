@@ -118,6 +118,20 @@ describe("run usage errors", () => {
     expect(result.stdout).toContain("not found in chains.toml");
   });
 
+  it("exits with the usage code for an unknown chain subcommand", () => {
+    const result = cli("chain", "frobnicate-ga3");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("unknown chain subcommand");
+  });
+
+  it("exits with the usage code for an unknown runs subcommand", () => {
+    const result = cli("runs", "frobnicate-ga3");
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("Unknown runs subcommand");
+  });
+
   it("prints the version and exits successfully", () => {
     const result = cli("--version");
 

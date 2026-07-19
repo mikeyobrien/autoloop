@@ -1,5 +1,6 @@
 import { buildChainPlan, renderChainPlan } from "../chains/dry-run.js";
 import * as chains from "../chains.js";
+import { fail } from "../cli/fail.js";
 
 export async function dispatchChain(
   args: string[],
@@ -60,11 +61,20 @@ export async function dispatchChain(
       return true;
     }
     default:
-      console.log("Usage:");
-      console.log("  autoloop chain list [project-dir]");
-      console.log(
+      if (sub === "" || sub === "--help" || sub === "-h") {
+        console.log("Usage:");
+        console.log("  autoloop chain list [project-dir]");
+        console.log(
+          "  autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]",
+        );
+        return true;
+      }
+      fail([
+        `error: unknown chain subcommand \`${sub}\``,
+        "Usage:",
+        "  autoloop chain list [project-dir]",
         "  autoloop chain run <name> [project-dir] [prompt...] [--dry-run] [--json]",
-      );
+      ]);
       return true;
   }
 }

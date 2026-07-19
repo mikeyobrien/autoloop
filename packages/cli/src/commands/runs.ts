@@ -29,6 +29,7 @@ export function dispatchRuns(args: string[]): void {
 
   console.log(`Unknown runs subcommand: ${sub}`);
   printRunsUsage();
+  process.exitCode = 1;
 }
 
 // Mark runs still recorded "running" whose OS process is gone as "stopped" — the rot
