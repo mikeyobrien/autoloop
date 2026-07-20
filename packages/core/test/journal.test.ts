@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { writeChainStepStateLayout } from "../src/chain-state.js";
 import { readAllJournals, readRunJournal } from "../src/journal.js";
 
 const tmpDir = join(import.meta.dirname, "__tmp_journal_test__");
@@ -59,6 +60,35 @@ describe("readAllJournals", () => {
     const lines = readAllJournals(tmpDir);
     expect(lines).toHaveLength(0);
   });
+
+  it("merges journals from a recorded default child under a custom parent", () => {
+    const parentStateDirRel = join(".ralph", "autoloop");
+    const stepDir = join(tmpDir, "chains", "chain-mixed", "step-1");
+    const childStateDir = join(stepDir, ".autoloop");
+    const worktreeStateDir = join(
+      childStateDir,
+      "worktrees",
+      "child-wt",
+      "tree",
+      ".autoloop",
+    );
+    mkdirSync(worktreeStateDir, { recursive: true });
+    writeChainStepStateLayout(stepDir, ".autoloop");
+    writeFileSync(
+      join(childStateDir, "journal.jsonl"),
+      `${journalLine("child-direct", "loop.start", "2026-01-01T00:00:01Z")}\n`,
+    );
+    writeFileSync(
+      join(worktreeStateDir, "journal.jsonl"),
+      `${journalLine("child-wt", "loop.start", "2026-01-01T00:00:02Z")}\n`,
+    );
+
+    const lines = readAllJournals(tmpDir, parentStateDirRel);
+    expect(lines.map((line) => JSON.parse(line).run)).toEqual([
+      "child-direct",
+      "child-wt",
+    ]);
+  });
 });
 
 describe("readRunJournal", () => {
@@ -77,7 +107,7 @@ describe("readRunJournal", () => {
 
   it("reads journal from worktree path", () => {
     // stateDir basename is used to find the journal inside the worktree
-    const stateDirRelativePath = tmpDir.split("/").pop()!;
+    const stateDirRelativePath = basename(tmpDir);
     const wtDir = join(
       tmpDir,
       "worktrees",
@@ -108,7 +138,7 @@ describe("readRunJournal", () => {
       `${journalLine("dual-run", "loop.start", "2026-01-01T00:00:00Z")}\n`,
     );
 
-    const stateDirRelativePath = tmpDir.split("/").pop()!;
+    const stateDirRelativePath = basename(tmpDir);
     const wtDir = join(
       tmpDir,
       "worktrees",
@@ -145,7 +175,7 @@ describe("readAllJournals with worktree journals", () => {
     );
 
     // Worktree journal
-    const stateDirRelativePath = tmpDir.split("/").pop()!;
+    const stateDirRelativePath = basename(tmpDir);
     const wtDir = join(
       tmpDir,
       "worktrees",

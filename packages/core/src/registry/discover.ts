@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
+import { discoverChainStepStateLayouts } from "../chain-state.js";
 import { DEFAULT_STATE_DIR } from "../config-schema.js";
 import { readRegistry } from "./read.js";
 import type { RunRecord } from "./types.js";
@@ -17,31 +18,28 @@ function listDirs(dir: string): string[] {
 
 /**
  * Discover chain and worktree registry files under the given state directory.
- * Walks chains/{id}/step-{n}/<stateDirRel>/ for registry.jsonl files,
- * including worktree-isolated registries nested further below.
+ * Each step uses its recorded child state layout. Legacy steps without metadata
+ * use the default child root and parent layout as bounded fallbacks.
  */
 export function discoverChainRegistries(
   stateDir: string,
   stateDirRel: string = DEFAULT_STATE_DIR,
 ): string[] {
-  const results: string[] = [];
-  const chainsDir = join(stateDir, "chains");
-  for (const chainDir of listDirs(chainsDir)) {
-    for (const stepDir of listDirs(chainDir)) {
-      if (!stepDir.includes("step-")) continue;
-      const stepState = join(stepDir, stateDirRel);
-      // Direct chain step registry
-      const regPath = join(stepState, "registry.jsonl");
-      if (existsSync(regPath)) results.push(regPath);
-      // Worktree-isolated registries under this step
-      const wtDir = join(stepState, "worktrees");
-      for (const wtRunDir of listDirs(wtDir)) {
-        const wtReg = join(wtRunDir, "tree", stateDirRel, "registry.jsonl");
-        if (existsSync(wtReg)) results.push(wtReg);
-      }
+  const results = new Set<string>();
+  for (const layout of discoverChainStepStateLayouts(stateDir, stateDirRel)) {
+    const regPath = join(layout.stateDir, "registry.jsonl");
+    if (existsSync(regPath)) results.add(regPath);
+
+    for (const wtRunDir of listDirs(join(layout.stateDir, "worktrees"))) {
+      const treeDir = join(wtRunDir, "tree");
+      const wtState = isAbsolute(layout.stateDirRel)
+        ? layout.stateDirRel
+        : join(treeDir, layout.stateDirRel);
+      const wtReg = join(wtState, "registry.jsonl");
+      if (existsSync(wtReg)) results.add(wtReg);
     }
   }
-  return results;
+  return [...results];
 }
 
 /**

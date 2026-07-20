@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   generateCompactId,
   generateReadableId,
   joinCsv,
   jsonField,
   uniqueGeneratedId,
+  writeChainStepStateLayout,
 } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { presetCategory } from "@mobrienv/autoloop-core/isolation/resolve";
@@ -15,6 +16,7 @@ import {
   extractTopic,
   readLines,
 } from "@mobrienv/autoloop-core/journal";
+import { tryResolveGitRoot } from "@mobrienv/autoloop-core/worktree";
 import * as harness from "@mobrienv/autoloop-harness";
 import { checkBudget, checkPlanBudget, defaultBudget } from "./budget.js";
 import { loadBudget, parseInlineChain } from "./load.js";
@@ -93,7 +95,7 @@ export async function runChain(
       ", " +
       jsonField("outcome", result.outcome) +
       (result.failedReason
-        ? ", " + jsonField("failed_reason", result.failedReason)
+        ? `, ${jsonField("failed_reason", result.failedReason)}`
         : ""),
   );
 
@@ -205,6 +207,12 @@ async function runSteps(
     completed,
     runOptions.prompt ?? null,
   );
+  const stepConfig = config.loadProject(presetDir, {
+    presetName: basename(presetDir),
+    workDir: tryResolveGitRoot(stepWorkDir) ?? stepWorkDir,
+    cliOverride: runOptions.configOverride,
+  });
+  writeChainStepStateLayout(stepWorkDir, config.stateDirRel(stepConfig));
   appendChainEvent(
     journalFile,
     chainRunId,

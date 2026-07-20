@@ -9,7 +9,8 @@ import {
   renameSync,
   writeSync,
 } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
+import { discoverChainStepStateLayouts } from "./chain-state.js";
 import { decodeEvent } from "./events/decode.js";
 import { encodeEvent } from "./events/encode.js";
 import {
@@ -174,50 +175,60 @@ export function latestIterationForRun(path: string, runId: string): string {
   return current;
 }
 
-/**
- * Merge journals from the top-level file, per-run journals under runs/,
- * and worktree journals under worktrees/<id>/tree/<stateDirRel>/.
- * Returns all lines sorted by timestamp.
- */
-export function readAllJournals(
+function appendStateJournals(
+  allLines: string[],
   baseStateDir: string,
-  stateDirRel: string = basename(baseStateDir),
-): string[] {
-  const allLines: string[] = [];
-
-  // Top-level journal
+  stateDirRel: string,
+): void {
   const topLevel = join(baseStateDir, "journal.jsonl");
   if (existsSync(topLevel)) allLines.push(...readLines(topLevel));
 
-  // Per-run journals under runs/*/journal.jsonl
   const runsDir = join(baseStateDir, "runs");
   if (existsSync(runsDir)) {
-    const entries = readdirSync(runsDir, { withFileTypes: true });
-    for (const entry of entries) {
+    for (const entry of readdirSync(runsDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const runJournal = join(runsDir, entry.name, "journal.jsonl");
       if (existsSync(runJournal)) allLines.push(...readLines(runJournal));
     }
   }
 
-  // Worktree journals under worktrees/<id>/tree/<stateDirRel>/journal.jsonl.
-  // stateDirRel mirrors the main relative state dir inside the worktree tree
-  // (e.g. ".ralph/autoloop"); it defaults to the base dir's leaf name so callers
-  // that only know the absolute state dir keep working for single-segment roots.
-  const wtDir = join(baseStateDir, "worktrees");
-  if (existsSync(wtDir)) {
-    const entries = readdirSync(wtDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const wtJournal = join(
-        wtDir,
-        entry.name,
-        "tree",
-        stateDirRel,
-        "journal.jsonl",
-      );
-      if (existsSync(wtJournal)) allLines.push(...readLines(wtJournal));
-    }
+  for (const entry of readdirDirs(join(baseStateDir, "worktrees"))) {
+    const treeDir = join(baseStateDir, "worktrees", entry, "tree");
+    const wtStateDir = isAbsolute(stateDirRel)
+      ? stateDirRel
+      : join(treeDir, stateDirRel);
+    const wtJournal = join(wtStateDir, "journal.jsonl");
+    if (existsSync(wtJournal)) allLines.push(...readLines(wtJournal));
+  }
+}
+
+function readdirDirs(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Merge journals from the top-level state, its isolated runs, and bounded chain
+ * step roots. Chain children use recorded state layouts with legacy fallbacks.
+ */
+export function readAllJournals(
+  baseStateDir: string,
+  stateDirRel: string = basename(baseStateDir),
+): string[] {
+  const allLines: string[] = [];
+  appendStateJournals(allLines, baseStateDir, stateDirRel);
+
+  for (const layout of discoverChainStepStateLayouts(
+    baseStateDir,
+    stateDirRel,
+  )) {
+    appendStateJournals(allLines, layout.stateDir, layout.stateDirRel);
   }
 
   // Sort by timestamp field if present

@@ -9,6 +9,7 @@ let writeFileCalls: Array<[string, string]> = [];
 
 vi.mock("@mobrienv/autoloop-core/config", () => ({
   loadProject: vi.fn(() => ({})),
+  stateDirRel: vi.fn(() => ".autoloop"),
   get: vi.fn(() => "compact"),
   stateDirPath: vi.fn(() => "/tmp/test-chain-state"),
   resolveJournalFile: vi.fn(() => "/tmp/test-journal"),

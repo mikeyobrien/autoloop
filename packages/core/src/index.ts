@@ -7,6 +7,7 @@
  */
 
 export * from "./bundled-presets.js";
+export * from "./chain-state.js";
 export * from "./color.js";
 export * from "./duration.js";
 export * from "./events/decode.js";

@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeChainStepStateLayout } from "@mobrienv/autoloop-core";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { healthSummary } from "../../src/loops/health.js";
@@ -45,6 +46,7 @@ function writeJsonl(path: string, records: RunRecord[]): void {
   );
 }
 
+const PARENT_STATE_DIR_REL = join(".ralph", "autoloop");
 let stateDir: string;
 
 beforeEach(() => {
@@ -70,6 +72,10 @@ function writeStepRegistry(records: RunRecord[]): void {
     ".autoloop",
   );
   mkdirSync(stepStateDir, { recursive: true });
+  writeChainStepStateLayout(
+    join(stateDir, "chains", "chain-inline-1", "step-1"),
+    ".autoloop",
+  );
   writeJsonl(join(stepStateDir, "registry.jsonl"), records);
 }
 
@@ -77,7 +83,7 @@ describe("chain child registry visibility in loops surfaces", () => {
   it("lists an active chain child run even when the root registry is empty", () => {
     writeStepRegistry([makeRecord()]);
 
-    const result = listRuns(stateDir, false);
+    const result = listRuns(stateDir, false, PARENT_STATE_DIR_REL);
 
     expect(result).toContain("chain-child-run-001");
     expect(result).not.toContain("No active runs.");
@@ -86,7 +92,7 @@ describe("chain child registry visibility in loops surfaces", () => {
   it("shows details for a chain child run by prefix", () => {
     writeStepRegistry([makeRecord()]);
 
-    const result = showRun(stateDir, "chain-child-run");
+    const result = showRun(stateDir, "chain-child-run", PARENT_STATE_DIR_REL);
 
     expect(result).toContain("Run:");
     expect(result).toContain("chain-child-run-001");
@@ -97,7 +103,7 @@ describe("chain child registry visibility in loops surfaces", () => {
   it("includes an active chain child run in health output", () => {
     writeStepRegistry([makeRecord()]);
 
-    const result = healthSummary(stateDir, false);
+    const result = healthSummary(stateDir, false, PARENT_STATE_DIR_REL);
 
     expect(result).toContain("All clear. 1 active");
     expect(result).not.toContain("0 active");
@@ -113,7 +119,7 @@ describe("chain child registry visibility in loops surfaces", () => {
     ]);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
-    await watchRun(stateDir, "chain-child-run");
+    await watchRun(stateDir, "chain-child-run", PARENT_STATE_DIR_REL);
 
     const output = logSpy.mock.calls.flat().join("\n");
     expect(output).toContain("[watch] Run already completed.");
