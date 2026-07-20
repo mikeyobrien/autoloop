@@ -88,7 +88,7 @@ describe("runFinishNotification", () => {
     const stdinOut = join(dir, "stdin.out");
     writeFileSync(
       join(dir, "autoloops.toml"),
-      `[notify]\ncommand = "env | grep ^AUTOLOOP_ > ${envOut}; cat > ${stdinOut}"\n`,
+      `[notify]\ncommand = "env > ${envOut}; cat > ${stdinOut}"\n`,
     );
 
     const result = runFinishNotification(
@@ -118,7 +118,7 @@ describe("runFinishNotification", () => {
     expect(events[0]?.run).toBe("run-notify-1");
     if (events[0]?.shape === "fields") {
       expect(events[0].fields.stop_reason).toBe("completed");
-      expect(events[0].fields.command).toContain("env | grep ^AUTOLOOP_");
+      expect(events[0].fields.command).toContain("env >");
     } else {
       throw new Error("expected fields event");
     }

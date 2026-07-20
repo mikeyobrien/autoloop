@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,6 +21,15 @@ export const PRESET_FIXTURE_DIR = resolve(
 );
 
 let buildEnsured = false;
+const tempProjects = new Set<string>();
+
+export interface CliResult {
+  stdout: string;
+  stderr: string;
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  spawnError?: string;
+}
 
 export function ensureBuild(): void {
   if (
@@ -47,6 +57,7 @@ export function ensureBuild(): void {
 
 export function makeTempProject(name: string): string {
   const dir = mkdtempSync(join(tmpdir(), `autoloop-${name}-`));
+  tempProjects.add(dir);
   cpSync(PRESET_FIXTURE_DIR, dir, { recursive: true });
   const configPath = join(dir, "autoloops.toml");
   let config = readFileSync(configPath, "utf-8");
@@ -59,6 +70,11 @@ backend.args = [${JSON.stringify(MOCK_BACKEND)}]
 `;
   writeFileSync(configPath, config, "utf-8");
   return dir;
+}
+
+export function cleanupTempProjects(): void {
+  for (const dir of tempProjects) rmSync(dir, { recursive: true, force: true });
+  tempProjects.clear();
 }
 
 export function readText(path: string): string {
@@ -90,7 +106,7 @@ export function runCli(
   args: string[],
   env: Record<string, string>,
   cwd?: string,
-): { stdout: string; stderr: string; status: number | null } {
+): CliResult {
   const res = spawnSync("node", [DIST_ENTRY, ...args], {
     cwd: cwd || inferCwd(args),
     encoding: "utf-8",
@@ -101,7 +117,22 @@ export function runCli(
     stdout: res.stdout || "",
     stderr: res.stderr || "",
     status: res.status,
+    signal: res.signal,
+    spawnError: res.error?.message,
   };
+}
+
+export function expectCliStatus(result: CliResult, expected: number): void {
+  if (result.status === expected) return;
+  throw new Error(
+    [
+      `Expected CLI status ${expected}, received ${String(result.status)}.`,
+      `signal: ${result.signal ?? "none"}`,
+      `spawn error: ${result.spawnError ?? "none"}`,
+      `stdout: ${result.stdout || "<empty>"}`,
+      `stderr: ${result.stderr || "<empty>"}`,
+    ].join("\n"),
+  );
 }
 
 export function inspectCli(

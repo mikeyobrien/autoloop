@@ -120,14 +120,13 @@ export default defineConfig({
     setupFiles: ["./test/setup/hermetic-env.ts"],
     env: { TZ: "UTC" },
     // Integration tests under test/worktree and test/integration spawn git/node
-    // subprocesses. Cap worker pool so subprocess-heavy tests don't starve each
-    // other; bump testTimeout to absorb spiky CI/load.
+    // subprocesses. Vitest's default pool is forks, so use the pool-agnostic
+    // worker cap rather than a threads-only option that default runs ignore.
+    // Keep file-level parallelism for ordinary unit tests.
     testTimeout: 60000,
-    poolOptions: {
-      threads: {
-        maxThreads: 4,
-      },
-    },
+    pool: "forks",
+    maxWorkers: 4,
+    fileParallelism: true,
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts", "packages/*/src/**/*.ts"],
