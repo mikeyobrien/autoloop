@@ -1,5 +1,9 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import {
+  flushStreamLog,
+  pushStreamLogLine,
+  resetStreamLog,
+} from "./incremental-stream-log.js";
 
 export interface PiClientOptions {
   command: string;
@@ -43,8 +47,13 @@ export interface PiSession {
   nextRequestId: number;
   pending: Map<string, PendingResponse>;
   agentEndWaiters: ((event: PiRpcMessage) => void)[];
-  /** Raw RPC lines for the in-flight prompt, flushed to streamLogPath. */
+  /** True only while sendPiPrompt owns incoming RPC records for this prompt. */
+  streamLogActive: boolean;
+  /** Complete raw RPC records waiting for the next incremental flush. */
   streamLines: string[];
+  streamBufferedBytes: number;
+  streamLogStarted: boolean;
+  streamLastFlushAt: number;
   /** Where to persist the raw RPC stream for the current prompt, if anywhere. */
   streamLogPath?: string;
 }
@@ -120,7 +129,11 @@ export async function initPiSession(opts: PiClientOptions): Promise<PiSession> {
     nextRequestId: 0,
     pending: new Map(),
     agentEndWaiters: [],
+    streamLogActive: false,
     streamLines: [],
+    streamBufferedBytes: 0,
+    streamLogStarted: false,
+    streamLastFlushAt: Date.now(),
   };
 
   if (child.stderr) {
@@ -173,7 +186,8 @@ export async function sendPiPrompt(
 ): Promise<PiPromptResult> {
   session.textBuffer = "";
   session.lastError = "";
-  session.streamLines = [];
+  resetStreamLog(session);
+  session.streamLogActive = true;
 
   let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -222,6 +236,7 @@ export async function sendPiPrompt(
     return { output: session.textBuffer, timedOut: false, error: String(err) };
   } finally {
     flushStreamLog(session);
+    session.streamLogActive = false;
   }
 }
 
@@ -384,7 +399,7 @@ function finishPrompt(session: PiSession, end: PiRpcMessage): PiPromptResult {
  * responses carry an `id`, events do not.
  */
 function handlePiLine(session: PiSession, line: string): void {
-  session.streamLines.push(line);
+  if (session.streamLogActive) pushStreamLogLine(session, line);
 
   let msg: PiRpcMessage;
   try {
@@ -474,21 +489,6 @@ function rejectAfter(ms: number, message: string): Promise<never> {
     const timer = setTimeout(() => reject(new Error(message)), ms);
     timer.unref?.();
   });
-}
-
-/**
- * Persist the raw RPC traffic of the finished prompt — the pi equivalent of
- * the journal's backend output, but with full tool/thinking event fidelity.
- */
-function flushStreamLog(session: PiSession): void {
-  const path = session.streamLogPath;
-  if (!path || session.streamLines.length === 0) return;
-  try {
-    writeFileSync(path, `${session.streamLines.join("\n")}\n`, "utf-8");
-  } catch {
-    /* logging must never fail the iteration */
-  }
-  session.streamLines = [];
 }
 
 function crashError(

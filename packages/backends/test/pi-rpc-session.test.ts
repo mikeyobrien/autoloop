@@ -33,12 +33,15 @@ vi.mock("node:child_process", () => {
   function createMockChild(): ChildProcess {
     const child = new EventEmitter() as MockChild;
     child.sent = [];
-    child.autoRespond = (globalThis as any).__piAutoRespond ?? true;
+    child.autoRespond =
+      ((globalThis as Record<string, unknown>).__piAutoRespond as
+        | boolean
+        | undefined) ?? true;
     child.failCommands = new Set();
     child.responseData = {};
     child.pushLine = (msg) => {
       const line = typeof msg === "string" ? msg : JSON.stringify(msg);
-      (child.stdout as any).push(`${line}\n`);
+      (child.stdout as { push: (chunk: string) => void }).push(`${line}\n`);
     };
     child.stdin = new Writable({
       write(chunk: Buffer, _e: unknown, cb: () => void) {
@@ -80,7 +83,7 @@ vi.mock("node:child_process", () => {
   return {
     spawn: vi.fn(() => {
       const child = createMockChild();
-      (globalThis as any).__lastPiMockChild = child;
+      (globalThis as Record<string, unknown>).__lastPiMockChild = child;
       return child;
     }),
   };
@@ -101,7 +104,8 @@ async function startSession(
     abortGraceMs: 20,
     ...opts,
   });
-  lastChild = (globalThis as any).__lastPiMockChild as MockChild;
+  lastChild = (globalThis as Record<string, unknown>)
+    .__lastPiMockChild as MockChild;
   return session;
 }
 
@@ -132,10 +136,11 @@ describe("initPiSession", () => {
 
   it("rejects when the process dies before the handshake completes", async () => {
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
-    (globalThis as any).__piAutoRespond = false;
+    (globalThis as Record<string, unknown>).__piAutoRespond = false;
     try {
       const pending = initPiSession({ command: "pi", args: [], cwd: "/tmp" });
-      const child = (globalThis as any).__lastPiMockChild as MockChild;
+      const child = (globalThis as Record<string, unknown>)
+        .__lastPiMockChild as MockChild;
       child.stderr?.push("boom: command exploded\n");
       await settle();
       child.emit("close", 1, null);
@@ -143,14 +148,14 @@ describe("initPiSession", () => {
       await expect(pending).rejects.toThrow(/pi exited unexpectedly: code=1/);
       await expect(pending).rejects.toThrow(/boom: command exploded/);
     } finally {
-      (globalThis as any).__piAutoRespond = true;
+      (globalThis as Record<string, unknown>).__piAutoRespond = true;
       killSpy.mockRestore();
     }
   });
 
   it("times out a wedged handshake and reaps the orphan process", async () => {
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
-    (globalThis as any).__piAutoRespond = false;
+    (globalThis as Record<string, unknown>).__piAutoRespond = false;
     try {
       const pending = initPiSession({
         command: "pi",
@@ -160,10 +165,11 @@ describe("initPiSession", () => {
       });
 
       await expect(pending).rejects.toThrow("pi RPC handshake timed out");
-      const child = (globalThis as any).__lastPiMockChild as MockChild;
+      const child = (globalThis as Record<string, unknown>)
+        .__lastPiMockChild as MockChild;
       expect(child.kill).toHaveBeenCalledWith("SIGTERM");
     } finally {
-      (globalThis as any).__piAutoRespond = true;
+      (globalThis as Record<string, unknown>).__piAutoRespond = true;
       killSpy.mockRestore();
     }
   });
@@ -386,7 +392,7 @@ describe("RPC framing", () => {
     const pending = sendPiPrompt(session, "framing", 5000);
     await settle();
 
-    const stdout = lastChild.stdout as any;
+    const stdout = lastChild.stdout as { push: (chunk: string) => void };
     stdout.push('{"type":"message_update","assistantMessageEvent"');
     stdout.push(':{"type":"text_delta","delta":"split"}}\r\n');
     stdout.push("not json at all\n");
@@ -456,22 +462,49 @@ describe("getPiSessionStats", () => {
 });
 
 describe("stream logging", () => {
-  it("persists the raw RPC traffic of a prompt to the stream log path", async () => {
+  it("flushes complete size-batched records mid-prompt without duplication", async () => {
     const session = await startSession();
-    const logPath = join(tmpdir(), `pi-stream-test-${process.pid}.jsonl`);
+    const logPath = join(
+      tmpdir(),
+      `pi-stream-test-${process.pid}-${Date.now()}.jsonl`,
+    );
+    const delta = {
+      type: "message_update",
+      assistantMessageEvent: {
+        type: "text_delta",
+        delta: "x".repeat(64 * 1024),
+      },
+    };
+    const end = { type: "agent_end", messages: [] };
 
     const pending = runPiIteration(session, "log me", 5000, logPath);
     await settle();
-    lastChild.pushLine({
-      type: "message_update",
-      assistantMessageEvent: { type: "text_delta", delta: "OK" },
-    });
-    lastChild.pushLine({ type: "agent_end", messages: [] });
-    await pending;
+    lastChild.pushLine(delta);
+    await settle();
 
-    const logged = readFileSync(logPath, "utf-8");
-    expect(logged).toContain('"type":"agent_end"');
-    expect(logged).toContain('"delta":"OK"');
+    const midPrompt = readFileSync(logPath, "utf-8");
+    expect(midPrompt.endsWith("\n")).toBe(true);
+    const midRecords = midPrompt.trim().split("\n").map(JSON.parse);
+    expect(midRecords).toEqual([
+      {
+        type: "response",
+        id: "req-2",
+        command: "prompt",
+        success: true,
+      },
+      delta,
+    ]);
+
+    lastChild.pushLine(end);
+    await pending;
+    const finalLog = readFileSync(logPath, "utf-8");
+    const finalRecords = finalLog.trim().split("\n").map(JSON.parse);
+    expect(finalRecords).toEqual([...midRecords, end]);
+
+    session.streamLastFlushAt = 0;
+    lastChild.responseData.get_session_stats = { tokens: { total: 1 } };
+    await getPiSessionStats(session);
+    expect(readFileSync(logPath, "utf-8")).toBe(finalLog);
   });
 });
 

@@ -1,4 +1,3 @@
-import { writeFileSync } from "node:fs";
 import type {
   HookInput,
   HookJSONOutput,
@@ -13,6 +12,11 @@ import {
   commandFloorDecision,
   extractCommandFromToolInput,
 } from "./command-risk.js";
+import {
+  flushStreamLog,
+  pushStreamLogLine,
+  resetStreamLog,
+} from "./incremental-stream-log.js";
 
 export interface ClaudeSdkClientOptions {
   /** Path to the Claude Code executable when it isn't the bare `claude` on PATH. */
@@ -77,8 +81,11 @@ export interface ClaudeSdkSession {
   /** Final result message of the last prompt — the usage/cost telemetry source. */
   lastResult?: SDKResultMessage;
   closed: boolean;
-  /** Raw SDK messages for the in-flight prompt, flushed to streamLogPath. */
+  /** Complete raw SDK records waiting for the next incremental flush. */
   streamLines: string[];
+  streamBufferedBytes: number;
+  streamLogStarted: boolean;
+  streamLastFlushAt: number;
   /** Where to persist the raw message stream for the current prompt, if anywhere. */
   streamLogPath?: string;
 }
@@ -202,6 +209,9 @@ export async function initClaudeSdkSession(
     lastError: "",
     closed: false,
     streamLines: [],
+    streamBufferedBytes: 0,
+    streamLogStarted: false,
+    streamLastFlushAt: Date.now(),
   };
 
   // Handshake: the SDK's control-channel initialize round trip confirms the
@@ -285,7 +295,7 @@ export async function sendClaudeSdkPrompt(
   session.textBuffer = "";
   session.lastError = "";
   session.lastResult = undefined;
-  session.streamLines = [];
+  resetStreamLog(session);
   session.pendingSteers = 0;
   session.turnActive = true;
 
@@ -470,10 +480,12 @@ function userMessage(text: string): SDKUserMessage {
 }
 
 function handleMessage(session: ClaudeSdkSession, msg: SDKMessage): void {
-  try {
-    session.streamLines.push(JSON.stringify(msg));
-  } catch {
-    /* unserializable message — skip the log line */
+  if (session.turnActive) {
+    try {
+      pushStreamLogLine(session, JSON.stringify(msg));
+    } catch {
+      /* unserializable message — skip the log line */
+    }
   }
 
   if (msg.type === "assistant") {
@@ -535,20 +547,4 @@ function rejectAfter(ms: number, message: string): Promise<never> {
     const timer = setTimeout(() => reject(new Error(message)), ms);
     timer.unref?.();
   });
-}
-
-/**
- * Persist the raw SDK message traffic of the finished prompt — the claude-sdk
- * equivalent of the journal's backend output, but with full tool/thinking
- * event fidelity.
- */
-function flushStreamLog(session: ClaudeSdkSession): void {
-  const path = session.streamLogPath;
-  if (!path || session.streamLines.length === 0) return;
-  try {
-    writeFileSync(path, `${session.streamLines.join("\n")}\n`, "utf-8");
-  } catch {
-    /* logging must never fail the iteration */
-  }
-  session.streamLines = [];
 }

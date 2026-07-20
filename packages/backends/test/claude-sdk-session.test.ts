@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -489,20 +489,42 @@ describe("runClaudeSdkIteration", () => {
     });
   });
 
-  it("persists the raw message stream to the log path", async () => {
+  it("flushes complete records mid-prompt and preserves exact final content", async () => {
     const session = await startSession();
     const logPath = join(
       tmpdir(),
       `claude-stream-test-${process.pid}-${Date.now()}.jsonl`,
     );
-    const pending = runClaudeSdkIteration(session, "go", 5000, logPath);
-    await settle();
-    lastQuery.emit(assistantMsg("hi"));
-    lastQuery.emit(resultMsg());
-    await pending;
-    const lines = readFileSync(logPath, "utf-8").trim().split("\n");
-    const types = lines.map((l) => (JSON.parse(l) as { type: string }).type);
-    expect(types).toEqual(["assistant", "result"]);
+    const first = assistantMsg("first");
+    const second = assistantMsg("second");
+    const result = resultMsg();
+    writeFileSync(logPath, "stale prompt data\n", "utf-8");
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+
+    try {
+      const pending = runClaudeSdkIteration(session, "go", 5000, logPath);
+      await settle();
+      lastQuery.emit(first);
+      await settle();
+
+      now.mockReturnValue(1_250);
+      lastQuery.emit(second);
+      await settle();
+
+      const midPrompt = readFileSync(logPath, "utf-8");
+      expect(midPrompt).toBe(
+        `${JSON.stringify(first)}\n${JSON.stringify(second)}\n`,
+      );
+      for (const line of midPrompt.trim().split("\n")) JSON.parse(line);
+
+      lastQuery.emit(result);
+      await pending;
+      expect(readFileSync(logPath, "utf-8")).toBe(
+        `${JSON.stringify(first)}\n${JSON.stringify(second)}\n${JSON.stringify(result)}\n`,
+      );
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 
