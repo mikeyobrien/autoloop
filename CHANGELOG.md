@@ -10,6 +10,18 @@
   compile time.
 
 ### Fixed
+- **Standalone Claude SDK runs resolve Claude Code from `PATH`.** Bun-compiled
+  binaries now pass an absolute executable path to the SDK while normal
+  Node/npm installs retain the SDK-bundled default, and missing executables
+  fail before startup with an actionable `PATH` error.
+- **Pi RPC stream logs grow linearly for long iterations.** Repeated cumulative
+  message histories are compacted from lifecycle records while preserving
+  assistant messages, thinking, tool events and results, final errors, source
+  ordering, and the terminal snapshot needed for replay.
+- **Subprocess-heavy integration tests use an effective bounded worker pool.**
+  Vitest's selected forks pool is now capped at four concurrent workers while
+  retaining file parallelism, with clearer subprocess failure diagnostics and
+  reliable temporary-project cleanup.
 - **Generated tool wrappers reliably re-invoke every CLI distribution.**
   Checkout builds now use the Node interpreter instead of asking `/bin/sh` to
   execute the ESM entry point, while standalone builds re-invoke their binary
