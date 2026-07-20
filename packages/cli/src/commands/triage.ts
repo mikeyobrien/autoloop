@@ -14,6 +14,7 @@ import { computeStats } from "./stats.js";
 
 export function triageJson(projectDir: string): string {
   const stateDir = config.stateDirPath(projectDir);
+  const stateDirRel = config.stateDirRelativePath(projectDir);
   const records = readRegistry(join(stateDir, "registry.jsonl"));
   const doctor = runDoctorChecks(projectDir);
   const failures = doctor.filter((c) => c.status === "fail");
@@ -40,10 +41,12 @@ export function triageJson(projectDir: string): string {
         doctor_failures: failures.length,
         doctor_warnings: warnings.length,
       },
-      runs: JSON.parse(listRunsJson(stateDir, false)),
-      health: JSON.parse(healthJson(stateDir)),
+      runs: JSON.parse(listRunsJson(stateDir, false, stateDirRel)),
+      health: JSON.parse(healthJson(stateDir, stateDirRel)),
       doctor: doctor,
-      stats: computeStats(records, (runId) => readRunJournal(stateDir, runId)),
+      stats: computeStats(records, (runId) =>
+        readRunJournal(stateDir, runId, stateDirRel),
+      ),
       recommended_commands: commands,
     },
     null,

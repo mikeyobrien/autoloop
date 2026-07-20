@@ -4,9 +4,9 @@ import { basename, dirname, join } from "node:path";
  * Resolve the run-scoped control directory.
  *
  * `runStateDir` is the per-run state tree:
- *   - run-scoped mode: <base>/.autoloop/runs/<run-id>/
- *   - worktree mode:   <worktree>/.autoloop/
- *   - shared mode:     <base>/.autoloop/runs/<run-id>/ (same as run-scoped)
+ *   - run-scoped mode: <base>/<state-root>/runs/<run-id>/
+ *   - worktree mode:   <worktree>/<state-root>/
+ *   - shared mode:     <base>/<state-root>/runs/<run-id>/ (same as run-scoped)
  *
  * The registry record's `state_dir` is always the right input.
  */

@@ -22,9 +22,13 @@ export {
  * Runs the registry reaper first so that stale "running" entries (PID dead)
  * are corrected before the health report is produced.
  */
-export function healthSummary(stateDir: string, verbose: boolean): string {
-  reapStaleRuns(stateDir);
-  const result = categorizeRuns(stateDir);
+export function healthSummary(
+  stateDir: string,
+  verbose: boolean,
+  stateDirRelativePath?: string,
+): string {
+  reapStaleRuns(stateDir, stateDirRelativePath);
+  const result = categorizeRuns(stateDir, stateDirRelativePath);
   return renderHealth(result, verbose);
 }
 

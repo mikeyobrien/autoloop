@@ -4,12 +4,15 @@
 // stats, verify, control) end-to-end with the mock backend, plus the default
 // standalone behavior for contrast.
 
+import { execSync, spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -130,6 +133,164 @@ describe("integration: core.state_dir is authoritative", () => {
     });
     expect(res.stdout + res.stderr).not.toMatch(/No run matching/i);
   });
+
+  it("prefers AUTOLOOP_STATE_DIR for generic management commands", () => {
+    const runtimeState = join(project, ".runtime", "state");
+    const configuredRegistry = join(
+      project,
+      CUSTOM_STATE_DIR,
+      "registry.jsonl",
+    );
+    mkdirSync(runtimeState, { recursive: true });
+    const latestLine = readFileSync(configuredRegistry, "utf-8")
+      .trim()
+      .split("\n")
+      .at(-1);
+    expect(latestLine).toBeDefined();
+    const latest = JSON.parse(latestLine ?? "");
+    const runtimeRecord = {
+      ...latest,
+      run_id: "runtime-state-only",
+      state_dir: runtimeState,
+      updated_at: new Date().toISOString(),
+    };
+    writeFileSync(
+      join(runtimeState, "registry.jsonl"),
+      `${JSON.stringify(runtimeRecord)}\n`,
+      { encoding: "utf-8", flag: "w" },
+    );
+
+    const res = runCli(["loops", "--all", "--json"], {
+      AUTOLOOP_PROJECT_DIR: project,
+      AUTOLOOP_STATE_DIR: runtimeState,
+    });
+
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("runtime-state-only");
+    expect(res.stdout).not.toContain(latest.run_id);
+  });
+});
+
+describe("integration: custom-root isolation and overrides", () => {
+  it("resumes a stopped run entirely under the custom root", () => {
+    const project = makeStateDirProject("resume", CUSTOM_STATE_DIR);
+    const configPath = join(project, "autoloops.toml");
+    writeFileSync(
+      configPath,
+      readFileSync(configPath, "utf-8").replace(
+        "event_loop.max_iterations = 5",
+        "event_loop.max_iterations = 1",
+      ),
+    );
+    const run = runCli(["run", project, "stop then resume"], {
+      MOCK_FIXTURE_PATH: join(FIXTURES_DIR, "no-completion.json"),
+    });
+    expect(run.status).toBe(0);
+    const runId = readRunId(project);
+
+    const resumed = runCli(["resume", runId, "--add-iterations", "1"], {
+      AUTOLOOP_PROJECT_DIR: project,
+      MOCK_FIXTURE_PATH: join(FIXTURES_DIR, "no-completion.json"),
+    });
+
+    expect(resumed.status).toBe(0);
+    expect(resumed.stdout).toContain(`resumed ${runId}`);
+    expect(
+      readFileSync(join(project, CUSTOM_STATE_DIR, "journal.jsonl"), "utf-8"),
+    ).toContain('"topic": "loop.resume"');
+    expect(existsSync(join(project, ".autoloop"))).toBe(false);
+  });
+
+  it("keeps a real worktree run beneath the nested custom root", () => {
+    const project = makeStateDirProject("worktree", CUSTOM_STATE_DIR);
+    execSync("git init && git add . && git commit -m init", {
+      cwd: project,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "test",
+        GIT_AUTHOR_EMAIL: "test@example.com",
+        GIT_COMMITTER_NAME: "test",
+        GIT_COMMITTER_EMAIL: "test@example.com",
+      },
+    });
+
+    const run = runCli(
+      ["run", project, "--worktree", "--keep-worktree", "nested worktree"],
+      { MOCK_FIXTURE_PATH: join(FIXTURES_DIR, "complete-success.json") },
+    );
+    expect(run.status).toBe(0);
+    const record = readLatestRecord(project);
+
+    expect(record.isolation_mode).toBe("worktree");
+    expect(record.worktree_path).toBeTruthy();
+    expect(record.state_dir).toBe(join(record.worktree_path, CUSTOM_STATE_DIR));
+    expect(record.journal_file).toBe(
+      join(record.worktree_path, CUSTOM_STATE_DIR, "journal.jsonl"),
+    );
+    expect(existsSync(record.journal_file)).toBe(true);
+    expect(existsSync(join(project, ".autoloop"))).toBe(false);
+  });
+
+  it("keeps explicit storage paths ahead of derived custom-root defaults", () => {
+    const project = makeStateDirProject("overrides", CUSTOM_STATE_DIR);
+    const configPath = join(project, "autoloops.toml");
+    writeFileSync(
+      configPath,
+      `${readFileSync(configPath, "utf-8")}core.journal_file = ".stores/journal.jsonl"\ncore.memory_file = ".stores/memory.jsonl"\ncore.tasks_file = ".stores/tasks.jsonl"\n`,
+    );
+
+    const run = runCli(["run", project, "explicit stores"], {
+      MOCK_FIXTURE_PATH: join(FIXTURES_DIR, "complete-success.json"),
+    });
+    expect(run.status).toBe(0);
+    const record = readLatestRecord(project);
+
+    expect(record.journal_file).toBe(
+      join(realpathSync(project), ".stores", "journal.jsonl"),
+    );
+    expect(existsSync(record.journal_file)).toBe(true);
+    expect(existsSync(join(project, CUSTOM_STATE_DIR, "journal.jsonl"))).toBe(
+      false,
+    );
+    expect(existsSync(join(project, ".autoloop"))).toBe(false);
+  });
+
+  it("both sync CLIs honor runtime state over configured state without network calls", () => {
+    const project = makeStateDirProject("sync", CUSTOM_STATE_DIR);
+    const runtimeState = join(project, ".runtime", "issue-sync");
+    mkdirSync(runtimeState, { recursive: true });
+    writeFileSync(
+      join(runtimeState, "issue-sync.toml"),
+      [
+        'repo = "owner/repo"',
+        'queued_label = "queued"',
+        'team = "TEAM"',
+        'project = "Project"',
+      ].join("\n"),
+    );
+    const env = {
+      ...process.env,
+      AUTOLOOP_PROJECT_DIR: project,
+      AUTOLOOP_STATE_DIR: runtimeState,
+      AUTOLOOP_CONFIG: join(project, "missing-user-config.toml"),
+      LINEAR_API_KEY: "local-test-key",
+    };
+
+    for (const cli of [
+      join(process.cwd(), "packages", "gh-sync", "dist", "cli.js"),
+      join(process.cwd(), "packages", "linear-sync", "dist", "cli.js"),
+    ]) {
+      const result = spawnSync(process.execPath, [cli, "local-path-check"], {
+        encoding: "utf-8",
+        env,
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Unknown subcommand: local-path-check");
+      expect(result.stderr).not.toContain("No issue-sync.toml found");
+    }
+    expect(existsSync(join(project, ".autoloop"))).toBe(false);
+  });
 });
 
 describe("integration: default standalone state root", () => {
@@ -156,12 +317,23 @@ describe("integration: default standalone state root", () => {
   });
 });
 
-/** Read the newest run_id from the custom-root registry. */
-function readRunId(project: string): string {
+interface RegistryRecord {
+  run_id: string;
+  isolation_mode: string;
+  worktree_path: string;
+  state_dir: string;
+  journal_file: string;
+}
+
+function readLatestRecord(project: string): RegistryRecord {
   const registry = join(project, CUSTOM_STATE_DIR, "registry.jsonl");
   const lines = readFileSync(registry, "utf-8")
     .split("\n")
-    .filter((l) => l.trim());
-  const last = JSON.parse(lines[lines.length - 1]);
-  return last.run_id as string;
+    .filter((line) => line.trim());
+  return JSON.parse(lines[lines.length - 1]) as RegistryRecord;
+}
+
+/** Read the newest run_id from the custom-root registry. */
+function readRunId(project: string): string {
+  return readLatestRecord(project).run_id;
 }

@@ -560,6 +560,47 @@ describe("dashboard /api/runs/:id/events", () => {
     expect(body.events[0].topic).toBe("loop.start");
     expect(body.events[1].topic).toBe("build.blocked");
   });
+
+  it("returns events from a nested custom-root worktree journal", async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "dashboard-nested-state-"));
+    const stateDirRelativePath = join(".ralph", "autoloop");
+    const stateDir = join(projectDir, stateDirRelativePath);
+    const registryPath = join(stateDir, "registry.jsonl");
+    const journalPath = join(stateDir, "journal.jsonl");
+    const runId = "run-wt-nested";
+    const worktreeStateDir = join(
+      stateDir,
+      "worktrees",
+      runId,
+      "tree",
+      stateDirRelativePath,
+    );
+    mkdirSync(worktreeStateDir, { recursive: true });
+    writeFileSync(registryPath, "", "utf-8");
+    writeFileSync(journalPath, "", "utf-8");
+    writeFileSync(
+      join(worktreeStateDir, "journal.jsonl"),
+      `${makeEvent(runId, "nested.found", 1)}\n`,
+      "utf-8",
+    );
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      stateDirRelativePath,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+      listPresets: () => [],
+    });
+
+    const res = await app.request(`/api/runs/${runId}/events`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.events).toHaveLength(1);
+    expect(body.events[0].topic).toBe("nested.found");
+  });
 });
 
 describe("dashboard /api/runs/:id/artifacts", () => {

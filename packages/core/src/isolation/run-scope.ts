@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Create a run-scoped state directory under `.autoloop/runs/<runId>/`.
+ * Create a run-scoped directory under `<state-root>/runs/<runId>/`.
  * Returns the absolute path to the created directory.
  */
 export function createRunScopedDir(

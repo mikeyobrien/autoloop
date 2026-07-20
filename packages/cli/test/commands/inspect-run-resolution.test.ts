@@ -23,7 +23,7 @@ vi.mock("@mobrienv/autoloop-core/config", () => ({
     return fallback;
   }),
   stateDirPath: vi.fn((projectDir: string) => join(projectDir, ".autoloop")),
-  stateDirName: vi.fn(() => ".autoloop"),
+  stateDirRelativePath: vi.fn(() => ".autoloop"),
   resolveJournalFile: vi.fn((projectDir: string) =>
     join(projectDir, ".autoloop", "journal.jsonl"),
   ),

@@ -290,6 +290,9 @@ export function runtimeEnvLines(
     "export AUTOLOOP_STATE_DIR=" +
     shellQuote(loop.paths.stateDir) +
     "\n" +
+    "export AUTOLOOP_BASE_STATE_DIR=" +
+    shellQuote(loop.paths.baseStateDir) +
+    "\n" +
     "export AUTOLOOP_PROJECT_DIR=" +
     shellQuote(loop.paths.projectDir) +
     "\n" +

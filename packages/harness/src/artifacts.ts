@@ -169,7 +169,7 @@ export function collectArtifacts(
   if (documents.length === 0 && workDir) {
     const scanned = scanFrontmatterArtifacts(
       workDir,
-      config.stateDirName(projectDir),
+      config.stateDirRelativePath(projectDir),
     );
     for (const doc of scanned) {
       if (!documentPaths.has(doc.path)) {
@@ -338,12 +338,12 @@ function formatBytes(bytes: number): string {
  */
 function scanFrontmatterArtifacts(
   dir: string,
-  stateDirName: string,
+  stateDirRelativePath: string,
 ): DocumentArtifact[] {
   const results: DocumentArtifact[] = [];
   // Only the top path segment matters at depth 0 (e.g. ".ralph" for
   // ".ralph/autoloop"); recursion descends into the rest normally.
-  const stateDirTop = stateDirName.split(/[\\/]/)[0];
+  const stateDirTop = stateDirRelativePath.split(/[\\/]/)[0];
   try {
     scanDir(dir, dir, results, 0, stateDirTop);
   } catch {

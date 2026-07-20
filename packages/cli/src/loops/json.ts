@@ -47,12 +47,16 @@ export function runSummary(r: RunRecord): Record<string, unknown> {
  * JSON equivalent of listRuns: array of run summaries.
  * Mirrors the same selection/ordering as the human table.
  */
-export function listRunsJson(stateDir: string, all: boolean): string {
+export function listRunsJson(
+  stateDir: string,
+  all: boolean,
+  stateDirRelativePath?: string,
+): string {
   const runs = all
-    ? readMergedRegistry(stateDir).sort((a, b) =>
+    ? readMergedRegistry(stateDir, stateDirRelativePath).sort((a, b) =>
         b.updated_at.localeCompare(a.updated_at),
       )
-    : mergedActiveRuns(stateDir);
+    : mergedActiveRuns(stateDir, stateDirRelativePath);
   return JSON.stringify(runs.map(runSummary), null, 2);
 }
 
@@ -61,8 +65,12 @@ export function listRunsJson(stateDir: string, all: boolean): string {
  * `health` bucket. Unknown/ambiguous ids produce an error object
  * and exit code 1.
  */
-export function showRunJson(stateDir: string, partial: string): JsonResult {
-  const result = mergedFindRunByPrefix(stateDir, partial);
+export function showRunJson(
+  stateDir: string,
+  partial: string,
+  stateDirRelativePath?: string,
+): JsonResult {
+  const result = mergedFindRunByPrefix(stateDir, partial, stateDirRelativePath);
 
   if (result === undefined) {
     return {
@@ -102,8 +110,12 @@ export function showRunJson(stateDir: string, partial: string): JsonResult {
 /**
  * JSON equivalent of showArtifacts: artifact paths for a run.
  */
-export function artifactsJson(stateDir: string, partial: string): JsonResult {
-  const result = mergedFindRunByPrefix(stateDir, partial);
+export function artifactsJson(
+  stateDir: string,
+  partial: string,
+  stateDirRelativePath?: string,
+): JsonResult {
+  const result = mergedFindRunByPrefix(stateDir, partial, stateDirRelativePath);
 
   if (result === undefined) {
     return {
@@ -151,9 +163,12 @@ export function artifactsJson(stateDir: string, partial: string): JsonResult {
  *
  * Reaps stale runs first so the health snapshot reflects reality.
  */
-export function healthJson(stateDir: string): string {
-  reapStaleRuns(stateDir);
-  const h = categorizeRuns(stateDir);
+export function healthJson(
+  stateDir: string,
+  stateDirRelativePath?: string,
+): string {
+  reapStaleRuns(stateDir, stateDirRelativePath);
+  const h = categorizeRuns(stateDir, stateDirRelativePath);
   const bucket = (runs: RunRecord[]) => ({
     count: runs.length,
     run_ids: runs.map((r) => r.run_id),

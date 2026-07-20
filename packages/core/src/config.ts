@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import {
   type Config,
   DEFAULT_STATE_DIR,
@@ -355,45 +355,99 @@ export function resolveProjectDir(
   return resolveBundledPresetDir(projectDirOrPreset, bundleRoot);
 }
 
-export function resolveJournalFile(projectDir: string): string {
-  return join(projectDir, journalRelPath(projectDir));
+export interface RuntimePathEnv {
+  AUTOLOOP_STATE_DIR?: string;
+  AUTOLOOP_JOURNAL_FILE?: string;
+  AUTOLOOP_EVENTS_FILE?: string;
+  AUTOLOOP_MEMORY_FILE?: string;
+  AUTOLOOP_TASKS_FILE?: string;
+}
+
+/** Anchor a configured/runtime path without corrupting absolute overrides. */
+export function anchorPath(baseDir: string, path: string): string {
+  return isAbsolute(path) ? path : join(baseDir, path);
+}
+
+export function resolveJournalFile(
+  projectDir: string,
+  env: RuntimePathEnv = process.env,
+  loadOptions: LoadLayeredOptions = {},
+): string {
+  const runtimeFile = env.AUTOLOOP_JOURNAL_FILE || env.AUTOLOOP_EVENTS_FILE;
+  if (runtimeFile) return runtimeFile;
+
+  const cfg = loadProject(projectDir, loadOptions);
+  const explicitFile =
+    get(cfg, "core.journal_file", "") || get(cfg, "core.events_file", "");
+  return explicitFile
+    ? anchorPath(projectDir, explicitFile)
+    : join(stateDirPath(projectDir, env, loadOptions), "journal.jsonl");
 }
 
 export function resolveJournalFileIn(
   projectDir: string,
   workDir: string,
 ): string {
-  return join(workDir, journalRelPath(projectDir));
+  return anchorPath(workDir, journalRelPath(projectDir));
 }
 
-export function resolveMemoryFile(projectDir: string): string {
-  return join(projectDir, memoryRelPath(projectDir));
+export function resolveMemoryFile(
+  projectDir: string,
+  env: RuntimePathEnv = process.env,
+  loadOptions: LoadLayeredOptions = {},
+): string {
+  if (env.AUTOLOOP_MEMORY_FILE) return env.AUTOLOOP_MEMORY_FILE;
+
+  const cfg = loadProject(projectDir, loadOptions);
+  const explicitFile = get(cfg, "core.memory_file", "");
+  return explicitFile
+    ? anchorPath(projectDir, explicitFile)
+    : join(stateDirPath(projectDir, env, loadOptions), "memory.jsonl");
 }
 
 export function resolveMemoryFileIn(
   projectDir: string,
   workDir: string,
 ): string {
-  return join(workDir, memoryRelPath(projectDir));
+  return anchorPath(workDir, memoryRelPath(projectDir));
 }
 
-export function resolveTasksFile(projectDir: string): string {
-  return join(projectDir, tasksRelPath(projectDir));
+export function resolveTasksFile(
+  projectDir: string,
+  env: RuntimePathEnv = process.env,
+  loadOptions: LoadLayeredOptions = {},
+): string {
+  if (env.AUTOLOOP_TASKS_FILE) return env.AUTOLOOP_TASKS_FILE;
+
+  const cfg = loadProject(projectDir, loadOptions);
+  const explicitFile = get(cfg, "core.tasks_file", "");
+  return explicitFile
+    ? anchorPath(projectDir, explicitFile)
+    : join(stateDirPath(projectDir, env, loadOptions), "tasks.jsonl");
 }
 
 export function resolveTasksFileIn(
   projectDir: string,
   workDir: string,
 ): string {
-  return join(workDir, tasksRelPath(projectDir));
+  return anchorPath(workDir, tasksRelPath(projectDir));
 }
 
-export function stateDirName(projectDir: string): string {
+/** Configured state root relative to the project, including all segments. */
+export function stateDirRelativePath(projectDir: string): string {
   return stateDirRel(loadProject(projectDir));
 }
 
-export function stateDirPath(projectDir: string): string {
-  return join(projectDir, stateDirName(projectDir));
+/** Runtime state root, then configured core.state_dir, then `.autoloop`. */
+export function stateDirPath(
+  projectDir: string,
+  env: Pick<RuntimePathEnv, "AUTOLOOP_STATE_DIR"> = process.env,
+  loadOptions: LoadLayeredOptions = {},
+): string {
+  return anchorPath(
+    projectDir,
+    env.AUTOLOOP_STATE_DIR || stateDirRel(loadProject(projectDir, loadOptions)),
+  );
 }
 
 function journalRelPath(projectDir: string): string {

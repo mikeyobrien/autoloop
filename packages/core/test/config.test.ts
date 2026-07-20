@@ -17,6 +17,9 @@ import {
   projectHasConfig,
   put,
   resolveJournalFile,
+  resolveMemoryFile,
+  resolveTasksFile,
+  stateDirPath,
   stateDirRel,
   tasksPath,
   userConfigPath,
@@ -160,6 +163,98 @@ describe("state-dir-derived paths", () => {
     expect(stateDirRel(cfg)).toBe(".autoloop");
     expect(memoryPath(cfg)).toBe(".autoloop/memory.jsonl");
     expect(tasksPath(cfg)).toBe(".autoloop/tasks.jsonl");
+  });
+});
+
+describe("runtime path resolution", () => {
+  const originalRuntimeConfig = process.env.AUTOLOOP_CONFIG;
+
+  beforeEach(() => {
+    process.env.AUTOLOOP_CONFIG = join(TMP_BASE, "missing-runtime-config.toml");
+  });
+
+  afterEach(() => {
+    if (originalRuntimeConfig === undefined) delete process.env.AUTOLOOP_CONFIG;
+    else process.env.AUTOLOOP_CONFIG = originalRuntimeConfig;
+  });
+
+  it("applies runtime state over configured state over the default", () => {
+    const configured = tmpDir("runtime-state-configured");
+    writeFileSync(
+      join(configured, "autoloops.toml"),
+      '[core]\nstate_dir = ".configured/state"\n',
+    );
+    const fallback = tmpDir("runtime-state-default");
+
+    expect(
+      stateDirPath(configured, { AUTOLOOP_STATE_DIR: ".runtime/state" }),
+    ).toBe(join(configured, ".runtime", "state"));
+    expect(stateDirPath(configured, {})).toBe(
+      join(configured, ".configured", "state"),
+    );
+    expect(stateDirPath(fallback, {})).toBe(join(fallback, ".autoloop"));
+  });
+
+  it("derives generic stores from runtime state when no file is explicit", () => {
+    const dir = tmpDir("runtime-derived-stores");
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      '[core]\nstate_dir = ".configured"\n',
+    );
+    const env = { AUTOLOOP_STATE_DIR: join(dir, ".runtime") };
+
+    expect(resolveJournalFile(dir, env)).toBe(
+      join(dir, ".runtime", "journal.jsonl"),
+    );
+    expect(resolveMemoryFile(dir, env)).toBe(
+      join(dir, ".runtime", "memory.jsonl"),
+    );
+    expect(resolveTasksFile(dir, env)).toBe(
+      join(dir, ".runtime", "tasks.jsonl"),
+    );
+  });
+
+  it("preserves explicit configured stores ahead of a runtime state root", () => {
+    const dir = tmpDir("runtime-explicit-stores");
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      [
+        "[core]",
+        'state_dir = ".configured"',
+        'journal_file = ".stores/journal.jsonl"',
+        'memory_file = ".stores/memory.jsonl"',
+        'tasks_file = ".stores/tasks.jsonl"',
+      ].join("\n"),
+    );
+    const env = { AUTOLOOP_STATE_DIR: join(dir, ".runtime") };
+
+    expect(resolveJournalFile(dir, env)).toBe(
+      join(dir, ".stores", "journal.jsonl"),
+    );
+    expect(resolveMemoryFile(dir, env)).toBe(
+      join(dir, ".stores", "memory.jsonl"),
+    );
+    expect(resolveTasksFile(dir, env)).toBe(
+      join(dir, ".stores", "tasks.jsonl"),
+    );
+  });
+
+  it("gives exact runtime store files highest precedence", () => {
+    const dir = tmpDir("runtime-exact-stores");
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      '[core]\njournal_file = "configured-journal"\nmemory_file = "configured-memory"\ntasks_file = "configured-tasks"\n',
+    );
+
+    expect(
+      resolveJournalFile(dir, { AUTOLOOP_EVENTS_FILE: "/runtime/events" }),
+    ).toBe("/runtime/events");
+    expect(
+      resolveMemoryFile(dir, { AUTOLOOP_MEMORY_FILE: "/runtime/memory" }),
+    ).toBe("/runtime/memory");
+    expect(
+      resolveTasksFile(dir, { AUTOLOOP_TASKS_FILE: "/runtime/tasks" }),
+    ).toBe("/runtime/tasks");
   });
 });
 

@@ -119,4 +119,23 @@ describe("chain child registry visibility in loops surfaces", () => {
     expect(output).toContain("[watch] Run already completed.");
     expect(output).toContain("chain-child-run-001");
   });
+
+  it("lists a chain child stored beneath a nested custom state root", () => {
+    const stateDirRelativePath = join(".ralph", "autoloop");
+    const stepStateDir = join(
+      stateDir,
+      "chains",
+      "chain-custom",
+      "step-1",
+      stateDirRelativePath,
+    );
+    mkdirSync(stepStateDir, { recursive: true });
+    writeJsonl(join(stepStateDir, "registry.jsonl"), [
+      makeRecord({ run_id: "custom-root-child" }),
+    ]);
+
+    expect(listRuns(stateDir, false, stateDirRelativePath)).toContain(
+      "custom-root-child",
+    );
+  });
 });

@@ -1,8 +1,8 @@
 // Durable suspend/resume signalling for the lifecycle hooks engine.
 //
-// `on_error = "suspend"` writes a versioned `.autoloop/suspend-state.json`
+// `on_error = "suspend"` writes a versioned `<state-root>/suspend-state.json`
 // and (for in-process phases) blocks the harness until an operator drops
-// `.autoloop/resume-requested` (or `autoloop hooks clear-suspend` / `resume`
+// `<state-root>/resume-requested` (or `autoloop hooks clear-suspend` / `resume`
 // clears it). This lets a hook halt the loop for out-of-band remediation
 // (e.g. a human approval gate) without losing the run's position.
 

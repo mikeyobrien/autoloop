@@ -131,6 +131,7 @@ export class DashboardControl {
       registryPath: join(stateDir, "registry.jsonl"),
       journalPath: config.resolveJournalFile(resolved),
       stateDir,
+      stateDirRelativePath: config.stateDirRelativePath(resolved),
       bundleRoot: this.opts.bundleRoot,
       projectDir: resolved,
       selfCmd: this.opts.selfCmd,

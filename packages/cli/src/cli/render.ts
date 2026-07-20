@@ -106,7 +106,7 @@ export function renderJournal(projectDir: string, runId?: string): void {
     const lines = readRunJournal(
       stateDir,
       runId,
-      config.stateDirName(projectDir),
+      config.stateDirRelativePath(projectDir),
     );
     console.log(lines.join("\n"));
     return;
@@ -116,7 +116,10 @@ export function renderJournal(projectDir: string, runId?: string): void {
 
 export function renderAllJournals(projectDir: string): void {
   const stateDir = config.stateDirPath(projectDir);
-  const lines = readAllJournals(stateDir, config.stateDirName(projectDir));
+  const lines = readAllJournals(
+    stateDir,
+    config.stateDirRelativePath(projectDir),
+  );
   if (lines.length > 0) {
     console.log(lines.join("\n"));
   } else {
@@ -238,7 +241,7 @@ export function renderJournalTimeline(
   let lines: string[];
   if (spec.allRuns) {
     const stateDir = config.stateDirPath(projectDir);
-    lines = readAllJournals(stateDir, config.stateDirName(projectDir));
+    lines = readAllJournals(stateDir, config.stateDirRelativePath(projectDir));
     if (lines.length === 0) {
       const journalFile = resolveEmitJournalFile(projectDir);
       lines = readRunLines(journalFile, ensureRenderRunId(journalFile));

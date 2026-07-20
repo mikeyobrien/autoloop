@@ -177,7 +177,8 @@ describe("runtimeEnvLines", () => {
       requiredEvents: ["tests.passed"],
     },
     paths: {
-      stateDir: "/tmp/state",
+      stateDir: "/tmp/state/runs/run-abc",
+      baseStateDir: "/tmp/state",
       projectDir: "/tmp/project",
       journalFile: "/tmp/journal.jsonl",
       memoryFile: "/tmp/memory.md",
@@ -199,7 +200,8 @@ describe("runtimeEnvLines", () => {
     expect(lines).toContain("AUTOLOOP_LOG_LEVEL='info'");
     expect(lines).toContain("AUTOLOOP_COMPLETION_PROMISE='LOOP_COMPLETE'");
     expect(lines).toContain("AUTOLOOP_COMPLETION_EVENT='task.complete'");
-    expect(lines).toContain("AUTOLOOP_STATE_DIR='/tmp/state'");
+    expect(lines).toContain("AUTOLOOP_STATE_DIR='/tmp/state/runs/run-abc'");
+    expect(lines).toContain("AUTOLOOP_BASE_STATE_DIR='/tmp/state'");
     expect(lines).toContain("AUTOLOOP_PROJECT_DIR='/tmp/project'");
     expect(lines).toContain("AUTOLOOP_JOURNAL_FILE='/tmp/journal.jsonl'");
     expect(lines).toContain("AUTOLOOP_EVENTS_FILE='/tmp/journal.jsonl'");

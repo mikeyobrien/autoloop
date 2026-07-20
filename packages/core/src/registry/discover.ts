@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { DEFAULT_STATE_DIR } from "../config-schema.js";
 import { readRegistry } from "./read.js";
 import type { RunRecord } from "./types.js";
 
@@ -16,23 +17,26 @@ function listDirs(dir: string): string[] {
 
 /**
  * Discover chain and worktree registry files under the given state directory.
- * Walks chains/{id}/step-{n}/.autoloop/ for registry.jsonl files,
+ * Walks chains/{id}/step-{n}/<stateDirRel>/ for registry.jsonl files,
  * including worktree-isolated registries nested further below.
  */
-export function discoverChainRegistries(stateDir: string): string[] {
+export function discoverChainRegistries(
+  stateDir: string,
+  stateDirRel: string = DEFAULT_STATE_DIR,
+): string[] {
   const results: string[] = [];
   const chainsDir = join(stateDir, "chains");
   for (const chainDir of listDirs(chainsDir)) {
     for (const stepDir of listDirs(chainDir)) {
       if (!stepDir.includes("step-")) continue;
-      const stepState = join(stepDir, ".autoloop");
+      const stepState = join(stepDir, stateDirRel);
       // Direct chain step registry
       const regPath = join(stepState, "registry.jsonl");
       if (existsSync(regPath)) results.push(regPath);
       // Worktree-isolated registries under this step
       const wtDir = join(stepState, "worktrees");
       for (const wtRunDir of listDirs(wtDir)) {
-        const wtReg = join(wtRunDir, "tree", ".autoloop", "registry.jsonl");
+        const wtReg = join(wtRunDir, "tree", stateDirRel, "registry.jsonl");
         if (existsSync(wtReg)) results.push(wtReg);
       }
     }
@@ -61,9 +65,12 @@ function mergeRecords(recordSets: RunRecord[][]): RunRecord[] {
  * Read the root registry plus all discovered chain/worktree registries,
  * returning a deduplicated merged view.
  */
-export function readMergedRegistry(stateDir: string): RunRecord[] {
+export function readMergedRegistry(
+  stateDir: string,
+  stateDirRel: string = DEFAULT_STATE_DIR,
+): RunRecord[] {
   const rootPath = join(stateDir, "registry.jsonl");
-  const childPaths = discoverChainRegistries(stateDir);
+  const childPaths = discoverChainRegistries(stateDir, stateDirRel);
   const recordSets = [readRegistry(rootPath)];
   for (const p of childPaths) {
     recordSets.push(readRegistry(p));
@@ -72,13 +79,22 @@ export function readMergedRegistry(stateDir: string): RunRecord[] {
 }
 
 /** Active runs from the merged registry view. */
-export function mergedActiveRuns(stateDir: string): RunRecord[] {
-  return readMergedRegistry(stateDir).filter((r) => r.status === "running");
+export function mergedActiveRuns(
+  stateDir: string,
+  stateDirRel: string = DEFAULT_STATE_DIR,
+): RunRecord[] {
+  return readMergedRegistry(stateDir, stateDirRel).filter(
+    (r) => r.status === "running",
+  );
 }
 
 /** Recent runs from the merged registry view, sorted by updated_at desc. */
-export function mergedRecentRuns(stateDir: string, limit: number): RunRecord[] {
-  const all = readMergedRegistry(stateDir);
+export function mergedRecentRuns(
+  stateDir: string,
+  limit: number,
+  stateDirRel: string = DEFAULT_STATE_DIR,
+): RunRecord[] {
+  const all = readMergedRegistry(stateDir, stateDirRel);
   all.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   return all.slice(0, limit);
 }
@@ -89,8 +105,9 @@ export function mergedRecentRuns(stateDir: string, limit: number): RunRecord[] {
 export function mergedFindRunByPrefix(
   stateDir: string,
   partial: string,
+  stateDirRel: string = DEFAULT_STATE_DIR,
 ): RunRecord | RunRecord[] | undefined {
-  const all = readMergedRegistry(stateDir);
+  const all = readMergedRegistry(stateDir, stateDirRel);
   const exact = all.find((r) => r.run_id === partial);
   if (exact) return exact;
   const matches = all.filter((r) => r.run_id.startsWith(partial));

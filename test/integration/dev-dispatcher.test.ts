@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -69,8 +71,23 @@ describe("bin/dev", () => {
   }, 60_000);
 
   it("test subcommand delegates to vitest", () => {
-    // Run a small, fast unit test to verify delegation without self-recursion
-    const out = run(["test", "test/agent-map.test.ts"], 60_000);
-    expect(out).toContain("agent-map");
+    // A parent `vitest --coverage` exports coverage state to subprocesses. Give
+    // this nested Vitest invocation its own report directory so its startup
+    // cleanup cannot remove the parent's in-flight coverage/.tmp files.
+    const coverageDir = mkdtempSync(join(tmpdir(), "autoloop-dev-coverage-"));
+    try {
+      const out = run(
+        [
+          "test",
+          "--coverage.reportsDirectory",
+          coverageDir,
+          "test/agent-map.test.ts",
+        ],
+        60_000,
+      );
+      expect(out).toContain("agent-map");
+    } finally {
+      rmSync(coverageDir, { recursive: true, force: true });
+    }
   }, 60_000);
 });

@@ -77,8 +77,14 @@ describe("readRunJournal", () => {
 
   it("reads journal from worktree path", () => {
     // stateDir basename is used to find the journal inside the worktree
-    const stateDirName = tmpDir.split("/").pop()!;
-    const wtDir = join(tmpDir, "worktrees", "wt-run-1", "tree", stateDirName);
+    const stateDirRelativePath = tmpDir.split("/").pop()!;
+    const wtDir = join(
+      tmpDir,
+      "worktrees",
+      "wt-run-1",
+      "tree",
+      stateDirRelativePath,
+    );
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "journal.jsonl"),
@@ -102,8 +108,14 @@ describe("readRunJournal", () => {
       `${journalLine("dual-run", "loop.start", "2026-01-01T00:00:00Z")}\n`,
     );
 
-    const stateDirName = tmpDir.split("/").pop()!;
-    const wtDir = join(tmpDir, "worktrees", "dual-run", "tree", stateDirName);
+    const stateDirRelativePath = tmpDir.split("/").pop()!;
+    const wtDir = join(
+      tmpDir,
+      "worktrees",
+      "dual-run",
+      "tree",
+      stateDirRelativePath,
+    );
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "journal.jsonl"),
@@ -133,8 +145,14 @@ describe("readAllJournals with worktree journals", () => {
     );
 
     // Worktree journal
-    const stateDirName = tmpDir.split("/").pop()!;
-    const wtDir = join(tmpDir, "worktrees", "wt-1", "tree", stateDirName);
+    const stateDirRelativePath = tmpDir.split("/").pop()!;
+    const wtDir = join(
+      tmpDir,
+      "worktrees",
+      "wt-1",
+      "tree",
+      stateDirRelativePath,
+    );
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "journal.jsonl"),

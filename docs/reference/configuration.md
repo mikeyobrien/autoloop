@@ -35,10 +35,14 @@ For preset runs, scalar/config overrides are layered on top of the selected pres
 2. user config (`~/.config/autoloop/config.toml`, or `AUTOLOOP_CONFIG`)
 3. selected preset config (`autoloops.toml` / `autoloops.conf`)
 4. user preset override (`~/.config/autoloop/overrides/<preset>.toml`)
-5. repo preset override (`<repo>/.autoloop/overrides/<preset>.toml`)
+5. repo preset override (`<repo>/<core.state_dir>/overrides/<preset>.toml`; `.autoloop/overrides/...` by default)
 6. run-scoped CLI override (`--max-iterations`, `--iterations`, or `--set key=value`)
 
 The CLI `-b`/`--backend` flag overrides backend settings at runtime (kind, command, args, prompt_mode) without changing the file. Extra backend arguments can be passed after `--` on the command line (e.g. `autoloop run autocode -b pi -- --model anthropic/claude-sonnet-4`). These are appended to the backend's argument list.
+
+Generic runtime path resolution uses `AUTOLOOP_STATE_DIR` first, then the layered `core.state_dir`, then `.autoloop`. Exact runtime store variables (`AUTOLOOP_JOURNAL_FILE`/`AUTOLOOP_EVENTS_FILE`, `AUTOLOOP_MEMORY_FILE`, and `AUTOLOOP_TASKS_FILE`) take precedence over configured store paths. Otherwise an explicit `core.journal_file`/`core.events_file`, `core.memory_file`, or `core.tasks_file` is preserved; only omitted paths derive from the effective state root.
+
+Hooks receive both `AUTOLOOP_STATE_DIR` (the active, possibly run-scoped or worktree state) and `AUTOLOOP_BASE_STATE_DIR` (the shared registry/config state root), plus the exact `AUTOLOOP_TASKS_FILE`. The GitHub and Linear sync hooks use the shared base root for `issue-sync.toml` and `issue-sync-state.json`, while operating on the exact active task file. Standalone sync commands use `AUTOLOOP_STATE_DIR`, then layered `core.state_dir`, then `.autoloop` when no hook-provided base root exists.
 
 Run-scoped config overrides are also runtime-only and are reapplied after every hot reload:
 
@@ -206,10 +210,10 @@ The `--profile` CLI flag adds profiles on top of the defaults. Use `--no-default
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `core.state_dir` | string | `".autoloop"` | Directory for runtime state (journal, memory, tools). |
-| `core.journal_file` | string | `".autoloop/journal.jsonl"` | Path to the journal file. |
-| `core.memory_file` | string | `".autoloop/memory.jsonl"` | Path to the memory file. |
-| `core.tasks_file` | string | `".autoloop/tasks.jsonl"` | Path to the tasks file (used by the `task` tool). |
-| `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. Still accepted; prefer `journal_file`. |
+| `core.journal_file` | string | `<core.state_dir>/journal.jsonl` | Path to the journal file. The default is derived from the effective `core.state_dir`; an explicit path wins. |
+| `core.memory_file` | string | `<core.state_dir>/memory.jsonl` | Path to the shared memory file. The default is derived from the effective `core.state_dir`; an explicit path wins. |
+| `core.tasks_file` | string | `<effective run state>/tasks.jsonl` | Path to the tasks file (used by the `task` tool). When omitted, runtime isolation derives a per-run path beneath `core.state_dir`; an explicit path wins. |
+| `core.events_file` | string | — | **Legacy alias** for `core.journal_file`. An explicit `journal_file` wins when both are set. |
 | `core.log_level` | string | `"info"` | Log verbosity. Valid levels: `debug`, `info`, `warn`, `error`, `none`. Overridden by `-v`/`--verbose` (sets `debug`). Exported as `AUTOLOOP_LOG_LEVEL`. |
 | `core.run_id_format` | string | `"human"` | Run ID format: `"human"` for readable `<word>-<word>` ids, `"compact"` for legacy timestamp-based `run-<base36>-<suffix>`, `"counter"` for sequential `run-1`, `run-2`. |
 
@@ -238,9 +242,11 @@ memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
 core.state_dir = ".autoloop"
-core.journal_file = ".autoloop/journal.jsonl"
-core.memory_file = ".autoloop/memory.jsonl"
-core.tasks_file = ".autoloop/tasks.jsonl"
+# The following are optional overrides. When omitted, they derive from
+# core.state_dir (tasks additionally derive from the effective run state).
+# core.journal_file = ".autoloop/journal.jsonl"
+# core.memory_file = ".autoloop/memory.jsonl"
+# core.tasks_file = ".autoloop/tasks.jsonl"
 # core.log_level = "info"
 
 worktree.enabled = false

@@ -1,6 +1,6 @@
 // `autoloop doctor` — preflight and state-health diagnostics.
 //
-// Checks the environment (node, git, backend command) and the `.autoloop/`
+// Checks the environment (node, git, backend command) and the configured
 // state tree (registry integrity, stale "running" runs, stale wave markers,
 // orphaned worktrees) so operators — and agents — can diagnose a project in
 // one command before or after a run. `--json` emits machine-readable results.
@@ -384,7 +384,7 @@ function commandOnPath(executable: string): boolean {
 function printDoctorUsage(): void {
   console.log("Usage: autoloop doctor [project-dir] [--json]");
   console.log("");
-  console.log("Diagnose the environment and .autoloop state: node/git/backend");
+  console.log("Diagnose the environment and runtime state: node/git/backend");
   console.log(
     "availability, registry integrity, stale running runs, stale wave",
   );

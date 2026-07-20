@@ -79,7 +79,8 @@ export function apiRoutes(ctx: DashboardContext): Hono {
 
     const runId = result?.run_id || id;
     const runJournal =
-      result?.journal_file || resolveRunJournalPath(ctx.stateDir, runId);
+      result?.journal_file ||
+      resolveRunJournalPath(ctx.stateDir, runId, ctx.stateDirRelativePath);
     const lines = runJournal
       ? readRunLines(runJournal, runId)
       : readRunLines(ctx.journalPath, runId);
@@ -104,7 +105,8 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     }
     const runId = result?.run_id || id;
     const runJournal =
-      result?.journal_file || resolveRunJournalPath(ctx.stateDir, runId);
+      result?.journal_file ||
+      resolveRunJournalPath(ctx.stateDir, runId, ctx.stateDirRelativePath);
     const lines = runJournal
       ? readRunLines(runJournal, runId)
       : readRunLines(ctx.journalPath, runId);

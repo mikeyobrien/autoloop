@@ -8,6 +8,7 @@ import {
   dispatchStats,
   renderStats,
 } from "../../src/commands/stats.js";
+import { triageJson } from "../../src/commands/triage.js";
 
 function record(overrides: Partial<RunRecord>): RunRecord {
   return {
@@ -157,6 +158,51 @@ describe("dispatchStats", () => {
     const parsed = JSON.parse(lines.join("\n"));
     expect(parsed.presets).toHaveLength(1);
     expect(parsed.presets[0].preset).toBe("autocode");
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it("stats and triage find a nested-root worktree journal", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "autoloop-stats-wt-test-"));
+    const stateDirRel = join(".ralph", "autoloop");
+    const stateDir = join(projectDir, stateDirRel);
+    const runId = "worktree-run";
+    const worktreeStateDir = join(
+      stateDir,
+      "worktrees",
+      runId,
+      "tree",
+      stateDirRel,
+    );
+    mkdirSync(worktreeStateDir, { recursive: true });
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      'core.state_dir = ".ralph/autoloop"\n',
+    );
+    writeFileSync(
+      join(stateDir, "registry.jsonl"),
+      `${JSON.stringify(
+        record({
+          run_id: runId,
+          isolation_mode: "worktree",
+          status: "completed",
+        }),
+      )}\n`,
+    );
+    writeFileSync(
+      join(worktreeStateDir, "journal.jsonl"),
+      `${usageLine(runId, "0.75")}\n`,
+    );
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      lines.push(args.join(" "));
+    });
+    dispatchStats([projectDir, "--json"]);
+    const stats = JSON.parse(lines.join("\n"));
+    const triage = JSON.parse(triageJson(projectDir));
+
+    expect(stats.presets[0].costUsd).toBe(0.75);
+    expect(triage.stats[0].costUsd).toBe(0.75);
     rmSync(projectDir, { recursive: true, force: true });
   });
 

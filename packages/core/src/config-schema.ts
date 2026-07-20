@@ -150,7 +150,7 @@ export function put(config: Config, key: string, value: string): Config {
 }
 
 /**
- * The configured state-root name (relative to the project/work dir). This is
+ * The configured state-root path (relative to the project/work dir). This is
  * the single seam every derived path hangs off of; ordinary standalone usage
  * resolves to {@link DEFAULT_STATE_DIR}.
  */

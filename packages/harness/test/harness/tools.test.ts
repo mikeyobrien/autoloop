@@ -9,7 +9,8 @@ function fakeLoop(overrides: Partial<LoopContext> = {}): LoopContext {
   return {
     paths: {
       projectDir: "/tmp/project",
-      stateDir: "/tmp/state",
+      stateDir: "/tmp/state/runs/run-123",
+      baseStateDir: "/tmp/state",
       journalFile: "/tmp/journal.jsonl",
       memoryFile: "/tmp/memory.md",
       tasksFile: "/tmp/tasks.jsonl",
@@ -44,7 +45,14 @@ describe("emitToolScript", () => {
 
   it("exports AUTOLOOP_STATE_DIR", () => {
     const script = emitToolScript(fakeLoop());
-    expect(script).toContain("export AUTOLOOP_STATE_DIR='/tmp/state'");
+    expect(script).toContain(
+      "export AUTOLOOP_STATE_DIR='/tmp/state/runs/run-123'",
+    );
+  });
+
+  it("exports AUTOLOOP_BASE_STATE_DIR", () => {
+    const script = emitToolScript(fakeLoop());
+    expect(script).toContain("export AUTOLOOP_BASE_STATE_DIR='/tmp/state'");
   });
 
   it("exports AUTOLOOP_JOURNAL_FILE", () => {

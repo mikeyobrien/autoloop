@@ -72,9 +72,10 @@ function healthState(r: RunRecord, nowMs: number): HealthState {
 export async function watchRun(
   stateDir: string,
   partial: string,
+  stateDirRelativePath?: string,
   intervalMs: number = DEFAULT_INTERVAL_MS,
 ): Promise<void> {
-  const initial = resolveRun(stateDir, partial);
+  const initial = resolveRun(stateDir, partial, stateDirRelativePath);
   if (typeof initial === "string") {
     console.log(initial);
     return;
@@ -108,7 +109,11 @@ export async function watchRun(
     process.on("SIGINT", onSigint);
 
     const timer = setInterval(() => {
-      const current = resolveRun(stateDir, initial.run_id);
+      const current = resolveRun(
+        stateDir,
+        initial.run_id,
+        stateDirRelativePath,
+      );
       if (typeof current === "string") {
         // Run disappeared from registry — unusual but handle gracefully
         console.log(`[watch] ${current}`);
@@ -145,8 +150,12 @@ export async function watchRun(
   });
 }
 
-function resolveRun(stateDir: string, partial: string): RunRecord | string {
-  const result = mergedFindRunByPrefix(stateDir, partial);
+function resolveRun(
+  stateDir: string,
+  partial: string,
+  stateDirRelativePath?: string,
+): RunRecord | string {
+  const result = mergedFindRunByPrefix(stateDir, partial, stateDirRelativePath);
   if (result === undefined) {
     return `No run matching '${partial}'.`;
   }

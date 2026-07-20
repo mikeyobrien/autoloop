@@ -5,8 +5,12 @@ import { renderArtifacts, renderRunDetail } from "./render.js";
 /**
  * Show detail view for a run by exact or partial ID.
  */
-export function showRun(stateDir: string, partial: string): string {
-  const result = mergedFindRunByPrefix(stateDir, partial);
+export function showRun(
+  stateDir: string,
+  partial: string,
+  stateDirRelativePath?: string,
+): string {
+  const result = mergedFindRunByPrefix(stateDir, partial, stateDirRelativePath);
 
   if (result === undefined) {
     return `No run matching '${partial}'.`;
@@ -23,8 +27,12 @@ export function showRun(stateDir: string, partial: string): string {
 /**
  * Show artifact paths for a run by exact or partial ID.
  */
-export function showArtifacts(stateDir: string, partial: string): string {
-  const result = mergedFindRunByPrefix(stateDir, partial);
+export function showArtifacts(
+  stateDir: string,
+  partial: string,
+  stateDirRelativePath?: string,
+): string {
+  const result = mergedFindRunByPrefix(stateDir, partial, stateDirRelativePath);
 
   if (result === undefined) {
     return `No run matching '${partial}'.`;

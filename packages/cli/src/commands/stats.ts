@@ -42,9 +42,10 @@ export function dispatchStats(args: string[]): void {
   }
   const projectDir = positionals[0] ?? resolveRuntimeProjectDir();
   const stateDir = config.stateDirPath(projectDir);
+  const stateDirRel = config.stateDirRelativePath(projectDir);
   const records = readRegistry(join(stateDir, "registry.jsonl"));
   const stats = computeStats(records, (runId) =>
-    readRunJournal(stateDir, runId),
+    readRunJournal(stateDir, runId, stateDirRel),
   );
   if (json) {
     console.log(JSON.stringify({ projectDir, presets: stats }, null, 2));

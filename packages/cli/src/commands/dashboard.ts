@@ -38,6 +38,7 @@ export function dispatchDashboard(
     registryPath: join(stateDir, "registry.jsonl"),
     journalPath: config.resolveJournalFile(resolved),
     stateDir,
+    stateDirRelativePath: config.stateDirRelativePath(resolved),
     bundleRoot,
     projectDir: resolved,
     selfCmd,

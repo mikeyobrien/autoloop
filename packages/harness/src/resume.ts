@@ -124,10 +124,10 @@ export function buildResumeContext(
   }
 
   // findRunByPrefix reads the registry directly, so a resumable run always
-  // carries the real state_dir that registryStart wrote (.autoloop/ for shared
-  // and worktree modes, .autoloop/runs/<id>/ for run-scoped). Never guess it
-  // from the journal path — for run-scoped runs the journal lives at the
-  // top-level .autoloop/ while the state dir is .autoloop/runs/<id>/, so a
+  // carries the real state_dir that registryStart wrote (<state-root>/ for
+  // shared/worktree modes, <state-root>/runs/<id>/ for run-scoped). Never
+  // guess it from the journal path — for run-scoped runs the journal lives at
+  // the top-level state root while state_dir is nested under runs/<id>, so a
   // dirname() guess would point at the wrong directory.
   const stateDir = record.state_dir;
   if (!stateDir) {
@@ -154,7 +154,11 @@ export function buildResumeContext(
         presetName: record.preset || basename(projectDir),
         workDir,
       });
-  const memoryFile = join(workDir, config.memoryPath(cfg));
+  const memoryFile = config.anchorPath(workDir, config.memoryPath(cfg));
+  const configuredTasksFile = config.get(cfg, "core.tasks_file", "");
+  const tasksFile = configuredTasksFile
+    ? config.anchorPath(workDir, config.tasksPath(cfg))
+    : join(stateDir, "tasks.jsonl");
 
   // baseStateDir is the main repo's state dir (registry + worktree metadata
   // live here). Prefer the caller-supplied path (the registry the record was
@@ -163,7 +167,7 @@ export function buildResumeContext(
   const baseStateDir =
     options.baseStateDir ||
     (worktreeMode
-      ? join(record.project_dir, config.stateDirRel(cfg))
+      ? config.anchorPath(record.project_dir, config.stateDirRel(cfg))
       : stateDir);
   const registryFile = join(baseStateDir, "registry.jsonl");
 
@@ -213,7 +217,7 @@ export function buildResumeContext(
       journalFile,
       memoryFile,
       runMemoryFile: join(stateDir, "memory.jsonl"),
-      tasksFile: join(stateDir, "tasks.jsonl"),
+      tasksFile,
       registryFile,
       toolPath: join(stateDir, "autoloops"),
       piAdapterPath: join(stateDir, "pi-adapter"),

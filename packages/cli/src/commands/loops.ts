@@ -15,12 +15,15 @@ import { watchRun } from "../loops/watch.js";
 export function dispatchLoops(args: string[]): void {
   const projectDir = resolveProjectDir();
   const stateDir = config.stateDirPath(projectDir);
+  const stateDirRelativePath = config.stateDirRelativePath(projectDir);
   const json = args.includes("--json");
   const rest = json ? args.filter((a) => a !== "--json") : args;
 
   if (rest.length === 0) {
     console.log(
-      json ? listRunsJson(stateDir, false) : listRuns(stateDir, false),
+      json
+        ? listRunsJson(stateDir, false, stateDirRelativePath)
+        : listRuns(stateDir, false, stateDirRelativePath),
     );
     return;
   }
@@ -33,7 +36,11 @@ export function dispatchLoops(args: string[]): void {
   }
 
   if (first === "--all") {
-    console.log(json ? listRunsJson(stateDir, true) : listRuns(stateDir, true));
+    console.log(
+      json
+        ? listRunsJson(stateDir, true, stateDirRelativePath)
+        : listRuns(stateDir, true, stateDirRelativePath),
+    );
     return;
   }
 
@@ -44,10 +51,10 @@ export function dispatchLoops(args: string[]): void {
       return;
     }
     if (json) {
-      printJsonResult(showRunJson(stateDir, runId));
+      printJsonResult(showRunJson(stateDir, runId, stateDirRelativePath));
       return;
     }
-    console.log(showRun(stateDir, runId));
+    console.log(showRun(stateDir, runId, stateDirRelativePath));
     return;
   }
 
@@ -58,10 +65,10 @@ export function dispatchLoops(args: string[]): void {
       return;
     }
     if (json) {
-      printJsonResult(artifactsJson(stateDir, runId));
+      printJsonResult(artifactsJson(stateDir, runId, stateDirRelativePath));
       return;
     }
-    console.log(showArtifacts(stateDir, runId));
+    console.log(showArtifacts(stateDir, runId, stateDirRelativePath));
     return;
   }
 
@@ -71,7 +78,7 @@ export function dispatchLoops(args: string[]): void {
       failMissingArg("autoloop loops watch <run-id>", "run-id");
       return;
     }
-    watchRun(stateDir, runId).catch((err: unknown) => {
+    watchRun(stateDir, runId, stateDirRelativePath).catch((err: unknown) => {
       console.error("Watch error:", err);
       process.exitCode = 1;
     });
@@ -80,11 +87,11 @@ export function dispatchLoops(args: string[]): void {
 
   if (first === "health") {
     if (json) {
-      console.log(healthJson(stateDir));
+      console.log(healthJson(stateDir, stateDirRelativePath));
       return;
     }
     const verbose = rest.includes("--verbose") || rest.includes("-v");
-    console.log(healthSummary(stateDir, verbose));
+    console.log(healthSummary(stateDir, verbose, stateDirRelativePath));
     return;
   }
 

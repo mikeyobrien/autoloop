@@ -81,7 +81,7 @@ vi.mock("../../src/registry-bridge.js", () => ({
   registryProgress: vi.fn(),
 }));
 
-import { resume, run } from "@mobrienv/autoloop-harness";
+import { buildResumeContext, resume, run } from "@mobrienv/autoloop-harness";
 
 function makeProject(maxIterations: number): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-resume-"));
@@ -179,6 +179,76 @@ describe("harness.resume integration", () => {
     for (const n of [1, 2, 3, 4, 5]) {
       expect(journal).toContain(`"iteration": "${n}"`);
     }
+  });
+
+  it("preserves explicit journal, memory, and task paths on resume", () => {
+    const dir = makeProject(3);
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      [
+        '[backend]\ncommand = "echo"',
+        "[event_loop]",
+        "max_iterations = 3",
+        "[review]",
+        "enabled = false",
+        "[core]",
+        'state_dir = ".ralph/autoloop"',
+        'journal_file = ".stores/journal.jsonl"',
+        'memory_file = ".stores/memory.jsonl"',
+        'tasks_file = ".stores/tasks.jsonl"',
+      ].join("\n"),
+    );
+    const record = {
+      ...recordFor(dir),
+      state_dir: join(dir, ".ralph", "autoloop", "runs", "run-resume-test"),
+      journal_file: join(dir, ".stores", "journal.jsonl"),
+    };
+    mkdirSync(record.state_dir, { recursive: true });
+
+    const { loop } = buildResumeContext(record);
+
+    expect(loop.paths.journalFile).toBe(join(dir, ".stores", "journal.jsonl"));
+    expect(loop.paths.memoryFile).toBe(join(dir, ".stores", "memory.jsonl"));
+    expect(loop.paths.tasksFile).toBe(join(dir, ".stores", "tasks.jsonl"));
+    expect(loop.paths.baseStateDir).toBe(record.state_dir);
+  });
+
+  it("preserves explicit worktree-relative stores on worktree resume", () => {
+    const dir = makeProject(3);
+    const worktree = join(dir, "worktree");
+    mkdirSync(worktree, { recursive: true });
+    writeFileSync(
+      join(dir, "autoloops.toml"),
+      [
+        '[backend]\ncommand = "echo"',
+        "[event_loop]",
+        "max_iterations = 3",
+        "[review]",
+        "enabled = false",
+        "[core]",
+        'state_dir = ".ralph/autoloop"',
+        'memory_file = ".stores/memory.jsonl"',
+        'tasks_file = ".stores/tasks.jsonl"',
+      ].join("\n"),
+    );
+    const record = {
+      ...recordFor(dir),
+      isolation_mode: "worktree" as const,
+      work_dir: worktree,
+      worktree_path: worktree,
+      state_dir: join(worktree, ".ralph", "autoloop"),
+      journal_file: join(worktree, ".stores", "events.jsonl"),
+    };
+    mkdirSync(record.state_dir, { recursive: true });
+
+    const { loop } = buildResumeContext(record);
+
+    expect(loop.paths.journalFile).toBe(record.journal_file);
+    expect(loop.paths.memoryFile).toBe(
+      join(worktree, ".stores", "memory.jsonl"),
+    );
+    expect(loop.paths.tasksFile).toBe(join(worktree, ".stores", "tasks.jsonl"));
+    expect(loop.paths.baseStateDir).toBe(join(dir, ".ralph", "autoloop"));
   });
 
   it("defaults add-iterations to the run's original max_iterations", async () => {

@@ -20,10 +20,7 @@ export interface MemoryStats {
 }
 
 export function resolveFile(projectDir: string): string {
-  const envPath = process.env.AUTOLOOP_MEMORY_FILE;
-  if (envPath) return envPath;
-  const cfg = config.loadProject(projectDir);
-  return join(projectDir, config.memoryPath(cfg));
+  return config.resolveMemoryFile(projectDir);
 }
 
 export function renderProject(projectDir: string, budgetChars: number): string {

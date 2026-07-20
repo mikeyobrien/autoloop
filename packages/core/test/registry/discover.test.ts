@@ -101,6 +101,36 @@ describe("discoverChainRegistries", () => {
     expect(found).toHaveLength(1);
     expect(found[0]).toContain("worktrees");
   });
+
+  it("discovers direct and worktree registries under a nested custom root", () => {
+    const stateDirRel = join(".ralph", "autoloop");
+    const stepDir = join(stateDir, "chains", "chain-custom", "step-1");
+    const direct = join(stepDir, stateDirRel);
+    const worktree = join(
+      direct,
+      "worktrees",
+      "run-custom",
+      "tree",
+      stateDirRel,
+    );
+    mkdirSync(worktree, { recursive: true });
+    writeJsonl(join(direct, "registry.jsonl"), [
+      makeRecord({ run_id: "custom-direct" }),
+    ]);
+    writeJsonl(join(worktree, "registry.jsonl"), [
+      makeRecord({ run_id: "custom-worktree" }),
+    ]);
+
+    const found = discoverChainRegistries(stateDir, stateDirRel);
+
+    expect(found).toEqual([
+      join(direct, "registry.jsonl"),
+      join(worktree, "registry.jsonl"),
+    ]);
+    expect(
+      readMergedRegistry(stateDir, stateDirRel).map((r) => r.run_id),
+    ).toEqual(["custom-direct", "custom-worktree"]);
+  });
 });
 
 describe("readMergedRegistry", () => {

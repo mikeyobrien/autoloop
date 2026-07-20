@@ -176,7 +176,7 @@ export function latestIterationForRun(path: string, runId: string): string {
 
 /**
  * Merge journals from the top-level file, per-run journals under runs/,
- * and worktree journals under worktrees/<id>/tree/<stateDirName>/.
+ * and worktree journals under worktrees/<id>/tree/<stateDirRel>/.
  * Returns all lines sorted by timestamp.
  */
 export function readAllJournals(
@@ -204,7 +204,6 @@ export function readAllJournals(
   // stateDirRel mirrors the main relative state dir inside the worktree tree
   // (e.g. ".ralph/autoloop"); it defaults to the base dir's leaf name so callers
   // that only know the absolute state dir keep working for single-segment roots.
-  const stateDirName = stateDirRel;
   const wtDir = join(baseStateDir, "worktrees");
   if (existsSync(wtDir)) {
     const entries = readdirSync(wtDir, { withFileTypes: true });
@@ -214,7 +213,7 @@ export function readAllJournals(
         wtDir,
         entry.name,
         "tree",
-        stateDirName,
+        stateDirRel,
         "journal.jsonl",
       );
       if (existsSync(wtJournal)) allLines.push(...readLines(wtJournal));

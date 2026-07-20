@@ -9,6 +9,7 @@
  */
 
 import { join } from "node:path";
+import { DEFAULT_STATE_DIR } from "./config-schema.js";
 import { isProcessAlive } from "./helpers.js";
 import {
   discoverChainRegistries,
@@ -78,8 +79,11 @@ export interface HealthResult {
 }
 
 /** Read the merged registry and classify all records. */
-export function categorizeRuns(stateDir: string): HealthResult {
-  const all = readMergedRegistry(stateDir);
+export function categorizeRuns(
+  stateDir: string,
+  stateDirRel: string = DEFAULT_STATE_DIR,
+): HealthResult {
+  const all = readMergedRegistry(stateDir, stateDirRel);
   return categorizeRecords(all);
 }
 
@@ -155,12 +159,14 @@ function isRecent(r: RunRecord, nowMs: number): boolean {
  *
  * Returns the count of stale runs reaped across all registry files.
  */
-export function reapStaleRuns(stateDir: string): number {
+export function reapStaleRuns(
+  stateDir: string,
+  stateDirRel: string = DEFAULT_STATE_DIR,
+): number {
   let total = 0;
 
-  for (const regPath of allRegistryPaths(stateDir)) {
+  for (const regPath of allRegistryPaths(stateDir, stateDirRel)) {
     const records = readRegistry(regPath);
-    let changed = false;
 
     for (const r of records) {
       if (r.status === "running" && r.pid != null && !isProcessAlive(r.pid)) {
@@ -171,7 +177,6 @@ export function reapStaleRuns(stateDir: string): number {
           updated_at: new Date().toISOString(),
         };
         appendRegistryEntry(regPath, reaped);
-        changed = true;
         total++;
       }
     }
@@ -180,10 +185,10 @@ export function reapStaleRuns(stateDir: string): number {
   return total;
 }
 
-function allRegistryPaths(stateDir: string): string[] {
+function allRegistryPaths(stateDir: string, stateDirRel: string): string[] {
   const rootPath = join(stateDir, "registry.jsonl");
   const paths = [rootPath];
-  for (const child of discoverChainRegistries(stateDir)) {
+  for (const child of discoverChainRegistries(stateDir, stateDirRel)) {
     paths.push(child);
   }
   return paths;

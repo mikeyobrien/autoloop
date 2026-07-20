@@ -9,6 +9,10 @@ export interface HookEnv {
   AUTOLOOP_PROJECT_DIR: string;
   AUTOLOOP_RUN_ID: string;
   AUTOLOOP_PRESET: string;
+  /** Active run state, which may be run-scoped or inside a worktree. */
+  AUTOLOOP_STATE_DIR: string;
+  /** Shared top-level state root for cross-run hook state. */
+  AUTOLOOP_BASE_STATE_DIR: string;
   AUTOLOOP_TASKS_FILE: string;
   AUTOLOOP_ITERATION?: string;
   AUTOLOOP_GIT_SHA_BEFORE?: string;
@@ -27,11 +31,13 @@ export function buildHookEnv(
   },
 ): HookEnv {
   const env: HookEnv = {
-    // The work dir is the repo being worked (where .autoloop/issue-sync.toml lives);
-    // projectDir can be the preset directory, which is not what hooks want.
+    // The work dir is the repo being worked; projectDir can be the preset
+    // directory, which is not what hooks want.
     AUTOLOOP_PROJECT_DIR: loop.paths.workDir,
     AUTOLOOP_RUN_ID: loop.runtime.runId,
     AUTOLOOP_PRESET: loop.launch.preset,
+    AUTOLOOP_STATE_DIR: loop.paths.stateDir,
+    AUTOLOOP_BASE_STATE_DIR: loop.paths.baseStateDir,
     AUTOLOOP_TASKS_FILE: loop.paths.tasksFile,
   };
   if (extra?.iteration !== undefined) {

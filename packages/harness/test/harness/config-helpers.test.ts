@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -821,6 +822,78 @@ describe("solo-run default run-scoping", () => {
 
     expect(loop.runtime.isolationMode).toBe("run-scoped");
     expect(loop.paths.stateDir).toContain("/runs/");
+  });
+});
+
+describe("configured storage path precedence", () => {
+  it("preserves explicit journal, memory, and task files in run-scoped mode", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        "[core]",
+        'state_dir = ".ralph/autoloop"',
+        'journal_file = ".stores/journal.jsonl"',
+        'memory_file = ".stores/memory.jsonl"',
+        'tasks_file = ".stores/tasks.jsonl"',
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("run-scoped");
+    expect(loop.paths.journalFile).toBe(
+      join(projectDir, ".stores", "journal.jsonl"),
+    );
+    expect(loop.paths.memoryFile).toBe(
+      join(projectDir, ".stores", "memory.jsonl"),
+    );
+    expect(loop.paths.tasksFile).toBe(
+      join(projectDir, ".stores", "tasks.jsonl"),
+    );
+  });
+
+  it("roots explicit stores inside a real isolated worktree", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        "[core]",
+        'state_dir = ".ralph/autoloop"',
+        'events_file = ".stores/events.jsonl"',
+        'memory_file = ".stores/memory.jsonl"',
+        'tasks_file = ".stores/tasks.jsonl"',
+      ].join("\n"),
+    );
+    execSync("git init && git add . && git commit -m init", {
+      cwd: projectDir,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "test",
+        GIT_AUTHOR_EMAIL: "test@example.com",
+        GIT_COMMITTER_NAME: "test",
+        GIT_COMMITTER_EMAIL: "test@example.com",
+      },
+    });
+
+    const loop = buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+      worktree: true,
+    });
+
+    expect(loop.runtime.isolationMode).toBe("worktree");
+    expect(loop.paths.stateDir).toBe(
+      join(loop.paths.worktreePath, ".ralph", "autoloop"),
+    );
+    expect(loop.paths.journalFile).toBe(
+      join(loop.paths.worktreePath, ".stores", "events.jsonl"),
+    );
+    expect(loop.paths.memoryFile).toBe(
+      join(loop.paths.worktreePath, ".stores", "memory.jsonl"),
+    );
+    expect(loop.paths.tasksFile).toBe(
+      join(loop.paths.worktreePath, ".stores", "tasks.jsonl"),
+    );
   });
 });
 

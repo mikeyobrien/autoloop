@@ -1,7 +1,7 @@
 // `autoloop init` — project onboarding scaffold.
 //
 // `autoloop init [dir]` writes a fully commented starter `autoloops.toml`
-// and gitignores `.autoloop/` so a project is ready for its first run.
+// and gitignores the configured state root so a project is ready for its first run.
 // `autoloop init --preset <name> [dir]` scaffolds a custom preset directory
 // (autoloops.toml + harness.md + topology.toml + roles/) modeled on the
 // bundled presets, with a minimal builder → critic topology.
@@ -212,7 +212,7 @@ Start skeptical: missing evidence means rejection, not benefit of the doubt.
  */
 export function ensureGitignore(dir: string): void {
   if (!existsSync(join(dir, ".git"))) return;
-  const stateName = config.stateDirName(dir);
+  const stateName = config.stateDirRelativePath(dir);
   const entry = `${stateName}/`;
   const bareEntry = stateName;
   const path = join(dir, ".gitignore");
@@ -407,7 +407,7 @@ function printInitUsage(): void {
   console.log("");
   console.log("  autoloop init             write a commented starter");
   console.log("                            autoloops.toml and gitignore");
-  console.log("                            .autoloop/ (git repos only)");
+  console.log("                            state root (git repos only)");
   console.log("  autoloop init --preset x  scaffold a custom preset at");
   console.log("                            <dir>/presets/x/ (autoloops.toml,");
   console.log("                            harness.md, topology.toml, roles/)");

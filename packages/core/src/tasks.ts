@@ -76,8 +76,6 @@ export interface MaterializedTasks {
 }
 
 export function resolveFile(projectDir: string): string {
-  const envPath = process.env.AUTOLOOP_TASKS_FILE;
-  if (envPath) return envPath;
   return config.resolveTasksFile(projectDir);
 }
 

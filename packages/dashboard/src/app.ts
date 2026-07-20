@@ -12,6 +12,8 @@ export interface DashboardContext {
   registryPath: string;
   journalPath: string;
   stateDir: string;
+  /** Configured project-relative state root used inside isolated worktrees. */
+  stateDirRelativePath?: string;
   bundleRoot: string;
   projectDir: string;
   selfCmd: string;

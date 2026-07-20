@@ -335,7 +335,7 @@ export function resolveJournalFileForRun(
   const resolved = resolveRunJournalPath(
     stateDir,
     runId,
-    config.stateDirName(projectDir),
+    config.stateDirRelativePath(projectDir),
   );
   const journalFile = resolved ?? config.resolveJournalFile(projectDir);
   return { journalFile, runId };
@@ -367,12 +367,18 @@ export function buildLoopContext(
     : config.loadProject(resolvedProjectDir, loadOptions);
   const stateDirAnchor = configWorkDir;
   const stateDirRel = config.stateDirRel(cfg);
-  const stateDir = join(stateDirAnchor, stateDirRel);
+  const stateDir = config.anchorPath(stateDirAnchor, stateDirRel);
   const journalRelPath = config.journalPath(cfg);
-  const journalFile = join(resolvedWorkDir, journalRelPath);
-  const memoryFile = join(resolvedWorkDir, config.memoryPath(cfg));
-  // tasksFile is resolved later, after isolation mode determines effectiveStateDir
-  const runId = nextRunId(journalFile, cfg);
+  const memoryRelPath = config.memoryPath(cfg);
+  const tasksRelPath = config.tasksPath(cfg);
+  const hasExplicitTasksFile = Boolean(config.get(cfg, "core.tasks_file", ""));
+  // Run IDs are allocated from the main checkout's configured journal. In
+  // worktree mode the same relative journal path is then rooted in the tree.
+  const journalFileForRunId = config.anchorPath(
+    resolvedWorkDir,
+    journalRelPath,
+  );
+  const runId = nextRunId(journalFileForRunId, cfg);
   const backendOverride = runOptions.backendOverride || {};
   const logLevel =
     runOptions.logLevel || config.get(cfg, "core.log_level", "info");
@@ -416,7 +422,7 @@ export function buildLoopContext(
       runOptions.mergeStrategy ||
       config.get(cfg, "worktree.merge_strategy", "squash");
     const wt = createWorktree({
-      mainStateDir: join(gitRoot, stateDirRel),
+      mainStateDir: config.anchorPath(gitRoot, stateDirRel),
       runId,
       branchPrefix,
       mergeStrategy,
@@ -426,7 +432,7 @@ export function buildLoopContext(
     worktreeBranch = wt.branch;
     worktreePath = wt.worktreePath;
     worktreeMetaDir = wt.metaDir;
-    effectiveStateDir = join(wt.worktreePath, stateDirRel);
+    effectiveStateDir = config.anchorPath(wt.worktreePath, stateDirRel);
   }
 
   // Compute active profiles: config defaults (unless suppressed) + CLI explicit
@@ -435,17 +441,16 @@ export function buildLoopContext(
   const configDefaults = noDefaults ? [] : config.getProfileDefaults(cfg);
   const activeProfiles = [...configDefaults, ...cliProfiles];
 
-  // Tasks are always per-run: use effectiveStateDir (already per-run for
-  // run-scoped/worktree), or route to runs/<runId>/ for shared mode.
-  const tasksFile =
-    isolation.mode === "run-scoped" || isolation.mode === "worktree"
-      ? join(effectiveStateDir, "tasks.jsonl")
-      : join(stateDir, "runs", runId, "tasks.jsonl");
+  // Explicit stores are project/worktree-relative and must not be replaced by
+  // isolation defaults. An omitted task path remains per-run, rooted in the
+  // effective state dir selected above.
+  const journalFile = config.anchorPath(effectiveWorkDir, journalRelPath);
+  const memoryFile = config.anchorPath(effectiveWorkDir, memoryRelPath);
+  const tasksFile = hasExplicitTasksFile
+    ? config.anchorPath(effectiveWorkDir, tasksRelPath)
+    : join(effectiveStateDir, "tasks.jsonl");
 
-  const runMemoryFile =
-    isolation.mode === "run-scoped" || isolation.mode === "worktree"
-      ? join(effectiveStateDir, "memory.jsonl")
-      : join(stateDir, "runs", runId, "memory.jsonl");
+  const runMemoryFile = join(effectiveStateDir, "memory.jsonl");
 
   // Only paths, runtime, launch, profiles, and store survive — reloadLoop fills the rest from config.
   const seed = {
@@ -453,10 +458,7 @@ export function buildLoopContext(
       projectDir: resolvedProjectDir,
       workDir: effectiveWorkDir,
       stateDir: effectiveStateDir,
-      journalFile:
-        isolation.mode === "worktree"
-          ? join(effectiveStateDir, "journal.jsonl")
-          : journalFile,
+      journalFile,
       memoryFile,
       runMemoryFile,
       tasksFile,

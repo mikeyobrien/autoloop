@@ -297,7 +297,7 @@ export async function release(
 }
 
 /**
- * A TasksApi backed by autoloop's append-only `.autoloop/tasks.jsonl`. Shared by the
+ * A TasksApi backed by Autoloop's configured append-only task store. Shared by the
  * tracker CLIs so the format/ID logic lives in one place.
  */
 export function createJsonlTasksApi(tasksFile: string): TasksApi {
