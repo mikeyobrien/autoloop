@@ -29,25 +29,26 @@ export function dispatchControl(args: string[]): void {
 
   const projectDir = resolveProjectDir();
   const stateDir = config.stateDirPath(projectDir);
+  const stateDirRelativePath = config.stateDirRelativePath(projectDir);
 
   if (sub === "show") {
-    handleShow(stateDir, args.slice(1));
+    handleShow(stateDir, stateDirRelativePath, args.slice(1));
     return;
   }
   if (sub === "capabilities" || sub === "caps") {
-    handleCapabilities(stateDir, args.slice(1));
+    handleCapabilities(stateDir, stateDirRelativePath, args.slice(1));
     return;
   }
   if (sub === "interrupt") {
-    handleInterrupt(stateDir, args.slice(1));
+    handleInterrupt(stateDir, stateDirRelativePath, args.slice(1));
     return;
   }
   if (sub === "guide") {
-    handleGuide(stateDir, args.slice(1));
+    handleGuide(stateDir, stateDirRelativePath, args.slice(1));
     return;
   }
   if (sub === "respond") {
-    handleRespond(stateDir, args.slice(1));
+    handleRespond(stateDir, stateDirRelativePath, args.slice(1));
     return;
   }
 
@@ -62,9 +63,10 @@ function resolveProjectDir(): string {
 
 function resolveRun(
   stateDir: string,
+  stateDirRelativePath: string,
   partial: string,
 ): RunRecord | { error: string } {
-  const result = mergedFindRunByPrefix(stateDir, partial);
+  const result = mergedFindRunByPrefix(stateDir, partial, stateDirRelativePath);
   if (result === undefined) return { error: `No run matching '${partial}'.` };
   if (Array.isArray(result)) {
     const ids = result.map((r) => `  ${r.run_id}`).join("\n");
@@ -90,14 +92,18 @@ function buildSnapshot(run: RunRecord): ControlSnapshot {
   };
 }
 
-function handleShow(stateDir: string, args: string[]): void {
+function handleShow(
+  stateDir: string,
+  stateDirRelativePath: string,
+  args: string[],
+): void {
   const partial = args[0];
   if (!partial) {
     console.log("Usage: autoloop control show <run-id>");
     process.exitCode = 1;
     return;
   }
-  const res = resolveRun(stateDir, partial);
+  const res = resolveRun(stateDir, stateDirRelativePath, partial);
   if ("error" in res) {
     console.log(res.error);
     process.exitCode = 1;
@@ -106,14 +112,18 @@ function handleShow(stateDir: string, args: string[]): void {
   console.log(renderShow(buildSnapshot(res)));
 }
 
-function handleCapabilities(stateDir: string, args: string[]): void {
+function handleCapabilities(
+  stateDir: string,
+  stateDirRelativePath: string,
+  args: string[],
+): void {
   const partial = args[0];
   if (!partial) {
     console.log("Usage: autoloop control capabilities <run-id>");
     process.exitCode = 1;
     return;
   }
-  const res = resolveRun(stateDir, partial);
+  const res = resolveRun(stateDir, stateDirRelativePath, partial);
   if ("error" in res) {
     console.log(res.error);
     process.exitCode = 1;
@@ -123,7 +133,11 @@ function handleCapabilities(stateDir: string, args: string[]): void {
   console.log(renderCapabilities(caps));
 }
 
-function handleRespond(stateDir: string, args: string[]): void {
+function handleRespond(
+  stateDir: string,
+  stateDirRelativePath: string,
+  args: string[],
+): void {
   const runArg = args[0];
   const questionId = args[1];
   const answer = args.slice(2).join(" ");
@@ -134,7 +148,7 @@ function handleRespond(stateDir: string, args: string[]): void {
     process.exitCode = 1;
     return;
   }
-  const res = resolveRun(stateDir, runArg);
+  const res = resolveRun(stateDir, stateDirRelativePath, runArg);
   if ("error" in res) {
     console.log(res.error);
     process.exitCode = 1;
@@ -149,14 +163,18 @@ function handleRespond(stateDir: string, args: string[]): void {
   );
 }
 
-function handleInterrupt(stateDir: string, args: string[]): void {
+function handleInterrupt(
+  stateDir: string,
+  stateDirRelativePath: string,
+  args: string[],
+): void {
   const { runArg, reason } = parseReason(args);
   if (!runArg) {
     console.log("Usage: autoloop control interrupt <run-id> [-m <reason>]");
     process.exitCode = 1;
     return;
   }
-  const res = resolveRun(stateDir, runArg);
+  const res = resolveRun(stateDir, stateDirRelativePath, runArg);
   if ("error" in res) {
     console.log(res.error);
     process.exitCode = 1;
@@ -180,7 +198,11 @@ function handleInterrupt(stateDir: string, args: string[]): void {
   }
 }
 
-function handleGuide(stateDir: string, args: string[]): void {
+function handleGuide(
+  stateDir: string,
+  stateDirRelativePath: string,
+  args: string[],
+): void {
   let runArg = "";
   let noInterrupt = false;
   const messageParts: string[] = [];
@@ -205,7 +227,7 @@ function handleGuide(stateDir: string, args: string[]): void {
     return;
   }
 
-  const res = resolveRun(stateDir, runArg);
+  const res = resolveRun(stateDir, stateDirRelativePath, runArg);
   if ("error" in res) {
     console.log(res.error);
     process.exitCode = 1;

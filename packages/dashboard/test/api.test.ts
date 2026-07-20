@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "@mobrienv/autoloop-dashboard";
@@ -561,26 +567,72 @@ describe("dashboard /api/runs/:id/events", () => {
     expect(body.events[1].topic).toBe("build.blocked");
   });
 
-  it("returns events from a nested custom-root worktree journal", async () => {
+  it("discovers a custom-root chain child across dashboard surfaces", async () => {
     const projectDir = mkdtempSync(join(tmpdir(), "dashboard-nested-state-"));
     const stateDirRelativePath = join(".ralph", "autoloop");
     const stateDir = join(projectDir, stateDirRelativePath);
     const registryPath = join(stateDir, "registry.jsonl");
     const journalPath = join(stateDir, "journal.jsonl");
-    const runId = "run-wt-nested";
-    const worktreeStateDir = join(
+    const childStateDir = join(
       stateDir,
-      "worktrees",
-      runId,
-      "tree",
+      "chains",
+      "chain-custom",
+      "step-1",
       stateDirRelativePath,
     );
-    mkdirSync(worktreeStateDir, { recursive: true });
+    const runId = "run-chain-nested";
+    const runStateDir = join(childStateDir, "runs", runId);
+    const runJournal = join(runStateDir, "journal.jsonl");
+    const workDir = join(projectDir, "child-work");
+    const now = new Date().toISOString();
+
+    mkdirSync(runStateDir, { recursive: true });
+    mkdirSync(workDir, { recursive: true });
     writeFileSync(registryPath, "", "utf-8");
     writeFileSync(journalPath, "", "utf-8");
+    writeFileSync(join(workDir, "result.md"), "# Child result\n", "utf-8");
     writeFileSync(
-      join(worktreeStateDir, "journal.jsonl"),
-      `${makeEvent(runId, "nested.found", 1)}\n`,
+      runJournal,
+      `${JSON.stringify({
+        run: runId,
+        topic: "loop.start",
+        iteration: "1",
+        timestamp: now,
+        fields: { preset: "autocode" },
+      })}\n${JSON.stringify({
+        run: runId,
+        topic: "artifact.created",
+        iteration: "1",
+        timestamp: now,
+        fields: { path: "result.md", kind: "report", title: "Child result" },
+      })}\n`,
+      "utf-8",
+    );
+    writeFileSync(
+      join(childStateDir, "registry.jsonl"),
+      `${JSON.stringify({
+        run_id: runId,
+        status: "running",
+        preset: "autocode",
+        objective: "nested state root chain child",
+        trigger: "chain",
+        project_dir: projectDir,
+        work_dir: workDir,
+        state_dir: runStateDir,
+        journal_file: runJournal,
+        parent_run_id: "chain-custom",
+        backend: "mock",
+        backend_args: [],
+        created_at: now,
+        updated_at: now,
+        iteration: 1,
+        max_iterations: 10,
+        stop_reason: "",
+        latest_event: "artifact.created",
+        isolation_mode: "run-scoped",
+        worktree_name: "",
+        worktree_path: "",
+      })}\n`,
       "utf-8",
     );
 
@@ -595,11 +647,46 @@ describe("dashboard /api/runs/:id/events", () => {
       listPresets: () => [],
     });
 
-    const res = await app.request(`/api/runs/${runId}/events`);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.events).toHaveLength(1);
-    expect(body.events[0].topic).toBe("nested.found");
+    const list = await app.request("/api/runs");
+    expect(list.status).toBe(200);
+    const listBody = await list.json();
+    const listed = [
+      ...listBody.active,
+      ...listBody.watching,
+      ...listBody.stuck,
+      ...listBody.recentFailed,
+      ...listBody.recentCompleted,
+    ];
+    expect(listed.some((run: { run_id: string }) => run.run_id === runId)).toBe(
+      true,
+    );
+
+    const prefix = "run-chain-nest";
+    const details = await app.request(`/api/runs/${prefix}`);
+    expect(details.status).toBe(200);
+    expect((await details.json()).run_id).toBe(runId);
+
+    const events = await app.request(`/api/runs/${prefix}/events`);
+    expect(events.status).toBe(200);
+    expect((await events.json()).events).toHaveLength(2);
+
+    const artifacts = await app.request(`/api/runs/${prefix}/artifacts`);
+    expect(artifacts.status).toBe(200);
+    const artifactsBody = await artifacts.json();
+    expect(artifactsBody.runId).toBe(runId);
+    expect(artifactsBody.documents).toContainEqual(
+      expect.objectContaining({ path: "result.md", missing: false }),
+    );
+
+    const guide = await app.request(`/api/runs/${prefix}/guide`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: "check nested journal" }),
+    });
+    expect(guide.status).toBe(200);
+    const updatedJournal = readFileSync(runJournal, "utf-8");
+    expect(updatedJournal).toContain('"topic": "operator.guidance"');
+    expect(updatedJournal).toContain("check nested journal");
   });
 });
 

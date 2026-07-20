@@ -33,7 +33,7 @@ function enrichRecords(stateDir: string, records: RunRecord[]): void {
 export function buildRunsPayload(
   ctx: DashboardContext,
 ): ReturnType<typeof categorizeRuns> {
-  const result = categorizeRuns(ctx.stateDir);
+  const result = categorizeRuns(ctx.stateDir, ctx.stateDirRelativePath);
   for (const bucket of [
     result.active,
     result.watching,
@@ -53,7 +53,11 @@ export function apiRoutes(ctx: DashboardContext): Hono {
 
   api.get("/runs/:id", (c) => {
     const id = c.req.param("id");
-    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    const result = mergedFindRunByPrefix(
+      ctx.stateDir,
+      id,
+      ctx.stateDirRelativePath,
+    );
     if (result === undefined) {
       return c.json({ error: "not found" }, 404);
     }
@@ -69,7 +73,11 @@ export function apiRoutes(ctx: DashboardContext): Hono {
 
   api.get("/runs/:id/events", (c) => {
     const id = c.req.param("id");
-    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    const result = mergedFindRunByPrefix(
+      ctx.stateDir,
+      id,
+      ctx.stateDirRelativePath,
+    );
     if (Array.isArray(result)) {
       return c.json(
         { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
@@ -96,7 +104,11 @@ export function apiRoutes(ctx: DashboardContext): Hono {
 
   api.get("/runs/:id/artifacts", (c) => {
     const id = c.req.param("id");
-    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    const result = mergedFindRunByPrefix(
+      ctx.stateDir,
+      id,
+      ctx.stateDirRelativePath,
+    );
     if (Array.isArray(result)) {
       return c.json(
         { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
@@ -130,7 +142,11 @@ export function apiRoutes(ctx: DashboardContext): Hono {
       return c.json({ error: "only .md files supported" }, 400);
     }
     const id = c.req.param("id");
-    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    const result = mergedFindRunByPrefix(
+      ctx.stateDir,
+      id,
+      ctx.stateDirRelativePath,
+    );
     if (Array.isArray(result)) {
       return c.json(
         { error: "ambiguous prefix", candidates: result.map((r) => r.run_id) },
@@ -163,7 +179,11 @@ export function apiRoutes(ctx: DashboardContext): Hono {
 
   api.post("/runs/:id/guide", async (c) => {
     const id = c.req.param("id");
-    const result = mergedFindRunByPrefix(ctx.stateDir, id);
+    const result = mergedFindRunByPrefix(
+      ctx.stateDir,
+      id,
+      ctx.stateDirRelativePath,
+    );
     if (result === undefined) {
       return c.json({ error: "not found" }, 404);
     }
@@ -188,7 +208,7 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     const runId = result.run_id;
     const journalPath =
       result.journal_file ||
-      resolveRunJournalPath(ctx.stateDir, runId) ||
+      resolveRunJournalPath(ctx.stateDir, runId, ctx.stateDirRelativePath) ||
       ctx.journalPath;
     const iteration = latestIterationForRun(journalPath, runId) || "1";
     appendOperatorEvent(
