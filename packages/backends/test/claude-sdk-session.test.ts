@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -20,6 +21,7 @@ import {
   terminateClaudeSdkSession,
 } from "@mobrienv/autoloop-backends/claude-sdk-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveClaudeCodeExecutable } from "../src/claude-executable.js";
 
 interface MockQuery {
   /** User messages the SDK pulled from the streaming-input iterable. */
@@ -316,6 +318,7 @@ describe("initClaudeSdkSession", () => {
           expect(message).toMatch(/claude/i);
           expect(message).toMatch(/executable/i);
           expect(message).toMatch(/PATH/i);
+          expect(query).not.toHaveBeenCalled();
         } finally {
           if ("session" in outcome) {
             await terminateClaudeSdkSession(outcome.session);
@@ -324,6 +327,95 @@ describe("initClaudeSdkSession", () => {
       });
     } finally {
       rmSync(emptyPath, { force: true, recursive: true });
+    }
+  });
+
+  it("keeps the SDK default under ordinary Bun and honors explicit commands", async () => {
+    await withBunMain("/work/autoloop.ts", async () => {
+      expect(
+        resolveClaudeCodeExecutable({ cwd: "/work", env: {} }),
+      ).toBeUndefined();
+    });
+    await withBunMain("/$bunfs/root/autoloop", async () => {
+      expect(
+        resolveClaudeCodeExecutable({
+          command: "custom-claude",
+          cwd: "/work",
+          env: {},
+        }),
+      ).toBe("custom-claude");
+    });
+  });
+
+  it("selects the first regular executable in standalone PATH order", async () => {
+    const directoryCandidate = mkdtempSync(
+      join(tmpdir(), "autoloop-claude-directory-"),
+    );
+    const nonExecutable = mkdtempSync(
+      join(tmpdir(), "autoloop-claude-nonexec-"),
+    );
+    const firstExecutable = mkdtempSync(
+      join(tmpdir(), "autoloop-claude-first-"),
+    );
+    const laterExecutable = mkdtempSync(
+      join(tmpdir(), "autoloop-claude-later-"),
+    );
+    mkdirSync(join(directoryCandidate, "claude"));
+    writeFileSync(join(nonExecutable, "claude"), "not executable", "utf-8");
+    for (const directory of [firstExecutable, laterExecutable]) {
+      writeFileSync(join(directory, "claude"), "#!/bin/sh\n", "utf-8");
+      chmodSync(join(directory, "claude"), 0o755);
+    }
+
+    try {
+      await withBunMain("/$bunfs/root/autoloop", async () => {
+        expect(
+          resolveClaudeCodeExecutable({
+            cwd: "/work",
+            env: {
+              PATH: [
+                directoryCandidate,
+                nonExecutable,
+                firstExecutable,
+                laterExecutable,
+              ].join(":"),
+            },
+          }),
+        ).toBe(join(firstExecutable, "claude"));
+      });
+    } finally {
+      for (const directory of [
+        directoryCandidate,
+        nonExecutable,
+        firstExecutable,
+        laterExecutable,
+      ]) {
+        rmSync(directory, { force: true, recursive: true });
+      }
+    }
+  });
+
+  it("uses the session cwd for empty PATH segments", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "autoloop-claude-cwd-"));
+    const executable = join(cwd, "claude");
+    writeFileSync(executable, "#!/bin/sh\n", "utf-8");
+    chmodSync(executable, 0o755);
+
+    try {
+      await withBunMain("/$bunfs/root/autoloop", async () => {
+        expect(resolveClaudeCodeExecutable({ cwd, env: { PATH: "" } })).toBe(
+          executable,
+        );
+        chmodSync(executable, 0o644);
+        expect(() =>
+          resolveClaudeCodeExecutable({ cwd, env: { PATH: "" } }),
+        ).toThrow(/executable.*PATH/i);
+        expect(() => resolveClaudeCodeExecutable({ cwd, env: {} })).toThrow(
+          /executable.*PATH/i,
+        );
+      });
+    } finally {
+      rmSync(cwd, { force: true, recursive: true });
     }
   });
 

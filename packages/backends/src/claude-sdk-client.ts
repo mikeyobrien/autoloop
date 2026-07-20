@@ -8,6 +8,7 @@ import type {
   SDKResultMessage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { resolveClaudeCodeExecutable } from "./claude-executable.js";
 import {
   commandFloorDecision,
   extractCommandFromToolInput,
@@ -160,6 +161,7 @@ class PushableInput implements AsyncIterable<SDKUserMessage> {
 export async function initClaudeSdkSession(
   opts: ClaudeSdkClientOptions,
 ): Promise<ClaudeSdkSession> {
+  const executable = resolveClaudeCodeExecutable(opts);
   const { query } = await import("@anthropic-ai/claude-agent-sdk");
 
   const abortController = new AbortController();
@@ -175,7 +177,7 @@ export async function initClaudeSdkSession(
     includePartialMessages: opts.verbose === true,
   };
   if (opts.model) options.model = opts.model;
-  if (opts.command) options.pathToClaudeCodeExecutable = opts.command;
+  if (executable) options.pathToClaudeCodeExecutable = executable;
   if (opts.trustAllTools) {
     // Parity with the injected --dangerously-skip-permissions of the shell path.
     options.permissionMode = "bypassPermissions";
