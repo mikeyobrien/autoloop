@@ -61,10 +61,10 @@ describe("readAllJournals", () => {
     expect(lines).toHaveLength(0);
   });
 
-  it("merges journals from a recorded default child under a custom parent", () => {
+  it("merges journals from an anchored default child under a custom parent", () => {
     const parentStateDirRel = join(".ralph", "autoloop");
     const stepDir = join(tmpDir, "chains", "chain-mixed", "step-1");
-    const childStateDir = join(stepDir, ".autoloop");
+    const childStateDir = join(tmpDir, "project-default-state");
     const worktreeStateDir = join(
       childStateDir,
       "worktrees",
@@ -73,7 +73,12 @@ describe("readAllJournals", () => {
       ".autoloop",
     );
     mkdirSync(worktreeStateDir, { recursive: true });
-    writeChainStepStateLayout(stepDir, ".autoloop");
+    writeChainStepStateLayout(stepDir, ".autoloop", childStateDir);
+    writeChainStepStateLayout(
+      join(tmpDir, "chains", "chain-mixed", "step-2"),
+      ".autoloop",
+      childStateDir,
+    );
     writeFileSync(
       join(childStateDir, "journal.jsonl"),
       `${journalLine("child-direct", "loop.start", "2026-01-01T00:00:01Z")}\n`,

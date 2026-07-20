@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 import {
   generateCompactId,
   generateReadableId,
@@ -207,12 +207,20 @@ async function runSteps(
     completed,
     runOptions.prompt ?? null,
   );
+  const stepStateAnchor = tryResolveGitRoot(stepWorkDir) ?? stepWorkDir;
   const stepConfig = config.loadProject(presetDir, {
     presetName: basename(presetDir),
-    workDir: tryResolveGitRoot(stepWorkDir) ?? stepWorkDir,
+    workDir: stepStateAnchor,
     cliOverride: runOptions.configOverride,
   });
-  writeChainStepStateLayout(stepWorkDir, config.stateDirRel(stepConfig));
+  const stepStateDirRel = config.stateDirRel(stepConfig);
+  writeChainStepStateLayout(
+    stepWorkDir,
+    stepStateDirRel,
+    isAbsolute(stepStateDirRel)
+      ? stepStateDirRel
+      : join(stepStateAnchor, stepStateDirRel),
+  );
   appendChainEvent(
     journalFile,
     chainRunId,

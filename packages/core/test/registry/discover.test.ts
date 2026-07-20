@@ -84,6 +84,24 @@ describe("discoverChainRegistries", () => {
     ).toEqual([join(childStateDir, "registry.jsonl")]);
   });
 
+  it("reads metadata written before explicit state roots were recorded", () => {
+    const stepDir = join(stateDir, "chains", "chain-old-metadata", "step-1");
+    const childStateDir = join(stepDir, ".autoloop");
+    mkdirSync(childStateDir, { recursive: true });
+    writeFileSync(
+      join(stepDir, "state-layout.json"),
+      `${JSON.stringify({ version: 1, state_dir: ".autoloop" })}\n`,
+      "utf-8",
+    );
+    writeJsonl(join(childStateDir, "registry.jsonl"), [
+      makeRecord({ run_id: "old-metadata" }),
+    ]);
+
+    expect(discoverChainRegistries(stateDir)).toEqual([
+      join(childStateDir, "registry.jsonl"),
+    ]);
+  });
+
   it("supports an explicitly recorded absolute child state root", () => {
     const stepDir = join(stateDir, "chains", "chain-absolute", "step-1");
     const childStateDir = join(stateDir, "absolute-child-state");
@@ -136,10 +154,10 @@ describe("discoverChainRegistries", () => {
     expect(found[0]).toContain("worktrees");
   });
 
-  it("uses recorded default child layout when the parent root is custom", () => {
+  it("uses a recorded anchored child root when the parent root is custom", () => {
     const parentStateDirRel = join(".ralph", "autoloop");
     const stepDir = join(stateDir, "chains", "chain-mixed", "step-1");
-    const direct = join(stepDir, ".autoloop");
+    const direct = join(stateDir, "project-default-state");
     const worktree = join(
       direct,
       "worktrees",
@@ -148,7 +166,7 @@ describe("discoverChainRegistries", () => {
       ".autoloop",
     );
     mkdirSync(worktree, { recursive: true });
-    writeChainStepStateLayout(stepDir, ".autoloop");
+    writeChainStepStateLayout(stepDir, ".autoloop", direct);
     writeJsonl(join(direct, "registry.jsonl"), [
       makeRecord({ run_id: "mixed-direct" }),
     ]);

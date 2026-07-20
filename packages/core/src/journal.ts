@@ -6,6 +6,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   writeSync,
 } from "node:fs";
@@ -175,20 +176,32 @@ export function latestIterationForRun(path: string, runId: string): string {
   return current;
 }
 
+function appendJournal(
+  allLines: string[],
+  seenPaths: Set<string>,
+  path: string,
+): void {
+  if (!existsSync(path)) return;
+  const canonicalPath = realpathSync(path);
+  if (seenPaths.has(canonicalPath)) return;
+  seenPaths.add(canonicalPath);
+  allLines.push(...readLines(path));
+}
+
 function appendStateJournals(
   allLines: string[],
+  seenPaths: Set<string>,
   baseStateDir: string,
   stateDirRel: string,
 ): void {
-  const topLevel = join(baseStateDir, "journal.jsonl");
-  if (existsSync(topLevel)) allLines.push(...readLines(topLevel));
+  appendJournal(allLines, seenPaths, join(baseStateDir, "journal.jsonl"));
 
   const runsDir = join(baseStateDir, "runs");
   if (existsSync(runsDir)) {
     for (const entry of readdirSync(runsDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const runJournal = join(runsDir, entry.name, "journal.jsonl");
-      if (existsSync(runJournal)) allLines.push(...readLines(runJournal));
+      appendJournal(allLines, seenPaths, runJournal);
     }
   }
 
@@ -198,7 +211,7 @@ function appendStateJournals(
       ? stateDirRel
       : join(treeDir, stateDirRel);
     const wtJournal = join(wtStateDir, "journal.jsonl");
-    if (existsSync(wtJournal)) allLines.push(...readLines(wtJournal));
+    appendJournal(allLines, seenPaths, wtJournal);
   }
 }
 
@@ -222,13 +235,19 @@ export function readAllJournals(
   stateDirRel: string = basename(baseStateDir),
 ): string[] {
   const allLines: string[] = [];
-  appendStateJournals(allLines, baseStateDir, stateDirRel);
+  const seenPaths = new Set<string>();
+  appendStateJournals(allLines, seenPaths, baseStateDir, stateDirRel);
 
   for (const layout of discoverChainStepStateLayouts(
     baseStateDir,
     stateDirRel,
   )) {
-    appendStateJournals(allLines, layout.stateDir, layout.stateDirRel);
+    appendStateJournals(
+      allLines,
+      seenPaths,
+      layout.stateDir,
+      layout.stateDirRel,
+    );
   }
 
   // Sort by timestamp field if present

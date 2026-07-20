@@ -1,8 +1,10 @@
+import { execFileSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -55,6 +57,16 @@ describe("integration: heterogeneous chain child state layout", () => {
       "utf-8",
     );
 
+    execFileSync("git", ["init", "-q"], { cwd: project });
+    execFileSync("git", ["config", "user.email", "test@example.com"], {
+      cwd: project,
+    });
+    execFileSync("git", ["config", "user.name", "Integration Test"], {
+      cwd: project,
+    });
+    execFileSync("git", ["add", "."], { cwd: project });
+    execFileSync("git", ["commit", "-qm", "fixture"], { cwd: project });
+
     const result = runCli(
       ["run", "--chain", "normal-child", project, "mixed state roots"],
       { MOCK_FIXTURE_PATH: join(FIXTURES_DIR, "complete-success.json") },
@@ -68,12 +80,16 @@ describe("integration: heterogeneous chain child state layout", () => {
       .find((entry) => existsSync(join(entry, "step-1")));
     expect(chainDir).toBeDefined();
     const stepDir = join(chainDir ?? "", "step-1");
-    expect(
-      JSON.parse(readFileSync(join(stepDir, "state-layout.json"), "utf-8")),
-    ).toEqual({ version: 1, state_dir: ".autoloop" });
+    const layout = JSON.parse(
+      readFileSync(join(stepDir, "state-layout.json"), "utf-8"),
+    ) as { version: number; state_dir: string; state_root: string };
+    expect(layout).toMatchObject({ version: 1, state_dir: ".autoloop" });
+    expect(realpathSync(layout.state_root)).toBe(
+      realpathSync(join(project, ".autoloop")),
+    );
 
     const records = readFileSync(
-      join(stepDir, ".autoloop", "registry.jsonl"),
+      join(layout.state_root, "registry.jsonl"),
       "utf-8",
     )
       .trim()

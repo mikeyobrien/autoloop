@@ -13,6 +13,7 @@ export const CHAIN_STEP_STATE_FILE = "state-layout.json";
 interface ChainStepStateMetadata {
   version: 1;
   state_dir: string;
+  state_root?: string;
 }
 
 export interface ChainStepStateLayout {
@@ -36,7 +37,9 @@ function statePath(stepDir: string, stateDirRel: string): string {
   return isAbsolute(stateDirRel) ? stateDirRel : join(stepDir, stateDirRel);
 }
 
-function readRecordedStateDir(stepDir: string): string | null {
+function readRecordedStateLayout(
+  stepDir: string,
+): Omit<ChainStepStateLayout, "stepDir"> | null {
   try {
     const parsed = JSON.parse(
       readFileSync(join(stepDir, CHAIN_STEP_STATE_FILE), "utf-8"),
@@ -48,7 +51,11 @@ function readRecordedStateDir(stepDir: string): string | null {
     ) {
       return null;
     }
-    return parsed.state_dir;
+    const stateRoot =
+      typeof parsed.state_root === "string" && parsed.state_root.trim() !== ""
+        ? parsed.state_root
+        : statePath(stepDir, parsed.state_dir);
+    return { stateDir: stateRoot, stateDirRel: parsed.state_dir };
   } catch {
     return null;
   }
@@ -58,11 +65,13 @@ function readRecordedStateDir(stepDir: string): string | null {
 export function writeChainStepStateLayout(
   stepDir: string,
   stateDirRel: string,
+  stateDir: string = statePath(stepDir, stateDirRel),
 ): void {
   mkdirSync(stepDir, { recursive: true });
   const metadata: ChainStepStateMetadata = {
     version: 1,
     state_dir: stateDirRel,
+    state_root: stateDir,
   };
   writeFileSync(
     join(stepDir, CHAIN_STEP_STATE_FILE),
@@ -86,11 +95,16 @@ export function discoverChainStepStateLayouts(
       const stepName = stepDir.slice(chainDir.length + 1);
       if (!/^step-\d+$/.test(stepName)) continue;
 
-      const recorded = readRecordedStateDir(stepDir);
-      const candidates = recorded
-        ? [recorded]
-        : [...new Set([DEFAULT_STATE_DIR, parentStateDirRel])];
-      for (const stateDirRel of candidates) {
+      const recorded = readRecordedStateLayout(stepDir);
+      if (recorded) {
+        layouts.push({ stepDir, ...recorded });
+        continue;
+      }
+
+      for (const stateDirRel of new Set([
+        DEFAULT_STATE_DIR,
+        parentStateDirRel,
+      ])) {
         layouts.push({
           stepDir,
           stateDir: statePath(stepDir, stateDirRel),
