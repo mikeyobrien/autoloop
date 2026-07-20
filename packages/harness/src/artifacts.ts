@@ -167,7 +167,10 @@ export function collectArtifacts(
 
   // Fallback: scan for frontmatter if no artifact.created events found
   if (documents.length === 0 && workDir) {
-    const scanned = scanFrontmatterArtifacts(workDir);
+    const scanned = scanFrontmatterArtifacts(
+      workDir,
+      config.stateDirName(projectDir),
+    );
     for (const doc of scanned) {
       if (!documentPaths.has(doc.path)) {
         documentPaths.add(doc.path);
@@ -333,10 +336,16 @@ function formatBytes(bytes: number): string {
  * Scan a directory for .md files with autoloop frontmatter.
  * Checks first 20 lines for `autoloop:` in YAML frontmatter.
  */
-function scanFrontmatterArtifacts(dir: string): DocumentArtifact[] {
+function scanFrontmatterArtifacts(
+  dir: string,
+  stateDirName: string,
+): DocumentArtifact[] {
   const results: DocumentArtifact[] = [];
+  // Only the top path segment matters at depth 0 (e.g. ".ralph" for
+  // ".ralph/autoloop"); recursion descends into the rest normally.
+  const stateDirTop = stateDirName.split(/[\\/]/)[0];
   try {
-    scanDir(dir, dir, results, 0);
+    scanDir(dir, dir, results, 0, stateDirTop);
   } catch {
     // ignore filesystem errors
   }
@@ -348,6 +357,7 @@ function scanDir(
   currentDir: string,
   results: DocumentArtifact[],
   depth: number,
+  stateDirTop: string,
 ): void {
   if (depth > 4) return; // limit recursion depth
   try {
@@ -356,14 +366,14 @@ function scanDir(
       if (
         entry.name.startsWith(".") &&
         depth === 0 &&
-        entry.name !== ".autoloop"
+        entry.name !== stateDirTop
       )
         continue;
       if (entry.name === "node_modules") continue;
       if (entry.isSymbolicLink()) continue;
       const fullPath = join(currentDir, entry.name);
       if (entry.isDirectory()) {
-        scanDir(baseDir, fullPath, results, depth + 1);
+        scanDir(baseDir, fullPath, results, depth + 1, stateDirTop);
       } else if (entry.isFile() && extname(entry.name) === ".md") {
         const doc = checkFrontmatter(baseDir, fullPath);
         if (doc) results.push(doc);

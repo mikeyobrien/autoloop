@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { parseFlag } from "@mobrienv/autoloop-core";
+import * as config from "@mobrienv/autoloop-core/config";
 import type {
   DiffWorktreeResult,
   MergeOpts,
@@ -17,7 +18,7 @@ import { formatTime } from "../loops/render.js";
 
 export function dispatchWorktree(args: string[]): void {
   const projectDir = resolveProjectDir();
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
 
   if (args.length === 0 || args[0] === "list") {
     listWorktrees(stateDir);

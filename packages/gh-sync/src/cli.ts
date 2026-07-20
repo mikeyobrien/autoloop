@@ -12,10 +12,36 @@ import {
 import type { GhSyncConfig } from "./adapter.js";
 import { GhAdapter } from "./adapter.js";
 
+/**
+ * Resolve the state-root directory for issue-sync files.
+ *
+ * gh-sync runs as a standalone hook binary and cannot load the full autoloop
+ * preset, so it honors this runtime contract instead:
+ *  1. `AUTOLOOP_STATE_DIR` env var (set by the harness) — highest priority.
+ *  2. `core.state_dir` read directly from `<projectDir>/autoloops.toml`.
+ *  3. The `.autoloop` default.
+ * (The task store additionally honors `AUTOLOOP_TASKS_FILE`; see `tasksFileFor`.)
+ */
+function stateDirFor(projectDir: string): string {
+  const envDir = process.env.AUTOLOOP_STATE_DIR;
+  if (envDir) return envDir;
+  let stateName = ".autoloop";
+  try {
+    const raw = readFileSync(join(projectDir, "autoloops.toml"), "utf-8");
+    const m = raw.match(/^\s*state_dir\s*=\s*"([^"]+)"/m);
+    if (m) stateName = m[1];
+  } catch {
+    // No project config: fall back to the default state root.
+  }
+  return join(projectDir, stateName);
+}
+
 function loadIssueSyncConfig(projectDir: string): IssueSyncConfig {
-  const tomlPath = join(projectDir, ".autoloop", "issue-sync.toml");
+  const tomlPath = join(stateDirFor(projectDir), "issue-sync.toml");
   if (!existsSync(tomlPath)) {
-    throw new Error(`No .autoloop/issue-sync.toml found in ${projectDir}`);
+    throw new Error(
+      `No issue-sync.toml found under ${stateDirFor(projectDir)}`,
+    );
   }
   const raw = readFileSync(tomlPath, "utf-8");
   const repoMatch = raw.match(/^\s*repo\s*=\s*"([^"]+)"/m);
@@ -37,7 +63,7 @@ function git(args: string[]): string | undefined {
 function tasksFileFor(projectDir: string): string {
   return (
     process.env.AUTOLOOP_TASKS_FILE ??
-    join(projectDir, ".autoloop", "tasks.jsonl")
+    join(stateDirFor(projectDir), "tasks.jsonl")
   );
 }
 
@@ -46,7 +72,7 @@ async function main() {
   const subcommand = cliArgs[0];
   const projectDir = process.env.AUTOLOOP_PROJECT_DIR ?? process.cwd();
   const runId = process.env.AUTOLOOP_RUN_ID ?? "";
-  const stateFile = join(projectDir, ".autoloop", "issue-sync-state.json");
+  const stateFile = join(stateDirFor(projectDir), "issue-sync-state.json");
 
   if (!subcommand || subcommand === "--help" || subcommand === "help") {
     console.log("Usage: autoloop-gh-sync <pull|push|release> [options]");

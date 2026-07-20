@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { isProcessAlive, parseFlag } from "@mobrienv/autoloop-core";
+import * as config from "@mobrienv/autoloop-core/config";
 import { cleanRunScopedDirs } from "@mobrienv/autoloop-core/isolation/run-scope";
 import { activeRuns } from "@mobrienv/autoloop-core/registry/read";
 import { appendRegistryEntry } from "@mobrienv/autoloop-core/registry/update";
@@ -8,7 +9,7 @@ const DEFAULT_MAX_AGE_DAYS = 7;
 
 export function dispatchRuns(args: string[]): void {
   const projectDir = process.env.AUTOLOOP_PROJECT_DIR || ".";
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
 
   const sub = args[0] ?? "";
 

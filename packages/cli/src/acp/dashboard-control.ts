@@ -8,6 +8,7 @@
 
 import { join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
+import * as config from "@mobrienv/autoloop-core/config";
 import type { DashboardContext } from "@mobrienv/autoloop-dashboard";
 import { createApp } from "@mobrienv/autoloop-dashboard";
 import { listPresetsWithDescriptions } from "../chains/load.js";
@@ -125,10 +126,10 @@ export class DashboardControl {
     projectDir?: string,
   ): Promise<RunningDashboard> {
     const resolved = resolve(projectDir ?? this.opts.projectDir);
-    const stateDir = join(resolved, ".autoloop");
+    const stateDir = config.stateDirPath(resolved);
     const ctx: DashboardContext = {
       registryPath: join(stateDir, "registry.jsonl"),
-      journalPath: join(stateDir, "journal.jsonl"),
+      journalPath: config.resolveJournalFile(resolved),
       stateDir,
       bundleRoot: this.opts.bundleRoot,
       projectDir: resolved,

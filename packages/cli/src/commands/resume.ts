@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import * as config from "@mobrienv/autoloop-core/config";
 import { findRunByPrefix } from "@mobrienv/autoloop-core/registry/read";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import * as harness from "@mobrienv/autoloop-harness";
@@ -40,7 +41,7 @@ export async function dispatchResume(
   }
 
   const projectDir = process.env.AUTOLOOP_PROJECT_DIR || ".";
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
   const registryFile = join(stateDir, "registry.jsonl");
 
   const lookup = findRunByPrefix(registryFile, parsed.runId);

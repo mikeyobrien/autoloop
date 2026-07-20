@@ -332,7 +332,11 @@ export function resolveJournalFileForRun(
   runId: string,
 ): { journalFile: string; runId: string } {
   const stateDir = config.stateDirPath(projectDir);
-  const resolved = resolveRunJournalPath(stateDir, runId);
+  const resolved = resolveRunJournalPath(
+    stateDir,
+    runId,
+    config.stateDirName(projectDir),
+  );
   const journalFile = resolved ?? config.resolveJournalFile(projectDir);
   return { journalFile, runId };
 }
@@ -362,16 +366,11 @@ export function buildLoopContext(
     ? config.loadProjectFromFile(presetFile, loadOptions)
     : config.loadProject(resolvedProjectDir, loadOptions);
   const stateDirAnchor = configWorkDir;
-  const stateDir = join(
-    stateDirAnchor,
-    config.get(cfg, "core.state_dir", ".autoloop"),
-  );
+  const stateDirRel = config.stateDirRel(cfg);
+  const stateDir = join(stateDirAnchor, stateDirRel);
   const journalRelPath = config.journalPath(cfg);
   const journalFile = join(resolvedWorkDir, journalRelPath);
-  const memoryFile = join(
-    resolvedWorkDir,
-    config.get(cfg, "core.memory_file", ".autoloop/memory.jsonl"),
-  );
+  const memoryFile = join(resolvedWorkDir, config.memoryPath(cfg));
   // tasksFile is resolved later, after isolation mode determines effectiveStateDir
   const runId = nextRunId(journalFile, cfg);
   const backendOverride = runOptions.backendOverride || {};
@@ -417,10 +416,7 @@ export function buildLoopContext(
       runOptions.mergeStrategy ||
       config.get(cfg, "worktree.merge_strategy", "squash");
     const wt = createWorktree({
-      mainStateDir: join(
-        gitRoot,
-        config.get(cfg, "core.state_dir", ".autoloop"),
-      ),
+      mainStateDir: join(gitRoot, stateDirRel),
       runId,
       branchPrefix,
       mergeStrategy,
@@ -430,10 +426,7 @@ export function buildLoopContext(
     worktreeBranch = wt.branch;
     worktreePath = wt.worktreePath;
     worktreeMetaDir = wt.metaDir;
-    effectiveStateDir = join(
-      wt.worktreePath,
-      config.get(cfg, "core.state_dir", ".autoloop"),
-    );
+    effectiveStateDir = join(wt.worktreePath, stateDirRel);
   }
 
   // Compute active profiles: config defaults (unless suppressed) + CLI explicit

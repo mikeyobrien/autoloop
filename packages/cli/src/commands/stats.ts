@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import { collectUsage } from "@mobrienv/autoloop-core";
+import * as config from "@mobrienv/autoloop-core/config";
 import { readRunJournal } from "@mobrienv/autoloop-core/journal";
 import { readRegistry } from "@mobrienv/autoloop-core/registry/read";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
@@ -40,7 +41,7 @@ export function dispatchStats(args: string[]): void {
     else positionals.push(arg);
   }
   const projectDir = positionals[0] ?? resolveRuntimeProjectDir();
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
   const records = readRegistry(join(stateDir, "registry.jsonl"));
   const stats = computeStats(records, (runId) =>
     readRunJournal(stateDir, runId),

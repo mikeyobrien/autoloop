@@ -5,6 +5,7 @@
 // ready follow-up commands so the next action never needs a docs lookup.
 
 import { join } from "node:path";
+import * as config from "@mobrienv/autoloop-core/config";
 import { readRunJournal } from "@mobrienv/autoloop-core/journal";
 import { readRegistry } from "@mobrienv/autoloop-core/registry/read";
 import { healthJson, listRunsJson } from "../loops/json.js";
@@ -12,7 +13,7 @@ import { runDoctorChecks } from "./doctor.js";
 import { computeStats } from "./stats.js";
 
 export function triageJson(projectDir: string): string {
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
   const records = readRegistry(join(stateDir, "registry.jsonl"));
   const doctor = runDoctorChecks(projectDir);
   const failures = doctor.filter((c) => c.status === "fail");

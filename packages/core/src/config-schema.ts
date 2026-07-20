@@ -5,11 +5,13 @@
 // ./config.ts and re-exports the public pieces from this module so callers
 // keep a single import surface (`import * as config from "./config.js"`).
 
+import { join } from "node:path";
 import TOML from "@iarna/toml";
 import { MAX_TIMER_MS, parseDurationMs } from "./duration.js";
 import { parseStringList } from "./utils.js";
 
-const DEFAULT_JOURNAL_FILE = ".autoloop/journal.jsonl";
+/** The `.autoloop` default state root for ordinary standalone usage. */
+export const DEFAULT_STATE_DIR = ".autoloop";
 
 export type Config = Record<string, unknown>;
 export type Provenance = Record<string, string>;
@@ -82,10 +84,14 @@ export function defaults(): Config {
     },
     memory: { prompt_budget_chars: "8000" },
     core: {
-      state_dir: ".autoloop",
+      state_dir: DEFAULT_STATE_DIR,
+      // Empty by default: journal/events/memory/tasks paths derive from
+      // core.state_dir unless a caller sets an explicit path here, which then
+      // wins (see journalPath/memoryPath/tasksPath).
       journal_file: "",
       events_file: "",
-      memory_file: ".autoloop/memory.jsonl",
+      memory_file: "",
+      tasks_file: "",
       run_id_format: "human",
       log_level: "info",
     },
@@ -143,12 +149,47 @@ export function put(config: Config, key: string, value: string): Config {
   return putPath(config, key.split("."), value);
 }
 
+/**
+ * The configured state-root name (relative to the project/work dir). This is
+ * the single seam every derived path hangs off of; ordinary standalone usage
+ * resolves to {@link DEFAULT_STATE_DIR}.
+ */
+export function stateDirRel(config: Config): string {
+  return get(config, "core.state_dir", DEFAULT_STATE_DIR);
+}
+
+/**
+ * Relative journal path. Explicit `core.journal_file` wins, then the legacy
+ * `core.events_file` alias, otherwise it derives from `core.state_dir`.
+ */
 export function journalPath(config: Config): string {
   const journalFile = get(config, "core.journal_file", "");
   if (journalFile) return journalFile;
 
   const eventsFile = get(config, "core.events_file", "");
-  return eventsFile || DEFAULT_JOURNAL_FILE;
+  if (eventsFile) return eventsFile;
+
+  return join(stateDirRel(config), "journal.jsonl");
+}
+
+/**
+ * Relative memory-store path. Explicit `core.memory_file` wins; otherwise it
+ * derives from `core.state_dir` rather than staying fixed under `.autoloop`.
+ */
+export function memoryPath(config: Config): string {
+  const memoryFile = get(config, "core.memory_file", "");
+  if (memoryFile) return memoryFile;
+  return join(stateDirRel(config), "memory.jsonl");
+}
+
+/**
+ * Relative task-store path. Explicit `core.tasks_file` wins; otherwise it
+ * derives from `core.state_dir`.
+ */
+export function tasksPath(config: Config): string {
+  const tasksFile = get(config, "core.tasks_file", "");
+  if (tasksFile) return tasksFile;
+  return join(stateDirRel(config), "tasks.jsonl");
 }
 
 export function parseToml(text: string): Config {

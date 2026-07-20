@@ -43,7 +43,7 @@ export function dispatchDoctor(args: string[]): void {
 }
 
 export function runDoctorChecks(projectDir: string): DoctorCheck[] {
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
   const checks: DoctorCheck[] = [];
   checks.push(checkNode());
   checks.push(checkGit(projectDir));

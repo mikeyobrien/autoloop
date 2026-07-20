@@ -9,16 +9,20 @@ import { homedir, platform } from "node:os";
 import { basename, dirname, join } from "node:path";
 import {
   type Config,
+  DEFAULT_STATE_DIR,
   deepMerge,
   defaults,
   get,
   journalPath,
   type LayeredConfig,
+  memoryPath,
   type Provenance,
   parseRawToml,
   parseToml,
   recordProvenance,
+  stateDirRel,
   stringifyValues,
+  tasksPath,
 } from "@mobrienv/autoloop-core/config-schema";
 import { bundledPresetsRoot } from "./bundled-presets.js";
 import { type HookSpec, parseHookSpecs } from "./hooks-schema.js";
@@ -29,6 +33,7 @@ export type {
   Provenance,
 } from "@mobrienv/autoloop-core/config-schema";
 export {
+  DEFAULT_STATE_DIR,
   deepMerge,
   defaults,
   get,
@@ -38,10 +43,13 @@ export {
   getList,
   getProfileDefaults,
   journalPath,
+  memoryPath,
   parseRawToml,
   parseToml,
   put,
+  stateDirRel,
   stringifyValues,
+  tasksPath,
 } from "@mobrienv/autoloop-core/config-schema";
 
 export interface LoadLayeredOptions {
@@ -80,13 +88,9 @@ export function userPresetOverridePath(presetName: string): string {
 export function repoPresetOverridePath(
   workDir: string,
   presetName: string,
+  stateDir: string = DEFAULT_STATE_DIR,
 ): string {
-  return join(
-    workDir,
-    ".autoloop",
-    "overrides",
-    `${basename(presetName)}.toml`,
-  );
+  return join(workDir, stateDir, "overrides", `${basename(presetName)}.toml`);
 }
 
 export function hasUserConfig(): boolean {
@@ -156,6 +160,7 @@ function loadLayeredFrom(
     const repoOverridePath = repoPresetOverridePath(
       options.workDir,
       presetName,
+      stateDirRel(merged),
     );
     if (existsSync(repoOverridePath)) {
       const repoOverride = stringifyValues(
@@ -384,7 +389,7 @@ export function resolveTasksFileIn(
 }
 
 export function stateDirName(projectDir: string): string {
-  return get(loadProject(projectDir), "core.state_dir", ".autoloop");
+  return stateDirRel(loadProject(projectDir));
 }
 
 export function stateDirPath(projectDir: string): string {
@@ -396,19 +401,11 @@ function journalRelPath(projectDir: string): string {
 }
 
 function memoryRelPath(projectDir: string): string {
-  return get(
-    loadProject(projectDir),
-    "core.memory_file",
-    ".autoloop/memory.jsonl",
-  );
+  return memoryPath(loadProject(projectDir));
 }
 
 function tasksRelPath(projectDir: string): string {
-  return get(
-    loadProject(projectDir),
-    "core.tasks_file",
-    ".autoloop/tasks.jsonl",
-  );
+  return tasksPath(loadProject(projectDir));
 }
 
 function resolveBundledPresetDir(name: string, bundleRoot: string): string {

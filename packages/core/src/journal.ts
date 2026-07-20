@@ -179,7 +179,10 @@ export function latestIterationForRun(path: string, runId: string): string {
  * and worktree journals under worktrees/<id>/tree/<stateDirName>/.
  * Returns all lines sorted by timestamp.
  */
-export function readAllJournals(baseStateDir: string): string[] {
+export function readAllJournals(
+  baseStateDir: string,
+  stateDirRel: string = basename(baseStateDir),
+): string[] {
   const allLines: string[] = [];
 
   // Top-level journal
@@ -197,8 +200,11 @@ export function readAllJournals(baseStateDir: string): string[] {
     }
   }
 
-  // Worktree journals under worktrees/<id>/tree/<stateDirName>/journal.jsonl
-  const stateDirName = basename(baseStateDir);
+  // Worktree journals under worktrees/<id>/tree/<stateDirRel>/journal.jsonl.
+  // stateDirRel mirrors the main relative state dir inside the worktree tree
+  // (e.g. ".ralph/autoloop"); it defaults to the base dir's leaf name so callers
+  // that only know the absolute state dir keep working for single-segment roots.
+  const stateDirName = stateDirRel;
   const wtDir = join(baseStateDir, "worktrees");
   if (existsSync(wtDir)) {
     const entries = readdirSync(wtDir, { withFileTypes: true });
@@ -231,17 +237,17 @@ export function readAllJournals(baseStateDir: string): string[] {
 export function resolveRunJournalPath(
   baseStateDir: string,
   runId: string,
+  stateDirRel: string = basename(baseStateDir),
 ): string | null {
   const runJournal = join(baseStateDir, "runs", runId, "journal.jsonl");
   if (existsSync(runJournal)) return runJournal;
 
-  const stateDirName = basename(baseStateDir);
   const wtJournal = join(
     baseStateDir,
     "worktrees",
     runId,
     "tree",
-    stateDirName,
+    stateDirRel,
     "journal.jsonl",
   );
   if (existsSync(wtJournal)) return wtJournal;
@@ -253,8 +259,12 @@ export function resolveRunJournalPath(
  * Read journal lines for a specific run.
  * Checks run-scoped and worktree paths via resolveRunJournalPath.
  */
-export function readRunJournal(baseStateDir: string, runId: string): string[] {
-  const path = resolveRunJournalPath(baseStateDir, runId);
+export function readRunJournal(
+  baseStateDir: string,
+  runId: string,
+  stateDirRel?: string,
+): string[] {
+  const path = resolveRunJournalPath(baseStateDir, runId, stateDirRel);
   return path ? readLines(path) : [];
 }
 

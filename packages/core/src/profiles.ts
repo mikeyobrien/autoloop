@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Role } from "@mobrienv/autoloop-core/topology";
+import * as config from "./config.js";
 
 export interface ProfileSpec {
   scope: "repo" | "user";
@@ -30,7 +31,8 @@ export function parseProfileSpec(spec: string): ProfileSpec {
 
 export function resolveProfileDir(spec: ProfileSpec, workDir: string): string {
   if (spec.scope === "repo") {
-    return join(workDir, ".autoloop", "profiles", spec.name);
+    // Repo profiles live under the configured state root (default .autoloop).
+    return join(config.stateDirPath(workDir), "profiles", spec.name);
   }
   return join(homedir(), ".config", "autoloops", "profiles", spec.name);
 }

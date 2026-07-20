@@ -12,10 +12,13 @@ import {
   loadLayered,
   loadProject,
   loadUserConfig,
+  memoryPath,
   parseToml,
   projectHasConfig,
   put,
   resolveJournalFile,
+  stateDirRel,
+  tasksPath,
   userConfigPath,
   userPresetOverridePath,
 } from "../src/config.js";
@@ -121,6 +124,42 @@ describe("journalPath", () => {
 
   it("uses the default journal path when neither name is set", () => {
     expect(journalPath(parseToml(""))).toBe(".autoloop/journal.jsonl");
+  });
+
+  it("derives from core.state_dir when journal_file is unset", () => {
+    const cfg = parseToml('[core]\nstate_dir = ".ralph/autoloop"\n');
+    expect(journalPath(cfg)).toBe(join(".ralph/autoloop", "journal.jsonl"));
+  });
+
+  it("keeps an explicit journal_file even when state_dir is custom", () => {
+    const cfg = parseToml(
+      '[core]\nstate_dir = ".ralph/autoloop"\njournal_file = "custom/j.jsonl"\n',
+    );
+    expect(journalPath(cfg)).toBe("custom/j.jsonl");
+  });
+});
+
+describe("state-dir-derived paths", () => {
+  it("derives memory/tasks defaults from a custom state_dir", () => {
+    const cfg = parseToml('[core]\nstate_dir = ".ralph/autoloop"\n');
+    expect(stateDirRel(cfg)).toBe(".ralph/autoloop");
+    expect(memoryPath(cfg)).toBe(join(".ralph/autoloop", "memory.jsonl"));
+    expect(tasksPath(cfg)).toBe(join(".ralph/autoloop", "tasks.jsonl"));
+  });
+
+  it("keeps explicit memory_file/tasks_file overrides", () => {
+    const cfg = parseToml(
+      '[core]\nstate_dir = ".ralph/autoloop"\nmemory_file = "m/mem.jsonl"\ntasks_file = "t/tasks.jsonl"\n',
+    );
+    expect(memoryPath(cfg)).toBe("m/mem.jsonl");
+    expect(tasksPath(cfg)).toBe("t/tasks.jsonl");
+  });
+
+  it("defaults to the .autoloop root for standalone usage", () => {
+    const cfg = parseToml("");
+    expect(stateDirRel(cfg)).toBe(".autoloop");
+    expect(memoryPath(cfg)).toBe(".autoloop/memory.jsonl");
+    expect(tasksPath(cfg)).toBe(".autoloop/tasks.jsonl");
   });
 });
 

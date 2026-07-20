@@ -1,4 +1,4 @@
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 /**
  * Resolve the run-scoped control directory.
@@ -28,17 +28,18 @@ export function controlCapabilitiesFile(runStateDir: string): string {
 
 /**
  * Infer the base state dir given a run's recorded state_dir. Used to find the
- * parent `.autoloop/` registry when the run dir is a per-run or worktree tree.
+ * parent state-dir registry when the run dir is a per-run or worktree tree.
+ *
+ * State-dir-name agnostic (works for any `core.state_dir`, including nested
+ * roots like `.ralph/autoloop`): a run-scoped tree always lives at
+ * `<base>/runs/<run-id>/`, so it's identified by its parent directory being
+ * named `runs`. Anything else (worktree/shared root) is already the base.
  */
 export function baseStateDirFromRunState(runStateDir: string): string {
-  // run-scoped: <base>/runs/<run-id>/  -> parent of parent
-  // worktree: <work>/.autoloop/        -> runStateDir itself is the base
-  // shared:   same as run-scoped
-  const parentName = basename(runStateDir);
-  if (parentName === ".autoloop" || parentName === ".miniloop") {
-    return runStateDir;
+  // run-scoped/shared: <base>/runs/<run-id>/ -> peel `runs/<run-id>`.
+  if (basename(dirname(runStateDir)) === "runs") {
+    return dirname(dirname(runStateDir));
   }
-  // runs/<run-id>/ path — peel two levels
-  const runs = join(runStateDir, "..");
-  return join(runs, "..");
+  // worktree: <work>/<state-dir>/ -> runStateDir itself is the base.
+  return runStateDir;
 }

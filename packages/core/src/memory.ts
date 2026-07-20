@@ -23,10 +23,7 @@ export function resolveFile(projectDir: string): string {
   const envPath = process.env.AUTOLOOP_MEMORY_FILE;
   if (envPath) return envPath;
   const cfg = config.loadProject(projectDir);
-  return join(
-    projectDir,
-    config.get(cfg, "core.memory_file", ".autoloop/memory.jsonl"),
-  );
+  return join(projectDir, config.memoryPath(cfg));
 }
 
 export function renderProject(projectDir: string, budgetChars: number): string {

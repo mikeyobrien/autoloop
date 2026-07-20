@@ -11,6 +11,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import * as config from "@mobrienv/autoloop-core/config";
 
 export function dispatchInit(args: string[]): void {
   if (args[0] === "--help" || args[0] === "-h") {
@@ -204,25 +205,31 @@ Start skeptical: missing evidence means rejection, not benefit of the doubt.
 `;
 }
 
-/** Append `.autoloop/` to .gitignore when `dir` is a git repo (no duplicates). */
+/**
+ * Append the configured state root (default `.autoloop/`) to .gitignore when
+ * `dir` is a git repo (no duplicates). The state dir name is read from the
+ * project config so a project that sets `core.state_dir` ignores the right tree.
+ */
 export function ensureGitignore(dir: string): void {
   if (!existsSync(join(dir, ".git"))) return;
-  const entry = ".autoloop/";
+  const stateName = config.stateDirName(dir);
+  const entry = `${stateName}/`;
+  const bareEntry = stateName;
   const path = join(dir, ".gitignore");
   if (!existsSync(path)) {
     writeFileSync(path, `${entry}\n`);
-    console.log("created .gitignore (.autoloop/)");
+    console.log(`created .gitignore (${entry})`);
     return;
   }
   const text = readFileSync(path, "utf-8");
   const lines = text.split("\n").map((l) => l.trim());
-  if (lines.includes(entry) || lines.includes(".autoloop")) {
-    console.log(".gitignore already ignores .autoloop/, skipped");
+  if (lines.includes(entry) || lines.includes(bareEntry)) {
+    console.log(`.gitignore already ignores ${entry}, skipped`);
     return;
   }
   const sep = text === "" || text.endsWith("\n") ? "" : "\n";
   writeFileSync(path, `${text}${sep}${entry}\n`);
-  console.log("updated .gitignore (.autoloop/)");
+  console.log(`updated .gitignore (${entry})`);
 }
 
 function writeIfMissing(dir: string, relative: string, content: string): void {

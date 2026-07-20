@@ -489,7 +489,10 @@ export function architectBrief(
 }
 
 function architectOutputPath(workDir: string | undefined): string {
-  return resolve(workDir || ".", ".autoloop", "generated-preset.toml");
+  const dir = workDir || ".";
+  // Honor the target project's core.state_dir (default .autoloop) so the
+  // generated preset lands in the same state root everything else uses.
+  return resolve(config.stateDirPath(dir), "generated-preset.toml");
 }
 
 function finalizeArchitectRun(

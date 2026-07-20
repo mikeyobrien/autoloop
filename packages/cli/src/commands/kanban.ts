@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "node:http";
 import { join, resolve } from "node:path";
 import { createAdaptorServer } from "@hono/node-server";
+import * as config from "@mobrienv/autoloop-core/config";
 import {
   installKanban,
   type KanbanContext,
@@ -36,7 +37,7 @@ export function dispatchKanban(
   }
 
   const resolved = resolve(projectDir);
-  const stateDir = join(resolved, ".autoloop");
+  const stateDir = config.stateDirPath(resolved);
   const autoloopBin = selfCmd.replace(/^'(.*)'$/, "$1");
 
   const ctx: KanbanContext = {

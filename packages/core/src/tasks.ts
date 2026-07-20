@@ -14,7 +14,8 @@ export type TaskPriority = "high" | "normal" | "low";
  *
  * Resolved by {@link resolveFile} with this precedence:
  * 1. `AUTOLOOP_TASKS_FILE` env var (absolute path) — highest priority.
- * 2. `core.tasks_file` config key (default `.autoloop/tasks.jsonl`).
+ * 2. `core.tasks_file` config key. When unset it derives from `core.state_dir`
+ *    (e.g. `<state_dir>/tasks.jsonl`; `.autoloop/tasks.jsonl` by default).
  *
  * Both the task CLI/agent tools AND the completion gate use this resolver, so
  * an external writer that sets `AUTOLOOP_TASKS_FILE` controls the exact file the

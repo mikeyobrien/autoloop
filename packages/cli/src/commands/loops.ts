@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import * as config from "@mobrienv/autoloop-core/config";
 import { failMissingArg, failUnknown } from "../cli/fail.js";
 import { healthSummary } from "../loops/health.js";
 import {
@@ -14,7 +14,7 @@ import { watchRun } from "../loops/watch.js";
 
 export function dispatchLoops(args: string[]): void {
   const projectDir = resolveProjectDir();
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
   const json = args.includes("--json");
   const rest = json ? args.filter((a) => a !== "--json") : args;
 

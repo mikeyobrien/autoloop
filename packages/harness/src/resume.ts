@@ -144,7 +144,6 @@ export function buildResumeContext(
 
   // Recompute config-anchored paths exactly as buildLoopContext does, but
   // rooted in this run's existing state dir rather than a freshly-created one.
-  const stateDirName = basename(stateDir);
   const presetFile = record.preset_file || "";
   const cfg = presetFile
     ? config.loadProjectFromFile(presetFile, {
@@ -155,12 +154,7 @@ export function buildResumeContext(
         presetName: record.preset || basename(projectDir),
         workDir,
       });
-  const memoryRel = config.get(
-    cfg,
-    "core.memory_file",
-    join(stateDirName, "memory.jsonl"),
-  );
-  const memoryFile = join(workDir, memoryRel);
+  const memoryFile = join(workDir, config.memoryPath(cfg));
 
   // baseStateDir is the main repo's state dir (registry + worktree metadata
   // live here). Prefer the caller-supplied path (the registry the record was
@@ -168,7 +162,9 @@ export function buildResumeContext(
   // lives under the worktree tree, so the main state dir is the project root's.
   const baseStateDir =
     options.baseStateDir ||
-    (worktreeMode ? join(record.project_dir, stateDirName) : stateDir);
+    (worktreeMode
+      ? join(record.project_dir, config.stateDirRel(cfg))
+      : stateDir);
   const registryFile = join(baseStateDir, "registry.jsonl");
 
   const backendOverride = options.backendOverride || {};

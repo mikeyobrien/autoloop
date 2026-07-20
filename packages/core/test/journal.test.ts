@@ -147,4 +147,27 @@ describe("readAllJournals with worktree journals", () => {
     expect(lines[0]).toContain("r1");
     expect(lines[1]).toContain("wt-1");
   });
+
+  it("finds worktree journals under a nested state root (.ralph/autoloop)", () => {
+    // For a nested core.state_dir, the worktree tree mirrors the FULL relative
+    // state dir — not just its leaf — so callers must pass stateDirRel.
+    const stateDirRel = join(".ralph", "autoloop");
+    writeFileSync(
+      join(tmpDir, "journal.jsonl"),
+      `${journalLine("r1", "loop.start", "2026-01-01T00:00:00Z")}\n`,
+    );
+    const wtDir = join(tmpDir, "worktrees", "wt-1", "tree", stateDirRel);
+    mkdirSync(wtDir, { recursive: true });
+    writeFileSync(
+      join(wtDir, "journal.jsonl"),
+      `${journalLine("wt-1", "loop.start", "2026-01-01T00:00:02Z")}\n`,
+    );
+
+    // Default basename derivation would look under "tree/<leaf>" and miss it.
+    expect(readAllJournals(tmpDir)).toHaveLength(1);
+    // Passing the full relative state dir resolves the nested worktree journal.
+    const lines = readAllJournals(tmpDir, stateDirRel);
+    expect(lines).toHaveLength(2);
+    expect(readRunJournal(tmpDir, "wt-1", stateDirRel)).toHaveLength(1);
+  });
 });

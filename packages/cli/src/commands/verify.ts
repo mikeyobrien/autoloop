@@ -27,7 +27,7 @@ export function dispatchVerify(args: string[]): void {
   }
   const projectDir = positionals[0] ?? resolveRuntimeProjectDir();
   const runIdArg = positionals[1];
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
   const records = readRegistry(join(stateDir, "registry.jsonl"));
   const record = pickRun(records, runIdArg);
   if (!record) {

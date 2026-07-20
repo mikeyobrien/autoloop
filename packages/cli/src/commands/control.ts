@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import * as config from "@mobrienv/autoloop-core/config";
 import { appendOperatorEvent } from "@mobrienv/autoloop-core/journal";
 import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
@@ -27,7 +28,7 @@ export function dispatchControl(args: string[]): void {
   }
 
   const projectDir = resolveProjectDir();
-  const stateDir = join(projectDir, ".autoloop");
+  const stateDir = config.stateDirPath(projectDir);
 
   if (sub === "show") {
     handleShow(stateDir, args.slice(1));
@@ -74,8 +75,9 @@ function resolveRun(
 
 function runStateDir(run: RunRecord): string {
   if (run.state_dir) return run.state_dir;
-  // Legacy/derived records without state_dir: fall back to <work>/.autoloop
-  return join(run.work_dir || ".", ".autoloop");
+  // Legacy/derived records without state_dir: fall back to the configured
+  // state root for the run's work dir (honors core.state_dir; default .autoloop).
+  return config.stateDirPath(run.work_dir || ".");
 }
 
 function buildSnapshot(run: RunRecord): ControlSnapshot {
