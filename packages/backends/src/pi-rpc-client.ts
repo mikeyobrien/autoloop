@@ -4,6 +4,9 @@ import {
   pushStreamLogLine,
   resetStreamLog,
 } from "./incremental-stream-log.js";
+import { preparePiStreamRecord } from "./pi-stream-record.js";
+
+export { preparePiStreamRecord } from "./pi-stream-record.js";
 
 export interface PiClientOptions {
   command: string;
@@ -399,14 +402,9 @@ function finishPrompt(session: PiSession, end: PiRpcMessage): PiPromptResult {
  * responses carry an `id`, events do not.
  */
 function handlePiLine(session: PiSession, line: string): void {
-  if (session.streamLogActive) pushStreamLogLine(session, line);
-
-  let msg: PiRpcMessage;
-  try {
-    msg = JSON.parse(line) as PiRpcMessage;
-  } catch {
-    return; /* skip malformed */
-  }
+  const { message: msg, persistedLine } = preparePiStreamRecord(line);
+  if (session.streamLogActive) pushStreamLogLine(session, persistedLine);
+  if (!msg) return; /* skip malformed/non-object records */
 
   if (msg.type === "response" && typeof msg.id === "string") {
     const pending = session.pending.get(msg.id);

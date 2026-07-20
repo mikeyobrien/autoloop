@@ -9,6 +9,7 @@ import {
   getPiSessionStats,
   initPiSession,
   type PiSession,
+  preparePiStreamRecord,
   resetPiSession,
   sendPiPrompt,
   steerPiTurn,
@@ -534,6 +535,13 @@ describe("stream logging", () => {
         ],
       },
     });
+    expect(
+      events
+        .filter(
+          (event) => event.type === "message_end" || event.type === "turn_end",
+        )
+        .every((event) => !("messages" in event)),
+    ).toBe(true);
 
     const thinkingDeltas = events.filter(
       (event) =>
@@ -585,6 +593,75 @@ describe("stream logging", () => {
           errorMessage: "synthetic final failure",
         }),
       ]),
+    });
+  });
+
+  it("compacts only cumulative intermediate lifecycle snapshots", () => {
+    const historicalMessages = [{ role: "user", content: "history" }];
+    const currentMessage = {
+      role: "assistant",
+      content: [{ type: "text", text: "current answer" }],
+    };
+    const messageEndLine = JSON.stringify({
+      type: "message_end",
+      sequence: 1,
+      message: currentMessage,
+      messages: historicalMessages,
+    });
+    const messageEnd = preparePiStreamRecord(messageEndLine);
+    expect(JSON.parse(messageEnd.persistedLine)).toEqual({
+      type: "message_end",
+      sequence: 1,
+      message: currentMessage,
+    });
+    expect(messageEnd.message?.messages).toEqual(historicalMessages);
+
+    const turnEnd = preparePiStreamRecord(
+      JSON.stringify({
+        type: "turn_end",
+        sequence: 2,
+        messages: historicalMessages,
+      }),
+    );
+    expect(JSON.parse(turnEnd.persistedLine)).toEqual({
+      type: "turn_end",
+      sequence: 2,
+    });
+
+    const agentEndLine = JSON.stringify({
+      type: "agent_end",
+      sequence: 3,
+      messages: historicalMessages,
+    });
+    expect(preparePiStreamRecord(agentEndLine)).toEqual({
+      message: JSON.parse(agentEndLine),
+      persistedLine: agentEndLine,
+    });
+
+    const updateLine = JSON.stringify({
+      type: "message_update",
+      messages: historicalMessages,
+      assistantMessageEvent: { type: "text_delta", delta: "kept" },
+    });
+    expect(preparePiStreamRecord(updateLine).persistedLine).toBe(updateLine);
+
+    const nonSnapshotLine = JSON.stringify({
+      type: "message_end",
+      messages: "not a cumulative snapshot",
+    });
+    expect(preparePiStreamRecord(nonSnapshotLine).persistedLine).toBe(
+      nonSnapshotLine,
+    );
+  });
+
+  it("keeps malformed and non-object records observable without dispatching them", () => {
+    expect(preparePiStreamRecord("not json")).toEqual({
+      persistedLine: "not json",
+    });
+    expect(preparePiStreamRecord("null")).toEqual({ persistedLine: "null" });
+    expect(preparePiStreamRecord("[]")).toEqual({ persistedLine: "[]" });
+    expect(preparePiStreamRecord('"text"')).toEqual({
+      persistedLine: '"text"',
     });
   });
 

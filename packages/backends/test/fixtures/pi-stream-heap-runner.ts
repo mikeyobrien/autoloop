@@ -1,9 +1,6 @@
 import { statSync } from "node:fs";
-import { runPiIteration } from "@mobrienv/autoloop-backends";
-import {
-  initPiSession,
-  terminatePiSession,
-} from "@mobrienv/autoloop-backends/pi-rpc-client";
+import { runPiIteration } from "../../src/index.js";
+import { initPiSession, terminatePiSession } from "../../src/pi-rpc-client.js";
 
 const eventCount = Number(process.env.PI_FIXTURE_EVENTS);
 const payloadBytes = Number(process.env.PI_FIXTURE_PAYLOAD_BYTES);
