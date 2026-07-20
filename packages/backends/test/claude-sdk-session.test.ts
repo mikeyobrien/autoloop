@@ -1,4 +1,10 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -107,6 +113,33 @@ function settle(): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withBunMain<T>(
+  main: string | undefined,
+  run: () => Promise<T>,
+): Promise<T> {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "Bun");
+  try {
+    if (main === undefined) {
+      Reflect.deleteProperty(globalThis, "Bun");
+    } else {
+      const current = (globalThis as Record<string, unknown>).Bun;
+      const bun =
+        typeof current === "object" && current !== null
+          ? { ...current, main }
+          : { main };
+      Object.defineProperty(globalThis, "Bun", {
+        configurable: true,
+        value: bun,
+        writable: true,
+      });
+    }
+    return await run();
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, "Bun", descriptor);
+    else Reflect.deleteProperty(globalThis, "Bun");
+  }
 }
 
 async function startSession(
@@ -230,10 +263,68 @@ describe("initClaudeSdkSession", () => {
     expect(hooks?.PreToolUse?.length).toBeGreaterThan(0);
   });
 
-  it("omits executable path for the bare claude command", async () => {
-    await startSession({});
-    expect(lastQuery.options.pathToClaudeCodeExecutable).toBeUndefined();
-    expect(lastQuery.options.model).toBeUndefined();
+  it("omits executable path for the bare claude command under Node", async () => {
+    await withBunMain(undefined, async () => {
+      const session = await startSession({});
+      try {
+        expect(lastQuery.options.pathToClaudeCodeExecutable).toBeUndefined();
+        expect(lastQuery.options.model).toBeUndefined();
+      } finally {
+        await terminateClaudeSdkSession(session);
+      }
+    });
+  });
+
+  it("resolves the bare claude command from PATH in a compiled standalone", async () => {
+    const binDir = mkdtempSync(join(tmpdir(), "autoloop-claude-path-"));
+    const executable = join(binDir, "claude");
+    writeFileSync(executable, "#!/bin/sh\nexit 0\n", "utf-8");
+    chmodSync(executable, 0o755);
+
+    try {
+      await withBunMain("/$bunfs/root/autoloop", async () => {
+        const session = await startSession({ env: { PATH: binDir } });
+        try {
+          expect(lastQuery.options.pathToClaudeCodeExecutable).toBe(executable);
+        } finally {
+          await terminateClaudeSdkSession(session);
+        }
+      });
+    } finally {
+      rmSync(binDir, { force: true, recursive: true });
+    }
+  });
+
+  it("rejects a compiled standalone when claude is absent from PATH", async () => {
+    const emptyPath = mkdtempSync(join(tmpdir(), "autoloop-empty-path-"));
+
+    try {
+      await withBunMain("/$bunfs/root/autoloop", async () => {
+        const outcome = await initClaudeSdkSession({
+          cwd: "/tmp",
+          env: { PATH: emptyPath },
+          handshakeTimeoutMs: 1000,
+          trustAllTools: true,
+        }).then(
+          (session) => ({ session }),
+          (error: unknown) => ({ error }),
+        );
+
+        try {
+          expect(outcome).toHaveProperty("error");
+          const message = String("error" in outcome ? outcome.error : "");
+          expect(message).toMatch(/claude/i);
+          expect(message).toMatch(/executable/i);
+          expect(message).toMatch(/PATH/i);
+        } finally {
+          if ("session" in outcome) {
+            await terminateClaudeSdkSession(outcome.session);
+          }
+        }
+      });
+    } finally {
+      rmSync(emptyPath, { force: true, recursive: true });
+    }
   });
 
   it("fails the handshake when no init message arrives in time", async () => {
