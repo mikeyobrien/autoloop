@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runPiIteration } from "@mobrienv/autoloop-backends";
@@ -15,6 +15,7 @@ import {
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cumulativePiEvents } from "./fixtures/pi-cumulative-rpc.mjs";
 
 interface MockChild extends ChildProcess {
   sent: Record<string, unknown>[];
@@ -91,6 +92,45 @@ vi.mock("node:child_process", () => {
 
 function settle(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
+}
+
+interface LoggedCumulativeStream {
+  bytes: number;
+  records: Record<string, unknown>[];
+}
+
+async function logCumulativeStream(
+  eventCount: number,
+  payloadBytes = 384,
+): Promise<LoggedCumulativeStream> {
+  const directory = mkdtempSync(join(tmpdir(), "pi-cumulative-stream-"));
+  const logPath = join(directory, "pi-stream.jsonl");
+  try {
+    const session = await startSession();
+    const pending = runPiIteration(
+      session,
+      "exercise cumulative persistence",
+      30_000,
+      logPath,
+    );
+    await settle();
+    for (const event of cumulativePiEvents(eventCount, payloadBytes)) {
+      lastChild.pushLine(event);
+    }
+    await pending;
+
+    const contents = readFileSync(logPath, "utf8");
+    expect(contents.endsWith("\n")).toBe(true);
+    return {
+      bytes: statSync(logPath).size,
+      records: contents
+        .trimEnd()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>),
+    };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 async function startSession(
@@ -462,6 +502,166 @@ describe("getPiSessionStats", () => {
 });
 
 describe("stream logging", () => {
+  it("preserves cumulative lifecycle stream fidelity and source order exactly once", async () => {
+    const eventCount = 258;
+    const { records } = await logCumulativeStream(eventCount);
+    const events = records.slice(1);
+
+    expect(records[0]).toMatchObject({
+      type: "response",
+      command: "prompt",
+      success: true,
+    });
+    expect(events).toHaveLength(eventCount);
+    expect(events.map((event) => event.sequence)).toEqual(
+      Array.from({ length: eventCount }, (_, sequence) => sequence),
+    );
+    expect(new Set(events.map((event) => event.sequence)).size).toBe(
+      eventCount,
+    );
+
+    const assistantEnds = events.filter((event) => {
+      const message = event.message as { role?: string } | undefined;
+      return event.type === "message_end" && message?.role === "assistant";
+    });
+    expect(assistantEnds.length).toBeGreaterThan(20);
+    expect(assistantEnds[0]).toMatchObject({
+      message: {
+        content: [
+          { type: "thinking", thinking: "thinking-0" },
+          { type: "text" },
+          { type: "toolCall", id: "tool-0", name: "bash" },
+        ],
+      },
+    });
+
+    const thinkingDeltas = events.filter(
+      (event) =>
+        event.type === "message_update" &&
+        (event.assistantMessageEvent as { type?: string } | undefined)?.type ===
+          "thinking_delta",
+    );
+    const textDeltas = events.filter(
+      (event) =>
+        event.type === "message_update" &&
+        (event.assistantMessageEvent as { type?: string } | undefined)?.type ===
+          "text_delta",
+    );
+    expect(thinkingDeltas.length).toBeGreaterThan(20);
+    expect(textDeltas.length).toBe(thinkingDeltas.length);
+
+    const toolStarts = events.filter(
+      (event) => event.type === "tool_execution_start",
+    );
+    const toolUpdates = events.filter(
+      (event) => event.type === "tool_execution_update",
+    );
+    const toolEnds = events.filter(
+      (event) => event.type === "tool_execution_end",
+    );
+    expect(toolStarts.length).toBeGreaterThan(20);
+    expect(toolUpdates).toHaveLength(toolStarts.length);
+    expect(toolEnds).toHaveLength(toolStarts.length);
+    expect(toolEnds[0]).toMatchObject({
+      toolCallId: "tool-0",
+      toolName: "bash",
+      result: { content: [{ type: "text", text: "result-0" }] },
+      isError: false,
+    });
+
+    expect(events.at(-2)).toMatchObject({
+      type: "message_update",
+      assistantMessageEvent: {
+        type: "error",
+        reason: "synthetic final failure",
+      },
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: "agent_end",
+      messages: expect.arrayContaining([
+        expect.objectContaining({
+          role: "assistant",
+          stopReason: "error",
+          errorMessage: "synthetic final failure",
+        }),
+      ]),
+    });
+  });
+
+  it("keeps cumulative stream persistence near-linear when the event count doubles", async () => {
+    const small = await logCumulativeStream(256);
+    const large = await logCumulativeStream(512);
+    const ratio = large.bytes / small.bytes;
+    console.info(
+      `Pi cumulative growth: N=256 ${small.bytes} bytes; 2N=512 ${large.bytes} bytes; ratio=${ratio.toFixed(3)}`,
+    );
+
+    // Fixed framing can add a small constant, but 2.35x + 128 KiB leaves
+    // ample room around linear 2x growth while deterministically rejecting 4x.
+    expect(large.bytes).toBeLessThanOrEqual(small.bytes * 2.35 + 128 * 1024);
+  });
+
+  it("persists 4,400 events under a 256 MB child heap with a bounded log", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "pi-stream-heap-"));
+    const logPath = join(directory, "pi-stream.jsonl");
+    const runnerPath = join(
+      process.cwd(),
+      "packages/backends/test/fixtures/pi-stream-heap-runner.ts",
+    );
+    const rpcPath = join(
+      process.cwd(),
+      "packages/backends/test/fixtures/pi-cumulative-rpc.mjs",
+    );
+    const viteNodePath = join(
+      process.cwd(),
+      "node_modules/vite-node/vite-node.mjs",
+    );
+    const { spawnSync } =
+      await vi.importActual<typeof import("node:child_process")>(
+        "node:child_process",
+      );
+
+    try {
+      const startedAt = Date.now();
+      const child = spawnSync(
+        process.execPath,
+        ["--max-old-space-size=256", viteNodePath, "--script", runnerPath],
+        {
+          cwd: process.cwd(),
+          env: {
+            ...process.env,
+            PI_FIXTURE_EVENTS: "4400",
+            PI_FIXTURE_PAYLOAD_BYTES: "384",
+            PI_FIXTURE_LOG_PATH: logPath,
+            PI_FIXTURE_RPC_PATH: rpcPath,
+          },
+          encoding: "utf8",
+          maxBuffer: 1024 * 1024,
+          timeout: 45_000,
+        },
+      );
+      const durationMs = Date.now() - startedAt;
+      const summaryLine = child.stdout.trim().split("\n").at(-1);
+      const summary = summaryLine
+        ? (JSON.parse(summaryLine) as {
+            eventCount: number;
+            outputBytes: number;
+            durationMs: number;
+          })
+        : undefined;
+      console.info(
+        `Pi 4,400-event heap reproduction: status=${child.status} signal=${child.signal} durationMs=${durationMs} outputBytes=${summary?.outputBytes ?? "unavailable"}`,
+      );
+
+      expect(child.signal, child.stderr).toBeNull();
+      expect(child.status, child.stderr).toBe(0);
+      expect(summary).toMatchObject({ eventCount: 4400 });
+      expect(summary?.outputBytes).toBeLessThanOrEqual(32 * 1024 * 1024);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("flushes complete size-batched records mid-prompt without duplication", async () => {
     const session = await startSession();
     const logPath = join(
