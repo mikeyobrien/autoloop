@@ -65,7 +65,7 @@
     "format": "biome format src/ test/",
     "format:fix": "biome format --write src/ test/",
     "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
-    "test:coverage": "node --experimental-vm-modules node_modules/.bin/vitest run --no-file-parallelism --coverage",
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/vitest run --no-file-parallelism --maxWorkers=1 --coverage",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest",
     "check": "biome check src/ test/ && tsc --noEmit && npm run test:coverage",
     "release": "node bin/release",
