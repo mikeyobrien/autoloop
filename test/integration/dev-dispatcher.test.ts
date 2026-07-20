@@ -1,7 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -71,23 +69,13 @@ describe("bin/dev", () => {
   }, 60_000);
 
   it("test subcommand delegates to vitest", () => {
-    // A parent `vitest --coverage` exports coverage state to subprocesses. Give
-    // this nested Vitest invocation its own report directory so its startup
-    // cleanup cannot remove the parent's in-flight coverage/.tmp files.
-    const coverageDir = mkdtempSync(join(tmpdir(), "autoloop-dev-coverage-"));
-    try {
-      const out = run(
-        [
-          "test",
-          "--coverage.reportsDirectory",
-          coverageDir,
-          "test/agent-map.test.ts",
-        ],
-        60_000,
-      );
-      expect(out).toContain("agent-map");
-    } finally {
-      rmSync(coverageDir, { recursive: true, force: true });
-    }
+    // The parent full gate runs Vitest with coverage enabled. A nested covered
+    // Vitest process can delete the parent's shared coverage/.tmp directory at
+    // startup, so this delegation smoke explicitly disables child coverage.
+    const out = run(
+      ["test", "--coverage.enabled=false", "test/agent-map.test.ts"],
+      60_000,
+    );
+    expect(out).toContain("agent-map");
   }, 60_000);
 });
