@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { put } from "@mobrienv/autoloop-core/config";
@@ -7,6 +13,7 @@ import {
   buildLoopContext,
   injectClaudePermissions,
   processIntOverride,
+  readOptionalProjectFile,
   reloadLoop,
   resolveProcessKind,
 } from "@mobrienv/autoloop-harness/config-helpers";
@@ -141,6 +148,42 @@ describe("injectClaudePermissions", () => {
   });
 });
 
+describe("readOptionalProjectFile", () => {
+  it("reads a file contained by the project", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n", {
+      files: { "roles/builder.md": "contained prompt\n" },
+    });
+
+    expect(readOptionalProjectFile(projectDir, "roles/builder.md")).toBe(
+      "contained prompt\n",
+    );
+  });
+
+  it("rejects parent traversal outside the project", () => {
+    const parent = mkdtempSync(join(tmpdir(), "autoloop-ts-file-parent-"));
+    const projectDir = join(parent, "project");
+    mkdirSync(projectDir);
+    writeFileSync(join(parent, "outside.md"), "host-only instructions\n");
+
+    expect(() => readOptionalProjectFile(projectDir, "../outside.md")).toThrow(
+      /must stay within the project directory/i,
+    );
+  });
+
+  it("rejects symlinks outside the project", () => {
+    const parent = mkdtempSync(join(tmpdir(), "autoloop-ts-file-link-"));
+    const projectDir = join(parent, "project");
+    mkdirSync(projectDir);
+    const outside = join(parent, "outside.md");
+    writeFileSync(outside, "host-only instructions\n");
+    symlinkSync(outside, join(projectDir, "prompt.md"));
+
+    expect(() => readOptionalProjectFile(projectDir, "prompt.md")).toThrow(
+      /must stay within the project directory/i,
+    );
+  });
+});
+
 describe("buildLoopContext", () => {
   it("rejects an unrecognized global backend kind", () => {
     const projectDir = makeProject(
@@ -252,6 +295,24 @@ describe("buildLoopContext", () => {
     });
 
     expect(loop.objective).toBe("Configured file prompt\n");
+  });
+
+  it("keeps an explicitly configured empty prompt_file authoritative", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.prompt_file = "empty.md"',
+      ].join("\n"),
+      { files: { "empty.md": "" } },
+    );
+    const workDir = mkdtempSync(join(tmpdir(), "autoloop-ts-prompt-work-"));
+    writeFileSync(join(workDir, "PROMPT.md"), "Root prompt\n");
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir,
+    });
+
+    expect(loop.objective).toBe("");
   });
 
   it("does not replace an existing in-flight plan with work directory PROMPT.md", () => {
