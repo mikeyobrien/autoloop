@@ -165,8 +165,14 @@ export function runProcess(
   command: string,
   timeoutMs: number,
   providerKind = "command",
+  projectDir?: string,
 ): ProcessResult {
-  const result = runBackendCommand(providerKind, command, timeoutMs);
+  const result = runBackendCommand(
+    providerKind,
+    command,
+    timeoutMs,
+    projectDir,
+  );
   return {
     output: result.output,
     exitCode: result.exitCode,
@@ -186,9 +192,14 @@ export function runProcessAsync(
   timeoutMs: number,
   providerKind = "command",
   onSpawn?: (pid: number) => void,
+  projectDir?: string,
 ): Promise<ProcessResult> {
-  return runBackendCommandAsync(providerKind, command, timeoutMs, (pid) =>
-    onSpawn?.(pid),
+  return runBackendCommandAsync(
+    providerKind,
+    command,
+    timeoutMs,
+    (pid) => onSpawn?.(pid),
+    projectDir,
   ).then((result) => ({
     output: result.output,
     exitCode: result.exitCode,

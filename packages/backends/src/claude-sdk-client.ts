@@ -13,6 +13,7 @@ import {
   commandFloorDecision,
   extractCommandFromToolInput,
 } from "./command-risk.js";
+import { sanitizeBackendEnvironment } from "./environment.js";
 
 export interface ClaudeSdkClientOptions {
   /** Path to the Claude Code executable when it isn't the bare `claude` on PATH. */
@@ -160,7 +161,9 @@ export async function initClaudeSdkSession(
   const options: Options = {
     cwd: opts.cwd,
     abortController,
-    env: opts.env ?? process.env,
+    env: sanitizeBackendEnvironment(opts.env ?? process.env, {
+      projectDir: opts.cwd,
+    }),
     // Parity with the legacy `claude -p` shell backend: the Claude Code
     // system prompt and project settings (CLAUDE.md) stay loaded.
     systemPrompt: { type: "preset", preset: "claude_code" },

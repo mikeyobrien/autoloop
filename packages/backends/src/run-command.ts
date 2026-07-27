@@ -1,6 +1,13 @@
 import { type ChildProcess, execSync, spawn } from "node:child_process";
 import { shellQuote, shellWords } from "@mobrienv/autoloop-core";
+import { sanitizeBackendEnvironment } from "./environment.js";
 import type { BackendRunResult } from "./types.js";
+
+export interface ShellCommandOptions {
+  projectDir?: string;
+  env?: NodeJS.ProcessEnv;
+  cwd?: string;
+}
 
 export function buildCommandInvocation(
   spec: { command: string; args: string[]; promptMode: string },
@@ -24,7 +31,12 @@ export function runShellCommand(
   providerKind: string,
   command: string,
   timeoutMs: number,
+  options: ShellCommandOptions = {},
 ): BackendRunResult {
+  const sourceEnv = options.env ?? process.env;
+  const env = sanitizeBackendEnvironment(sourceEnv, {
+    projectDir: options.projectDir ?? options.cwd ?? process.cwd(),
+  });
   try {
     const output = execSync(command, {
       encoding: "utf-8",
@@ -32,6 +44,8 @@ export function runShellCommand(
       stdio: ["pipe", "pipe", "inherit"],
       shell: "/bin/sh",
       maxBuffer: 100 * 1024 * 1024,
+      cwd: options.cwd,
+      env,
     });
     return {
       output: output ?? "",
@@ -89,7 +103,11 @@ export function spawnShellCommand(
   command: string,
   timeoutMs: number,
   onSpawn?: (pid: number, child: ChildProcess) => void,
+  options: ShellCommandOptions = {},
 ): Promise<BackendRunResult> {
+  const env = sanitizeBackendEnvironment(options.env ?? process.env, {
+    projectDir: options.projectDir ?? options.cwd ?? process.cwd(),
+  });
   return new Promise((resolve) => {
     // `detached: true` makes the child a process-group leader, so a timeout
     // kill can target the whole group (`-pid`) rather than only the `/bin/sh`
@@ -102,6 +120,8 @@ export function spawnShellCommand(
     const child = spawn("/bin/sh", ["-c", command], {
       stdio: ["pipe", "pipe", "inherit"],
       detached: true,
+      cwd: options.cwd,
+      env,
     });
     if (child.pid) onSpawn?.(child.pid, child);
 

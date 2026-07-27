@@ -130,6 +130,23 @@ describe("initPiSession", () => {
     expect(lastChild.sent[0]).toMatchObject({ type: "get_state" });
   });
 
+  it("sanitizes the environment passed to the Pi process", async () => {
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    await startSession({
+      cwd: "/tmp/project",
+      env: {
+        PATH: "/usr/bin:/tmp/project/bin",
+        NORMAL_PROJECT_FLAG: "enabled",
+        PYTHONPATH: "./owned-python",
+      },
+    });
+
+    const options = spawnFn.mock.calls.at(-1)?.[2];
+    expect(options.env.NORMAL_PROJECT_FLAG).toBe("enabled");
+    expect(options.env.PYTHONPATH).toBeUndefined();
+    expect(options.env.PATH).toBe("/usr/bin");
+  });
+
   it("rejects when the process dies before the handshake completes", async () => {
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
     (globalThis as any).__piAutoRespond = false;

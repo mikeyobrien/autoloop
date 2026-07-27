@@ -403,6 +403,7 @@ async function runBackendIteration(
     (pid) => {
       loop.commandSession.current = { pid };
     },
+    loop.paths.workDir,
   );
   loop.commandSession.current = undefined;
   if (iter.backend.kind === "command") {

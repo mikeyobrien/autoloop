@@ -150,6 +150,7 @@ export async function runMetareviewReview(
               buildReviewCommand(loop, iteration, reviewPrompt),
               loop.review.timeoutMs,
               loop.review.kind,
+              loop.paths.workDir,
             );
 
   appendEvent(

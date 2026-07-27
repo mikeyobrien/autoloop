@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { sanitizeBackendEnvironment } from "./environment.js";
 
 export interface PiClientOptions {
   command: string;
@@ -11,6 +12,7 @@ export interface PiClientOptions {
   handshakeTimeoutMs?: number;
   /** How long a timed-out turn may drain after `abort` before the session is reused (default 2s). */
   abortGraceMs?: number;
+  env?: NodeJS.ProcessEnv;
 }
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000;
@@ -99,7 +101,9 @@ export async function initPiSession(opts: PiClientOptions): Promise<PiSession> {
   const child = spawn(opts.command, args, {
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
-    env: process.env,
+    env: sanitizeBackendEnvironment(opts.env ?? process.env, {
+      projectDir: opts.cwd,
+    }),
     detached: true, // own process group so terminatePiSession can kill the full tree
   });
 

@@ -71,6 +71,7 @@ audit, all covering silent-failure and crash-recovery contract gaps.
 Recovery note: `v0.9.0` was tagged and partially published before npm trusted publishing rejected newly added optional sync-adapter packages that are not in the root package install graph. `v0.9.1` published the root package, but `@mobrienv/autoloop-backends@0.9.1` had registry metadata without a fetchable tarball, so fresh installs failed. `v0.9.2` is the canonical public release for this feature train and adds registry tarball verification to the publish workflow.
 
 ### Added
+- **Shared SDE runtime hardening.** Every backend mode now receives sanitized process inheritance: process-injection and Git-authority override variables are removed, repository-owned/relative `PATH` entries cannot shadow trusted executables, and credential-bearing or malformed proxy URLs fail closed before backend startup. The policy covers ordinary iterations, role overrides, parallel branches, and metareviews while preserving normal project/toolchain variables. Configured objective, harness, metareview, and role prompt files are now containment-checked after symlink resolution so presets cannot inject arbitrary host files with `..` or symlink escapes.
 - **`autowiki` preset — OKF LLM-wiki pipeline.** A bundled preset that ingests a queue of
   hand-curated source URLs into an OKF-conformant LLM wiki of cross-linked markdown concept
   pages (Karpathy "LLM Wiki" pattern; openable in Obsidian). One task = one source URL, each

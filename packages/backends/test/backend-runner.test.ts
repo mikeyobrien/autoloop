@@ -4,7 +4,10 @@ import {
   runAcpIteration,
   runKiroIteration,
 } from "@mobrienv/autoloop-backends";
-import { runShellCommand } from "@mobrienv/autoloop-backends/run-command";
+import {
+  runShellCommand,
+  spawnShellCommand,
+} from "@mobrienv/autoloop-backends/run-command";
 import { describe, expect, it } from "vitest";
 
 describe("backend runner", () => {
@@ -75,6 +78,42 @@ describe("backend runner", () => {
       runtimeEnv: "",
     });
     expect(command.match(/--dangerously-skip-permissions/g)?.length).toBe(1);
+  });
+
+  it("sanitizes the environment inherited by command backends", () => {
+    const result = runShellCommand(
+      "command",
+      `printf '%s' "\${NODE_OPTIONS-unset}|$NORMAL_PROJECT_FLAG"`,
+      5000,
+      {
+        env: {
+          PATH: process.env.PATH,
+          NORMAL_PROJECT_FLAG: "enabled",
+          NODE_OPTIONS: "--require ./owned.js",
+        },
+      },
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe("unset|enabled");
+  });
+
+  it("sanitizes the environment inherited by asynchronous command backends", async () => {
+    const result = await spawnShellCommand(
+      "command",
+      `printf '%s' "\${NODE_OPTIONS-unset}|$NORMAL_PROJECT_FLAG"`,
+      5000,
+      undefined,
+      {
+        projectDir: "/workspace/project",
+        env: {
+          PATH: process.env.PATH,
+          NORMAL_PROJECT_FLAG: "enabled",
+          NODE_OPTIONS: "--require ./owned.js",
+        },
+      },
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe("unset|enabled");
   });
 
   it("reports non-zero exit failures", () => {

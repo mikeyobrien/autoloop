@@ -6,6 +6,7 @@ import {
   commandFloorDecision,
   extractCommandFromToolInput,
 } from "./command-risk.js";
+import { sanitizeBackendEnvironment } from "./environment.js";
 
 export interface AcpClientOptions {
   provider?: string;
@@ -18,6 +19,7 @@ export interface AcpClientOptions {
   verbose?: boolean;
   /** Deadline for the ACP handshake (default 30s). */
   handshakeTimeoutMs?: number;
+  env?: NodeJS.ProcessEnv;
 }
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000;
@@ -78,7 +80,9 @@ export async function initAcpSession(
   const child = spawn(opts.command, opts.args, {
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
-    env: process.env,
+    env: sanitizeBackendEnvironment(opts.env ?? process.env, {
+      projectDir: opts.cwd,
+    }),
     detached: true, // create own process group so process.kill(-pid) in terminateAcpSession kills the full tree
   });
 

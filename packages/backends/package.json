@@ -31,6 +31,10 @@
       "types": "./dist/run-command.d.ts",
       "default": "./dist/run-command.js"
     },
+    "./environment": {
+      "types": "./dist/environment.d.ts",
+      "default": "./dist/environment.js"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
