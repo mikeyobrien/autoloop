@@ -318,6 +318,43 @@ describe("buildLoopContext", () => {
     expect(loop.policy.fileModAudit).toBe(false);
   });
 
+  it("inherits backend environments by default", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.environmentPolicy).toBe("inherit");
+    expect(loop.review.environmentPolicy).toBe("inherit");
+  });
+
+  it("supports explicit backend hardening with an independent review override", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'backend.environment_policy = "hardened"',
+        'review.environment_policy = "inherit"',
+      ].join("\n"),
+    );
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.backend.environmentPolicy).toBe("hardened");
+    expect(loop.review.environmentPolicy).toBe("inherit");
+  });
+
+  it("rejects unknown backend environment policies", () => {
+    const projectDir = makeProject(
+      'event_loop.max_iterations = 1\nbackend.environment_policy = "strict-ish"\n',
+    );
+    expect(() =>
+      buildLoopContext(projectDir, null, "node dist/main.js", {
+        workDir: projectDir,
+      }),
+    ).toThrow(/invalid environment policy/i);
+  });
+
   it("reads event_loop.completion_must_be_last and event_loop.audit_file_mods from TOML", () => {
     const projectDir = makeProject(
       [

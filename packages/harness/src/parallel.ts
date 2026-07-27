@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { BackendEnvironmentPolicy } from "@mobrienv/autoloop-backends";
 import {
   buildBackendShellCommand,
   normalizeBackendLabel,
@@ -165,8 +166,16 @@ export function runProcess(
   command: string,
   timeoutMs: number,
   providerKind = "command",
+  projectDir?: string,
+  environmentPolicy?: BackendEnvironmentPolicy,
 ): ProcessResult {
-  const result = runBackendCommand(providerKind, command, timeoutMs);
+  const result = runBackendCommand(
+    providerKind,
+    command,
+    timeoutMs,
+    projectDir,
+    environmentPolicy,
+  );
   return {
     output: result.output,
     exitCode: result.exitCode,
@@ -186,9 +195,16 @@ export function runProcessAsync(
   timeoutMs: number,
   providerKind = "command",
   onSpawn?: (pid: number) => void,
+  projectDir?: string,
+  environmentPolicy?: BackendEnvironmentPolicy,
 ): Promise<ProcessResult> {
-  return runBackendCommandAsync(providerKind, command, timeoutMs, (pid) =>
-    onSpawn?.(pid),
+  return runBackendCommandAsync(
+    providerKind,
+    command,
+    timeoutMs,
+    (pid) => onSpawn?.(pid),
+    projectDir,
+    environmentPolicy,
   ).then((result) => ({
     output: result.output,
     exitCode: result.exitCode,

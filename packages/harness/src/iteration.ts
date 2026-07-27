@@ -194,6 +194,7 @@ export async function runIteration(
       agentName: iter.backend.agent || undefined,
       modelId: iter.backend.model || undefined,
       verbose: loop.runtime.logLevel === "debug",
+      environmentPolicy: iter.backend.environmentPolicy,
     };
     loop.acpSession.current = await initAcpSession(acpOpts);
     log(
@@ -231,6 +232,7 @@ export async function runIteration(
       trustAllTools: iter.backend.trustAllTools,
       disallowedTools: iter.backend.disallowedTools,
       verbose: loop.runtime.logLevel === "debug",
+      environmentPolicy: iter.backend.environmentPolicy,
     });
     log(
       loop,
@@ -403,6 +405,8 @@ async function runBackendIteration(
     (pid) => {
       loop.commandSession.current = { pid };
     },
+    loop.paths.workDir,
+    iter.backend.environmentPolicy,
   );
   loop.commandSession.current = undefined;
   if (iter.backend.kind === "command") {
@@ -566,6 +570,7 @@ async function ensurePiSession(
     cwd: loop.paths.workDir,
     modelId: iter.backend.model || undefined,
     verbose: loop.runtime.logLevel === "debug",
+    environmentPolicy: iter.backend.environmentPolicy,
   });
   log(
     loop,

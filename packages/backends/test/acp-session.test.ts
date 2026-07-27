@@ -142,6 +142,44 @@ describe("initAcpSession", () => {
     }
   });
 
+  it("sanitizes the environment passed to the ACP process", async () => {
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    await initAcpSession({
+      command: "kiro-cli",
+      args: ["--acp"],
+      cwd: "/tmp/project",
+      trustAllTools: true,
+      environmentPolicy: "hardened",
+      env: {
+        PATH: "/usr/bin:/tmp/project/bin",
+        NORMAL_PROJECT_FLAG: "enabled",
+        NODE_OPTIONS: "--require ./owned.js",
+      },
+    });
+
+    const options = spawnFn.mock.calls.at(-1)?.[2];
+    expect(options.env.NORMAL_PROJECT_FLAG).toBe("enabled");
+    expect(options.env.NODE_OPTIONS).toBeUndefined();
+    expect(options.env.PATH).toBe("/usr/bin");
+  });
+
+  it("inherits the ACP process environment when policy is omitted", async () => {
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    const env = {
+      PATH: "/usr/bin:/tmp/project/bin",
+      NODE_OPTIONS: "--require ./project-hook.js",
+    };
+    await initAcpSession({
+      command: "kiro-cli",
+      args: ["--acp"],
+      cwd: "/tmp/project",
+      trustAllTools: true,
+      env,
+    });
+
+    expect(spawnFn.mock.calls.at(-1)?.[2].env).toBe(env);
+  });
+
   it("resolves provider metadata from options and command", async () => {
     const session = await initAcpSession({
       provider: "claude-agent-acp",

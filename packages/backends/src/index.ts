@@ -35,6 +35,15 @@ export {
   isCommandBearingTool,
   readSafetyAllowlist,
 } from "./command-risk.js";
+export type {
+  BackendEnvironmentOptions,
+  BackendEnvironmentPolicy,
+  ResolveBackendEnvironmentOptions,
+} from "./environment.js";
+export {
+  resolveBackendEnvironment,
+  sanitizeBackendEnvironment,
+} from "./environment.js";
 export type { BackendErrorClass } from "./error-class.js";
 export { classifyBackendError, isRetryableErrorClass } from "./error-class.js";
 export type {
@@ -199,8 +208,13 @@ export function runBackendCommand(
   providerKind: string,
   command: string,
   timeoutMs: number,
+  projectDir?: string,
+  environmentPolicy?: import("./environment.js").BackendEnvironmentPolicy,
 ): BackendRunResult {
-  return runShellCommand(providerKind, command, timeoutMs);
+  return runShellCommand(providerKind, command, timeoutMs, {
+    projectDir,
+    environmentPolicy,
+  });
 }
 
 /**
@@ -214,9 +228,15 @@ export function runBackendCommandAsync(
   command: string,
   timeoutMs: number,
   onSpawn?: (pid: number) => void,
+  projectDir?: string,
+  environmentPolicy?: import("./environment.js").BackendEnvironmentPolicy,
 ): Promise<BackendRunResult> {
-  return spawnShellCommand(providerKind, command, timeoutMs, (pid) =>
-    onSpawn?.(pid),
+  return spawnShellCommand(
+    providerKind,
+    command,
+    timeoutMs,
+    (pid) => onSpawn?.(pid),
+    { projectDir, environmentPolicy },
   );
 }
 

@@ -1,3 +1,4 @@
+import type { BackendEnvironmentPolicy } from "@mobrienv/autoloop-backends";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { ClaudeSdkSession } from "@mobrienv/autoloop-backends/claude-sdk-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
@@ -170,6 +171,7 @@ export interface LoopContext {
      * `$AUTOLOOP_USAGE_FILE`. Empty disables extraction (default).
      */
     usageFrom: string;
+    environmentPolicy?: BackendEnvironmentPolicy;
   };
   review: {
     enabled: boolean;
@@ -186,6 +188,7 @@ export interface LoopContext {
     agent: string;
     model: string;
     profile?: string;
+    environmentPolicy?: BackendEnvironmentPolicy;
     /**
      * Fail-closed routing for an UNKNOWN verdict (malformed/empty/timed-out
      * review, or confidence below `minConfidence`). Default `hold`: stop the

@@ -206,6 +206,33 @@ describe("initClaudeSdkSession", () => {
     expect(lastQuery.options.abortController).toBeInstanceOf(AbortController);
   });
 
+  it("sanitizes the environment passed to the SDK", async () => {
+    await startSession({
+      cwd: "/tmp/project",
+      environmentPolicy: "hardened",
+      env: {
+        PATH: "/usr/bin:/tmp/project/bin",
+        NORMAL_PROJECT_FLAG: "enabled",
+        GIT_CONFIG_COUNT: "1",
+      },
+    });
+
+    const env = lastQuery.options.env as Record<string, string>;
+    expect(env.NORMAL_PROJECT_FLAG).toBe("enabled");
+    expect(env.GIT_CONFIG_COUNT).toBeUndefined();
+    expect(env.PATH).toBe("/usr/bin");
+  });
+
+  it("inherits the SDK environment when policy is omitted", async () => {
+    const env = {
+      PATH: "/usr/bin:/tmp/project/bin",
+      NODE_OPTIONS: "--require ./project-hook.js",
+    };
+    await startSession({ cwd: "/tmp/project", env });
+
+    expect(lastQuery.options.env).toBe(env);
+  });
+
   it("keeps default permissions when tools are not trusted", async () => {
     await startSession({ trustAllTools: false });
     expect(lastQuery.options.permissionMode).toBeUndefined();

@@ -90,6 +90,7 @@ Prompt resolution order: CLI prompt override > `event_loop.prompt` > `event_loop
 | `backend.profile` | string | `""` | Provider-side agent profile. For `provider = "hermes"`, launches as `hermes --profile <name> acp` to select which Hermes Agent profile runs the iteration. Empty means the Hermes default profile. Has no effect on other providers. |
 | `backend.disallowed_tools` | list (CSV) | `""` | **`claude-sdk` only.** Comma-separated tool names to remove from the agent entirely (e.g. `"WebFetch,WebSearch"`). A hard block that applies even under `bypassPermissions` (unlike deny rules). Empty by default, so other presets are unaffected. Used to force a preset onto a dedicated capture tool by removing the built-ins. |
 | `backend.usage_from` | string | `""` | **`command` only.** Opt-in cost-telemetry convention. Set to `"file"` to have the harness read a JSON usage object the wrapped command writes to `$AUTOLOOP_USAGE_FILE` before exiting. Empty (default) skips extraction entirely — no behavior change for existing presets. See [The `command` backend: cost telemetry and live control](#the-command-backend-cost-telemetry-and-live-control) below. |
+| `backend.environment_policy` | `"inherit"` or `"hardened"` | `"inherit"` | Process environment policy for command, ACP, Pi RPC, and Claude SDK children. `inherit` preserves the current environment exactly for backward compatibility. `hardened` removes process-injection and Git-authority variables, relative and project-owned `PATH` entries, and rejects credential-bearing proxy URLs. Enable only after confirming the provider and project toolchain do not depend on those values. |
 
 Kind auto-detection: if `kind` is empty, the harness checks whether `command` is or ends with `pi` (→ `"pi"`); then whether it is or ends with `claude` with no custom `args` (→ `"claude-sdk"`); otherwise `"command"`. Pin `kind = "command"` to force the legacy `claude -p` shell path. Use `kind = "acp"` for ACP providers, or the CLI aliases `-b claude-sdk`, `-b kiro`, `-b hermes[:profile]`, `-b claude-agent-acp`, or `-b acp:<provider>:<command>`. Unknown non-empty kinds fail during configuration resolution, including values supplied by `--set backend.kind=...` and per-role `backend_kind` overrides.
 
@@ -129,6 +130,7 @@ The review pass is a separate backend invocation that runs periodically for cons
 | `review.agent` | string | *backend.agent* | ACP session mode/agent for reviews. |
 | `review.model` | string | *backend.model* | Model ID for the review backend. |
 | `review.profile` | string | *backend.profile* | Hermes profile for the review backend (provider = `"hermes"`). |
+| `review.environment_policy` | `"inherit"` or `"hardened"` | *backend.environment_policy* | Optional review-specific environment policy. This allows a constrained reviewer without changing the primary implementation backend, or an inherited reviewer when the primary backend is hardened. |
 | `review.prompt` | string | `""` | Inline review prompt. If set, takes precedence over `prompt_file`. |
 | `review.prompt_file` | string | `"metareview.md"` | Path to the review prompt file, relative to the project directory. |
 

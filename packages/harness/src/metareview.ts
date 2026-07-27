@@ -150,6 +150,8 @@ export async function runMetareviewReview(
               buildReviewCommand(loop, iteration, reviewPrompt),
               loop.review.timeoutMs,
               loop.review.kind,
+              loop.paths.workDir,
+              loop.review.environmentPolicy,
             );
 
   appendEvent(
@@ -270,6 +272,7 @@ async function runPiReview(
     cwd: loop.paths.workDir,
     modelId: loop.review.model || undefined,
     verbose: loop.runtime.logLevel === "debug",
+    environmentPolicy: loop.review.environmentPolicy,
   });
   try {
     return await runPiIteration(
@@ -305,6 +308,7 @@ async function runClaudeSdkReview(
     cwd: loop.paths.workDir,
     trustAllTools: loop.review.trustAllTools,
     verbose: loop.runtime.logLevel === "debug",
+    environmentPolicy: loop.review.environmentPolicy,
   });
   try {
     return await runClaudeSdkIteration(
@@ -339,6 +343,7 @@ async function runAcpReview(
     agentName: loop.review.agent || undefined,
     modelId: loop.review.model || undefined,
     verbose: loop.runtime.logLevel === "debug",
+    environmentPolicy: loop.review.environmentPolicy,
   });
   try {
     return await runAcpIteration(session, reviewPrompt, loop.review.timeoutMs);
