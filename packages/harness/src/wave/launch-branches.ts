@@ -282,6 +282,11 @@ export function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
     ", " +
     jsonField("backend_timeout_ms", String(loop.backend.timeoutMs)) +
     ", " +
+    jsonField(
+      "backend_environment_policy",
+      loop.backend.environmentPolicy ?? "inherit",
+    ) +
+    ", " +
     jsonField("branch_timeout_ms", String(loop.parallel.branchTimeoutMs)) +
     ", " +
     jsonField("log_level", loop.runtime.logLevel) +

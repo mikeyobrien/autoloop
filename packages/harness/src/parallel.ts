@@ -39,6 +39,8 @@ export interface BranchLaunch {
   backendArgs: string[];
   backendPromptMode: string;
   backendTimeoutMs: number;
+  /** Exact parent environment policy applied again by the child backend. */
+  backendEnvironmentPolicy: BackendEnvironmentPolicy;
   /** Parent-side wall-clock deadline used to clamp this child iteration. */
   branchTimeoutMs: number;
   logLevel: string;
@@ -63,6 +65,9 @@ export function loadParallelBranchLaunch(branchDir: string): BranchLaunch {
     backendPromptMode: extractField(line, "backend_prompt_mode"),
     backendTimeoutMs:
       Number.parseInt(extractField(line, "backend_timeout_ms"), 10) || 0,
+    backendEnvironmentPolicy: branchEnvironmentPolicy(
+      extractField(line, "backend_environment_policy"),
+    ),
     branchTimeoutMs:
       Number.parseInt(extractField(line, "branch_timeout_ms"), 10) || 0,
     logLevel: extractField(line, "log_level"),
@@ -113,7 +118,15 @@ export function parallelBranchBackendOverride(
   if (launch.backendPromptMode) override.prompt_mode = launch.backendPromptMode;
   if (launch.backendTimeoutMs > 0)
     override.timeout_ms = launch.backendTimeoutMs;
+  if (launch.backendEnvironmentPolicy === "hardened")
+    override.environment_policy = "hardened";
   return override;
+}
+
+function branchEnvironmentPolicy(value: string): BackendEnvironmentPolicy {
+  if (!value) return "inherit";
+  if (value === "inherit" || value === "hardened") return value;
+  throw new Error(`unknown branch backend environment policy: ${value}`);
 }
 
 export function writeParallelBranchSummary(
