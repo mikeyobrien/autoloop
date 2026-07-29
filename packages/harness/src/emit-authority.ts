@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import {
   appendFileSync,
   closeSync,
@@ -23,6 +23,46 @@ export interface EmitAuthorityPaths {
   dir: string;
   keyPath: string;
   ledgerPath: string;
+}
+
+export interface ParentAuthoritySink {
+  runtime: { runId: string };
+  paths: {
+    projectDir: string;
+    stateDir: string;
+  };
+  emitAuthority?: {
+    accepted: Map<string, AcceptedEmitAuthority>;
+  };
+}
+
+/**
+ * Issue a parent-owned acceptance id, record it in memory + durable ledger, and
+ * return the id for stamping on the journal line. Used for harness routing
+ * events (parallel joins) and parent-generated event.invalid telemetry.
+ */
+export function acceptParentJournalRecord(
+  loop: ParentAuthoritySink,
+  iteration: string,
+  topic: string,
+): string {
+  if (!loop.emitAuthority) {
+    loop.emitAuthority = { accepted: new Map() };
+  }
+  const authorityId = `${randomUUID()}:p${loop.emitAuthority.accepted.size}`;
+  loop.emitAuthority.accepted.set(authorityId, { topic, iteration });
+  appendAcceptedEmitAuthority(
+    resolveEmitAuthorityPaths(
+      loop.runtime.runId,
+      loop.paths.projectDir,
+      loop.paths.stateDir,
+    ),
+    loop.runtime.runId,
+    authorityId,
+    topic,
+    iteration,
+  );
+  return authorityId;
 }
 
 interface LedgerRecord {

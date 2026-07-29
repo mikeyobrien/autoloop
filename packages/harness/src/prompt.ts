@@ -120,6 +120,10 @@ function deriveRunContext(
     tasksMaterialized,
     loop.tasks.budgetChars,
   );
+  const authoritative = authoritativeRunLines(
+    runLines,
+    loop.emitAuthority?.accepted,
+  );
   return {
     scratchpadText: renderRunScratchpadPrompt(runLines),
     memoryText: memory.renderTwoTier(
@@ -139,13 +143,10 @@ function deriveRunContext(
       total: tasksMaterialized.open.length + tasksMaterialized.done.length,
     },
     guidanceMessages: drainGuidance(runLines),
-    routing: iterationRoutingContext(
-      loop.topology,
-      authoritativeRunLines(runLines, loop.emitAuthority?.accepted),
-    ),
-    backpressure: latestInvalidNote(runLines),
-    invalidCount: invalidEventCount(runLines),
-    lastRejected: lastRejectedTopic(runLines),
+    routing: iterationRoutingContext(loop.topology, authoritative),
+    backpressure: latestInvalidNote(authoritative),
+    invalidCount: invalidEventCount(authoritative),
+    lastRejected: lastRejectedTopic(authoritative),
   };
 }
 
@@ -730,11 +731,10 @@ export function acceptedAuthoritiesFromRun(
 }
 
 function trustedNonAgentTopic(topic: string): boolean {
-  // Non-agent journal lines are not a trust boundary: the backend can write
-  // AUTOLOOP_JOURNAL_FILE. Only non-routing harness telemetry may pass through
-  // without parent agent authority. Routing-capable system topics (loop.start,
-  // wave.*, etc.) must not be forgeable from the journal.
-  if (topic === "event.invalid") return true;
+  // Non-agent journal lines without parent authority_id are not a trust boundary.
+  // Only non-routing harness telemetry may pass through unstamped. Routing-capable
+  // system topics, parallel joins, and event.invalid require parent acceptance.
+  if (topic === "event.invalid") return false;
   if (!systemTopic(topic)) return false;
   return !routingTopic(topic);
 }
@@ -747,11 +747,11 @@ export function authoritativeRunLines(
   const seen = new Set<string>();
   return runLines.filter((line) => {
     const topic = extractTopic(line);
-    const source = extractField(line, "source");
+    const authorityId = extractField(line, "authority_id");
 
-    if (source === "agent") {
-      const authorityId = extractField(line, "authority_id");
-      if (!authorityId || seen.has(authorityId)) return false;
+    // Parent-stamped records (agent emits, harness joins, parent invalids).
+    if (authorityId) {
+      if (seen.has(authorityId)) return false;
       const accepted = acceptedAuthorities.get(authorityId);
       if (
         !accepted ||
@@ -764,8 +764,8 @@ export function authoritativeRunLines(
       return true;
     }
 
-    // Missing source usually means fields-shaped harness records. Explicit
-    // harness/operator payload sources are not a trust boundary.
+    // Unstamped non-agent lines: non-routing telemetry only.
+    if (extractField(line, "source") === "agent") return false;
     return trustedNonAgentTopic(topic);
   });
 }

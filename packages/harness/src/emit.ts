@@ -613,6 +613,8 @@ export interface EmitValidation {
   journalFile?: string;
   /** Unpredictable parent-issued id; absent for standalone/legacy emits. */
   authorityId?: string;
+  /** Parent-issued id for a resulting event.invalid journal stamp. */
+  invalidAuthorityId?: string;
 }
 
 function emitValidationContext(
@@ -694,6 +696,7 @@ function rejectEmit(
     topic,
     validation.allowedRoles,
     validation.allowedEvents,
+    validation.invalidAuthorityId,
   );
   return { ok: false, topic, error: message };
 }
@@ -719,20 +722,20 @@ export function appendInvalidEvent(
   emittedTopic: string,
   allowedRoles: string[],
   allowedEvents: string[],
+  authorityId?: string,
 ): void {
-  appendEvent(
-    journalFile,
-    runId,
-    iteration,
-    "event.invalid",
+  let fields =
     jsonField("recent_event", recentEvent) +
-      ", " +
-      jsonField("emitted", emittedTopic) +
-      ", " +
-      jsonField("suggested_roles", joinCsv(allowedRoles)) +
-      ", " +
-      jsonField("allowed_events", joinCsv(allowedEvents)),
-  );
+    ", " +
+    jsonField("emitted", emittedTopic) +
+    ", " +
+    jsonField("suggested_roles", joinCsv(allowedRoles)) +
+    ", " +
+    jsonField("allowed_events", joinCsv(allowedEvents));
+  if (authorityId) {
+    fields += `, ${jsonField("authority_id", authorityId)}`;
+  }
+  appendEvent(journalFile, runId, iteration, "event.invalid", fields);
 }
 
 export function resolveEmitJournalFile(projectDir: string): string {

@@ -63,8 +63,17 @@ export function appendHarnessEvent(
   iteration: string,
   topic: string,
   payload: string,
+  authorityId?: string,
 ): void {
-  appendEmittedEvent(path, runId, iteration, topic, payload, "harness");
+  appendEmittedEvent(
+    path,
+    runId,
+    iteration,
+    topic,
+    payload,
+    "harness",
+    authorityId,
+  );
 }
 
 export function appendOperatorEvent(

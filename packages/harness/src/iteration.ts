@@ -61,6 +61,7 @@ import {
   systemTopic,
 } from "./emit.js";
 import {
+  acceptParentJournalRecord,
   appendAcceptedEmitAuthority,
   resolveEmitAuthorityPaths,
 } from "./emit-authority.js";
@@ -187,6 +188,24 @@ function drainAuthorizedEmits(loop: LoopContext, iter: IterationContext): void {
   for (let index = 0; index < requests.length; index += 1) {
     const request = requests[index];
     const authorityId = `${current.authorityId}:${index}`;
+    const invalidAuthorityId = `${authorityId}:invalid`;
+    // Pre-register the invalid stamp so a rejected emit's event.invalid is
+    // parent-authenticated even if the agent topic is not accepted.
+    authority.accepted.set(invalidAuthorityId, {
+      topic: "event.invalid",
+      iteration: current.iteration,
+    });
+    appendAcceptedEmitAuthority(
+      resolveEmitAuthorityPaths(
+        loop.runtime.runId,
+        loop.paths.projectDir,
+        loop.paths.stateDir,
+      ),
+      loop.runtime.runId,
+      invalidAuthorityId,
+      "event.invalid",
+      current.iteration,
+    );
     const validation: EmitValidation = {
       runId: loop.runtime.runId,
       iteration: current.iteration,
@@ -199,6 +218,7 @@ function drainAuthorizedEmits(loop: LoopContext, iter: IterationContext): void {
       askEvent: loop.ask.enabled ? loop.ask.event : "",
       journalFile: loop.paths.journalFile,
       authorityId,
+      invalidAuthorityId,
     };
     const result = emitAuthorized(
       loop.paths.projectDir,
@@ -982,6 +1002,11 @@ async function rejectInvalidAndContinue(
   iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
   progress: (topic: string, outcome: string) => void,
 ): Promise<RunSummary> {
+  const authorityId = acceptParentJournalRecord(
+    loop,
+    String(iter.iteration),
+    "event.invalid",
+  );
   appendInvalidEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
@@ -990,6 +1015,7 @@ async function rejectInvalidAndContinue(
     emittedTopic,
     iter.allowedRoles,
     iter.allowedEvents,
+    authorityId,
   );
   log(
     loop,
