@@ -46,10 +46,12 @@ export function createApp(
     if (!host) {
       return c.json({ error: "origin mismatch" }, 403);
     }
+    // Direct TLS/HTTPS wins. Forwarded proto is consulted only for plaintext
+    // backends behind an explicit trusted reverse proxy.
     let scheme: "http" | "https" = c.req.url.startsWith("https:")
       ? "https"
       : "http";
-    if (trustProxy) {
+    if (scheme === "http" && trustProxy) {
       const forwarded = c.req.header("x-forwarded-proto");
       const proto = forwarded?.split(",")[0]?.trim().toLowerCase();
       if (proto === "https" || proto === "http") scheme = proto;

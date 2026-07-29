@@ -32,7 +32,7 @@ Tier B surfaces are intended for integration use but may see breaking changes in
 
 - **Harness emit() API**: `packages/harness/src/emit.ts` public interface and behavior.
 - **LoopEvent schema**: Event envelope shape in `packages/harness/src/events.ts`.
-- **Other package export subpaths**: Declared `exports` not listed as Tier A above (e.g., `@mobrienv/autoloop-harness/emit`, `@mobrienv/autoloop-kanban/runtime`).
+- **Other package export subpaths**: Declared `exports` not listed as Tier A above (e.g., `@mobrienv/autoloop-harness/emit`, `@mobrienv/autoloop-harness/prompt`).
 - **Human-readable CLI rendering**: headings, colors, spacing, and prose intended for terminal users. Machine consumers should use documented `--json` modes.
 
 **Policy:** Changes to Tier B require a changelog note but no RFC or deprecation grace period.

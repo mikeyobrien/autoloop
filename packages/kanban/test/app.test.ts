@@ -106,4 +106,16 @@ describe("createApp", () => {
     });
     expect(res.status).toBe(404);
   });
+
+  it("does not let X-Forwarded-Proto override direct https with trustProxy", async () => {
+    const app = createApp({ ...baseCtx, trustProxy: true }, freshStore());
+    const res = await app.request("https://127.0.0.1:4801/api/foo", {
+      headers: {
+        host: "127.0.0.1:4801",
+        origin: "http://127.0.0.1:4801",
+        "x-forwarded-proto": "http",
+      },
+    });
+    expect(res.status).toBe(403);
+  });
 });
