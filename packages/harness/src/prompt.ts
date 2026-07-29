@@ -713,17 +713,41 @@ function maxReviewPromptIteration(runLines: string[]): number {
 export function acceptedAuthoritiesFromRun(
   runLines: string[],
 ): Map<string, { topic: string; iteration: string }> {
+  const allowedByIteration = new Map<string, Set<string>>();
+  for (const line of runLines) {
+    if (extractTopic(line) !== "iteration.start") continue;
+    allowedByIteration.set(
+      extractIteration(line),
+      new Set(csvFieldList(line, "allowed_events")),
+    );
+  }
+
   const accepted = new Map<string, { topic: string; iteration: string }>();
   for (const line of runLines) {
     if (extractField(line, "source") !== "agent") continue;
     const authorityId = extractField(line, "authority_id");
     if (!authorityId || accepted.has(authorityId)) continue;
-    accepted.set(authorityId, {
-      topic: extractTopic(line),
-      iteration: extractIteration(line),
-    });
+    // Parent issuance ids are `${uuid}:${index}`. Reject free-form forgeries.
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:\d+$/i.test(
+        authorityId,
+      )
+    ) {
+      continue;
+    }
+    const topic = extractTopic(line);
+    const iteration = extractIteration(line);
+    if (!allowedByIteration.get(iteration)?.has(topic)) continue;
+    accepted.set(authorityId, { topic, iteration });
   }
   return accepted;
+}
+
+function trustedNonAgentTopic(topic: string): boolean {
+  // Fields-shaped harness telemetry and control topics never carry agent handoff
+  // authority. Anything else (including forged payload records with source
+  // harness/operator) must come through parent-authorized agent ingress.
+  return systemTopic(topic) || topic === "event.invalid";
 }
 
 export function authoritativeRunLines(
@@ -733,19 +757,28 @@ export function authoritativeRunLines(
   if (!acceptedAuthorities) return runLines;
   const seen = new Set<string>();
   return runLines.filter((line) => {
-    if (extractField(line, "source") !== "agent") return true;
-    const authorityId = extractField(line, "authority_id");
-    if (!authorityId || seen.has(authorityId)) return false;
-    const accepted = acceptedAuthorities.get(authorityId);
-    if (
-      !accepted ||
-      accepted.topic !== extractTopic(line) ||
-      accepted.iteration !== extractField(line, "iteration")
-    ) {
-      return false;
+    const topic = extractTopic(line);
+    const source = extractField(line, "source");
+
+    if (source === "agent") {
+      const authorityId = extractField(line, "authority_id");
+      if (!authorityId || seen.has(authorityId)) return false;
+      const accepted = acceptedAuthorities.get(authorityId);
+      if (
+        !accepted ||
+        accepted.topic !== topic ||
+        accepted.iteration !== extractField(line, "iteration")
+      ) {
+        return false;
+      }
+      seen.add(authorityId);
+      return true;
     }
-    seen.add(authorityId);
-    return true;
+
+    // Missing source usually means fields-shaped harness records. Explicit
+    // harness/operator payload sources are not a trust boundary: the agent can
+    // write the journal path, so only known non-routing system topics pass.
+    return trustedNonAgentTopic(topic);
   });
 }
 
@@ -766,16 +799,14 @@ export function validateAgentEventsForRun(
     );
   }
 
+  // Completion and required-event membership are agent-ingress concerns.
+  // System topics stay available for routing/projections via authoritative lines,
+  // but they never satisfy completion.requiredEvents / completion.event.
   const validatedTopics = new Set<string>();
   for (const line of authoritativeLines) {
     const topic = extractTopic(line);
     if (!topic) continue;
-
-    if (extractField(line, "source") !== "agent") {
-      validatedTopics.add(topic);
-      continue;
-    }
-
+    if (extractField(line, "source") !== "agent") continue;
     if (coordinationTopic(topic) || topic === "human.ask") continue;
     if (allowedByIteration.get(extractIteration(line))?.has(topic)) {
       validatedTopics.add(topic);

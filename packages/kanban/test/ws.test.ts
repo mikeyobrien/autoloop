@@ -287,6 +287,45 @@ describe("installKanbanWs: origin enforcement (Slice B)", () => {
     await new Promise<void>((resolve) => ws.on("close", () => resolve()));
   });
 
+  it("rejects same-host Origin with mismatched scheme", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "scheme-mismatch" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: { Origin: `https://127.0.0.1:${harness.port}` },
+      },
+    );
+    const closeOrError = await new Promise<string>((resolve) => {
+      ws.on("error", () => resolve("error"));
+      ws.on("close", () => resolve("close"));
+      setTimeout(() => resolve("timeout"), 500);
+    });
+    expect(["error", "close"]).toContain(closeOrError);
+    expect(harness?.ensureCalls).toEqual([]);
+  });
+
+  it("accepts https Origin when X-Forwarded-Proto is https", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "forwarded-https" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: {
+          Origin: `https://127.0.0.1:${harness.port}`,
+          "X-Forwarded-Proto": "https",
+        },
+      },
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.on("open", () => resolve());
+      ws.on("error", reject);
+    });
+    expect(harness.ensureCalls.length).toBe(1);
+    ws.close();
+    await new Promise<void>((resolve) => ws.on("close", () => resolve()));
+  });
+
   it("accepts same-origin upgrade when bound to all interfaces", async () => {
     harness = await boot({ host: "0.0.0.0" });
     const t = harness.store.add({ title: "wildcard-bind-origin" });

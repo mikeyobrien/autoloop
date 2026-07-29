@@ -14,9 +14,24 @@ export interface InstallWsResult {
   close(): void;
 }
 
+function requestScheme(req: IncomingMessage): "http" | "https" {
+  const socket = req.socket as { encrypted?: boolean };
+  if (socket.encrypted) return "https";
+
+  // Single trusted hop only: first X-Forwarded-Proto value. Used when TLS is
+  // terminated in front of a plain HTTP Node listener (common reverse-proxy).
+  const forwarded = req.headers["x-forwarded-proto"];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const proto = raw?.split(",")[0]?.trim().toLowerCase();
+  if (proto === "https") return "https";
+  if (proto === "http") return "http";
+  return "http";
+}
+
 function isOriginAllowed(
   requestOrigin: string | undefined,
   requestHost: string | undefined,
+  scheme: "http" | "https",
 ): boolean {
   // Non-browser/native clients often omit Origin. Preserve that behavior while
   // rejecting cross-origin browser upgrades.
@@ -25,8 +40,11 @@ function isOriginAllowed(
 
   try {
     const originUrl = new URL(requestOrigin);
+    // Require a true same-origin match: scheme + host[:port]. Reject values
+    // that are merely same-host across http/https, and reject non-origin forms.
     return (
-      (originUrl.protocol === "http:" || originUrl.protocol === "https:") &&
+      originUrl.origin === requestOrigin &&
+      originUrl.protocol === `${scheme}:` &&
       originUrl.host.toLowerCase() === requestHost.toLowerCase()
     );
   } catch {
@@ -48,9 +66,11 @@ export function installKanbanWs(
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== "/ws/kanban-pty") return;
 
-    // Validate browser Origin against the request Host header. This remains
-    // correct when the server binds 0.0.0.0 or sits behind TLS termination.
-    if (!isOriginAllowed(req.headers.origin, req.headers.host)) {
+    // Validate browser Origin as true same-origin against Host + request scheme
+    // (socket TLS or first X-Forwarded-Proto hop for reverse-proxy termination).
+    if (
+      !isOriginAllowed(req.headers.origin, req.headers.host, requestScheme(req))
+    ) {
       socket.destroy();
       return;
     }
