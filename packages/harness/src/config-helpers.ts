@@ -741,6 +741,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     runtime: loop.runtime,
     launch: loop.launch,
     store: loop.store,
+    emitAuthority: loop.emitAuthority ?? { accepted: new Map() },
     agentMap: loadAgentMap(pd),
     // Alias, never copy: all reloaded contexts must share one session holder.
     acpSession: loop.acpSession ?? { current: undefined },

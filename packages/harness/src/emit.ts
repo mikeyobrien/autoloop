@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import {
   joinCsv,
@@ -223,7 +223,35 @@ export function emit(
   topic: string,
   payload: string,
 ): EmitResult {
-  const result = emitCore(projectDir, topic, payload);
+  const requestFile = process.env.AUTOLOOP_EMIT_REQUEST_FILE;
+  if (requestFile) {
+    mkdirSync(dirname(requestFile), { recursive: true });
+    appendFileSync(
+      requestFile,
+      `${JSON.stringify({ v: 1, topic, payload })}\n`,
+      { encoding: "utf8", mode: 0o600 },
+    );
+    return { ok: true, topic };
+  }
+  return emitDirect(projectDir, topic, payload);
+}
+
+export function emitAuthorized(
+  projectDir: string,
+  topic: string,
+  payload: string,
+  validation: EmitValidation,
+): EmitResult {
+  return emitDirect(projectDir, topic, payload, validation);
+}
+
+function emitDirect(
+  projectDir: string,
+  topic: string,
+  payload: string,
+  validationOverride?: EmitValidation,
+): EmitResult {
+  const result = emitCore(projectDir, topic, payload, validationOverride);
   if (!result.ok) return result;
 
   // post_emit hooks run after a successful accept. They cannot un-journal the
@@ -231,8 +259,10 @@ export function emit(
   // result (visible to the agent/CLI caller) and a `suspend` policy writes
   // durable suspend state for the harness to catch at the next iteration
   // boundary.
-  const journalFile = resolveEmitJournalFile(projectDir);
-  const validation = emitValidationContext(projectDir, journalFile);
+  const journalFile =
+    validationOverride?.journalFile ?? resolveEmitJournalFile(projectDir);
+  const validation =
+    validationOverride ?? emitValidationContext(projectDir, journalFile);
   const postEmit = runEmitPhaseHooks(
     projectDir,
     journalFile,
@@ -256,10 +286,13 @@ function emitCore(
   projectDir: string,
   topic: string,
   payload: string,
+  validationOverride?: EmitValidation,
 ): EmitResult {
-  const journalFile = resolveEmitJournalFile(projectDir);
+  const journalFile =
+    validationOverride?.journalFile ?? resolveEmitJournalFile(projectDir);
   mkdirSync(dirname(journalFile), { recursive: true });
-  const validation = emitValidationContext(projectDir, journalFile);
+  const validation =
+    validationOverride ?? emitValidationContext(projectDir, journalFile);
 
   // pre_emit hooks: run before any gating so a configured mutation can steer
   // routing/gate decisions too. Runs disk/config-driven (see
@@ -567,7 +600,7 @@ export function routingTopic(topic: string): boolean {
   return !coordinationTopic(topic);
 }
 
-interface EmitValidation {
+export interface EmitValidation {
   runId: string;
   iteration: string;
   recentEvent: string;
@@ -577,6 +610,9 @@ interface EmitValidation {
   completionEvent: string;
   topo: topology.Topology;
   askEvent: string;
+  journalFile?: string;
+  /** Unpredictable parent-issued id; absent for standalone/legacy emits. */
+  authorityId?: string;
 }
 
 function emitValidationContext(
@@ -639,6 +675,7 @@ function acceptEmit(
     validation.iteration,
     topic,
     payload,
+    validation.authorityId,
   );
   return { ok: true, topic };
 }

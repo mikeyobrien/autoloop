@@ -139,7 +139,10 @@ function deriveRunContext(
       total: tasksMaterialized.open.length + tasksMaterialized.done.length,
     },
     guidanceMessages: drainGuidance(runLines),
-    routing: iterationRoutingContext(loop.topology, runLines),
+    routing: iterationRoutingContext(
+      loop.topology,
+      authoritativeRunLines(runLines, loop.emitAuthority?.accepted),
+    ),
     backpressure: latestInvalidNote(runLines),
     invalidCount: invalidEventCount(runLines),
     lastRejected: lastRejectedTopic(runLines),
@@ -707,9 +710,55 @@ function maxReviewPromptIteration(runLines: string[]): number {
  *
  * Coordination and ask topics are excluded (non-routing, already bypassed in emit).
  */
-export function validateAgentEventsForRun(runLines: string[]): Set<string> {
-  const allowedByIteration = new Map<string, Set<string>>();
+export function acceptedAuthoritiesFromRun(
+  runLines: string[],
+): Map<string, { topic: string; iteration: string }> {
+  const accepted = new Map<string, { topic: string; iteration: string }>();
   for (const line of runLines) {
+    if (extractField(line, "source") !== "agent") continue;
+    const authorityId = extractField(line, "authority_id");
+    if (!authorityId || accepted.has(authorityId)) continue;
+    accepted.set(authorityId, {
+      topic: extractTopic(line),
+      iteration: extractIteration(line),
+    });
+  }
+  return accepted;
+}
+
+export function authoritativeRunLines(
+  runLines: string[],
+  acceptedAuthorities?: Map<string, { topic: string; iteration: string }>,
+): string[] {
+  if (!acceptedAuthorities) return runLines;
+  const seen = new Set<string>();
+  return runLines.filter((line) => {
+    if (extractField(line, "source") !== "agent") return true;
+    const authorityId = extractField(line, "authority_id");
+    if (!authorityId || seen.has(authorityId)) return false;
+    const accepted = acceptedAuthorities.get(authorityId);
+    if (
+      !accepted ||
+      accepted.topic !== extractTopic(line) ||
+      accepted.iteration !== extractField(line, "iteration")
+    ) {
+      return false;
+    }
+    seen.add(authorityId);
+    return true;
+  });
+}
+
+export function validateAgentEventsForRun(
+  runLines: string[],
+  acceptedAuthorities?: Map<string, { topic: string; iteration: string }>,
+): Set<string> {
+  const authoritativeLines = authoritativeRunLines(
+    runLines,
+    acceptedAuthorities,
+  );
+  const allowedByIteration = new Map<string, Set<string>>();
+  for (const line of authoritativeLines) {
     if (extractTopic(line) !== "iteration.start") continue;
     allowedByIteration.set(
       extractIteration(line),
@@ -718,7 +767,7 @@ export function validateAgentEventsForRun(runLines: string[]): Set<string> {
   }
 
   const validatedTopics = new Set<string>();
-  for (const line of runLines) {
+  for (const line of authoritativeLines) {
     const topic = extractTopic(line);
     if (!topic) continue;
 

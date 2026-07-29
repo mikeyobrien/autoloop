@@ -18,6 +18,9 @@ export function decodeEvent(line: string): JournalEvent | null {
       };
       if (iteration) event.iteration = iteration;
       if (typeof parsed.source === "string") event.source = parsed.source;
+      if (typeof parsed.authority_id === "string") {
+        event.authorityId = parsed.authority_id;
+      }
       return event;
     }
 

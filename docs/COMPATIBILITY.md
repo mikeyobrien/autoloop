@@ -10,7 +10,7 @@ Tier A surfaces are part of the public contract and follow semantic versioning. 
 
 **Surfaces:**
 
-- **Journal JSONL contract (v1)**: On-disk record schema and semantics defined in `packages/core/src/events/encode.ts`. Every line is a JSON object with fields: `v` (version), `ts` (ISO-8601 timestamp), `run` (run ID), `topic` (event topic), optional `iteration`, then either `fields` (object) or `payload` + `source`.
+- **Journal JSONL contract (v1)**: On-disk record schema and semantics defined in `packages/core/src/events/encode.ts`. Every line is a JSON object with fields: `v` (version), `ts` (ISO-8601 timestamp), `run` (run ID), `topic` (event topic), optional `iteration`, then either `fields` (object) or `payload` + `source`. Agent payload records accepted through a live harness may also carry the additive optional `authority_id` field.
 - **Registry schema**: On-disk `RunRecord` shape and JSONL append protocol in `packages/core/src/registry/types.ts`. Back-compat-optional fields include `outcome`, `verdict`, `cost_usd`, `acceptance_verified`.
 - **CLI contracts**: documented argument and exit-code behavior for `run`, `emit`, `resume`, `inspect`, `list`, `loops`, and `config`, plus documented `--json` response fields. Human-oriented terminal rendering is Tier B unless a command explicitly documents it as stable.
 - **Completion and required-event semantics**: Behavior of `completion.event`, `completion.requiredEvents`, `completion.must_be_last`, and how the harness decides loop termination.

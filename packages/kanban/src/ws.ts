@@ -16,35 +16,22 @@ export interface InstallWsResult {
 
 function isOriginAllowed(
   requestOrigin: string | undefined,
-  clientHost: string,
-  clientPort: number,
+  requestHost: string | undefined,
 ): boolean {
-  // If no origin header, allow (matches HTTP policy; CLI/test clients may omit it).
+  // Non-browser/native clients often omit Origin. Preserve that behavior while
+  // rejecting cross-origin browser upgrades.
   if (!requestOrigin) return true;
+  if (!requestHost) return false;
 
-  // Parse the origin header as a URL.
-  let originUrl: URL;
   try {
-    originUrl = new URL(requestOrigin);
+    const originUrl = new URL(requestOrigin);
+    return (
+      (originUrl.protocol === "http:" || originUrl.protocol === "https:") &&
+      originUrl.host.toLowerCase() === requestHost.toLowerCase()
+    );
   } catch {
-    // Malformed origin URL — reject.
     return false;
   }
-
-  // Compute allowed origins: localhost forms and the actual bind host:port.
-  const allowedOrigins = new Set<string>();
-  const actualOrigin = `http://${clientHost}:${clientPort}`;
-  allowedOrigins.add(actualOrigin);
-
-  // If bound to localhost/127.0.0.1, also allow the alternate form.
-  if (clientHost === "127.0.0.1" || clientHost === "localhost") {
-    allowedOrigins.add(`http://127.0.0.1:${clientPort}`);
-    allowedOrigins.add(`http://localhost:${clientPort}`);
-  }
-
-  // Check if the origin matches one of the allowed origins.
-  const requestOriginNorm = `${originUrl.protocol}//${originUrl.host}`;
-  return allowedOrigins.has(requestOriginNorm);
 }
 
 export function installKanbanWs(
@@ -61,19 +48,9 @@ export function installKanbanWs(
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== "/ws/kanban-pty") return;
 
-    // Extract client host and port from the server address.
-    // Default to localhost:8000 if unavailable (for testing).
-    const serverAddr = server.address();
-    let clientHost = "127.0.0.1";
-    let clientPort = 8000;
-    if (serverAddr && typeof serverAddr !== "string") {
-      clientHost = serverAddr.address || "127.0.0.1";
-      clientPort = serverAddr.port || 8000;
-    }
-
-    // Validate origin (Slice B: WebSocket origin boundary).
-    const origin = req.headers.origin;
-    if (!isOriginAllowed(origin, clientHost, clientPort)) {
+    // Validate browser Origin against the request Host header. This remains
+    // correct when the server binds 0.0.0.0 or sits behind TLS termination.
+    if (!isOriginAllowed(req.headers.origin, req.headers.host)) {
       socket.destroy();
       return;
     }

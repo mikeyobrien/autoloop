@@ -19,6 +19,7 @@ import {
 import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
+import { acceptedAuthoritiesFromRun } from "./prompt.js";
 import {
   findDanglingProvisional,
   resolveOrphanedProvisional,
@@ -288,6 +289,11 @@ export async function resume(
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
+  loop.emitAuthority = {
+    accepted: acceptedAuthoritiesFromRun(
+      readRunLines(loop.paths.journalFile, loop.runtime.runId),
+    ),
+  };
 
   // Append the resume marker before any iteration so the scratchpad and derive
   // path see it. It's a system topic — routing ignores it.

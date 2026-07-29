@@ -45,6 +45,8 @@ export interface PayloadEvent extends EventBase {
   shape: "payload";
   payload: string;
   source?: string;
+  /** Parent-harness issuance id for agent events accepted through live ingress. */
+  authorityId?: string;
 }
 
 export type JournalEvent = FieldsEvent | PayloadEvent;

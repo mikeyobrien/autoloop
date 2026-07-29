@@ -287,6 +287,24 @@ describe("installKanbanWs: origin enforcement (Slice B)", () => {
     await new Promise<void>((resolve) => ws.on("close", () => resolve()));
   });
 
+  it("accepts same-origin upgrade when bound to all interfaces", async () => {
+    harness = await boot({ host: "0.0.0.0" });
+    const t = harness.store.add({ title: "wildcard-bind-origin" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: { Origin: `http://127.0.0.1:${harness.port}` },
+      },
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.on("open", () => resolve());
+      ws.on("error", reject);
+    });
+    expect(harness.ensureCalls.length).toBe(1);
+    ws.close();
+    await new Promise<void>((resolve) => ws.on("close", () => resolve()));
+  });
+
   it("rejects upgrade with malformed Origin header", async () => {
     harness = await boot({ host: "127.0.0.1" });
     const t = harness.store.add({ title: "malformed-origin" });

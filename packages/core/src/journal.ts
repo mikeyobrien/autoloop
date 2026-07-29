@@ -44,8 +44,17 @@ export function appendAgentEvent(
   iteration: string,
   topic: string,
   payload: string,
+  authorityId?: string,
 ): void {
-  appendEmittedEvent(path, runId, iteration, topic, payload, "agent");
+  appendEmittedEvent(
+    path,
+    runId,
+    iteration,
+    topic,
+    payload,
+    "agent",
+    authorityId,
+  );
 }
 
 export function appendHarnessEvent(
@@ -75,6 +84,7 @@ function appendEmittedEvent(
   topic: string,
   payload: string,
   source: string,
+  authorityId?: string,
 ): void {
   appendText(
     path,
@@ -85,6 +95,7 @@ function appendEmittedEvent(
       topic,
       payload,
       source,
+      authorityId,
     }),
   );
 }
