@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -618,6 +618,30 @@ describe("prompt_file support", () => {
     );
     const topo = loadTopology(dir);
     expect(topo.roles[0].prompt).toBe("Do something specific.");
+  });
+
+  it("rejects prompt files that escape through parent traversal", () => {
+    const dir = tmpDir("prompt-parent-escape");
+    writeFileSync(join(TMP_BASE, "outside.md"), "host-only instructions");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      '[[role]]\nid = "worker"\nprompt_file = "../outside.md"\nemits = ["done"]\n',
+    );
+
+    expect(() => loadTopology(dir)).toThrow(/prompt_file.*within/i);
+  });
+
+  it("rejects prompt files that escape through a symlink", () => {
+    const dir = tmpDir("prompt-symlink-escape");
+    const outside = join(TMP_BASE, "outside-symlink.md");
+    writeFileSync(outside, "host-only instructions");
+    symlinkSync(outside, join(dir, "linked-prompt.md"));
+    writeFileSync(
+      join(dir, "topology.toml"),
+      '[[role]]\nid = "worker"\nprompt_file = "linked-prompt.md"\nemits = ["done"]\n',
+    );
+
+    expect(() => loadTopology(dir)).toThrow(/prompt_file.*within/i);
   });
 });
 

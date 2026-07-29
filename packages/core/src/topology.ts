@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import TOML from "@iarna/toml";
+import { readOptionalContainedFile } from "./contained-file.js";
 import type {
   FanoutKind,
   FanoutStage,
@@ -624,9 +625,7 @@ function rolePrompt(role: Role, projectDir: string): string {
 }
 
 function readPromptFile(projectDir: string, promptFile: string): string {
-  const fullPath = join(projectDir, promptFile);
-  if (!existsSync(fullPath)) return "";
-  return readFileSync(fullPath, "utf-8");
+  return readOptionalContainedFile(projectDir, promptFile, "prompt_file");
 }
 
 function collectMatchingRoles(topology: Topology, event: string): string[] {

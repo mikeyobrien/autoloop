@@ -46,6 +46,54 @@ export function buildRunsPayload(
   return result;
 }
 
+export function splitSelfCommand(selfCmd: string): string[] {
+  const words: string[] = [];
+  let word = "";
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+  let started = false;
+
+  for (const char of selfCmd) {
+    if (escaped) {
+      word += char;
+      escaped = false;
+      started = true;
+      continue;
+    }
+    if (char === "\\" && quote !== "'") {
+      escaped = true;
+      started = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = null;
+      else word += char;
+      started = true;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      started = true;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (started) {
+        words.push(word);
+        word = "";
+        started = false;
+      }
+      continue;
+    }
+    word += char;
+    started = true;
+  }
+
+  if (escaped || quote) throw new Error("invalid self command quoting");
+  if (started) words.push(word);
+  if (words.length === 0 || !words[0]) throw new Error("self command is empty");
+  return words;
+}
+
 export function apiRoutes(ctx: DashboardContext): Hono {
   const api = new Hono();
 
@@ -219,10 +267,14 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     }
     args.push(prompt);
 
-    const child = spawn(ctx.selfCmd.replace(/'/g, ""), args, {
+    const [command, ...commandArgs] = splitSelfCommand(ctx.selfCmd);
+    const child = spawn(command, [...commandArgs, ...args], {
       cwd: ctx.projectDir,
       detached: true,
       stdio: "ignore",
+    });
+    child.once("error", (error) => {
+      console.error(`Failed to spawn dashboard run: ${error.message}`);
     });
     child.unref();
 

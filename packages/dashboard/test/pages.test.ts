@@ -378,6 +378,7 @@ describe("POST /api/runs input validation", () => {
         ...orig,
         spawn: vi.fn(() => ({
           pid: 12345,
+          once: vi.fn(),
           unref: vi.fn(),
         })),
       };

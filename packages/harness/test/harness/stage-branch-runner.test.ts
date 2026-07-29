@@ -16,6 +16,9 @@ import type { BranchSpec as WaveBranchSpec } from "../../src/wave/types.js";
 // The spawn boundary: capture what the runner would launch, and return a
 // scripted branch outcome instead of spinning up a real `branch-run` subprocess.
 const launchedSpecs: WaveBranchSpec[] = [];
+const launchBatchSizes: number[] = [];
+const launchTimeouts: number[] = [];
+const writtenTimeouts: number[] = [];
 let scriptedResult: {
   stopReason: string;
   output: string;
@@ -23,10 +26,21 @@ let scriptedResult: {
 };
 
 vi.mock("../../src/wave/launch-branches.js", () => ({
-  writeBranchLaunch: (spec: WaveBranchSpec) => {
+  writeBranchLaunch: (
+    spec: WaveBranchSpec,
+    loop: { parallel: { branchTimeoutMs: number } },
+  ) => {
     launchedSpecs.push(spec);
+    writtenTimeouts.push(loop.parallel.branchTimeoutMs);
   },
-  launchParallelBranches: (_loop: unknown, specs: WaveBranchSpec[]) => specs,
+  launchParallelBranches: (
+    loop: { parallel: { branchTimeoutMs: number } },
+    specs: WaveBranchSpec[],
+  ) => {
+    launchBatchSizes.push(specs.length);
+    launchTimeouts.push(loop.parallel.branchTimeoutMs);
+    return specs;
+  },
   joinParallelBranches: (
     _loop: unknown,
     _iter: unknown,
@@ -51,7 +65,10 @@ vi.mock("../../src/wave/launch-branches.js", () => ({
 
 import type { BranchSpec as StageSpec } from "../../src/fanout-runner.js";
 import type { IterationContext } from "../../src/prompt.js";
-import { buildStageBranchRunner } from "../../src/wave/stage-branch-runner.js";
+import {
+  buildStageBranchRunner,
+  runStageBranchBatch,
+} from "../../src/wave/stage-branch-runner.js";
 
 function makeLoop(): LoopContext {
   const workDir = mkdtempSync(join(tmpdir(), "autoloop-sbr-"));
@@ -79,6 +96,8 @@ function makeLoop(): LoopContext {
     },
     paths: { stateDir, journalFile },
     runtime: { runId: "run-sbr" },
+    parallel: { branchTimeoutMs: 180_000 },
+    stage: { branchTimeoutMs: 1_500_000, concurrency: 2 },
   } as unknown as LoopContext;
 }
 
@@ -99,9 +118,40 @@ function branchSpec(overrides: Partial<StageSpec> = {}): StageSpec {
 
 beforeEach(() => {
   launchedSpecs.length = 0;
+  launchBatchSizes.length = 0;
+  launchTimeouts.length = 0;
+  writtenTimeouts.length = 0;
 });
 
 describe("buildStageBranchRunner — real branch mapping", () => {
+  it("launches each concurrency window before joining it", async () => {
+    const loop = makeLoop();
+    scriptedResult = {
+      stopReason: "completion_event",
+      output: '{"affirm": true}',
+      elapsedMs: 100,
+    };
+    const specs = [
+      branchSpec({ branchId: "verify.0", index: 0 }),
+      branchSpec({ branchId: "verify.1", index: 1 }),
+      branchSpec({ branchId: "verify.2", index: 2 }),
+    ];
+
+    const results = await runStageBranchBatch(
+      loop,
+      iterCtx(),
+      "verify",
+      specs,
+      2,
+    );
+
+    expect(launchBatchSizes).toEqual([2, 1]);
+    expect(launchTimeouts).toEqual([1_500_000, 1_500_000]);
+    expect(writtenTimeouts).toEqual([1_500_000, 1_500_000, 1_500_000]);
+    expect(results).toHaveLength(3);
+    expect(results.every((result) => result.ok)).toBe(true);
+  });
+
   it("maps a completed branch whose output is a JSON object to a live BranchResult", async () => {
     const loop = makeLoop();
     scriptedResult = {

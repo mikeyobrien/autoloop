@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
+import { buildLoopContext } from "@mobrienv/autoloop-harness/config-helpers";
 import {
+  maybeRunMetareview,
   parseVerdict,
   runMetareviewReview,
   shouldRunMetareview,
@@ -525,5 +527,68 @@ describe("runMetareviewReview", () => {
     const verdict = await runMetareviewReview(loop, 2);
 
     expect(verdict.verdict).toBe("UNKNOWN");
+  });
+});
+
+describe("maybeRunMetareview preset safety", () => {
+  it("rolls back an invalid generated-preset edit before reloading", async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "autoloop-review-rollback-"));
+    const presetFile = join(projectDir, "generated-preset.toml");
+    const original = [
+      'name = "generated"',
+      'completion_event = "task.complete"',
+      "[event_loop]",
+      "max_iterations = 3",
+      "[backend]",
+      'kind = "pi"',
+      'command = "pi"',
+      "timeout_ms = 1000",
+      "[review]",
+      "enabled = true",
+      "every = 1",
+      "adversarial_first = true",
+      'kind = "pi"',
+      'command = "pi"',
+      "timeout_ms = 1000",
+      "[[role]]",
+      'id = "worker"',
+      'emits = ["task.complete"]',
+      "[handoff]",
+      '"loop.start" = ["worker"]',
+    ].join("\n");
+    writeFileSync(presetFile, original);
+    const loop = buildLoopContext(projectDir, "test", "autoloop", {
+      workDir: projectDir,
+      presetFile,
+      noWorktree: true,
+    });
+    mkdirSync(loop.paths.stateDir, { recursive: true });
+    writeFileSync(loop.paths.journalFile, "", { flag: "a" });
+
+    backendMocks.initPiSession.mockResolvedValue({
+      process: { pid: 11 },
+    } as unknown as PiSession);
+    backendMocks.terminatePiSession.mockResolvedValue(undefined);
+    backendMocks.runPiIteration.mockImplementation(async () => {
+      writeFileSync(
+        presetFile,
+        `${original}\n[stage]\nbranch_timeout_ms = 1500000\n[[stage]]\nid = "bad"\n`,
+      );
+      return {
+        output:
+          '```json\n{"verdict":"CONTINUE","confidence":0.9,"reasoning":"retry"}\n```',
+        exitCode: 0,
+        timedOut: false,
+      };
+    });
+
+    const reloaded = await maybeRunMetareview(loop, 2);
+
+    expect(readFileSync(presetFile, "utf8")).toBe(original);
+    expect(reloaded.lastVerdict).toMatchObject({
+      verdict: "UNKNOWN",
+      confidence: 0,
+    });
+    expect(reloaded.lastVerdict?.reasoning).toContain("rolled back");
   });
 });

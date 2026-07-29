@@ -23,7 +23,7 @@ import {
   readIfExists,
 } from "@mobrienv/autoloop-core/journal";
 import type { IterationContext } from "./prompt.js";
-import type { LoopContext } from "./types.js";
+import type { LoopContext, RunOptions } from "./types.js";
 
 export interface BranchLaunch {
   branchId: string;
@@ -38,7 +38,12 @@ export interface BranchLaunch {
   backendCommand: string;
   backendArgs: string[];
   backendPromptMode: string;
+  backendTimeoutMs: number;
+  /** Parent-side wall-clock deadline used to clamp this child iteration. */
+  branchTimeoutMs: number;
   logLevel: string;
+  /** Exact topology/config file used by the parent, including generated presets. */
+  presetFile: string;
 }
 
 export function loadParallelBranchLaunch(branchDir: string): BranchLaunch {
@@ -56,7 +61,38 @@ export function loadParallelBranchLaunch(branchDir: string): BranchLaunch {
     backendCommand: extractField(line, "backend_command"),
     backendArgs: csvFieldList(line, "backend_args"),
     backendPromptMode: extractField(line, "backend_prompt_mode"),
+    backendTimeoutMs:
+      Number.parseInt(extractField(line, "backend_timeout_ms"), 10) || 0,
+    branchTimeoutMs:
+      Number.parseInt(extractField(line, "branch_timeout_ms"), 10) || 0,
     logLevel: extractField(line, "log_level"),
+    presetFile: extractField(line, "preset_file"),
+  };
+}
+
+/** Build child options without silently falling back to the project's default preset. */
+export function parallelBranchRunOptions(
+  launch: BranchLaunch,
+  branchDir: string,
+): RunOptions {
+  return {
+    workDir: branchDir,
+    presetFile: launch.presetFile || undefined,
+    backendOverride: parallelBranchBackendOverride(launch),
+    configOverride:
+      launch.branchTimeoutMs > 0
+        ? {
+            parallel: {
+              branch_timeout_ms: String(launch.branchTimeoutMs),
+            },
+          }
+        : undefined,
+    logLevel: launch.logLevel || null,
+    trigger: "branch",
+    // A branch intentionally shares its parent's checkout. Its state remains
+    // isolated under branchDir, so nested worktree selection is both noisy and
+    // incorrect here.
+    noWorktree: true,
   };
 }
 
@@ -75,6 +111,8 @@ export function parallelBranchBackendOverride(
   if (launch.backendCommand) override.command = launch.backendCommand;
   if (launch.backendArgs.length > 0) override.args = launch.backendArgs;
   if (launch.backendPromptMode) override.prompt_mode = launch.backendPromptMode;
+  if (launch.backendTimeoutMs > 0)
+    override.timeout_ms = launch.backendTimeoutMs;
   return override;
 }
 

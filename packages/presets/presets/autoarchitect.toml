@@ -66,6 +66,11 @@ Rules for the preset you emit:
   work.
 - Where the objective benefits from parallel, heterogeneous verification or
   discovery, compose a fan-out [[stage]] block instead of a single critic role.
+  Configure its runtime controls in `[stage_runtime]` — never `[stage]`, which
+  is invalid beside `[[stage]]` in a single TOML file. For repository-scale
+  analysis use `concurrency` appropriate to the panel and
+  `branch_timeout_ms = 1500000` (25 minutes) unless the objective clearly needs
+  a stricter bound.
   A stage's `trigger` is a plain event some upstream role emits — route it in
   [handoff] to an EMPTY list (e.g. `"panel.judge" = []`) so it validates as
   reachable; the harness intercepts it and launches the branches itself. Every

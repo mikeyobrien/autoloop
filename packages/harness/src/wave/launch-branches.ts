@@ -280,7 +280,13 @@ export function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
     ", " +
     jsonField("backend_prompt_mode", loop.backend.promptMode) +
     ", " +
-    jsonField("log_level", loop.runtime.logLevel);
+    jsonField("backend_timeout_ms", String(loop.backend.timeoutMs)) +
+    ", " +
+    jsonField("branch_timeout_ms", String(loop.parallel.branchTimeoutMs)) +
+    ", " +
+    jsonField("log_level", loop.runtime.logLevel) +
+    ", " +
+    jsonField("preset_file", loop.launch.presetFile || "");
   writeFileSync(spec.launchFile, `{${fields}}\n`);
 }
 

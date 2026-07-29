@@ -15,6 +15,10 @@
   compile time.
 
 ### Fixed
+- **Configured prompt files cannot escape their declared roots.** Objective,
+  review, harness-instruction, and topology role paths now reject parent
+  traversal and symlink escapes while preserving optional and explicitly empty
+  file semantics.
 - **Generated tool wrappers reliably re-invoke every CLI distribution.**
   Checkout builds now use the Node interpreter instead of asking `/bin/sh` to
   execute the ESM entry point, while standalone builds re-invoke their binary

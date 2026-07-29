@@ -6,9 +6,10 @@
 // path once the stage has finished.
 
 import { jsonField } from "@mobrienv/autoloop-core";
-import type {
-  BranchResult as FanoutBranchResult,
-  FanoutStage,
+import {
+  type BranchResult as FanoutBranchResult,
+  type FanoutStage,
+  reduceStage,
 } from "@mobrienv/autoloop-core/fanout";
 import {
   appendEvent,
@@ -18,11 +19,11 @@ import {
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
 import { runCostUsd } from "./display.js";
-import type { BranchRunner, BranchSpec } from "./fanout-runner.js";
-import { expandStageBranches, runFanoutStage } from "./fanout-runner.js";
+import type { BranchSpec } from "./fanout-runner.js";
+import { expandStageBranches } from "./fanout-runner.js";
 import type { IterationContext } from "./prompt.js";
 import type { LoopContext, RunSummary } from "./types.js";
-import { buildStageBranchRunner } from "./wave/stage-branch-runner.js";
+import { runStageBranchBatch } from "./wave/stage-branch-runner.js";
 
 type IterateFn = (loop: LoopContext, iteration: number) => Promise<RunSummary>;
 
@@ -136,22 +137,27 @@ export async function finishStageIteration(
   const toAdmit = specs.filter((s) => !resumed.has(s.branchId));
   const admitted = admitByBudget(loop, iter, toAdmit);
 
-  const baseRunner = buildStageBranchRunner(loop, iter, stage.id);
-  const runner: BranchRunner = async (spec) => {
+  const concurrency = Math.max(1, loop.stage?.concurrency || 1);
+  const fresh = await runStageBranchBatch(
+    loop,
+    iter,
+    stage.id,
+    toAdmit.filter((spec) => admitted.has(spec.branchId)),
+    concurrency,
+  );
+  const freshById = new Map(fresh.map((result) => [result.branchId, result]));
+  const results: FanoutBranchResult[] = specs.map((spec) => {
     const cached = resumed.get(spec.branchId);
     if (cached) return cached;
-    if (!admitted.has(spec.branchId)) {
-      return {
-        branchId: spec.branchId,
-        ok: false,
-        error: "budget: not admitted this wave",
-      };
-    }
-    return baseRunner(spec);
-  };
-
-  const concurrency = Math.max(1, loop.stage?.concurrency || 1);
-  const outcome = await runFanoutStage(stage, runner, concurrency);
+    const live = freshById.get(spec.branchId);
+    if (live) return live;
+    return {
+      branchId: spec.branchId,
+      ok: false,
+      error: "budget: not admitted this wave",
+    };
+  });
+  const outcome = reduceStage(stage, results);
 
   appendEvent(
     loop.paths.journalFile,
