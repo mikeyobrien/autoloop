@@ -273,6 +273,11 @@ function appendWaveJoinFinish(
     emittedTopic,
     routingBasis,
   );
+  const authorityId = acceptParentJournalRecord(
+    loop,
+    String(iter.iteration),
+    "wave.join.finish",
+  );
   appendEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
@@ -292,6 +297,8 @@ function appendWaveJoinFinish(
       ", " +
       jsonField("resume_events", joinCsv(resumeEvents)) +
       ", " +
-      jsonField("elapsed_ms", String(totalElapsed)),
+      jsonField("elapsed_ms", String(totalElapsed)) +
+      ", " +
+      jsonField("authority_id", authorityId),
   );
 }

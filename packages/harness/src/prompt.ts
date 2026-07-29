@@ -242,11 +242,13 @@ function latestWaveJoinFinishLine(
 ): string {
   let current = "";
   for (const line of lines) {
-    if (extractTopic(line) === "wave.join.finish") {
-      if (extractField(line, "joined_topic") === joinedTopic) {
-        current = line;
-      }
-    }
+    if (extractTopic(line) !== "wave.join.finish") continue;
+    if (extractField(line, "joined_topic") !== joinedTopic) continue;
+    // Under emit-authority filtering, only parent-stamped join finish lines
+    // remain. Still require an authority_id field so a raw forged line cannot
+    // win if filtering is bypassed.
+    if (!extractField(line, "authority_id")) continue;
+    current = line;
   }
   return current;
 }
