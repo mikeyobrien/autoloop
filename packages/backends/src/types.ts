@@ -1,3 +1,5 @@
+import type { BackendEnvironmentPolicy } from "./environment.js";
+
 export interface BackendSpec {
   kind: string;
   provider?: string;
@@ -17,6 +19,8 @@ export interface BackendSpec {
   usageFrom?: string;
   /** Provider-side agent profile (Hermes: launches as `--profile <p> acp`). */
   profile?: string;
+  /** Process environment inheritance policy. Defaults to `inherit`. */
+  environmentPolicy?: BackendEnvironmentPolicy;
 }
 
 export interface BackendRunResult {

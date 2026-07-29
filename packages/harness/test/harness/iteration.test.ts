@@ -398,6 +398,7 @@ describe("runIteration pi RPC execution", () => {
       cwd: loop.paths.workDir,
       modelId: "gpt-5",
       verbose: false,
+      environmentPolicy: "inherit",
     });
     expect(piMocks.runPiIteration).toHaveBeenCalledWith(
       fakeSession,

@@ -43,6 +43,21 @@ describe("load", () => {
     expect(get(cfg, "backend.usage_from", "unset")).toBe("");
   });
 
+  it("defaults backend.environment_policy to inherit", () => {
+    const cfg = load("/nonexistent/path/autoloops.toml");
+    expect(get(cfg, "backend.environment_policy", "unset")).toBe("inherit");
+  });
+
+  it("parses an explicit hardened backend environment policy", () => {
+    const dir = tmpDir("environment-policy");
+    writeFileSync(
+      join(dir, "config.toml"),
+      '[backend]\nenvironment_policy = "hardened"\n',
+    );
+    const cfg = load(join(dir, "config.toml"));
+    expect(get(cfg, "backend.environment_policy", "")).toBe("hardened");
+  });
+
   it("parses backend.usage_from from a preset without breaking other keys", () => {
     const dir = tmpDir("usage-from");
     writeFileSync(

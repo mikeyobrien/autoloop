@@ -874,6 +874,13 @@ function readBackendConfig(
     "usage_from",
     config.get(cfg, "backend.usage_from", ""),
   );
+  const environmentPolicy = normalizeEnvironmentPolicy(
+    processStringOverride(
+      bo,
+      "environment_policy",
+      config.get(cfg, "backend.environment_policy", "inherit"),
+    ),
+  );
   return {
     kind,
     provider,
@@ -887,6 +894,7 @@ function readBackendConfig(
     profile,
     disallowedTools,
     usageFrom,
+    environmentPolicy,
   };
 }
 
@@ -926,6 +934,13 @@ function readReviewConfig(
     agent: config.get(cfg, "review.agent", backend.agent),
     model: config.get(cfg, "review.model", backend.model),
     profile: config.get(cfg, "review.profile", backend.profile ?? ""),
+    environmentPolicy: normalizeEnvironmentPolicy(
+      config.get(
+        cfg,
+        "review.environment_policy",
+        backend.environmentPolicy ?? "inherit",
+      ),
+    ),
     onError: normalizeReviewOnError(config.get(cfg, "review.on_error", "hold")),
     minConfidence: config.getFloat(cfg, "review.min_confidence", 0.5),
   };
@@ -938,6 +953,14 @@ function readReviewConfig(
 function normalizeReviewOnError(raw: string): ReviewOnError {
   const v = raw.trim().toLowerCase();
   return v === "exit" || v === "continue" ? v : "hold";
+}
+
+function normalizeEnvironmentPolicy(raw: string): "inherit" | "hardened" {
+  const value = raw.trim().toLowerCase();
+  if (value === "inherit" || value === "hardened") return value;
+  throw new Error(
+    `invalid environment policy ${JSON.stringify(raw)}; expected "inherit" or "hardened"`,
+  );
 }
 
 function readParallelConfig(cfg: config.Config): LoopContext["parallel"] {

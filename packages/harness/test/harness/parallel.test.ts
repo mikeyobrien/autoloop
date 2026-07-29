@@ -60,6 +60,7 @@ describe("parallelBranchBackendOverride", () => {
     backendArgs: [],
     backendPromptMode: "",
     backendTimeoutMs: 0,
+    backendEnvironmentPolicy: "inherit",
     branchTimeoutMs: 0,
     logLevel: "info",
     presetFile: "",
@@ -110,6 +111,7 @@ describe("parallelBranchBackendOverride", () => {
       backendCommand: "claude",
       backendArgs: ["--fast"],
       backendPromptMode: "pipe",
+      backendEnvironmentPolicy: "hardened",
     };
     expect(parallelBranchBackendOverride(launch)).toEqual({
       kind: "command",
@@ -117,6 +119,7 @@ describe("parallelBranchBackendOverride", () => {
       command: "claude",
       args: ["--fast"],
       prompt_mode: "pipe",
+      environment_policy: "hardened",
     });
   });
 });
@@ -148,6 +151,7 @@ describe("parallel branch launch context", () => {
         args: [],
         promptMode: "arg",
         timeoutMs: 1_500_000,
+        environmentPolicy: "hardened",
       },
       runtime: { logLevel: "info" },
       launch: { presetFile },
@@ -159,15 +163,35 @@ describe("parallel branch launch context", () => {
 
     expect(launch.presetFile).toBe(presetFile);
     expect(launch.backendTimeoutMs).toBe(1_500_000);
+    expect(launch.backendEnvironmentPolicy).toBe("hardened");
     expect(launch.branchTimeoutMs).toBe(1_500_000);
     expect(parallelBranchRunOptions(launch, branchDir)).toMatchObject({
       workDir: branchDir,
       presetFile,
       noWorktree: true,
       trigger: "branch",
-      backendOverride: { timeout_ms: 1_500_000 },
+      backendOverride: {
+        timeout_ms: 1_500_000,
+        environment_policy: "hardened",
+      },
       configOverride: { parallel: { branch_timeout_ms: "1500000" } },
     });
+  });
+
+  it("defaults legacy branch payloads to inherit and rejects unknown policies", () => {
+    const root = mkdtempSync(join(tmpdir(), "autoloop-branch-policy-"));
+    writeFileSync(join(root, "launch.json"), '{"branch_id": "legacy"}\n');
+    expect(loadParallelBranchLaunch(root).backendEnvironmentPolicy).toBe(
+      "inherit",
+    );
+
+    writeFileSync(
+      join(root, "launch.json"),
+      '{"branch_id": "invalid", "backend_environment_policy": "strict-ish"}\n',
+    );
+    expect(() => loadParallelBranchLaunch(root)).toThrow(
+      /unknown branch backend environment policy/i,
+    );
   });
 });
 

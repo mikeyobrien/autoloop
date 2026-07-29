@@ -71,6 +71,40 @@ describe("buildCommandInvocation", () => {
 });
 
 describe("spawnShellCommand", () => {
+  it("inherits caller environment by default", async () => {
+    const result = await spawnShellCommand(
+      "command",
+      `printf '%s' "$NODE_OPTIONS"`,
+      5000,
+      undefined,
+      {
+        projectDir: "/tmp/project",
+        env: { PATH: process.env.PATH, NODE_OPTIONS: "project-hook" },
+      },
+    );
+    expect(result.output).toBe("project-hook");
+  });
+
+  it("sanitizes caller environment only under hardened policy", async () => {
+    const result = await spawnShellCommand(
+      "command",
+      `printf '%s:%s' "\${NODE_OPTIONS-unset}" "\${LD_AUDIT-unset}"; bash -c 'if declare -F owned >/dev/null; then printf ":injected"; else printf ":unset"; fi'`,
+      5000,
+      undefined,
+      {
+        projectDir: "/tmp/project",
+        environmentPolicy: "hardened",
+        env: {
+          PATH: process.env.PATH,
+          NODE_OPTIONS: "project-hook",
+          LD_AUDIT: "/definitely-not-present-autoloop-audit.so",
+          "BASH_FUNC_owned%%": "() { echo injected; }",
+        },
+      },
+    );
+    expect(result.output).toBe("unset:unset:unset");
+  });
+
   it("resolves normally on a fast-exiting command", async () => {
     const result = await spawnShellCommand("command", "echo hello", 5000);
     expect(result.exitCode).toBe(0);

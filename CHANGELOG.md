@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Backend environment hardening is available as an opt-in policy.** Existing
+  presets continue to inherit their process environment unchanged. Setting
+  `backend.environment_policy = "hardened"` (or the review-specific override)
+  removes process-injection and Git-authority variables, repository-owned or
+  relative `PATH` entries, and rejects credential-bearing proxy URLs.
 - **Standalone binaries provide a Node-free installation channel.** GitHub
   releases now attach Bun-compiled executables for macOS and Linux on arm64
   and x64, plus a `SHA256SUMS` file. `scripts/build-standalone.sh` builds all

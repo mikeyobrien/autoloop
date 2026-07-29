@@ -13,6 +13,10 @@ import {
   commandFloorDecision,
   extractCommandFromToolInput,
 } from "./command-risk.js";
+import {
+  type BackendEnvironmentPolicy,
+  resolveBackendEnvironment,
+} from "./environment.js";
 
 export interface ClaudeSdkClientOptions {
   /** Path to the Claude Code executable when it isn't the bare `claude` on PATH. */
@@ -28,6 +32,7 @@ export interface ClaudeSdkClientOptions {
   /** How long a timed-out turn may drain after interrupt() before the session is abandoned (default 2s). */
   interruptGraceMs?: number;
   env?: Record<string, string | undefined>;
+  environmentPolicy?: BackendEnvironmentPolicy;
 }
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000;
@@ -160,7 +165,10 @@ export async function initClaudeSdkSession(
   const options: Options = {
     cwd: opts.cwd,
     abortController,
-    env: opts.env ?? process.env,
+    env: resolveBackendEnvironment(opts.env ?? process.env, {
+      projectDir: opts.cwd,
+      policy: opts.environmentPolicy,
+    }),
     // Parity with the legacy `claude -p` shell backend: the Claude Code
     // system prompt and project settings (CLAUDE.md) stay loaded.
     systemPrompt: { type: "preset", preset: "claude_code" },

@@ -113,7 +113,13 @@ function launchBranch(loop: LoopContext, spec: BranchSpec): BranchSpec {
     `rm -f ${shellQuote(spec.stdoutFile)} ${shellQuote(spec.stderrFile)} ${shellQuote(spec.statusFile)} ${shellQuote(spec.pidFile)} ; ` +
     `nohup sh ${shellQuote(spec.supervisorFile)} >/dev/null 2>&1 & printf '%s' "$!" > ${shellQuote(spec.pidFile)}`;
 
-  runProcess(cmd, 10000);
+  runProcess(
+    cmd,
+    10000,
+    "command",
+    loop.paths.workDir,
+    loop.backend.environmentPolicy,
+  );
   const launched = { ...spec, launchMs };
   const pid = readIfExists(spec.pidFile).trim();
   if (!pid) recordLaunchFailure(launched);
@@ -275,6 +281,11 @@ export function writeBranchLaunch(spec: BranchSpec, loop: LoopContext): void {
     jsonField("backend_prompt_mode", loop.backend.promptMode) +
     ", " +
     jsonField("backend_timeout_ms", String(loop.backend.timeoutMs)) +
+    ", " +
+    jsonField(
+      "backend_environment_policy",
+      loop.backend.environmentPolicy ?? "inherit",
+    ) +
     ", " +
     jsonField("branch_timeout_ms", String(loop.parallel.branchTimeoutMs)) +
     ", " +

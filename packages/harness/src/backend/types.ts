@@ -1,3 +1,4 @@
+import type { BackendEnvironmentPolicy } from "@mobrienv/autoloop-backends";
 import type { LoopContext } from "../types.js";
 
 export interface ResolvedIterationBackend {
@@ -13,6 +14,7 @@ export interface ResolvedIterationBackend {
   profile: string;
   disallowedTools: string[];
   usageFrom: string;
+  environmentPolicy: BackendEnvironmentPolicy;
 }
 
 export function resolvedFromLoopBackend(
@@ -31,5 +33,6 @@ export function resolvedFromLoopBackend(
     profile: loop.backend.profile ?? "",
     disallowedTools: [...(loop.backend.disallowedTools ?? [])],
     usageFrom: loop.backend.usageFrom ?? "",
+    environmentPolicy: loop.backend.environmentPolicy ?? "inherit",
   };
 }

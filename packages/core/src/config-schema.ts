@@ -60,6 +60,8 @@ export function defaults(): Config {
       // all optional) after each iteration. Empty = no extraction attempted
       // (default; existing presets are unaffected).
       usage_from: "",
+      // Child environments are inherited unchanged unless explicitly hardened.
+      environment_policy: "inherit",
     },
     parallel: {
       enabled: "false",
