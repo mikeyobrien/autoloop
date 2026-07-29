@@ -279,20 +279,6 @@ function csvFieldList(line: string, field: string): string[] {
     .filter((s) => s !== "");
 }
 
-export function routingEventFromLines(lines: string[]): string {
-  let current = "loop.start";
-  for (const line of lines) {
-    const topic = extractTopic(line);
-    if (topic === "event.invalid") {
-      const extracted = extractField(line, "recent_event");
-      if (extracted) current = extracted;
-    } else if (routingTopic(topic)) {
-      current = topic;
-    }
-  }
-  return current;
-}
-
 export function latestInvalidNote(runLines: string[]): string {
   let note = "";
   for (const line of runLines) {
@@ -744,10 +730,13 @@ export function acceptedAuthoritiesFromRun(
 }
 
 function trustedNonAgentTopic(topic: string): boolean {
-  // Fields-shaped harness telemetry and control topics never carry agent handoff
-  // authority. Anything else (including forged payload records with source
-  // harness/operator) must come through parent-authorized agent ingress.
-  return systemTopic(topic) || topic === "event.invalid";
+  // Non-agent journal lines are not a trust boundary: the backend can write
+  // AUTOLOOP_JOURNAL_FILE. Only non-routing harness telemetry may pass through
+  // without parent agent authority. Routing-capable system topics (loop.start,
+  // wave.*, etc.) must not be forgeable from the journal.
+  if (topic === "event.invalid") return true;
+  if (!systemTopic(topic)) return false;
+  return !routingTopic(topic);
 }
 
 export function authoritativeRunLines(
@@ -776,10 +765,28 @@ export function authoritativeRunLines(
     }
 
     // Missing source usually means fields-shaped harness records. Explicit
-    // harness/operator payload sources are not a trust boundary: the agent can
-    // write the journal path, so only known non-routing system topics pass.
+    // harness/operator payload sources are not a trust boundary.
     return trustedNonAgentTopic(topic);
   });
+}
+
+/**
+ * Derive routing position. Defaults to `loop.start`. Only routing topics move
+ * the position. `event.invalid` is intentionally ignored: the prior routing
+ * event remains in the journal, and forged invalid records must not steer.
+ * Callers under emit authority should pass already-filtered authoritative lines
+ * so routing-capable system forgeries never appear.
+ */
+export function routingEventFromLines(lines: string[]): string {
+  let current = "loop.start";
+  for (const line of lines) {
+    const topic = extractTopic(line);
+    if (topic === "event.invalid") continue;
+    if (routingTopic(topic)) {
+      current = topic;
+    }
+  }
+  return current;
 }
 
 export function validateAgentEventsForRun(

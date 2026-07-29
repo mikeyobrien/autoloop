@@ -21,8 +21,13 @@ Tier A surfaces are part of the public contract and follow semantic versioning. 
 1. RFC and discussion in the issue tracker.
 2. Deprecation notice in release notes (minimum 2 minor versions).
 3. Migration guide with examples.
+4. An intentional update to the pinned Tier A surface file
+   `test/fixtures/contracts/tier-a-surface.json` (export subpaths and
+   documented named imports) and any versioned contract fixtures.
 
-**Non-breaking additions** (new optional fields, new events, new CLI flags) may land in patch or minor versions.
+CI enforces the current Tier A surface pin and regenerates/checks the
+committed golden fixtures. It does not automatically compare against a prior
+published release tarball; that remains a maintainer release checklist item.
 
 ### Tier B: Semi-Stable (v1+)
 

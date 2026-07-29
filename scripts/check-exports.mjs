@@ -110,3 +110,59 @@ for (const packageDir of packageDirs) {
 console.log(
   `verified ${checked} public export/bin targets across ${packageDirs.length} packages`,
 );
+
+// --- Pinned Tier A surface + documented named imports -----------------------
+const tierAPinPath = resolve(
+  root,
+  "test/fixtures/contracts/tier-a-surface.json",
+);
+const tierAPin = JSON.parse(readFileSync(tierAPinPath, "utf8"));
+
+for (const [pkgName, subpaths] of Object.entries(tierAPin.exports ?? {})) {
+  const pkgDir = packageDirs.find((dir) => {
+    try {
+      return (
+        JSON.parse(readFileSync(resolve(dir, "package.json"), "utf8")).name ===
+        pkgName
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (!pkgDir) throw new Error(`Tier A pin package missing: ${pkgName}`);
+  const manifest = JSON.parse(
+    readFileSync(resolve(pkgDir, "package.json"), "utf8"),
+  );
+  const exportsMap = manifest.exports ?? {};
+  for (const subpath of subpaths) {
+    if (!(subpath in exportsMap)) {
+      throw new Error(
+        `Tier A export removed or missing: ${pkgName}${subpath === "." ? "" : subpath}`,
+      );
+    }
+  }
+}
+
+for (const entry of tierAPin.namedImports ?? []) {
+  const names = entry.names ?? [];
+  const importList = names.join(", ");
+  execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `const mod = await import(${JSON.stringify(entry.specifier)});
+       for (const name of ${JSON.stringify(names)}) {
+         if (!(name in mod)) {
+           throw new Error(${JSON.stringify(entry.specifier)} + " missing export " + name);
+         }
+       }
+       console.log("named-import-ok", ${JSON.stringify(entry.specifier)}, ${JSON.stringify(importList)});`,
+    ],
+    { cwd: root, stdio: "pipe" },
+  );
+}
+
+console.log(
+  `verified Tier A pin (${Object.keys(tierAPin.exports ?? {}).length} packages) and ${(tierAPin.namedImports ?? []).length} documented named imports`,
+);
