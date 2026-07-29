@@ -7,6 +7,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  writeFileSync,
   writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -75,15 +76,27 @@ export function resolveEmitAuthorityPaths(
   };
 }
 
-function loadOrCreateKey(keyPath: string): Buffer {
+function loadOrCreateKey(keyPath: string, ledgerPath: string): Buffer {
   mkdirSync(dirname(keyPath), { recursive: true, mode: 0o700 });
+  const ledgerExists = existsSync(ledgerPath);
+
+  // New run (no ledger yet): always mint a fresh parent key so a pre-seeded
+  // attacker file under the private path cannot become issuance material.
+  if (!ledgerExists) {
+    const key = randomBytes(32);
+    writeFileSync(keyPath, key, { mode: 0o600 });
+    return key;
+  }
+
+  // Resume path: ledger already exists; load the existing 32-byte key only.
   try {
-    // Exclusive create: a pre-seeded attacker file cannot become the parent key.
     const fd = openSync(
       keyPath,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
       0o600,
     );
+    // Ledger without key is corrupt; mint a new key but it will not validate
+    // prior ledger lines (fail closed for those records).
     try {
       const key = randomBytes(32);
       writeSync(fd, key);
@@ -127,7 +140,7 @@ export function appendAcceptedEmitAuthority(
   topic: string,
   iteration: string,
 ): void {
-  const key = loadOrCreateKey(paths.keyPath);
+  const key = loadOrCreateKey(paths.keyPath, paths.ledgerPath);
   const body = {
     run: runId,
     authority_id: authorityId,

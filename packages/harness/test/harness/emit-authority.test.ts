@@ -92,14 +92,41 @@ describe("emit authority private ledger", () => {
     const still = loadAcceptedEmitAuthorities(paths, "run-1");
     expect(still.has("33333333-3333-4333-8333-333333333333:0")).toBe(false);
 
-    // Wrong-size pre-seeded private key is refused on write.
+    // Pre-seeded private key is overwritten on a new run (no ledger yet).
     const paths2 = resolveEmitAuthorityPaths("run-2", projectDir, stateDir);
     mkdirSync(paths2.dir, { recursive: true });
-    writeFileSync(emitAuthorityKeyPath(paths2), Buffer.from("short"));
+    writeFileSync(emitAuthorityKeyPath(paths2), Buffer.alloc(32, 9));
+    appendAcceptedEmitAuthority(
+      paths2,
+      "run-2",
+      "11111111-1111-4111-8111-111111111111:0",
+      "tasks.ready",
+      "1",
+    );
+    const accepted2 = loadAcceptedEmitAuthorities(paths2, "run-2");
+    expect(accepted2.get("11111111-1111-4111-8111-111111111111:0")).toEqual({
+      topic: "tasks.ready",
+      iteration: "1",
+    });
+    // Wrong-size key with an existing ledger is refused.
+    const paths3 = resolveEmitAuthorityPaths("run-3", projectDir, stateDir);
+    mkdirSync(paths3.dir, { recursive: true });
+    writeFileSync(
+      emitAuthorityLedgerPath(paths3),
+      `${JSON.stringify({
+        v: 1,
+        run: "run-3",
+        authority_id: "x",
+        topic: "t",
+        iteration: "1",
+        mac: "00",
+      })}\n`,
+    );
+    writeFileSync(emitAuthorityKeyPath(paths3), Buffer.from("short"));
     expect(() =>
       appendAcceptedEmitAuthority(
-        paths2,
-        "run-2",
+        paths3,
+        "run-3",
         "11111111-1111-4111-8111-111111111111:0",
         "tasks.ready",
         "1",
