@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Need full history so base…HEAD / base HEAD diffs resolve on PRs.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -47,13 +50,13 @@ jobs:
 
       - name: Check trailing whitespace
         run: |
-          # Compare the PR/base range when available. A bare `git diff --check`
-          # on a clean checkout only sees uncommitted fixture drift, not PR bytes.
+          # Inspect committed PR/base bytes, not just working-tree drift.
+          # Two-dot form needs both tips present (fetch-depth: 0 above) and does
+          # not require a merge-base the way three-dot form does.
           if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
-            git fetch --no-tags --prune --depth=1 origin "${{ github.event.pull_request.base.sha }}"
-            git diff --check "${{ github.event.pull_request.base.sha }}...HEAD"
+            git diff --check "${{ github.event.pull_request.base.sha }}" HEAD
           elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-            git diff --check HEAD~1...HEAD
+            git diff --check HEAD~1 HEAD
           else
             git diff --check
           fi
