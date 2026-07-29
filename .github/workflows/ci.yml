@@ -31,5 +31,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check (lint, typecheck, coverage)
+        run: npm run check
+
       - name: Test
         run: npm test
+
+      - name: Contract tests (Tier A compatibility)
+        run: npm test -- test/integration/compat-contract.test.ts
+
+      - name: Check trailing whitespace
+        run: git diff --check

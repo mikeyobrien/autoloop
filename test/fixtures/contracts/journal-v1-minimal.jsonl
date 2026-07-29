@@ -1,0 +1,5 @@
+{"run": "test-golden-run-1", "iteration": "0", "topic": "recon.done", "ts": "2021-01-01T00:00:00.000Z", "v": 1, "payload": "Recon complete", "source": "harness"}
+{"run": "test-golden-run-1", "iteration": "1", "topic": "plan.ready", "ts": "2021-01-01T00:00:01.000Z", "v": 1, "payload": "Plan ready", "source": "harness"}
+{"run": "test-golden-run-1", "iteration": "1", "topic": "red.ready", "ts": "2021-01-01T00:00:02.000Z", "v": 1, "payload": "Tests written", "source": "agent"}
+{"run": "test-golden-run-1", "iteration": "2", "topic": "task.complete", "ts": "2021-01-01T00:00:03.000Z", "v": 1, "payload": "Loop completed", "source": "operator"}
+{"run": "test-golden-run-1", "iteration": "2", "topic": "loop.stop", "ts": "2021-01-01T00:00:04.000Z", "v": 1, "fields": {"reason": "completed", "exit_code": "0"}}
