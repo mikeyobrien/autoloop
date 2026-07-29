@@ -40,5 +40,10 @@ jobs:
       - name: Contract tests (Tier A compatibility)
         run: npm test -- test/integration/compat-contract.test.ts
 
+      - name: Contract fixtures are reproducible
+        run: |
+          npm run fixtures:contracts
+          git diff --exit-code test/fixtures/contracts
+
       - name: Check trailing whitespace
         run: git diff --check

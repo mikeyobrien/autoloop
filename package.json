@@ -68,6 +68,7 @@
     "test:coverage": "node --experimental-vm-modules node_modules/.bin/vitest run --no-file-parallelism --coverage",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest",
     "check": "biome check src/ test/ && tsc --noEmit && npm run test:coverage",
+    "fixtures:contracts": "node scripts/gen-contract-fixtures.mjs",
     "release": "node bin/release",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
