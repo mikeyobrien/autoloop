@@ -11,9 +11,13 @@ const branchRunnerCalls: string[] = [];
 const stubResults = new Map<string, BranchResult>();
 
 vi.mock("../../src/wave/stage-branch-runner.js", () => ({
-  buildStageBranchRunner:
-    () =>
-    async (spec: { branchId: string }): Promise<BranchResult> => {
+  runStageBranchBatch: async (
+    _loop: unknown,
+    _iter: unknown,
+    _stageId: string,
+    specs: { branchId: string }[],
+  ): Promise<BranchResult[]> =>
+    specs.map((spec) => {
       branchRunnerCalls.push(spec.branchId);
       return (
         stubResults.get(spec.branchId) ?? {
@@ -22,7 +26,7 @@ vi.mock("../../src/wave/stage-branch-runner.js", () => ({
           data: { affirm: true },
         }
       );
-    },
+    }),
 }));
 
 import type { IterationContext } from "../../src/prompt.js";

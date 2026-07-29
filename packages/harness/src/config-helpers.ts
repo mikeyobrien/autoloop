@@ -959,13 +959,21 @@ function normalizeAggregateMode(
 }
 
 function readStageConfig(cfg: config.Config): LoopContext["stage"] {
+  // `stage` is also the TOML array-of-tables name for fan-out topology. A
+  // single-file preset therefore cannot legally contain both `[[stage]]` and a
+  // `[stage]` runtime table. Prefer the collision-free namespace while keeping
+  // the legacy keys as fallbacks for directory presets.
   return {
     concurrency: config.getInt(
       cfg,
-      "stage.concurrency",
-      concurrency.defaultConcurrency(),
+      "stage_runtime.concurrency",
+      config.getInt(cfg, "stage.concurrency", concurrency.defaultConcurrency()),
     ),
-    branchTimeoutMs: config.getInt(cfg, "stage.branch_timeout_ms", 180000),
+    branchTimeoutMs: config.getInt(
+      cfg,
+      "stage_runtime.branch_timeout_ms",
+      config.getInt(cfg, "stage.branch_timeout_ms", 180000),
+    ),
   };
 }
 

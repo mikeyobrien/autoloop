@@ -42,11 +42,11 @@ describe("integration: registry lifecycle", () => {
   it("records failed status when backend exits non-zero", () => {
     const project = makeTempProject("registry-fail");
     const fixture = join(FIXTURES_DIR, "non-zero-exit.json");
-    const _res = runCli(["run", project, "fail test"], {
+    const res = runCli(["run", project, "fail test"], {
       MOCK_FIXTURE_PATH: fixture,
     });
 
-    // The CLI may return non-zero for backend failure
+    expect(res.status).toBe(1);
     const registryPath = join(project, ".autoloop/registry.jsonl");
     if (!pathExists(registryPath)) return; // skip if registry wasn't created (early crash)
 

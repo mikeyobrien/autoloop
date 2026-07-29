@@ -38,6 +38,11 @@ function tmpDir(name: string): string {
 beforeEach(() => {
   mkdirSync(TMP_BASE, { recursive: true });
   vi.clearAllMocks();
+  process.exitCode = undefined;
+  runSpy.mockResolvedValue({
+    stopReason: "completed",
+    iterations: 1,
+  });
 });
 
 afterEach(() => {
@@ -71,6 +76,62 @@ describe("applyGlobalBackendOverride", () => {
       args: ["acp"],
       prompt_mode: "acp",
     });
+  });
+
+  it.each([
+    "backend_failed",
+    "backend_timeout",
+    "auth_failed",
+    "quota_exhausted",
+    "rate_limited",
+    "transient_error",
+    "review_unknown",
+    "parallel_wave_timeout",
+    "parallel_wave_failed",
+    "parallel_wave_invalid",
+    "error",
+  ])("propagates %s to process exit status", async (stopReason) => {
+    const targetDir = tmpDir("target-failed-loop");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 1\n",
+    );
+    runSpy.mockResolvedValue({
+      stopReason,
+      iterations: 1,
+    });
+
+    await dispatchRun([targetDir, "review"], [], targetDir, "autoloop");
+
+    expect(process.exitCode).toBe(1);
+  });
+
+  it.each([
+    "completed",
+    "completion_event",
+    "completion_promise",
+    "max_iterations",
+    "stalled",
+    "cost_budget",
+    "max_runtime",
+    "premature_quit",
+    "interrupted",
+    "suspended",
+    "verdict_exit",
+    "verdict_takeover",
+    "verdict_unknown",
+    "completion_held",
+  ])("leaves controlled stop %s at exit zero", async (stopReason) => {
+    const targetDir = tmpDir("target-controlled-stop");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 1\n",
+    );
+    runSpy.mockResolvedValue({ stopReason, iterations: 1 });
+
+    await dispatchRun([targetDir, "review"], [], targetDir, "autoloop");
+
+    expect(process.exitCode).toBeUndefined();
   });
 
   it("maps -b claude-agent-acp to the npm ACP adapter", async () => {
