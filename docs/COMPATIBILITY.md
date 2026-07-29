@@ -14,7 +14,7 @@ Tier A surfaces are part of the public contract and follow semantic versioning. 
 - **Registry schema**: On-disk `RunRecord` shape and JSONL append protocol in `packages/core/src/registry/types.ts`. Back-compat-optional fields include `outcome`, `verdict`, `cost_usd`, `acceptance_verified`.
 - **CLI contracts**: documented argument and exit-code behavior for `run`, `emit`, `resume`, `inspect`, `list`, `loops`, and `config`, plus documented `--json` response fields. Human-oriented terminal rendering is Tier B unless a command explicitly documents it as stable.
 - **Completion and required-event semantics**: Behavior of `completion.event`, `completion.requiredEvents`, `completion.must_be_last`, and how the harness decides loop termination.
-- **Origin policies**: HTTP `Origin` header enforcement on protected `/api/*` routes and WebSocket `/ws/kanban-pty` upgrades.
+- **Origin policies**: HTTP `Origin` header enforcement on protected `/api/*` routes and WebSocket `/ws/kanban-pty` upgrades. Browser Origins must match request `Host` and scheme (true same-origin). Scheme comes from the direct socket TLS state; `X-Forwarded-Proto` is honored only when `trustProxy` / `--trust-proxy` is explicitly enabled behind a header-stripping reverse proxy. Missing `Origin` remains allowed for non-browser clients.
 - **Core package exports**: Subpaths re-exported from `@mobrienv/autoloop-core` (e.g., `./journal`, `./journal-format`, `./registry`, `./topology`, `./config-schema`, `./hooks-schema`).
 
 **Breaking changes are forbidden without:**

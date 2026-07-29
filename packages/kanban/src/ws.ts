@@ -14,12 +14,23 @@ export interface InstallWsResult {
   close(): void;
 }
 
-function requestScheme(req: IncomingMessage): "http" | "https" {
+export interface InstallWsOptions {
+  /**
+   * When true, honor the first `X-Forwarded-Proto` hop for origin scheme.
+   * Default false: only the direct socket TLS state is trusted. Enable only
+   * behind a reverse proxy that strips client-supplied forwarded headers.
+   */
+  trustProxy?: boolean;
+}
+
+function requestScheme(
+  req: IncomingMessage,
+  trustProxy: boolean,
+): "http" | "https" {
   const socket = req.socket as { encrypted?: boolean };
   if (socket.encrypted) return "https";
+  if (!trustProxy) return "http";
 
-  // Single trusted hop only: first X-Forwarded-Proto value. Used when TLS is
-  // terminated in front of a plain HTTP Node listener (common reverse-proxy).
   const forwarded = req.headers["x-forwarded-proto"];
   const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
   const proto = raw?.split(",")[0]?.trim().toLowerCase();
@@ -56,7 +67,9 @@ export function installKanbanWs(
   server: HttpServer,
   store: TaskStore,
   runtime: KanbanRuntime,
+  opts: InstallWsOptions = {},
 ): InstallWsResult {
+  const trustProxy = opts.trustProxy === true;
   const wss = new WebSocketServer({ noServer: true });
   const onUpgrade = (
     req: IncomingMessage,
@@ -66,10 +79,14 @@ export function installKanbanWs(
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== "/ws/kanban-pty") return;
 
-    // Validate browser Origin as true same-origin against Host + request scheme
-    // (socket TLS or first X-Forwarded-Proto hop for reverse-proxy termination).
+    // Validate browser Origin as true same-origin against Host + request scheme.
+    // Forwarded scheme is used only when trustProxy is explicitly enabled.
     if (
-      !isOriginAllowed(req.headers.origin, req.headers.host, requestScheme(req))
+      !isOriginAllowed(
+        req.headers.origin,
+        req.headers.host,
+        requestScheme(req, trustProxy),
+      )
     ) {
       socket.destroy();
       return;

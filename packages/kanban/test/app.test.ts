@@ -82,4 +82,28 @@ describe("createApp", () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it("rejects forged X-Forwarded-Proto without trustProxy", async () => {
+    const app = createApp(baseCtx, freshStore());
+    const res = await app.request("http://127.0.0.1:4801/api/foo", {
+      headers: {
+        host: "127.0.0.1:4801",
+        origin: "https://127.0.0.1:4801",
+        "x-forwarded-proto": "https",
+      },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("accepts https Origin when trustProxy is enabled", async () => {
+    const app = createApp({ ...baseCtx, trustProxy: true }, freshStore());
+    const res = await app.request("http://127.0.0.1:4801/api/foo", {
+      headers: {
+        host: "127.0.0.1:4801",
+        origin: "https://127.0.0.1:4801",
+        "x-forwarded-proto": "https",
+      },
+    });
+    expect(res.status).toBe(404);
+  });
 });

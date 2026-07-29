@@ -52,7 +52,7 @@ interface Harness {
 }
 
 async function boot(
-  opts: { throwOnEnsure?: boolean; host?: string } = {},
+  opts: { throwOnEnsure?: boolean; host?: string; trustProxy?: boolean } = {},
 ): Promise<Harness> {
   const store = freshStore();
   const pty = new FakePty();
@@ -77,7 +77,9 @@ async function boot(
     openSockets.add(s);
     s.on("close", () => openSockets.delete(s));
   });
-  const wsCloseHandle = installKanbanWs(server, store, runtime);
+  const wsCloseHandle = installKanbanWs(server, store, runtime, {
+    trustProxy: opts.trustProxy === true,
+  });
   const host = opts.host ?? "127.0.0.1";
   await new Promise<void>((resolve) => server.listen(0, host, resolve));
   const addr = server.address();
@@ -305,8 +307,29 @@ describe("installKanbanWs: origin enforcement (Slice B)", () => {
     expect(harness?.ensureCalls).toEqual([]);
   });
 
-  it("accepts https Origin when X-Forwarded-Proto is https", async () => {
+  it("rejects forged X-Forwarded-Proto https Origin without trustProxy", async () => {
     harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "forged-forwarded" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: {
+          Origin: `https://127.0.0.1:${harness.port}`,
+          "X-Forwarded-Proto": "https",
+        },
+      },
+    );
+    const closeOrError = await new Promise<string>((resolve) => {
+      ws.on("error", () => resolve("error"));
+      ws.on("close", () => resolve("close"));
+      setTimeout(() => resolve("timeout"), 500);
+    });
+    expect(["error", "close"]).toContain(closeOrError);
+    expect(harness?.ensureCalls).toEqual([]);
+  });
+
+  it("accepts https Origin when trustProxy honors X-Forwarded-Proto", async () => {
+    harness = await boot({ host: "127.0.0.1", trustProxy: true });
     const t = harness.store.add({ title: "forwarded-https" });
     const ws = new WebSocket(
       `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
