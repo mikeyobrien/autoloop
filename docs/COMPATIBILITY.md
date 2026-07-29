@@ -12,7 +12,7 @@ Tier A surfaces are part of the public contract and follow semantic versioning. 
 
 - **Journal JSONL contract (v1)**: On-disk record schema and semantics defined in `packages/core/src/events/encode.ts`. Every line is a JSON object with fields: `v` (version), `ts` (ISO-8601 timestamp), `run` (run ID), `topic` (event topic), optional `iteration`, then either `fields` (object) or `payload` + `source`.
 - **Registry schema**: On-disk `RunRecord` shape and JSONL append protocol in `packages/core/src/registry/types.ts`. Back-compat-optional fields include `outcome`, `verdict`, `cost_usd`, `acceptance_verified`.
-- **CLI verbs**: `run`, `emit`, `resume`, `inspect`, `ls`, `rm`, `config` commands and their exit codes, stdout format, and argument contracts.
+- **CLI contracts**: documented argument and exit-code behavior for `run`, `emit`, `resume`, `inspect`, `list`, `loops`, and `config`, plus documented `--json` response fields. Human-oriented terminal rendering is Tier B unless a command explicitly documents it as stable.
 - **Completion and required-event semantics**: Behavior of `completion.event`, `completion.requiredEvents`, `completion.must_be_last`, and how the harness decides loop termination.
 - **Origin policies**: HTTP `Origin` header enforcement on protected `/api/*` routes and WebSocket `/ws/kanban-pty` upgrades.
 - **Core package exports**: Subpaths re-exported from `@mobrienv/autoloop-core` (e.g., `./journal`, `./journal-format`, `./registry`, `./topology`, `./config-schema`, `./hooks-schema`).
@@ -32,7 +32,8 @@ Tier B surfaces are intended for integration use but may see breaking changes in
 
 - **Harness emit() API**: `packages/harness/src/emit.ts` public interface and behavior.
 - **LoopEvent schema**: Event envelope shape in `packages/harness/src/events.ts`.
-- **Package exports subpaths**: Declared `exports` map in each workspace `package.json` (e.g., `@mobrienv/autoloop-harness/emit`, `@mobrienv/autoloop-kanban/runtime`).
+- **Other package export subpaths**: Declared `exports` not listed as Tier A above (e.g., `@mobrienv/autoloop-harness/emit`, `@mobrienv/autoloop-kanban/runtime`).
+- **Human-readable CLI rendering**: headings, colors, spacing, and prose intended for terminal users. Machine consumers should use documented `--json` modes.
 
 **Policy:** Changes to Tier B require a changelog note but no RFC or deprecation grace period.
 
@@ -108,10 +109,11 @@ CI runs the generator and fails on any uncommitted fixture drift, so a hand-edit
 CI enforces:
 
 - `npm run build` — successful TypeScript compilation.
-- `npm run check` — biome lint/format, tsc --noEmit, test coverage thresholds.
+- `npm run check` — package-wide biome lint/format, `tsc --noEmit`, public export/bin resolution, and the coverage suite.
+- `npm run docs:build` — documentation links and rendering must compile.
 - Contract tests pass (detect schema drift).
 - `npm run fixtures:contracts` followed by `git diff --exit-code test/fixtures/contracts` — committed fixtures must be exactly reproducible from the generator.
-- Export-resolution test (all declared subpaths importable from dist).
+- `npm run check:exports` — every declared runtime/type export and bin target exists, and JavaScript exports load from built `dist` files.
 
 No PR merges without all gates green.
 
@@ -124,9 +126,8 @@ A tool/agent using Autoloop as a subprocess can rely on Tier A:
 ```bash
 #!/bin/bash
 # Inside AUTOLOOP_PROJECT_DIR, with AUTOLOOP_JOURNAL_FILE set by harness.
-source "$AUTOLOOP_BIN"
-
-# Emit event using harness-controlled journal path (Tier A).
+# Emit an event through the CLI; the parent harness independently validates
+# whether it is authorized for this iteration.
 "$AUTOLOOP_BIN" emit plan.ready "Planning complete"
 
 # Read journal (Tier A contract v1).
@@ -153,4 +154,4 @@ Declared subpaths are Tier B; undeclared internal modules are Tier C.
 
 ## Questions?
 
-Refer to RFCs in the `docs/rfcs/` folder for detailed design decisions. Open an issue to propose a compatibility concern or feature addition.
+Open an issue or discussion to propose a compatibility concern or feature addition.
