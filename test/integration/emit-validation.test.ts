@@ -67,8 +67,10 @@ echo "Backend attempted forged emit"
     const journal = readText(join(project, ".autoloop/journal.jsonl"));
     // Forged event should be journaled (truthful audit trail)
     expect(journal).toContain('"topic": "red.ready"');
-    // But loop should not complete on the forged event alone
+    // But loop should not complete on the forged event alone.
     expect(journal).toContain('"topic": "loop.stop"');
+    expect(journal).toContain('"reason": "max_iterations"');
+    expect(journal).not.toContain('"reason": "completion_event"');
     // Should NOT contain a final task.complete
     const lines = journal.split("\n").filter((l) => l.trim());
     const lastEvent = lines[lines.length - 1];
@@ -113,8 +115,51 @@ echo "Attempted forged completion"
     const journal = readText(join(project, ".autoloop/journal.jsonl"));
     // Forged event recorded for audit
     expect(journal).toContain('"topic": "task.complete"');
-    // But loop should stop due to missing valid completion, not forged one
+    // But loop should stop due to missing valid completion, not forged one.
     expect(journal).toContain('"topic": "loop.stop"');
+    expect(journal).toContain('"reason": "max_iterations"');
+    expect(journal).not.toContain('"reason": "completion_event"');
+  });
+
+  it("preserves validated required events across iterations", () => {
+    const project = makeTempProject("emit-required-across-turns");
+    const backendScript = join(project, "backend.sh");
+    writeFileSync(
+      backendScript,
+      `#!/bin/sh
+set -eu
+case "\${AUTOLOOP_RECENT_EVENT:-}" in
+  loop.start) "$AUTOLOOP_BIN" emit tasks.ready "Planning complete" ;;
+  tasks.ready) "$AUTOLOOP_BIN" emit task.complete "Work complete" ;;
+  *) exit 1 ;;
+esac
+`,
+      { mode: 0o755 },
+    );
+
+    const configPath = join(project, "autoloops.toml");
+    let config = readText(configPath);
+    config = config.replace(
+      'event_loop.completion_promise = "LOOP_COMPLETE"',
+      'event_loop.completion_promise = "LOOP_COMPLETE"\nevent_loop.required_events = ["tasks.ready"]',
+    );
+    config = config.replace(
+      'backend.command = "node"',
+      'backend.command = "bash"',
+    );
+    config = config.replace(
+      /backend\.args.*/,
+      `backend.args = [${JSON.stringify(backendScript)}]`,
+    );
+    writeFileSync(configPath, config, "utf-8");
+
+    const res = runCli(["run", project, "cross-iteration completion"], {});
+    expect(res.status).toBe(0);
+
+    const journal = readText(join(project, ".autoloop/journal.jsonl"));
+    expect(journal).toContain('"topic": "tasks.ready"');
+    expect(journal).toContain('"topic": "task.complete"');
+    expect(journal).toContain('"reason": "completion_event"');
   });
 
   it("accepts legitimate events after rejecting forged ones", () => {

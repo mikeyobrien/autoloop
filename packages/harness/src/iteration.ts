@@ -61,7 +61,7 @@ import {
 } from "./parallel.js";
 import { runProgressMetric } from "./progress.js";
 import type { IterationContext } from "./prompt.js";
-import { buildIterationContext, validateAgentEventsForTurn } from "./prompt.js";
+import { buildIterationContext, validateAgentEventsForRun } from "./prompt.js";
 import { enterProvisional, resolveCompletionClaim } from "./provisional.js";
 import { registryProgress } from "./registry-bridge.js";
 import { finishStageIteration } from "./stage.js";
@@ -694,10 +694,7 @@ export async function finishIteration(
   // Re-validate agent events against harness-computed allowed events.
   // This prevents backend-forged AUTOLOOP_ALLOWED_EVENTS from satisfying
   // required conditions or corrupting routing.
-  const validatedAgentTopics = validateAgentEventsForTurn(
-    turnLines,
-    iter.allowedEvents,
-  );
+  const validatedAgentTopics = validateAgentEventsForRun(runLines);
 
   const resolved = resolveOutcome({
     emittedTopic: emitted.topic,

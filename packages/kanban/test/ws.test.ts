@@ -266,7 +266,7 @@ describe("installKanbanWs: origin enforcement (Slice B)", () => {
     // Cross-origin should be rejected (close or error before open)
     expect(["error", "close"]).toContain(closeOrError);
     // Runtime should NOT have been invoked
-    expect(harness!.ensureCalls).toEqual([]);
+    expect(harness?.ensureCalls).toEqual([]);
   });
 
   it("accepts upgrade from matching localhost origin", async () => {
@@ -302,20 +302,6 @@ describe("installKanbanWs: origin enforcement (Slice B)", () => {
       setTimeout(() => resolve("timeout"), 500);
     });
     expect(["error", "close"]).toContain(closeOrError);
-    expect(harness!.ensureCalls).toEqual([]);
-  });
-
-  it("does not block non-WS requests to /ws/kanban-pty", async () => {
-    harness = await boot({ host: "127.0.0.1" });
-    // Non-WS GET/POST to the path should not be consumed by the upgrade
-    // handler. Instead, it should return and let other middleware handle it
-    // (or result in a 404). The important thing is that the runtime is NOT
-    // invoked.
-    const t = harness.store.add({ title: "http-request" });
-    // This is an HTTP request (no Upgrade header), not a WebSocket upgrade.
-    // The handler should not consume it.
-    // We can't easily test this with the http server directly here;
-    // this test documents the expected behavior.
-    expect(harness.ensureCalls).toEqual([]);
+    expect(harness?.ensureCalls).toEqual([]);
   });
 });

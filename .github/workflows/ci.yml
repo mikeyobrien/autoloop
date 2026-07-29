@@ -31,11 +31,11 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Check (lint, typecheck, coverage)
+      - name: Check (package lint, typecheck, exports, coverage)
         run: npm run check
 
-      - name: Test
-        run: npm test
+      - name: Build documentation
+        run: npm run docs:build
 
       - name: Contract tests (Tier A compatibility)
         run: npm test -- test/integration/compat-contract.test.ts

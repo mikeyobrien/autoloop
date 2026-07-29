@@ -707,6 +707,34 @@ function maxReviewPromptIteration(runLines: string[]): number {
  *
  * Coordination and ask topics are excluded (non-routing, already bypassed in emit).
  */
+export function validateAgentEventsForRun(runLines: string[]): Set<string> {
+  const allowedByIteration = new Map<string, Set<string>>();
+  for (const line of runLines) {
+    if (extractTopic(line) !== "iteration.start") continue;
+    allowedByIteration.set(
+      extractIteration(line),
+      new Set(csvFieldList(line, "allowed_events")),
+    );
+  }
+
+  const validatedTopics = new Set<string>();
+  for (const line of runLines) {
+    const topic = extractTopic(line);
+    if (!topic) continue;
+
+    if (extractField(line, "source") !== "agent") {
+      validatedTopics.add(topic);
+      continue;
+    }
+
+    if (coordinationTopic(topic) || topic === "human.ask") continue;
+    if (allowedByIteration.get(extractIteration(line))?.has(topic)) {
+      validatedTopics.add(topic);
+    }
+  }
+  return validatedTopics;
+}
+
 export function validateAgentEventsForTurn(
   turnLines: string[],
   allowedEvents: string[],
