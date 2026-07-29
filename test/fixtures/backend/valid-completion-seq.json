@@ -1,0 +1,7 @@
+{
+  "output": "Emitting tasks.ready then task.complete for valid completion sequence test.",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "tasks.ready",
+  "emit_payload": "Planning complete"
+}

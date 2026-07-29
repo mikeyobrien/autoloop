@@ -694,3 +694,44 @@ function maxReviewPromptIteration(runLines: string[]): number {
   }
   return current;
 }
+
+/**
+ * Validate agent-emitted events against harness-computed allowed events.
+ * Returns a set of topics that passed validation.
+ *
+ * This is the core of Slice C: harness-side authority enforcement.
+ * Backend-controlled environment variables (AUTOLOOP_ALLOWED_EVENTS) are hints,
+ * not authority. The harness re-validates by replaying the journal and checking
+ * against its own routing state, preventing a forged backend from satisfying
+ * required events, corrupting routing, or falsely completing the loop.
+ *
+ * Coordination and ask topics are excluded (non-routing, already bypassed in emit).
+ */
+export function validateAgentEventsForTurn(
+  turnLines: string[],
+  allowedEvents: string[],
+): Set<string> {
+  const validatedTopics = new Set<string>();
+  const allowedSet = new Set(allowedEvents);
+
+  for (const line of turnLines) {
+    const source = extractField(line, "source");
+    const topic = extractTopic(line);
+
+    // Only validate agent-emitted events; harness/operator events are trusted.
+    if (source !== "agent") continue;
+
+    // Skip coordination and ask topics (non-routing, excluded from completion logic).
+    if (coordinationTopic(topic) || topic === "human.ask") continue;
+
+    // Check if this agent event is in the harness-computed allowed set.
+    if (allowedSet.has(topic)) {
+      validatedTopics.add(topic);
+    }
+    // Note: invalid agent events are *not* added to the set.
+    // They remain in the journal for audit but are excluded from
+    // completion/routing logic below.
+  }
+
+  return validatedTopics;
+}

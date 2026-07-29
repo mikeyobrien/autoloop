@@ -61,7 +61,7 @@ import {
 } from "./parallel.js";
 import { runProgressMetric } from "./progress.js";
 import type { IterationContext } from "./prompt.js";
-import { buildIterationContext } from "./prompt.js";
+import { buildIterationContext, validateAgentEventsForTurn } from "./prompt.js";
 import { enterProvisional, resolveCompletionClaim } from "./provisional.js";
 import { registryProgress } from "./registry-bridge.js";
 import { finishStageIteration } from "./stage.js";
@@ -690,9 +690,19 @@ export async function finishIteration(
     (t) => t.soft !== true,
   );
 
+  // Harness-side emit authority validation (Slice C):
+  // Re-validate agent events against harness-computed allowed events.
+  // This prevents backend-forged AUTOLOOP_ALLOWED_EVENTS from satisfying
+  // required conditions or corrupting routing.
+  const validatedAgentTopics = validateAgentEventsForTurn(
+    turnLines,
+    iter.allowedEvents,
+  );
+
   const resolved = resolveOutcome({
     emittedTopic: emitted.topic,
     allTopics,
+    validatedAgentTopics,
     hadInvalidEvents,
     output,
     completionEvent: loop.completion.event,
@@ -895,6 +905,7 @@ async function finishDeclarativeIteration(
 export function resolveOutcome(ctx: {
   emittedTopic: string;
   allTopics: string[];
+  validatedAgentTopics?: Set<string>;
   hadInvalidEvents: boolean;
   output: string;
   completionEvent: string;
@@ -912,8 +923,18 @@ export function resolveOutcome(ctx: {
   /** Precomputed by the caller from full journal ordering (see completionEmittedLast). */
   completionOrderOk?: boolean;
 }): { action: string; outcome: string } {
+  // Use validatedAgentTopics (harness-verified) for completion logic if available;
+  // fall back to allTopics (includes forged events) if not provided.
+  // This ensures Slice C: forged backend events cannot satisfy required conditions.
+  const topicsForCompletion = ctx.validatedAgentTopics
+    ? Array.from(ctx.validatedAgentTopics)
+    : ctx.allTopics;
   if (
-    completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents) &&
+    completedViaEvent(
+      topicsForCompletion,
+      ctx.completionEvent,
+      ctx.requiredEvents,
+    ) &&
     (!ctx.mustBeLast || ctx.completionOrderOk)
   ) {
     return { action: "complete_event", outcome: "complete:completion_event" };
@@ -928,7 +949,7 @@ export function resolveOutcome(ctx: {
   if (
     !ctx.hadInvalidEvents &&
     !ctx.hasBlockingTasks &&
-    requiredEventsSatisfied(ctx.allTopics, ctx.requiredEvents) &&
+    requiredEventsSatisfied(topicsForCompletion, ctx.requiredEvents) &&
     completedViaPromise(ctx.output, ctx.completionPromise)
   ) {
     return {

@@ -1,0 +1,7 @@
+{
+  "output": "Backend attempting to forge required event by clearing AUTOLOOP_ALLOWED_EVENTS.\nLOOP_INCOMPLETE",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "red.ready",
+  "emit_payload": "Forged via cleared env"
+}
