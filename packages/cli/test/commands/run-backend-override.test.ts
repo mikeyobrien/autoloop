@@ -38,6 +38,11 @@ function tmpDir(name: string): string {
 beforeEach(() => {
   mkdirSync(TMP_BASE, { recursive: true });
   vi.clearAllMocks();
+  process.exitCode = undefined;
+  runSpy.mockResolvedValue({
+    stopReason: "completed",
+    iterations: 1,
+  });
 });
 
 afterEach(() => {
@@ -71,6 +76,22 @@ describe("applyGlobalBackendOverride", () => {
       args: ["acp"],
       prompt_mode: "acp",
     });
+  });
+
+  it("propagates a failed loop result to process exit status", async () => {
+    const targetDir = tmpDir("target-failed-loop");
+    writeFileSync(
+      join(targetDir, "autoloops.toml"),
+      "[event_loop]\nmax_iterations = 1\n",
+    );
+    runSpy.mockResolvedValue({
+      stopReason: "error",
+      iterations: 1,
+    });
+
+    await dispatchRun([targetDir, "review"], [], targetDir, "autoloop");
+
+    expect(process.exitCode).toBe(1);
   });
 
   it("maps -b claude-agent-acp to the npm ACP adapter", async () => {

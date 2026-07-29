@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   classifyBackendError,
@@ -93,10 +93,43 @@ export async function maybeRunMetareview(
   iteration: number,
 ): Promise<LoopContext> {
   if (shouldRunMetareview(loop, iteration)) {
+    const presetFile = loop.launch.presetFile || "";
+    const presetBefore =
+      presetFile && existsSync(presetFile)
+        ? readFileSync(presetFile, "utf8")
+        : null;
     const verdict = await runMetareviewReview(loop, iteration);
-    const reloaded = reloadLoop(loop);
-    reloaded.lastVerdict = verdict;
-    return reloaded;
+    try {
+      const reloaded = reloadLoop(loop);
+      reloaded.lastVerdict = verdict;
+      return reloaded;
+    } catch (error: unknown) {
+      const presetChanged =
+        presetBefore !== null &&
+        (!existsSync(presetFile) ||
+          readFileSync(presetFile, "utf8") !== presetBefore);
+      if (!presetChanged) throw error;
+
+      writeFileSync(presetFile, presetBefore);
+      const reason =
+        error instanceof Error
+          ? error.message
+          : String(error ?? "unknown error");
+      appendEvent(
+        loop.paths.journalFile,
+        loop.runtime.runId,
+        String(iteration),
+        "review.preset.rollback",
+        jsonField("preset_file", presetFile) +
+          ", " +
+          jsonField("reason", reason),
+      );
+      const restored = reloadLoop(loop);
+      restored.lastVerdict = unknownVerdict(
+        `Metareview produced an invalid preset; edit rolled back: ${reason}`,
+      );
+      return restored;
+    }
   }
   return loop;
 }

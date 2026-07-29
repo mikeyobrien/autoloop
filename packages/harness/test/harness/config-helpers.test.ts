@@ -142,6 +142,46 @@ describe("injectClaudePermissions", () => {
 });
 
 describe("buildLoopContext", () => {
+  it("loads stage runtime controls beside single-file fan-out stages", () => {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    const presetFile = join(projectDir, "generated-preset.toml");
+    writeFileSync(
+      presetFile,
+      [
+        'name = "generated-review"',
+        'completion_event = "review.complete"',
+        "",
+        "[event_loop]",
+        "max_iterations = 2",
+        "",
+        "[stage_runtime]",
+        "concurrency = 8",
+        "branch_timeout_ms = 1500000",
+        "",
+        "[[role]]",
+        'id = "lens"',
+        'emits = ["lens.done"]',
+        "",
+        "[[stage]]",
+        'id = "lenses"',
+        'roles = ["lens"]',
+        'reducer = "concat"',
+        'next = "review.complete"',
+      ].join("\n"),
+    );
+
+    const loop = buildLoopContext(projectDir, "review", "autoloop", {
+      workDir: projectDir,
+      presetFile,
+    });
+
+    expect(loop.stage).toEqual({
+      concurrency: 8,
+      branchTimeoutMs: 1_500_000,
+    });
+    expect(loop.topology.stages.map((stage) => stage.id)).toEqual(["lenses"]);
+  });
+
   it("rejects an unrecognized global backend kind", () => {
     const projectDir = makeProject(
       ["event_loop.max_iterations = 1", 'backend.kind = "clade-sdk"'].join(

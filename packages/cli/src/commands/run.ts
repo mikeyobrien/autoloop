@@ -164,7 +164,7 @@ export async function dispatchRun(
     process.on("SIGTERM", onSig);
 
     try {
-      await harness.run(
+      const runResult = await harness.run(
         options.projectDir,
         normalizePrompt(options.prompt),
         selfCmd,
@@ -177,6 +177,8 @@ export async function dispatchRun(
           ...chainableOptions(options),
         },
       );
+      propagateRunStopStatus(runResult);
+      if (runResult?.stopReason === "error") return true;
     } finally {
       process.removeListener("SIGINT", onSig);
       process.removeListener("SIGTERM", onSig);
@@ -232,7 +234,11 @@ async function runGeneratedPreset(
     return;
   }
   process.stderr.write(`\narchitect: running generated preset ${file}\n\n`);
-  await harness.run(
+  const effectiveConfig = config.loadProjectFromFile(file, {
+    workDir: options.workDir || undefined,
+    cliOverride: options.configOverride,
+  });
+  const runResult = await harness.run(
     dirname(file),
     normalizePrompt(options.architectObjective ?? null),
     selfCmd,
@@ -240,10 +246,66 @@ async function runGeneratedPreset(
       presetFile: file,
       workDir: options.workDir,
       backendOverride: options.backendOverride,
+      configOverride: generatedPresetConfigOverride(
+        options.configOverride,
+        options.ultra === true,
+        effectiveConfig,
+      ),
       logLevel: options.logLevel,
       onEvent,
     },
   );
+  propagateRunStopStatus(runResult);
+}
+
+function propagateRunStopStatus(
+  result: { stopReason?: string } | null | undefined,
+): void {
+  if (result?.stopReason === "error") process.exitCode = 1;
+}
+
+/**
+ * Ultra fan-out branches routinely need several minutes for repository-scale
+ * analysis. Keep standard architect behavior unchanged, preserve any operator
+ * override (including the legacy namespace), and otherwise grant 25 minutes.
+ */
+export function generatedPresetConfigOverride(
+  overrides: Record<string, unknown>,
+  ultra: boolean,
+  effectiveConfig: Record<string, unknown> = {},
+): Record<string, unknown> {
+  if (!ultra) return overrides;
+  const minimumMs = 1_500_000;
+  let result = overrides;
+  const explicitStageTimeout =
+    config.get(overrides, "stage_runtime.branch_timeout_ms", "") ||
+    config.get(overrides, "stage.branch_timeout_ms", "");
+  const effectiveStageTimeout = config.getInt(
+    effectiveConfig,
+    "stage_runtime.branch_timeout_ms",
+    config.getInt(effectiveConfig, "stage.branch_timeout_ms", 0),
+  );
+  if (!explicitStageTimeout && effectiveStageTimeout < minimumMs) {
+    result = config.put(
+      result,
+      "stage_runtime.branch_timeout_ms",
+      String(minimumMs),
+    );
+  }
+  const explicitBackendTimeout = config.get(
+    overrides,
+    "backend.timeout_ms",
+    "",
+  );
+  const effectiveBackendTimeout = config.getInt(
+    effectiveConfig,
+    "backend.timeout_ms",
+    0,
+  );
+  if (!explicitBackendTimeout && effectiveBackendTimeout < minimumMs) {
+    result = config.put(result, "backend.timeout_ms", String(minimumMs));
+  }
+  return result;
 }
 
 export function parseRunArgs(args: string[], bundleRoot: string): RunOptions {

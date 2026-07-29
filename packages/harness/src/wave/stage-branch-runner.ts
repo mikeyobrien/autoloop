@@ -54,84 +54,130 @@ export function buildStageBranchRunner(
   iter: IterationContext,
   stageId: string,
 ): BranchRunner {
-  const stageDir = stageBranchesDir(loop, stageId);
-  mkdirSync(stageDir, { recursive: true });
+  return async (spec: StageSpec): Promise<FanoutBranchResult> =>
+    (await runStageBranchBatch(loop, iter, stageId, [spec], 1))[0];
+}
 
-  return async (spec: StageSpec): Promise<FanoutBranchResult> => {
-    const branchDir = join(stageDir, spec.branchId);
-    mkdirSync(branchDir, { recursive: true });
-
-    const role = loop.topology.roles.find((r) => r.id === spec.role);
-    const prompt = renderStageBranchPrompt(loop, spec, role);
-
-    const waveSpec: WaveBranchSpec = {
-      branchId: spec.branchId,
-      waveId: stageId,
-      objective: spec.objective,
-      emittedTopic: stageId,
-      routingEvent: spec.role,
-      allowedRoles: role ? [role.id] : [],
-      allowedEvents: role?.emits ?? [],
-      prompt,
-      branchDir,
-      launchFile: join(branchDir, "launch.json"),
-      summaryFile: join(branchDir, "summary.json"),
-      stdoutFile: join(branchDir, "stdout.log"),
-      stderrFile: join(branchDir, "stderr.log"),
-      statusFile: join(branchDir, "status.txt"),
-      pidFile: join(branchDir, "pid.txt"),
-      supervisorFile: join(branchDir, "supervisor.sh"),
-      launchMs: 0,
-    };
-
-    writeBranchLaunch(waveSpec, loop);
-    appendStageBranchStart(loop, iter, stageId, spec);
-    const [launched] = launchParallelBranches(loop, [waveSpec]);
-    const { results } = joinParallelBranches(
-      loop,
+/**
+ * Launch each concurrency window as a group before entering the synchronous
+ * poller. Calling the old one-branch runner through `mapLimit` serialized in
+ * practice because its poll loop blocked the event loop before sibling tasks
+ * could spawn.
+ */
+export async function runStageBranchBatch(
+  loop: LoopContext,
+  iter: IterationContext,
+  stageId: string,
+  specs: StageSpec[],
+  concurrency: number,
+): Promise<FanoutBranchResult[]> {
+  const results: FanoutBranchResult[] = [];
+  const width = Math.max(1, concurrency);
+  const executionLoop: LoopContext = {
+    ...loop,
+    parallel: {
+      ...loop.parallel,
+      branchTimeoutMs:
+        loop.stage?.branchTimeoutMs ?? loop.parallel.branchTimeoutMs,
+    },
+  };
+  for (let offset = 0; offset < specs.length; offset += width) {
+    const chunk = specs.slice(offset, offset + width);
+    const waveSpecs = chunk.map((spec) => makeWaveSpec(loop, stageId, spec));
+    for (let index = 0; index < chunk.length; index += 1) {
+      writeBranchLaunch(waveSpecs[index], executionLoop);
+      appendStageBranchStart(loop, iter, stageId, chunk[index]);
+    }
+    const launched = launchParallelBranches(executionLoop, waveSpecs);
+    const joined = joinParallelBranches(
+      executionLoop,
       iter,
       stageId,
-      [launched],
+      launched,
       { mode: "wait_for_all", timeoutMs: 0 },
       Date.now(),
     );
-    const result = results[0];
-    if (!result) {
-      const branchResult: FanoutBranchResult = {
+    for (const spec of chunk) {
+      const result = joined.results.find(
+        (candidate) => candidate.branchId === spec.branchId,
+      );
+      const branchResult = mapStageBranchResult(spec, result);
+      appendStageBranchFinish(
+        loop,
+        iter,
+        stageId,
+        branchResult,
+        result?.elapsedMs ?? 0,
+      );
+      results.push(branchResult);
+    }
+  }
+  return results;
+}
+
+function makeWaveSpec(
+  loop: LoopContext,
+  stageId: string,
+  spec: StageSpec,
+): WaveBranchSpec {
+  const stageDir = stageBranchesDir(loop, stageId);
+  const branchDir = join(stageDir, spec.branchId);
+  mkdirSync(branchDir, { recursive: true });
+  const role = loop.topology.roles.find(
+    (candidate) => candidate.id === spec.role,
+  );
+  return {
+    branchId: spec.branchId,
+    waveId: stageId,
+    objective: spec.objective,
+    emittedTopic: stageId,
+    routingEvent: spec.role,
+    allowedRoles: role ? [role.id] : [],
+    allowedEvents: role?.emits ?? [],
+    prompt: renderStageBranchPrompt(loop, spec, role),
+    branchDir,
+    launchFile: join(branchDir, "launch.json"),
+    summaryFile: join(branchDir, "summary.json"),
+    stdoutFile: join(branchDir, "stdout.log"),
+    stderrFile: join(branchDir, "stderr.log"),
+    statusFile: join(branchDir, "status.txt"),
+    pidFile: join(branchDir, "pid.txt"),
+    supervisorFile: join(branchDir, "supervisor.sh"),
+    launchMs: 0,
+  };
+}
+
+function mapStageBranchResult(
+  spec: StageSpec,
+  result:
+    | {
+        stopReason: string;
+        output: string;
+        elapsedMs: number;
+      }
+    | undefined,
+): FanoutBranchResult {
+  if (!result) {
+    return {
+      branchId: spec.branchId,
+      ok: false,
+      error: "branch produced no result",
+    };
+  }
+  const succeeded =
+    result.stopReason === "max_iterations" ||
+    result.stopReason === "completion_event" ||
+    result.stopReason === "completion_promise";
+  const data = parseJsonObjectPayload(result.output);
+  return succeeded && data
+    ? { branchId: spec.branchId, ok: true, data }
+    : {
         branchId: spec.branchId,
         ok: false,
-        error: "branch produced no result",
+        error: succeeded
+          ? "branch did not respond with a parseable JSON object"
+          : `branch ${result.stopReason}`,
       };
-      appendStageBranchFinish(loop, iter, stageId, branchResult, 0);
-      return branchResult;
-    }
-
-    const succeeded =
-      result.stopReason === "max_iterations" ||
-      result.stopReason === "completion_event" ||
-      result.stopReason === "completion_promise";
-    const data = parseJsonObjectPayload(result.output);
-
-    const branchResult: FanoutBranchResult =
-      succeeded && data
-        ? { branchId: spec.branchId, ok: true, data }
-        : {
-            branchId: spec.branchId,
-            ok: false,
-            error: succeeded
-              ? "branch did not respond with a parseable JSON object"
-              : `branch ${result.stopReason}`,
-          };
-
-    appendStageBranchFinish(
-      loop,
-      iter,
-      stageId,
-      branchResult,
-      result.elapsedMs,
-    );
-    return branchResult;
-  };
 }
 
 function renderStageBranchPrompt(

@@ -8,13 +8,16 @@ import {
   branchStopReason,
   buildBackendCommand,
   csvFieldList,
+  loadParallelBranchLaunch,
   parallelBranchBackendOverride,
+  parallelBranchRunOptions,
   renderBranchResult,
   runtimeEnvLines,
 } from "@mobrienv/autoloop-harness/parallel";
 import { buildIterationContext } from "@mobrienv/autoloop-harness/prompt";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
 import { describe, expect, it } from "vitest";
+import { writeBranchLaunch } from "../../src/wave/launch-branches.js";
 
 describe("csvFieldList", () => {
   it("extracts comma-separated values from a JSON field", () => {
@@ -56,7 +59,10 @@ describe("parallelBranchBackendOverride", () => {
     backendCommand: "",
     backendArgs: [],
     backendPromptMode: "",
+    backendTimeoutMs: 0,
+    branchTimeoutMs: 0,
     logLevel: "info",
+    presetFile: "",
   };
 
   it("returns empty object when no overrides set", () => {
@@ -111,6 +117,56 @@ describe("parallelBranchBackendOverride", () => {
       command: "claude",
       args: ["--fast"],
       prompt_mode: "pipe",
+    });
+  });
+});
+
+describe("parallel branch launch context", () => {
+  it("round-trips the exact parent preset and reuses it in shared branch mode", () => {
+    const root = mkdtempSync(join(tmpdir(), "autoloop-branch-launch-"));
+    const branchDir = join(root, "branch");
+    mkdirSync(branchDir, { recursive: true });
+    const presetFile = join(root, "generated-preset.toml");
+    writeFileSync(presetFile, 'name = "generated"\n');
+    const spec = {
+      branchId: "lenses.0",
+      waveId: "lenses",
+      objective: "inspect state",
+      emittedTopic: "state.done",
+      routingEvent: "state_lens",
+      allowedRoles: ["state_lens"],
+      allowedEvents: ["state.done"],
+      prompt: "inspect state",
+      branchDir,
+      launchFile: join(branchDir, "launch.json"),
+    } as Parameters<typeof writeBranchLaunch>[0];
+    const parentLoop = {
+      backend: {
+        kind: "pi",
+        provider: "",
+        command: "pi",
+        args: [],
+        promptMode: "arg",
+        timeoutMs: 1_500_000,
+      },
+      runtime: { logLevel: "info" },
+      launch: { presetFile },
+      parallel: { branchTimeoutMs: 1_500_000 },
+    } as unknown as LoopContext;
+
+    writeBranchLaunch(spec, parentLoop);
+    const launch = loadParallelBranchLaunch(branchDir);
+
+    expect(launch.presetFile).toBe(presetFile);
+    expect(launch.backendTimeoutMs).toBe(1_500_000);
+    expect(launch.branchTimeoutMs).toBe(1_500_000);
+    expect(parallelBranchRunOptions(launch, branchDir)).toMatchObject({
+      workDir: branchDir,
+      presetFile,
+      noWorktree: true,
+      trigger: "branch",
+      backendOverride: { timeout_ms: 1_500_000 },
+      configOverride: { parallel: { branch_timeout_ms: "1500000" } },
     });
   });
 });

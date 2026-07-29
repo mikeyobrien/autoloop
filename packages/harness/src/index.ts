@@ -54,7 +54,7 @@ import {
   appendLoopStart,
   branchStopReason,
   loadParallelBranchLaunch,
-  parallelBranchBackendOverride,
+  parallelBranchRunOptions,
   renderBranchResult,
   seedBranchContext,
   writeParallelBranchSummary,
@@ -468,14 +468,12 @@ export async function runParallelBranchCli(
   const launch = loadParallelBranchLaunch(branchDir);
   const branchPrompt = launch.prompt;
   const routingEvent = launch.routingEvent || "loop.start";
-  const backendOverride = parallelBranchBackendOverride(launch);
-  const logLevelVal = launch.logLevel || null;
-  let branchLoop = buildLoopContext(projectDir, branchPrompt, selfCommand, {
-    workDir: branchDir,
-    backendOverride,
-    logLevel: logLevelVal,
-    trigger: "branch",
-  });
+  let branchLoop = buildLoopContext(
+    projectDir,
+    branchPrompt,
+    selfCommand,
+    parallelBranchRunOptions(launch, branchDir),
+  );
   branchLoop.onEvent = onEvent;
   branchLoop = initStore(branchLoop);
   branchLoop.runtime.branchMode = true;
