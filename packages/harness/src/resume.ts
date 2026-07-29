@@ -18,8 +18,8 @@ import {
 } from "./config-helpers.js";
 import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
+import { loadAcceptedEmitAuthorities } from "./emit-authority.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
-import { acceptedAuthoritiesFromRun } from "./prompt.js";
 import {
   findDanglingProvisional,
   resolveOrphanedProvisional,
@@ -290,8 +290,9 @@ export async function resume(
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
   loop.emitAuthority = {
-    accepted: acceptedAuthoritiesFromRun(
-      readRunLines(loop.paths.journalFile, loop.runtime.runId),
+    accepted: loadAcceptedEmitAuthorities(
+      loop.paths.stateDir,
+      loop.runtime.runId,
     ),
   };
 

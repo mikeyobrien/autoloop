@@ -44,25 +44,42 @@ describe("createApp", () => {
     expect(res.status).toBe(404);
   });
 
-  it("rejects /api/* with mismatched origin when host is 0.0.0.0", async () => {
+  it("rejects /api/* with mismatched Origin", async () => {
     const app = createApp(
       { ...baseCtx, host: "0.0.0.0", port: 4801 },
       freshStore(),
     );
-    const res = await app.request("/api/foo", {
-      headers: { origin: "http://evil.example" },
+    const res = await app.request("http://192.0.2.10:4801/api/foo", {
+      headers: {
+        host: "192.0.2.10:4801",
+        origin: "http://evil.example",
+      },
     });
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body).toEqual({ error: "origin mismatch" });
   });
 
-  it("skips origin guard when host is 127.0.0.1 (default)", async () => {
+  it("accepts /api/* with matching Origin and Host", async () => {
     const app = createApp(baseCtx, freshStore());
-    const res = await app.request("/api/foo", {
-      headers: { origin: "http://evil.example" },
+    const res = await app.request("http://127.0.0.1:4801/api/foo", {
+      headers: {
+        host: "127.0.0.1:4801",
+        origin: "http://127.0.0.1:4801",
+      },
     });
-    // No guard middleware mounted, so /api/foo 404s (origin header ignored).
+    // Guard passes; unknown API path still 404s.
     expect(res.status).toBe(404);
+  });
+
+  it("rejects /api/* with same-host scheme mismatch", async () => {
+    const app = createApp(baseCtx, freshStore());
+    const res = await app.request("http://127.0.0.1:4801/api/foo", {
+      headers: {
+        host: "127.0.0.1:4801",
+        origin: "https://127.0.0.1:4801",
+      },
+    });
+    expect(res.status).toBe(403);
   });
 });

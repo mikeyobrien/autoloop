@@ -60,6 +60,7 @@ import {
   parallelTriggerTopic,
   systemTopic,
 } from "./emit.js";
+import { appendAcceptedEmitAuthority } from "./emit-authority.js";
 import { runFileModAudit } from "./file-mod-audit.js";
 import { loopStartMs } from "./guards.js";
 import { buildHookEnv, captureGitSha, runPhaseHooks } from "./hooks.js";
@@ -207,6 +208,13 @@ function drainAuthorizedEmits(loop: LoopContext, iter: IterationContext): void {
         topic: result.topic,
         iteration: current.iteration,
       });
+      appendAcceptedEmitAuthority(
+        loop.paths.stateDir,
+        loop.runtime.runId,
+        authorityId,
+        result.topic,
+        current.iteration,
+      );
     }
   }
 }
