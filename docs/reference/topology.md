@@ -59,7 +59,7 @@ Each `[[role]]` table defines one role in the loop. Roles are processed in decla
 | `id` | string | Yes | Unique identifier for the role. Used in handoff maps and prompt rendering. |
 | `emits` | array of strings | Yes | Events this role is allowed to emit. Determines the allowed-event set for backpressure. |
 | `prompt` | string | No | Inline prompt text for this role. |
-| `prompt_file` | string | No | Path to a markdown file containing the role's prompt, relative to the project directory. |
+| `prompt_file` | string | No | Path to a markdown file containing the role's prompt, relative to the preset directory. Parent traversal and symlink escapes are rejected. |
 | `backend_kind` | string | No | Override the loop's `backend.kind` for iterations routed to this role. See [Per-role backend overrides](#per-role-backend-overrides). |
 | `backend_provider` | string | No | Override the ACP `backend.provider` preset for this role (`kiro`, `claude-agent-acp`, `generic`, or a custom label). |
 | `backend_command` | string | No | Override `backend.command` for this role's iterations. |
