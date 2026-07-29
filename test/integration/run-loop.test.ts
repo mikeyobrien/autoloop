@@ -180,7 +180,7 @@ describe("integration: run loop with mock backend", () => {
       },
     );
 
-    expect(res.status).toBe(0);
+    expect(res.status).toBe(1);
     expect(res.stdout).toContain("[progress]");
     expect(res.stdout).toContain("outcome=stop:backend_failed");
   });
@@ -202,7 +202,7 @@ describe("integration: run loop with mock backend", () => {
       },
     );
 
-    expect(res.status).toBe(0);
+    expect(res.status).toBe(1);
     expect(res.stdout).toContain("[progress]");
     expect(res.stdout).toContain("outcome=stop:backend_timeout");
   });

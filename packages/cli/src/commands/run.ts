@@ -177,8 +177,7 @@ export async function dispatchRun(
           ...chainableOptions(options),
         },
       );
-      propagateRunStopStatus(runResult);
-      if (runResult?.stopReason === "error") return true;
+      if (propagateRunStopStatus(runResult)) return true;
     } finally {
       process.removeListener("SIGINT", onSig);
       process.removeListener("SIGTERM", onSig);
@@ -258,10 +257,26 @@ async function runGeneratedPreset(
   propagateRunStopStatus(runResult);
 }
 
+const FAILURE_STOP_REASONS = new Set([
+  "backend_failed",
+  "backend_timeout",
+  "auth_failed",
+  "quota_exhausted",
+  "rate_limited",
+  "transient_error",
+  "review_unknown",
+  "parallel_wave_timeout",
+  "parallel_wave_failed",
+  "parallel_wave_invalid",
+  "error",
+]);
+
 function propagateRunStopStatus(
   result: { stopReason?: string } | null | undefined,
-): void {
-  if (result?.stopReason === "error") process.exitCode = 1;
+): boolean {
+  const failed = FAILURE_STOP_REASONS.has(result?.stopReason ?? "");
+  if (failed) process.exitCode = 1;
+  return failed;
 }
 
 /**
