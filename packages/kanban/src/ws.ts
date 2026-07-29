@@ -14,6 +14,39 @@ export interface InstallWsResult {
   close(): void;
 }
 
+function isOriginAllowed(
+  requestOrigin: string | undefined,
+  clientHost: string,
+  clientPort: number,
+): boolean {
+  // If no origin header, allow (matches HTTP policy; CLI/test clients may omit it).
+  if (!requestOrigin) return true;
+
+  // Parse the origin header as a URL.
+  let originUrl: URL;
+  try {
+    originUrl = new URL(requestOrigin);
+  } catch {
+    // Malformed origin URL — reject.
+    return false;
+  }
+
+  // Compute allowed origins: localhost forms and the actual bind host:port.
+  const allowedOrigins = new Set<string>();
+  const actualOrigin = `http://${clientHost}:${clientPort}`;
+  allowedOrigins.add(actualOrigin);
+
+  // If bound to localhost/127.0.0.1, also allow the alternate form.
+  if (clientHost === "127.0.0.1" || clientHost === "localhost") {
+    allowedOrigins.add(`http://127.0.0.1:${clientPort}`);
+    allowedOrigins.add(`http://localhost:${clientPort}`);
+  }
+
+  // Check if the origin matches one of the allowed origins.
+  const requestOriginNorm = `${originUrl.protocol}//${originUrl.host}`;
+  return allowedOrigins.has(requestOriginNorm);
+}
+
 export function installKanbanWs(
   server: HttpServer,
   store: TaskStore,
@@ -27,6 +60,24 @@ export function installKanbanWs(
   ): void => {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== "/ws/kanban-pty") return;
+
+    // Extract client host and port from the server address.
+    // Default to localhost:8000 if unavailable (for testing).
+    const serverAddr = server.address();
+    let clientHost = "127.0.0.1";
+    let clientPort = 8000;
+    if (serverAddr && typeof serverAddr !== "string") {
+      clientHost = serverAddr.address || "127.0.0.1";
+      clientPort = serverAddr.port || 8000;
+    }
+
+    // Validate origin (Slice B: WebSocket origin boundary).
+    const origin = req.headers.origin;
+    if (!isOriginAllowed(origin, clientHost, clientPort)) {
+      socket.destroy();
+      return;
+    }
+
     const taskId = url.searchParams.get("taskId") ?? "";
     const cols = Math.max(
       20,
