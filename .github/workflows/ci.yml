@@ -46,4 +46,14 @@ jobs:
           git diff --exit-code test/fixtures/contracts
 
       - name: Check trailing whitespace
-        run: git diff --check
+        run: |
+          # Compare the PR/base range when available. A bare `git diff --check`
+          # on a clean checkout only sees uncommitted fixture drift, not PR bytes.
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            git fetch --no-tags --prune --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            git diff --check "${{ github.event.pull_request.base.sha }}...HEAD"
+          elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            git diff --check HEAD~1...HEAD
+          else
+            git diff --check
+          fi

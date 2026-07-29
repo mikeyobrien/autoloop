@@ -18,7 +18,10 @@ import {
 } from "./config-helpers.js";
 import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
-import { loadAcceptedEmitAuthorities } from "./emit-authority.js";
+import {
+  loadAcceptedEmitAuthorities,
+  resolveEmitAuthorityPaths,
+} from "./emit-authority.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
 import {
   findDanglingProvisional,
@@ -291,7 +294,11 @@ export async function resume(
   installRuntimeTools(loop);
   loop.emitAuthority = {
     accepted: loadAcceptedEmitAuthorities(
-      loop.paths.stateDir,
+      resolveEmitAuthorityPaths(
+        loop.runtime.runId,
+        loop.paths.projectDir,
+        loop.paths.stateDir,
+      ),
       loop.runtime.runId,
     ),
   };
