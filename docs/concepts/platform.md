@@ -2,6 +2,14 @@
 
 autoloop is the execution engine and state model for long-horizon autonomous work. External interfaces — CLI, chat, cron, future API/UI — are thin shells that launch, observe, and report on runs. They do not orchestrate.
 
+## Ultra workflow architecture
+
+The Ultra path first uses an architect loop to inspect the repository and generate a validated, objective-specific preset. That preset then executes a bounded implementation loop, launches heterogeneous review branches concurrently where useful, restores declaration order for reduction, and only delivers after its verification gates pass.
+
+![Autoloop Ultra workflow: architect, adaptive preset, concurrent review, verification, and delivery](../assets/autoloop-ultra-preview.png)
+
+The source diagram is available as an [editable tldraw document](../assets/autoloop-ultra.tldr).
+
 ## Architectural roles
 
 ### Control plane (autoloop)
