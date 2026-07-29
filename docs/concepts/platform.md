@@ -8,7 +8,7 @@ The Ultra path first uses an architect loop to inspect the repository and genera
 
 ![Autoloop Ultra workflow: architect, adaptive preset, concurrent review, verification, and delivery](../assets/autoloop-ultra-preview.png)
 
-The source diagram is available as an [editable tldraw document](../assets/autoloop-ultra.tldr).
+The editable source is committed at `docs/assets/autoloop-ultra.tldr`.
 
 ## Architectural roles
 
