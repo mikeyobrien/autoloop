@@ -12,7 +12,8 @@
 // result (runId, iterations, stopReason), so a consumer gets the outcome from
 // the stream without parsing the journal.
 
-import { closeSync, openSync, writeSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
+import { dirname } from "node:path";
 import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 
 export interface EventSink {
@@ -27,6 +28,11 @@ export interface EventSink {
  * is best-effort: a write failure is swallowed so it can never crash the loop.
  */
 export function ndjsonEventSink(path: string): EventSink {
+  // Ensure the parent directory exists so `--events <nested/path/file.jsonl>`
+  // works from a fresh project without an existing state directory. This
+  // mirrors how other AutoLoop state/log paths create their parents and avoids
+  // an ENOENT from `openSync` when the directory does not yet exist.
+  mkdirSync(dirname(path), { recursive: true });
   const fd = openSync(path, "a");
   return {
     onEvent(event: LoopEvent): void {

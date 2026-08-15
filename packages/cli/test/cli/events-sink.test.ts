@@ -24,6 +24,21 @@ const sampleEvents: LoopEvent[] = [
 ];
 
 describe("ndjsonEventSink", () => {
+  it("creates the parent directory of a nested --events path", () => {
+    const dir = mkdtempSync(join(tmpdir(), "autoloop-events-"));
+    // Use a nested path whose parent does not yet exist.
+    const nested = join(dir, "deep", "sub", "events.ndjson");
+    const sink = ndjsonEventSink(nested);
+    sink.onEvent(sampleEvents[0]);
+    sink.close();
+
+    const lines = readFileSync(nested, "utf-8")
+      .split("\n")
+      .filter((l) => l.trim() !== "");
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0]).type).toBe("iteration.start");
+  });
+
   it("writes one valid NDJSON line per event", () => {
     const path = tmpFile("events.ndjson");
     const sink = ndjsonEventSink(path);
