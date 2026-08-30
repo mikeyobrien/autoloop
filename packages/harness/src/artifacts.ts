@@ -10,7 +10,7 @@ import type { JournalEvent } from "@mobrienv/autoloop-core";
 import { decodeEvent } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { topicCategory } from "@mobrienv/autoloop-core/journal-format";
-import * as memory from "@mobrienv/autoloop-core/memory";
+import { resolveMemoryPluginForProject } from "@mobrienv/autoloop-core/memory-plugin";
 
 export interface DocumentArtifact {
   path: string;
@@ -179,12 +179,17 @@ export function collectArtifacts(
   // Memory stats
   let memStats = { learnings: 0, meta: 0, preferences: 0 };
   try {
-    const stats = memory.statsProject(projectDir, 8000);
-    memStats = {
-      learnings: stats.learnings,
-      meta: stats.meta,
-      preferences: stats.preferences,
-    };
+    const stats = resolveMemoryPluginForProject(projectDir).statsProject?.(
+      projectDir,
+      8000,
+    );
+    if (stats) {
+      memStats = {
+        learnings: stats.learnings,
+        meta: stats.meta,
+        preferences: stats.preferences,
+      };
+    }
   } catch {
     // memory file may not exist
   }

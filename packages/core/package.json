@@ -63,6 +63,10 @@
       "types": "./dist/memory.d.ts",
       "default": "./dist/memory.js"
     },
+    "./memory-plugin": {
+      "types": "./dist/memory-plugin.d.ts",
+      "default": "./dist/memory-plugin.js"
+    },
     "./memory-render": {
       "types": "./dist/memory-render.d.ts",
       "default": "./dist/memory-render.js"

@@ -1,5 +1,8 @@
 {
   "name": "autoloop",
   "owner": { "name": "mikeyobrien" },
-  "plugins": [{ "name": "autoloop", "source": "./plugins/autoloop" }]
+  "plugins": [
+    { "name": "autoloop", "source": "./plugins/autoloop" },
+    { "name": "autoloop-memory", "source": "./plugins/autoloop-memory" }
+  ]
 }

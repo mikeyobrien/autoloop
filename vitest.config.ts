@@ -26,6 +26,7 @@ export default defineConfig({
       "@mobrienv/autoloop-core/tasks-render": `${CORE}/tasks-render.ts`,
       "@mobrienv/autoloop-core/tasks": `${CORE}/tasks.ts`,
       "@mobrienv/autoloop-core/memory-render": `${CORE}/memory-render.ts`,
+      "@mobrienv/autoloop-core/memory-plugin": `${CORE}/memory-plugin.ts`,
       "@mobrienv/autoloop-core/memory": `${CORE}/memory.ts`,
       "@mobrienv/autoloop-core/journal-format": `${CORE}/journal-format.ts`,
       "@mobrienv/autoloop-core/journal": `${CORE}/journal.ts`,

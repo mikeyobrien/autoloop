@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import * as config from "@mobrienv/autoloop-core/config";
-import * as memory from "@mobrienv/autoloop-core/memory";
+import { resolveMemoryPluginForProject } from "@mobrienv/autoloop-core/memory-plugin";
 import * as profiles from "@mobrienv/autoloop-core/profiles";
 import * as tasks from "@mobrienv/autoloop-core/tasks";
 import * as topo from "@mobrienv/autoloop-core/topology";
@@ -61,10 +61,15 @@ export function dispatchInspect(args: string[]): boolean {
     case "scratchpad":
       render.renderScratchpadFormat(projectDir, format, spec.run);
       return true;
-    case "memory":
-      if (format === "json") console.log(memory.rawProject(projectDir));
-      else console.log(memory.listProject(projectDir));
+    case "memory": {
+      const plugin = resolveMemoryPluginForProject(projectDir);
+      console.log(
+        format === "json"
+          ? (plugin.raw?.(projectDir) ?? plugin.list(projectDir))
+          : plugin.list(projectDir),
+      );
       return true;
+    }
     case "tasks":
       console.log(tasks.listTasks(projectDir));
       return true;

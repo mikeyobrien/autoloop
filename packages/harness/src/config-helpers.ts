@@ -716,6 +716,8 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     },
     memory: {
       budgetChars: config.getInt(cfg, "memory.prompt_budget_chars", 8000),
+      kind: config.get(cfg, "memory.kind", "jsonl"),
+      module: config.get(cfg, "memory.module", ""),
     },
     tasks: {
       budgetChars: config.getInt(cfg, "tasks.prompt_budget_chars", 4000),
