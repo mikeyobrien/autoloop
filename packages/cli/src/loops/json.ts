@@ -177,6 +177,7 @@ export function healthJson(stateDir: string): string {
  * Categorization runs on a copy so the reported record is never mutated.
  */
 function healthBucketFor(r: RunRecord): string | null {
+  if (r.status === "waiting") return "waiting";
   const h = categorizeRecords([{ ...r }]);
   if (h.stuck.length > 0) return "stuck";
   if (h.watching.length > 0) return "watching";

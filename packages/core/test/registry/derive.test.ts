@@ -169,6 +169,38 @@ describe("deriveRunRecords", () => {
     expect(records[0].stop_reason).toBe("max_iterations");
   });
 
+  it("marks waiting on wait.open and running again on wait.close", () => {
+    const lines = [
+      loopStartLine("run-1"),
+      iterationFinishLine("run-1", "1"),
+      encodeEvent({
+        shape: "fields",
+        run: "run-1",
+        iteration: "1",
+        topic: "wait.open",
+        fields: { wait_id: "company-nap", reason: "nap" },
+      }).trim(),
+    ];
+    const parked = deriveRunRecords(lines);
+    expect(parked[0].status).toBe("waiting");
+    expect(parked[0].stop_reason).toBe("waiting");
+    expect(parked[0].latest_event).toBe("wait.open");
+
+    lines.push(
+      encodeEvent({
+        shape: "fields",
+        run: "run-1",
+        iteration: "1",
+        topic: "wait.close",
+        fields: { wait_id: "company-nap" },
+      }).trim(),
+    );
+    const closed = deriveRunRecords(lines);
+    expect(closed[0].status).toBe("running");
+    expect(closed[0].stop_reason).toBe("");
+    expect(closed[0].latest_event).toBe("wait.close");
+  });
+
   it("transitions a stopped run back to running on loop.resume", () => {
     const lines = [
       loopStartLine("run-1", { max_iterations: "3" }),
@@ -264,5 +296,9 @@ describe("stopReasonToStatus", () => {
   it("maps anything else to stopped", () => {
     expect(stopReasonToStatus("max_iterations")).toBe("stopped");
     expect(stopReasonToStatus("unknown")).toBe("stopped");
+  });
+
+  it("maps waiting to waiting", () => {
+    expect(stopReasonToStatus("waiting")).toBe("waiting");
   });
 });

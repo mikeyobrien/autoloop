@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readRegistry } from "./read.js";
-import type { RunRecord } from "./types.js";
+import { isLiveStatus, type RunRecord } from "./types.js";
 
 function listDirs(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -71,9 +71,9 @@ export function readMergedRegistry(stateDir: string): RunRecord[] {
   return mergeRecords(recordSets);
 }
 
-/** Active runs from the merged registry view. */
+/** Live runs (running or waiting) from the merged registry view. */
 export function mergedActiveRuns(stateDir: string): RunRecord[] {
-  return readMergedRegistry(stateDir).filter((r) => r.status === "running");
+  return readMergedRegistry(stateDir).filter((r) => isLiveStatus(r.status));
 }
 
 /** Recent runs from the merged registry view, sorted by updated_at desc. */

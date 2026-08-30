@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import type { RunRecord } from "./types.js";
+import { isLiveStatus, type RunRecord } from "./types.js";
 
 export function readRegistry(path: string): RunRecord[] {
   if (!existsSync(path)) return [];
@@ -23,7 +23,7 @@ export function getRun(path: string, runId: string): RunRecord | undefined {
 }
 
 export function activeRuns(path: string): RunRecord[] {
-  return readRegistry(path).filter((r) => r.status === "running");
+  return readRegistry(path).filter((r) => isLiveStatus(r.status));
 }
 
 export function recentRuns(path: string, limit: number): RunRecord[] {

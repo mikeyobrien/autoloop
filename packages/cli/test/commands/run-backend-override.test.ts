@@ -117,6 +117,7 @@ describe("applyGlobalBackendOverride", () => {
     "premature_quit",
     "interrupted",
     "suspended",
+    "waiting",
     "verdict_exit",
     "verdict_takeover",
     "verdict_unknown",

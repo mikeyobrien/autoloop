@@ -81,6 +81,7 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/types": `${HARNESS}/types.ts`,
       "@mobrienv/autoloop-harness/events": `${HARNESS}/events.ts`,
       "@mobrienv/autoloop-harness/emit": `${HARNESS}/emit.ts`,
+      "@mobrienv/autoloop-harness/wait": `${HARNESS}/wait.ts`,
       "@mobrienv/autoloop-harness/ask": `${HARNESS}/ask.ts`,
       "@mobrienv/autoloop-harness/artifacts": `${HARNESS}/artifacts.ts`,
       "@mobrienv/autoloop-harness/config-helpers": `${HARNESS}/config-helpers.ts`,
@@ -122,8 +123,10 @@ export default defineConfig({
     env: { TZ: "UTC" },
     // Integration tests under test/worktree and test/integration spawn git/node
     // subprocesses. Cap worker pool so subprocess-heavy tests don't starve each
-    // other; bump testTimeout to absorb spiky CI/load.
+    // other; bump timeouts to absorb spiky CI/load. hookTimeout covers
+    // beforeEach git init/commit (default 10s is too tight under coverage).
     testTimeout: 60000,
+    hookTimeout: 60000,
     poolOptions: {
       threads: {
         maxThreads: 4,

@@ -67,6 +67,18 @@ export function cliPrintEvent(event: LoopEvent): void {
     case "ask.answered":
       // SDK-only marker; the answer is injected into the next prompt.
       return;
+    case "wait.open":
+      process.stderr.write(
+        `\n[wait] parked run ${event.runId} (id=${event.waitId})` +
+          `${event.reason ? `: ${event.reason}` : ""}\n` +
+          `      no live backend; resume with: autoloop resume ${event.runId}\n\n`,
+      );
+      return;
+    case "wait.close":
+      process.stderr.write(
+        `\n[wait] closed ${event.waitId} on ${event.runId}\n\n`,
+      );
+      return;
     case "backend.output":
       printBackendOutputTail(event.output, event.maxLines);
       return;

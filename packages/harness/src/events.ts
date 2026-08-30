@@ -76,6 +76,22 @@ export type LoopEvent =
       questionId: string;
       answer: string;
     }
+  // Durable wait: the run parked (process-free) or a parked wait closed.
+  | {
+      type: "wait.open";
+      runId: string;
+      iteration: number;
+      waitId: string;
+      reason: string;
+      name?: string;
+      duration?: string;
+    }
+  | {
+      type: "wait.close";
+      runId: string;
+      iteration: number;
+      waitId: string;
+    }
   | { type: "backend.output"; output: string; maxLines?: number }
   | { type: "failure.diagnostic"; output: string; stopReason: StopReason }
   // Emit-boundary file-mod audit (ralph parity): the acting role modified

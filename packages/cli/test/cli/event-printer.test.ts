@@ -145,6 +145,57 @@ describe("cliPrintEvent", () => {
     );
   });
 
+  it("wait.open prints a park notice with the resume command", () => {
+    const write = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    cliPrintEvent({
+      type: "wait.open",
+      runId: "swift-agent",
+      iteration: 1,
+      waitId: "company-nap",
+      reason: "between steps",
+    });
+    expect(write).toHaveBeenCalled();
+    const text = write.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toContain("[wait] parked run swift-agent");
+    expect(text).toContain("company-nap");
+    expect(text).toContain("autoloop resume swift-agent");
+    write.mockRestore();
+  });
+
+  it("wait.open omits the reason clause when empty", () => {
+    const write = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    cliPrintEvent({
+      type: "wait.open",
+      runId: "r1",
+      iteration: 2,
+      waitId: "wait_r1_2",
+      reason: "",
+    });
+    const text = write.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toContain("[wait] parked run r1 (id=wait_r1_2)");
+    expect(text).not.toContain(": \n");
+    write.mockRestore();
+  });
+
+  it("wait.close prints the closed wait id", () => {
+    const write = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    cliPrintEvent({
+      type: "wait.close",
+      runId: "swift-agent",
+      iteration: 1,
+      waitId: "company-nap",
+    });
+    const text = write.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toContain("[wait] closed company-nap");
+    write.mockRestore();
+  });
+
   it("summary builds a LoopContext stub with all fields display.ts reads", () => {
     cliPrintEvent({
       type: "summary",

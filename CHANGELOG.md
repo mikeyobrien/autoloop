@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Durable waits (`wait.request`).** An agent can park a named run without a
+  live backend: emit `wait.request`, the harness journals `wait.open`, registry
+  status becomes `waiting`, and the process exits 0. `autoloop resume <run-id>`
+  journals `wait.close` and continues on the same `run_id`. Duration on the
+  request is advisory — nothing sleeps in-process or burns `backend.timeout_ms`.
 - **Backend environment hardening is available as an opt-in policy.** Existing
   presets continue to inherit their process environment unchanged. Setting
   `backend.environment_policy = "hardened"` (or the review-specific override)

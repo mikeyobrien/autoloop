@@ -8,6 +8,7 @@ import {
   readRegistry,
   recentRuns,
 } from "../../src/registry/read.js";
+import { isLiveStatus } from "../../src/registry/types.js";
 
 const tmpDir = join(import.meta.dirname ?? ".", ".tmp-registry-read-test");
 const regFile = join(tmpDir, "registry.jsonl");
@@ -118,6 +119,25 @@ describe("activeRuns", () => {
     const active = activeRuns(regFile);
     expect(active).toHaveLength(2);
     expect(active.map((r) => r.run_id).sort()).toEqual(["r1", "r3"]);
+  });
+
+  it("isLiveStatus covers running and waiting only", () => {
+    expect(isLiveStatus("running")).toBe(true);
+    expect(isLiveStatus("waiting")).toBe(true);
+    expect(isLiveStatus("completed")).toBe(false);
+    expect(isLiveStatus("failed")).toBe(false);
+    expect(isLiveStatus("timed_out")).toBe(false);
+    expect(isLiveStatus("stopped")).toBe(false);
+  });
+
+  it("includes parked waiting runs as live", () => {
+    writeReg([
+      makeRecord({ run_id: "r1", status: "waiting" }),
+      makeRecord({ run_id: "r2", status: "stopped" }),
+    ]);
+    const active = activeRuns(regFile);
+    expect(active).toHaveLength(1);
+    expect(active[0].run_id).toBe("r1");
   });
 });
 

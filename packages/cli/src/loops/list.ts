@@ -6,7 +6,7 @@ import { renderListHeader, renderRunLine } from "./render.js";
 
 /**
  * List runs from the merged registry (root + chain/worktree children).
- * When `all` is false, only active (running) runs are shown.
+ * When `all` is false, only live runs (running or waiting) are shown.
  * When `all` is true, all runs are shown sorted by updated_at descending.
  */
 export function listRuns(stateDir: string, all: boolean): string {

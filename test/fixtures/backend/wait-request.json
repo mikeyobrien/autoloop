@@ -1,0 +1,7 @@
+{
+  "output": "Parking this run until the host resumes it.",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "wait.request",
+  "emit_payload": "name=company-nap; duration=300s; reason=between company steps;"
+}

@@ -57,3 +57,19 @@ journal (or the `--events` stream) for `ask.pending`, relaying the question to a
 human, and writing the answer back with `autoloop control respond`. The
 `respond` request is keyed by `question_id`, so it reaches exactly the turn that
 asked. Ctrl-C / abort cancels a pending ask cleanly.
+
+## Durable waits (process-free)
+
+`human.ask` **blocks the live process** until someone answers. That is the
+wrong primitive for a named nap: the backend stays up and `backend.timeout_ms`
+keeps ticking.
+
+To park a run without a live backend, emit `wait.request` instead:
+
+```bash
+autoloop emit wait.request "reason=nap; duration=300s; name=company-nap"
+```
+
+The harness journals `wait.open`, the process exits 0, and registry status
+becomes `waiting`. Resume the **same** `run_id` with `autoloop resume <run-id>`,
+which journals `wait.close` and continues. See [Journal Reference](../reference/journal.md#durable-waits).

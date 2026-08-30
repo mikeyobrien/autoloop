@@ -15,4 +15,5 @@ export {
 } from "./read.js";
 export { rebuildRegistry } from "./rebuild.js";
 export type { RegistryStatus, RunRecord } from "./types.js";
+export { isLiveStatus } from "./types.js";
 export { appendRegistryEntry } from "./update.js";

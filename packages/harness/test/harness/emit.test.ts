@@ -64,6 +64,12 @@ describe("coreSystemTopic", () => {
     expect(coreSystemTopic("hook.suspend")).toBe(true);
   });
 
+  it("recognizes durable-wait lifecycle records as system topics", () => {
+    expect(coreSystemTopic("wait.open")).toBe(true);
+    expect(coreSystemTopic("wait.close")).toBe(true);
+    expect(coreSystemTopic("wait.request")).toBe(false);
+  });
+
   it("rejects non-system topics", () => {
     expect(coreSystemTopic("task.complete")).toBe(false);
     expect(coreSystemTopic("gaps.identified")).toBe(false);
@@ -213,6 +219,12 @@ describe("routingTopic", () => {
 
   it("loop.start is routing", () => {
     expect(routingTopic("loop.start")).toBe(true);
+  });
+
+  it("durable wait topics are not routing", () => {
+    expect(routingTopic("wait.request")).toBe(false);
+    expect(routingTopic("wait.open")).toBe(false);
+    expect(routingTopic("wait.close")).toBe(false);
   });
 });
 

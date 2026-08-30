@@ -19,6 +19,10 @@
       "types": "./dist/emit.d.ts",
       "default": "./dist/emit.js"
     },
+    "./wait": {
+      "types": "./dist/wait.d.ts",
+      "default": "./dist/wait.js"
+    },
     "./events": {
       "types": "./dist/events.d.ts",
       "default": "./dist/events.js"

@@ -36,6 +36,11 @@ import type {
   RunSummary,
   StopReason,
 } from "./types.js";
+import {
+  openWaitFromLines,
+  WAIT_CLOSE_TOPIC,
+  waitCloseFields,
+} from "./wait.js";
 
 export interface ResumeOptions {
   /** Additional iterations to grant beyond the resume point. */
@@ -97,7 +102,8 @@ export function determineResumeIteration(
   if (stopReason === "backend_failed" || stopReason === "backend_timeout") {
     return registryIteration;
   }
-  // interrupted / stopped / unknown: trust the journal.
+  // waiting / interrupted / stopped / unknown: trust the journal.
+  // A wait.request parks after iteration.finish, so this resumes at N+1.
   const lines = readRunLines(journalFile, runId);
   const finished = lines.some(
     (line) =>
@@ -288,6 +294,28 @@ export async function resume(
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
+
+  // Close a parked durable wait on this same run_id before the resume
+  // marker. Hosts and `loops show` key off wait.close, not loop.resume.
+  const parked = openWaitFromLines(
+    readRunLines(loop.paths.journalFile, loop.runtime.runId),
+    loop.runtime.runId,
+  );
+  if (parked) {
+    appendEvent(
+      loop.paths.journalFile,
+      loop.runtime.runId,
+      parked.iteration,
+      WAIT_CLOSE_TOPIC,
+      waitCloseFields(parked.waitId),
+    );
+    loop.onEvent?.({
+      type: "wait.close",
+      runId: loop.runtime.runId,
+      iteration: Number(parked.iteration) || resumeIteration,
+      waitId: parked.waitId,
+    });
+  }
 
   // Append the resume marker before any iteration so the scratchpad and derive
   // path see it. It's a system topic — routing ignores it.

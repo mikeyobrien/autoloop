@@ -14,6 +14,7 @@ export type CoordinationTopic =
   | ArtifactTopic;
 export type ChainTopic = "chain.start" | "chain.complete";
 export type OperatorTopic = "operator.guidance" | "operator.guidance.consumed";
+export type WaitTopic = "wait.request" | "wait.open" | "wait.close";
 export type WaveTopic = string;
 export type CoreSystemTopic =
   | LoopTopic
@@ -26,6 +27,7 @@ export type KnownTopic =
   | CoordinationTopic
   | ChainTopic
   | OperatorTopic
+  | WaitTopic
   | WaveTopic
   | string;
 

@@ -430,6 +430,48 @@ export function stopSuspended(
   return { iterations: iteration, stopReason: "suspended" };
 }
 
+/**
+ * Process-free park: the current iteration already finished, wait.open is
+ * already in the journal, and the process is about to exit 0. Distinct from
+ * `stopSuspended` (hook failure) — this is the approved wait.request product.
+ */
+export function stopWaiting(
+  loop: LoopContext,
+  iteration: number,
+  waitId: string,
+  reason: string,
+): RunSummary {
+  log(
+    loop,
+    "info",
+    `loop wait open run_id=${loop.runtime.runId} wait_id=${waitId} iteration=${iteration}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration,
+    recentEvent: "wait.open",
+    allowedRoles: [],
+    emittedTopic: "wait.request",
+    outcome: "wait:open",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iteration),
+    "loop.stop",
+    jsonField("reason", "waiting") +
+      ", " +
+      jsonField("iteration", String(iteration)) +
+      ", " +
+      jsonField("wait_id", waitId) +
+      ", " +
+      jsonField("detail", reason),
+  );
+  registryStop(loop, iteration, "waiting");
+  return { iterations: iteration, stopReason: "waiting" };
+}
+
 export function completeLoop(
   loop: LoopContext,
   iteration: number,

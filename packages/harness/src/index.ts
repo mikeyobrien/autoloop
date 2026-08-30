@@ -340,8 +340,14 @@ export async function driveLoop(
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
 
-  // Post-run worktree lifecycle: status update, automerge, cleanup
-  if (loop.runtime.isolationMode === "worktree" && loop.paths.worktreeMetaDir) {
+  // Post-run worktree lifecycle: status update, automerge, cleanup.
+  // A parked wait keeps the worktree for resume on the same run_id —
+  // do not mark it failed or clean it.
+  if (
+    loop.runtime.isolationMode === "worktree" &&
+    loop.paths.worktreeMetaDir &&
+    summary.stopReason !== "waiting"
+  ) {
     const succeeded = summary.stopReason === "completed";
     const wtStatus = succeeded ? "completed" : "failed";
     try {
@@ -457,6 +463,16 @@ export {
   type ResumeResult,
   resume,
 } from "./resume.js";
+export {
+  isWaitLifecycleTopic,
+  isWaitRequestTopic,
+  openWaitFromLines,
+  parseWaitRequest,
+  WAIT_CLOSE_TOPIC,
+  WAIT_OPEN_TOPIC,
+  WAIT_REQUEST_TOPIC,
+  waitIdFor,
+} from "./wait.js";
 export { emitCmd as emit };
 
 export async function runParallelBranchCli(
