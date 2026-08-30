@@ -69,6 +69,15 @@ describe("routingEventFromLines", () => {
     expect(routingEventFromLines(lines)).toBe("gaps.identified");
   });
 
+  it("does not treat wait.request as a routing event", () => {
+    const lines = [
+      payloadLine("gaps.identified", "found stuff"),
+      payloadLine("wait.request", "name=nap; reason=hold;"),
+      fieldsLine("wait.open", { wait_id: "nap", reason: "hold" }),
+    ];
+    expect(routingEventFromLines(lines)).toBe("gaps.identified");
+  });
+
   it("tracks latest routing event through multiple events", () => {
     const lines = [
       payloadLine("gaps.identified", "a"),

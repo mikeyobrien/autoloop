@@ -371,9 +371,9 @@ export interface RunOptions {
  * `packages/harness/test/harness/stop-reason.test.ts`):
  * - `stop.ts` — `max_iterations`, `backend_failed`, `backend_timeout`,
  *   `stalled`, `cost_budget`, `max_runtime`, `review_unknown`,
- *   `premature_quit`, `suspended`, and `completeLoop()` which echoes the
- *   `completion_event`/`completion_promise`/`verdict_*` literals its
- *   callers pass in.
+ *   `premature_quit`, `suspended`, `waiting`, and `completeLoop()` which
+ *   echoes the `completion_event`/`completion_promise`/`verdict_*`
+ *   literals its callers pass in.
  * - `index.ts` — `interrupted`, `error`, and `verdict_unknown` /
  *   `verdict_exit` / `verdict_takeover` (via `completeLoop`).
  * - `iteration.ts` — `completion_event`, `completion_promise` (via
@@ -393,14 +393,15 @@ export interface RunOptions {
  *   never reaches `RunSummary` and is intentionally **not** part of this
  *   union.
  *
- * Categories (23 values enumerated by the originating issue, plus two
- * additional real terminal literals — `parallel_wave_invalid` and `suspended` —
- * discovered during implementation; see the parallel-wave and hooks notes above):
+ * Categories (23 values enumerated by the originating issue, plus three
+ * additional real terminal literals — `parallel_wave_invalid`, `suspended`,
+ * and `waiting` — discovered during implementation; see the parallel-wave,
+ * hooks, and durable-wait notes):
  * - success (3): `completed`, `completion_event`, `completion_promise`
  * - failures (7): `backend_failed`, `backend_timeout`, `auth_failed`,
  *   `quota_exhausted`, `rate_limited`, `transient_error`, `review_unknown`
- * - stops (7): `max_iterations`, `stalled`, `cost_budget`, `max_runtime`,
- *   `premature_quit`, `interrupted`, `suspended`
+ * - stops (8): `max_iterations`, `stalled`, `cost_budget`, `max_runtime`,
+ *   `premature_quit`, `interrupted`, `suspended`, `waiting`
  * - verdicts (3): `verdict_exit`, `verdict_takeover`, `verdict_unknown`
  * - held (1): `completion_held`
  * - parallel (3): `parallel_wave_timeout`, `parallel_wave_failed`,
@@ -429,7 +430,7 @@ export const STOP_REASONS = [
   "rate_limited",
   "transient_error",
   "review_unknown",
-  // stops (7)
+  // stops (8)
   "max_iterations",
   "stalled",
   "cost_budget",
@@ -437,6 +438,7 @@ export const STOP_REASONS = [
   "premature_quit",
   "interrupted",
   "suspended",
+  "waiting",
   // verdicts (3)
   "verdict_exit",
   "verdict_takeover",

@@ -72,6 +72,11 @@ const CORE_SYSTEM_TOPICS = new Set([
   // iteration for any preset with lifecycle hooks configured.
   "hook.output",
   "hook.suspend",
+  // Durable-wait lifecycle: harness-written. Omitting these would let
+  // latestAgentEventRecord treat wait.open/wait.close as the acting
+  // role's emit and reject them against topology.
+  "wait.open",
+  "wait.close",
 ]);
 
 export function coreSystemTopic(topic: string): boolean {
@@ -332,6 +337,12 @@ function emitCore(
     return acceptEmit(journalFile, topic, payload, validation);
   }
 
+  // Durable wait: always accepted. The harness parks the run after the
+  // iteration; topology must not reject the reserved wait.request topic.
+  if (topic === "wait.request") {
+    return acceptEmit(journalFile, topic, payload, validation);
+  }
+
   if (coordinationTopic(topic)) {
     return acceptEmit(journalFile, topic, payload, validation);
   }
@@ -561,6 +572,12 @@ export function routingTopic(topic: string): boolean {
     "ask.pending",
     "ask.answered",
     "ask.timeout",
+    // Durable waits are not routing: parking must not move the handoff
+    // position. wait.request is the agent emit; wait.open/wait.close are
+    // harness-written.
+    "wait.request",
+    "wait.open",
+    "wait.close",
     "",
   ]);
   if (nonRouting.has(topic)) return false;

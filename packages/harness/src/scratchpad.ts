@@ -18,7 +18,14 @@ interface ResumeMarker {
   addIterations: string;
 }
 
-type ScratchpadEntry = IterationEntry | ResumeMarker;
+interface WaitMarker {
+  kind: "wait";
+  phase: "open" | "close";
+  waitId: string;
+  reason: string;
+}
+
+type ScratchpadEntry = IterationEntry | ResumeMarker | WaitMarker;
 
 export function renderRunScratchpadFull(lines: string[]): string {
   const entries = collectScratchpadEntries(lines);
@@ -59,6 +66,20 @@ function collectScratchpadEntries(lines: string[]): ScratchpadEntry[] {
         previousStopReason: event.fields.previous_stop_reason ?? "",
         addIterations: event.fields.add_iterations ?? "",
       });
+    } else if (event.topic === "wait.open") {
+      entries.push({
+        kind: "wait",
+        phase: "open",
+        waitId: event.fields.wait_id ?? "",
+        reason: event.fields.reason ?? "",
+      });
+    } else if (event.topic === "wait.close") {
+      entries.push({
+        kind: "wait",
+        phase: "close",
+        waitId: event.fields.wait_id ?? "",
+        reason: event.fields.reason ?? "",
+      });
     }
   }
   return entries;
@@ -71,6 +92,9 @@ function renderScratchpadEntries(entries: ScratchpadEntry[]): string {
 function scratchpadEntryText(entry: ScratchpadEntry): string {
   if (entry.kind === "resume") {
     return `${resumeMarkerText(entry)}\n\n`;
+  }
+  if (entry.kind === "wait") {
+    return `${waitMarkerText(entry)}\n\n`;
   }
   return (
     heading(2, `Iteration ${entry.iteration}`) +
@@ -89,9 +113,21 @@ function resumeMarkerText(entry: ResumeMarker): string {
   return `--- resumed (was: ${reason}, adding ${adding} iterations) ---`;
 }
 
+function waitMarkerText(entry: WaitMarker): string {
+  const id = entry.waitId || "wait";
+  if (entry.phase === "open") {
+    const reason = entry.reason ? `: ${entry.reason}` : "";
+    return `--- wait.open ${id}${reason} ---`;
+  }
+  return `--- wait.close ${id} ---`;
+}
+
 function compactScratchpadItem(entry: ScratchpadEntry): string {
   if (entry.kind === "resume") {
     return resumeMarkerText(entry);
+  }
+  if (entry.kind === "wait") {
+    return waitMarkerText(entry);
   }
   return (
     "Iteration " +

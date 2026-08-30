@@ -82,4 +82,9 @@ describe("determineResumeIteration", () => {
       3,
     );
   });
+
+  it("waiting with iteration.finish resumes at the next iteration", () => {
+    const journal = writeJournal([finish("1")]);
+    expect(determineResumeIteration(journal, RUN, "waiting", 1)).toBe(2);
+  });
 });

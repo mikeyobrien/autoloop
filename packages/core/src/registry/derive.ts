@@ -63,6 +63,25 @@ export function deriveRunRecords(lines: string[]): RunRecord[] {
       continue;
     }
 
+    if (topic === "wait.open") {
+      // Process-free park: the run still owns this run_id, but no backend
+      // process is live. Distinct from loop.stop so a journal-only derive
+      // (no registry rewrite) still surfaces `waiting`.
+      record.status = "waiting";
+      record.stop_reason = "waiting";
+      record.updated_at = record.created_at;
+      record.latest_event = topic;
+      continue;
+    }
+
+    if (topic === "wait.close") {
+      record.status = "running";
+      record.stop_reason = "";
+      record.updated_at = record.created_at;
+      record.latest_event = topic;
+      continue;
+    }
+
     if (topic === "loop.resume") {
       // A terminated run is being continued. Flip it back to running and clear
       // the prior stop reason; subsequent iteration.finish / loop.* events
@@ -117,5 +136,6 @@ export function stopReasonToStatus(reason: string): RegistryStatus {
   // Auth/quota won't self-resolve on retry — surface as failures. Rate-limit
   // and transient outages are availability stops (retryable), not failures.
   if (reason === "auth_failed" || reason === "quota_exhausted") return "failed";
+  if (reason === "waiting") return "waiting";
   return "stopped";
 }

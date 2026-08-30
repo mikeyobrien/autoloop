@@ -117,6 +117,9 @@ describe("ask topics are non-routing", () => {
     expect(routingTopic("ask.pending")).toBe(false);
     expect(routingTopic("ask.answered")).toBe(false);
     expect(routingTopic("ask.timeout")).toBe(false);
+    expect(routingTopic("wait.request")).toBe(false);
+    expect(routingTopic("wait.open")).toBe(false);
+    expect(routingTopic("wait.close")).toBe(false);
   });
 
   it("still treats ordinary success events as routing", () => {

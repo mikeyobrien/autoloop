@@ -11,6 +11,8 @@ const SYSTEM_TOPICS = new Set([
   "backend.start",
   "backend.finish",
   "event.invalid",
+  "wait.open",
+  "wait.close",
 ]);
 
 const COORDINATION_TOPICS = new Set([

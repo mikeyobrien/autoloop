@@ -403,6 +403,8 @@ export function renderIterationPromptText(
     loop.completion.event +
     ' "brief completion summary"\n' +
     loop.paths.toolPath +
+    ' emit wait.request "reason=nap; duration=300s"\n' +
+    loop.paths.toolPath +
     ' memory add learning "durable lesson"\n' +
     loop.paths.toolPath +
     ' memory add preference Workflow "short preference note"\n' +
@@ -418,7 +420,8 @@ export function renderIterationPromptText(
     " inspect scratchpad --format md`, and `" +
     loop.paths.toolPath +
     " inspect memory --format md`.\n" +
-    "Plain text alone does not publish an event. Prefer the event tool over the stdout completion promise.\n"
+    "Plain text alone does not publish an event. Prefer the event tool over the stdout completion promise.\n" +
+    "To park this run without a live backend (same run_id, process exits 0), emit `wait.request`. Resume later with `autoloop resume <run-id>`. Do not sleep or backoff in-process — that burns backend.timeout_ms.\n"
   );
 }
 

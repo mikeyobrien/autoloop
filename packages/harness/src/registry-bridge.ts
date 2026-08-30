@@ -92,6 +92,12 @@ export function registryTerminal(
   record.stop_reason = stopReason;
   record.updated_at = new Date().toISOString();
   record.latest_event = latestEvent;
+  // Process-free waiting (and any other non-running terminal) must not
+  // claim a live PID. A leftover pid would make doctor/reaper treat a
+  // parked wait as an orphaned running process.
+  if (status !== "running") {
+    delete record.pid;
+  }
   // Verified-outcome ledger: persist the gate-verified outcome facts so ROI /
   // A-B / regression analytics read a real numerator, not a re-derived one.
   record.outcome = deriveOutcome(status, stopReason);

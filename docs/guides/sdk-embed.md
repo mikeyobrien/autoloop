@@ -112,6 +112,8 @@ The event envelope is a discriminated union on `type`. Variants are grouped into
 | `log`             | `{ level: string; message: string }`                                       |
 | `iteration.start` | `{ iteration: number; maxIterations: number; runId: string }`              |
 | `loop.finish`     | `{ iterations: number; stopReason: string; runId: string }`                |
+| `wait.open`       | `{ runId; iteration; waitId; reason; name?; duration? }` — run parked      |
+| `wait.close`      | `{ runId; iteration; waitId }` — parked wait closed on resume              |
 
 **Display-requested** — the harness asks the caller to render something:
 

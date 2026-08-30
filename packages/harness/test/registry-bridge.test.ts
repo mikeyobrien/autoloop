@@ -222,4 +222,16 @@ describe("registryStop", () => {
     registryStop(loop, 2, "backend_failed");
     expect(readLines()[1].outcome).toBe("failed");
   });
+
+  it("parks a waiting run without a live pid", () => {
+    const loop = makeLoopContext();
+    registryStart(loop);
+    expect(readLines()[0].pid).toBe(process.pid);
+    registryStop(loop, 1, "waiting");
+    const r = readLines()[1];
+    expect(r.status).toBe("waiting");
+    expect(r.stop_reason).toBe("waiting");
+    expect(r.pid).toBeUndefined();
+    expect(r.outcome).toBe("stopped");
+  });
 });

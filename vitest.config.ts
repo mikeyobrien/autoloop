@@ -81,6 +81,7 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/types": `${HARNESS}/types.ts`,
       "@mobrienv/autoloop-harness/events": `${HARNESS}/events.ts`,
       "@mobrienv/autoloop-harness/emit": `${HARNESS}/emit.ts`,
+      "@mobrienv/autoloop-harness/wait": `${HARNESS}/wait.ts`,
       "@mobrienv/autoloop-harness/ask": `${HARNESS}/ask.ts`,
       "@mobrienv/autoloop-harness/artifacts": `${HARNESS}/artifacts.ts`,
       "@mobrienv/autoloop-harness/config-helpers": `${HARNESS}/config-helpers.ts`,

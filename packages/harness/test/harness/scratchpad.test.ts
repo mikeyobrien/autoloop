@@ -200,3 +200,53 @@ describe("loop.resume scratchpad marker", () => {
     );
   });
 });
+
+function waitLine(
+  topic: "wait.open" | "wait.close",
+  waitId: string,
+  reason = "",
+): string {
+  return encodeEvent({
+    shape: "fields",
+    run: "r1",
+    iteration: "1",
+    topic,
+    fields: { wait_id: waitId, reason },
+    rawFields: { wait_id: waitId, reason },
+  }).trim();
+}
+
+describe("wait scratchpad markers", () => {
+  it("renders wait.open and wait.close between iterations", () => {
+    const lines = [
+      iterFinishLine("1", "0", "before"),
+      waitLine("wait.open", "company-nap", "between steps"),
+      waitLine("wait.close", "company-nap"),
+      iterFinishLine("2", "0", "after"),
+    ];
+    const result = renderRunScratchpadFull(lines);
+    expect(result).toContain("--- wait.open company-nap: between steps ---");
+    expect(result).toContain("--- wait.close company-nap ---");
+  });
+
+  it("falls back when wait_id is missing", () => {
+    const lines = [waitLine("wait.open", "", ""), waitLine("wait.close", "")];
+    const result = renderRunScratchpadFull(lines);
+    expect(result).toContain("--- wait.open wait ---");
+    expect(result).toContain("--- wait.close wait ---");
+  });
+
+  it("renders wait markers in the compacted earlier section", () => {
+    const lines = [
+      iterFinishLine("1", "0", "a"),
+      waitLine("wait.open", "nap", "hold"),
+      iterFinishLine("2", "0", "b"),
+      iterFinishLine("3", "0", "c"),
+      iterFinishLine("4", "0", "d"),
+      iterFinishLine("5", "0", "e"),
+    ];
+    const result = renderRunScratchpadPrompt(lines);
+    expect(result).toContain("Earlier iterations (compacted)");
+    expect(result).toContain("--- wait.open nap: hold ---");
+  });
+});

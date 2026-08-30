@@ -53,6 +53,7 @@ function isKnownStopReason(reason: StopReason): true {
     case "premature_quit":
     case "interrupted":
     case "suspended":
+    case "waiting":
     case "verdict_exit":
     case "verdict_takeover":
     case "verdict_unknown":
@@ -70,8 +71,8 @@ function isKnownStopReason(reason: StopReason): true {
 }
 
 describe("StopReason exhaustiveness", () => {
-  it("has exactly the 25 documented literals (23 from the issue + parallel_wave_invalid + suspended)", () => {
-    expect(STOP_REASONS.length).toBe(25);
+  it("has exactly the 26 documented literals (23 from the issue + parallel_wave_invalid + suspended + waiting)", () => {
+    expect(STOP_REASONS.length).toBe(26);
     expect(new Set(STOP_REASONS).size).toBe(STOP_REASONS.length);
   });
 

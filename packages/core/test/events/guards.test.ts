@@ -51,6 +51,8 @@ describe("isSystemEvent edge cases", () => {
       "backend.start",
       "backend.finish",
       "event.invalid",
+      "wait.open",
+      "wait.close",
     ];
     for (const topic of systemTopics) {
       expect(isSystemEvent(fieldsEvent(topic))).toBe(true);

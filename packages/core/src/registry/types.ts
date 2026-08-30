@@ -1,9 +1,15 @@
 export type RegistryStatus =
   | "running"
+  | "waiting"
   | "completed"
   | "failed"
   | "timed_out"
   | "stopped";
+
+/** A run that still owns the loop identity: live backend, or parked wait. */
+export function isLiveStatus(status: RegistryStatus): boolean {
+  return status === "running" || status === "waiting";
+}
 
 export interface RunRecord {
   run_id: string;

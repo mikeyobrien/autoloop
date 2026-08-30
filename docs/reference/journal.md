@@ -77,7 +77,9 @@ loop.complete   or   loop.stop
 | `review.start` | Before a metareview review pass. | `kind` (`"metareview"`), `backend_kind`, `command`, `prompt_mode`, `prompt`, `timeout_ms` |
 | `review.finish` | After review completes. | `kind` (`"metareview"`), `exit_code`, `timed_out` (boolean), `output` |
 | `loop.complete` | Loop finished successfully. | `reason` (`"completion_event"` or `"completion_promise"`) |
-| `loop.stop` | Loop halted without completion. | `reason` (`"max_iterations"`, `"backend_failed"`, `"backend_timeout"`, `"stalled"`, `"cost_budget"`, or `"max_runtime"`). The `max_iterations` variant also includes `completed_iterations`, `stopped_before_iteration`, and `max_iterations`. The `backend_failed` and `backend_timeout` variants also include `iteration` and `output_tail`. The `max_runtime` variant includes `completed_iterations`, `elapsed_ms`, `max_runtime_ms`, and (when a budget-clamped iteration timed out) `output_tail`. |
+| `loop.stop` | Loop halted without completion. | `reason` (`"max_iterations"`, `"backend_failed"`, `"backend_timeout"`, `"stalled"`, `"cost_budget"`, `"max_runtime"`, or `"waiting"`). The `max_iterations` variant also includes `completed_iterations`, `stopped_before_iteration`, and `max_iterations`. The `backend_failed` and `backend_timeout` variants also include `iteration` and `output_tail`. The `max_runtime` variant includes `completed_iterations`, `elapsed_ms`, `max_runtime_ms`, and (when a budget-clamped iteration timed out) `output_tail`. The `waiting` variant also includes `iteration`, `wait_id`, and `detail`. |
+| `wait.open` | A `wait.request` parked the run. Process exits 0; no backend stays live. | `wait_id`, `reason`, optional `name`, `duration`, `duration_ms` |
+| `wait.close` | Resume closed the parked wait on the same `run_id`. | `wait_id` |
 
 ### Agent events (custom)
 
@@ -164,6 +166,7 @@ Autoloop uses **soft routing with protocol backpressure**. The model receives ad
 3. When the agent emits an event (via `autoloop emit` or detected in backend output), it is checked against the allowed set.
 4. **Coordination events bypass validation** — they are always accepted.
 5. **If the allowed-events list is empty** (no topology or unmapped event), all events are accepted.
+6. **`wait.request` is always accepted** — it parks the run (see Durable waits below). It is not a routing event.
 
 ### On invalid emit
 
@@ -180,6 +183,24 @@ Invalid events are caught at two points:
 
 - **At emit time** — the `autoloop emit` command validates against `AUTOLOOP_ALLOWED_EVENTS` environment variable and rejects immediately.
 - **After iteration** — the harness scans the iteration's journal entries for the latest agent event and validates it against the topology. This catches events emitted through non-standard paths.
+
+## Durable waits
+
+An agent parks the current run without keeping a backend process alive by emitting the reserved topic:
+
+```bash
+autoloop emit wait.request "reason=nap; duration=300s; name=company-nap"
+```
+
+The harness journals `wait.open`, sets registry status to `waiting`, and the process exits 0. Duration is advisory metadata for a host or operator — nothing sleeps in-process. Resume the same `run_id`:
+
+```bash
+autoloop resume <run-id>
+```
+
+Resume journals `wait.close`, then `loop.resume`, and continues. Do not fake a nap with `sleep` / `bin/backoff` — that keeps the process alive and burns `backend.timeout_ms`.
+
+`wait.request` is not a routing event. It does not need to appear in a role `emits` list.
 
 ## Completion detection
 

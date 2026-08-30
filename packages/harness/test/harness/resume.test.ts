@@ -194,4 +194,35 @@ describe("harness.resume integration", () => {
     const resumeIters = runIteration.mock.calls.map((c) => c[1]);
     expect(resumeIters).toEqual([4, 5, 6]);
   });
+
+  it("closes an open durable wait on the same run_id before loop.resume", async () => {
+    const dir = makeProject(3);
+    await run(dir, "prompt", "autoloop", { workDir: dir });
+    const journalFile = join(dir, ".autoloop", "journal.jsonl");
+    appendEvent(
+      journalFile,
+      "run-resume-test",
+      "3",
+      "wait.open",
+      `"wait_id": "company-nap", "reason": "between steps"`,
+    );
+
+    runIteration.mockClear();
+    const waiting = {
+      ...recordFor(dir),
+      status: "waiting" as const,
+      stop_reason: "waiting",
+    };
+    const result = await resume(waiting, { addIterations: 1 });
+    expect(result.resumedFromIteration).toBe(4);
+
+    const journal = readFileSync(journalFile, "utf-8");
+    const openAt = journal.indexOf('"topic": "wait.open"');
+    const closeAt = journal.indexOf('"topic": "wait.close"');
+    const resumeAt = journal.indexOf('"topic": "loop.resume"');
+    expect(openAt).toBeGreaterThan(-1);
+    expect(closeAt).toBeGreaterThan(openAt);
+    expect(resumeAt).toBeGreaterThan(closeAt);
+    expect(journal).toContain('"wait_id": "company-nap"');
+  });
 });

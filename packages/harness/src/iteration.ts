@@ -36,6 +36,13 @@ import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { awaitHumanResponse } from "./ask.js";
 import {
+  isWaitRequestTopic,
+  parseWaitRequest,
+  waitIdFor,
+  WAIT_OPEN_TOPIC,
+  waitOpenFields,
+} from "./wait.js";
+import {
   backoffDelayMs,
   circuitDecision,
   countTransientPauses,
@@ -72,6 +79,7 @@ import {
   stopBackendTimeout,
   stopMaxRuntime,
   stopSuspended,
+  stopWaiting,
 } from "./stop.js";
 import { readSuspendState, resumeRequested } from "./suspend-state.js";
 import type { LoopContext, RunSummary } from "./types.js";
@@ -614,6 +622,12 @@ export async function finishIteration(
     return finishAskIteration(loop, iter, emitted.payload, iterate, progress);
   }
 
+  // Durable wait: park the run without a live backend. Handled before
+  // routing so wait.request is never treated as a topology/invalid event.
+  if (isWaitRequestTopic(emitted.topic)) {
+    return finishWaitIteration(loop, iter, emitted.payload, progress);
+  }
+
   if (
     invalidEvent(
       emitted.topic,
@@ -807,6 +821,41 @@ async function finishAskIteration(
   });
   progress(loop.ask.event, "ask:answered");
   return iterate(loop, iter.iteration + 1);
+}
+
+/**
+ * Park the run on `wait.request`. Journals `wait.open`, then returns a
+ * `waiting` stop so the process can exit 0 with no live backend. Resume
+ * on the same run_id journals `wait.close`.
+ */
+function finishWaitIteration(
+  loop: LoopContext,
+  iter: IterationContext,
+  payload: string,
+  progress: (emittedTopic: string, outcome: string) => void,
+): RunSummary {
+  const runId = loop.runtime.runId;
+  const request = parseWaitRequest(payload);
+  const waitId = waitIdFor(runId, iter.iteration, request.name);
+
+  appendEvent(
+    loop.paths.journalFile,
+    runId,
+    String(iter.iteration),
+    WAIT_OPEN_TOPIC,
+    waitOpenFields(waitId, request),
+  );
+  loop.onEvent?.({
+    type: "wait.open",
+    runId,
+    iteration: iter.iteration,
+    waitId,
+    reason: request.reason,
+    name: request.name || undefined,
+    duration: request.duration || undefined,
+  });
+  progress("wait.request", "wait:open");
+  return stopWaiting(loop, iter.iteration, waitId, request.reason);
 }
 
 async function rejectInvalidAndContinue(

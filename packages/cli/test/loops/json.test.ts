@@ -81,6 +81,17 @@ describe("listRunsJson", () => {
     expect(parsed[0].status).toBe("running");
   });
 
+  it("includes parked waiting runs in the default live list", () => {
+    writeRecords([
+      makeRecord("run-wait-1", { status: "waiting", stop_reason: "waiting" }),
+      makeRecord("run-done-1", { status: "completed" }),
+    ]);
+    const parsed = JSON.parse(listRunsJson(tmpDir, false));
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].run_id).toBe("run-wait-1");
+    expect(parsed[0].status).toBe("waiting");
+  });
+
   it("projects exactly the table fields and omits empty worktree fields", () => {
     writeRecords([makeRecord("run-fields-1", { status: "running" })]);
     const parsed = JSON.parse(listRunsJson(tmpDir, false));
@@ -154,6 +165,17 @@ describe("showRunJson", () => {
     expect(parsed.backend).toBe("mock");
     expect(parsed.work_dir).toBe("/tmp/proj");
     expect(parsed.health).toBe("active");
+  });
+
+  it("derives waiting health for a parked durable wait", () => {
+    writeRecords([
+      makeRecord("run-wait-show", {
+        status: "waiting",
+        stop_reason: "waiting",
+      }),
+    ]);
+    const parsed = JSON.parse(showRunJson(tmpDir, "run-wait-show").output);
+    expect(parsed.health).toBe("waiting");
   });
 
   it("derives recent_completed for a recently completed run", () => {
