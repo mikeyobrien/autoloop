@@ -236,7 +236,13 @@ describe("finishIteration parks on wait.request", () => {
         requiredEvents: [],
         mustBeLast: false,
       },
-      topology: { roles: [], handoff: {}, handoffKeys: [], gates: [], stages: [] },
+      topology: {
+        roles: [],
+        handoff: {},
+        handoffKeys: [],
+        gates: [],
+        stages: [],
+      },
       paths: {
         journalFile,
         registryFile,

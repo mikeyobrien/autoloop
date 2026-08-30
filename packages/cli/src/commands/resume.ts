@@ -246,7 +246,9 @@ export function printResumeUsage(): void {
   console.log(
     "Continue a previously-terminated or waiting run from where it left off,",
   );
-  console.log("reusing the run_id, journal, memory, working files, and worktree.");
+  console.log(
+    "reusing the run_id, journal, memory, working files, and worktree.",
+  );
   console.log(
     "A parked wait.request is closed (wait.close) on the same run_id.",
   );

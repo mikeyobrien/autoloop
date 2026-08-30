@@ -36,13 +36,6 @@ import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { awaitHumanResponse } from "./ask.js";
 import {
-  isWaitRequestTopic,
-  parseWaitRequest,
-  waitIdFor,
-  WAIT_OPEN_TOPIC,
-  waitOpenFields,
-} from "./wait.js";
-import {
   backoffDelayMs,
   circuitDecision,
   countTransientPauses,
@@ -83,6 +76,13 @@ import {
 } from "./stop.js";
 import { readSuspendState, resumeRequested } from "./suspend-state.js";
 import type { LoopContext, RunSummary } from "./types.js";
+import {
+  isWaitRequestTopic,
+  parseWaitRequest,
+  WAIT_OPEN_TOPIC,
+  waitIdFor,
+  waitOpenFields,
+} from "./wait.js";
 import {
   continueAfterParallelJoin,
   executeDeclarativeWave,

@@ -463,7 +463,6 @@ export {
   type ResumeResult,
   resume,
 } from "./resume.js";
-export { emitCmd as emit };
 export {
   isWaitLifecycleTopic,
   isWaitRequestTopic,
@@ -474,6 +473,7 @@ export {
   WAIT_REQUEST_TOPIC,
   waitIdFor,
 } from "./wait.js";
+export { emitCmd as emit };
 
 export async function runParallelBranchCli(
   projectDir: string,

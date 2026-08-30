@@ -146,7 +146,9 @@ describe("cliPrintEvent", () => {
   });
 
   it("wait.open prints a park notice with the resume command", () => {
-    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const write = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
     cliPrintEvent({
       type: "wait.open",
       runId: "swift-agent",
@@ -180,7 +182,9 @@ describe("cliPrintEvent", () => {
   });
 
   it("wait.close prints the closed wait id", () => {
-    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const write = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
     cliPrintEvent({
       type: "wait.close",
       runId: "swift-agent",

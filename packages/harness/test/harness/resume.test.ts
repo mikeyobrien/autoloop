@@ -197,11 +197,12 @@ describe("harness.resume integration", () => {
 
   it("closes an open durable wait on the same run_id before loop.resume", async () => {
     const dir = makeProject(3);
-    await run(dir, "prompt", "autoloop", { workDir: dir });
+    const first = await run(dir, "prompt", "autoloop", { workDir: dir });
+    const runId = first.runId ?? "run-resume-test";
     const journalFile = join(dir, ".autoloop", "journal.jsonl");
     appendEvent(
       journalFile,
-      "run-resume-test",
+      runId,
       "3",
       "wait.open",
       `"wait_id": "company-nap", "reason": "between steps"`,
@@ -210,6 +211,7 @@ describe("harness.resume integration", () => {
     runIteration.mockClear();
     const waiting = {
       ...recordFor(dir),
+      run_id: runId,
       status: "waiting" as const,
       stop_reason: "waiting",
     };

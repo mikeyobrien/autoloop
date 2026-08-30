@@ -26,11 +26,6 @@ import {
 import { registryStart } from "./registry-bridge.js";
 import { completeLoop } from "./stop.js";
 import {
-  openWaitFromLines,
-  WAIT_CLOSE_TOPIC,
-  waitCloseFields,
-} from "./wait.js";
-import {
   clearResumeRequest,
   clearSuspendState,
   readSuspendState,
@@ -41,6 +36,11 @@ import type {
   RunSummary,
   StopReason,
 } from "./types.js";
+import {
+  openWaitFromLines,
+  WAIT_CLOSE_TOPIC,
+  waitCloseFields,
+} from "./wait.js";
 
 export interface ResumeOptions {
   /** Additional iterations to grant beyond the resume point. */

@@ -26,10 +26,7 @@ function registryRecord(
   runId: string,
 ): { status: string; stop_reason: string; pid?: number; run_id: string } {
   const path = join(project, ".autoloop", "registry.jsonl");
-  const lines = readFileSync(path, "utf-8")
-    .trim()
-    .split("\n")
-    .filter(Boolean);
+  const lines = readFileSync(path, "utf-8").trim().split("\n").filter(Boolean);
   let latest: {
     status: string;
     stop_reason: string;

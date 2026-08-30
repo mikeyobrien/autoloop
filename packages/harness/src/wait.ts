@@ -8,8 +8,11 @@
 // Duration on the request is advisory metadata for a host/operator — v1
 // does not spawn a sleeper. That is the whole point versus `bin/backoff`.
 
-import { jsonField, parseDurationMs } from "@mobrienv/autoloop-core";
-import { decodeEvent } from "@mobrienv/autoloop-core/events/decode";
+import {
+  decodeEvent,
+  jsonField,
+  parseDurationMs,
+} from "@mobrienv/autoloop-core";
 
 export const WAIT_REQUEST_TOPIC = "wait.request";
 export const WAIT_OPEN_TOPIC = "wait.open";
@@ -92,10 +95,7 @@ export function sanitizeWaitName(name: string): string {
   return cleaned;
 }
 
-export function waitOpenFields(
-  waitId: string,
-  request: WaitRequest,
-): string {
+export function waitOpenFields(waitId: string, request: WaitRequest): string {
   const parts = [
     jsonField("wait_id", waitId),
     jsonField("reason", request.reason),
