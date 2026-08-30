@@ -22,3 +22,15 @@ if (!process.env.AUTOLOOP_CONFIG) {
   writeFileSync(cfg, "");
   process.env.AUTOLOOP_CONFIG = cfg;
 }
+
+// `git commit` in beforeEach (file-mod-audit, tamper, postconditions) inherits
+// the developer's global commit.gpgsign / core.fsmonitor. Signing + fsmonitor
+// on throwaway /tmp repos stalls past vitest's 10s hookTimeout under coverage.
+// GIT_CONFIG_* is `git -c` precedence and leaves the rest of global config.
+if (!process.env.GIT_CONFIG_COUNT) {
+  process.env.GIT_CONFIG_COUNT = "2";
+  process.env.GIT_CONFIG_KEY_0 = "commit.gpgsign";
+  process.env.GIT_CONFIG_VALUE_0 = "false";
+  process.env.GIT_CONFIG_KEY_1 = "core.fsmonitor";
+  process.env.GIT_CONFIG_VALUE_1 = "false";
+}
