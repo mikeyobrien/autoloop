@@ -74,6 +74,23 @@ describe("parseWaitRequest", () => {
     const parsed = parseWaitRequest("duration=1500; reason=short;");
     expect(parsed.durationMs).toBe(1500);
   });
+
+  it("treats an empty or zero duration as advisory-absent", () => {
+    const empty = parseWaitRequest("name=nap; duration=; leftover prose");
+    expect(empty.duration).toBe("");
+    expect(empty.durationMs).toBe(0);
+    expect(empty.reason).toBe("leftover prose");
+
+    const zero = parseWaitRequest("duration=0; reason=now;");
+    expect(zero.duration).toBe("0");
+    expect(zero.durationMs).toBe(0);
+  });
+
+  it("falls back to leftover prose when reason= is blank", () => {
+    const parsed = parseWaitRequest("name=nap; reason=   ; hold the line");
+    expect(parsed.name).toBe("nap");
+    expect(parsed.reason).toBe("hold the line");
+  });
 });
 
 describe("waitIdFor / sanitizeWaitName", () => {
@@ -172,6 +189,21 @@ describe("openWaitFromLines", () => {
       fields: { wait_id: "other-wait" },
     }).trim();
     expect(openWaitFromLines(["not-json", other], run)).toBeNull();
+  });
+
+  it("defaults missing wait.open fields to empty strings", () => {
+    const bare = JSON.stringify({
+      run,
+      topic: WAIT_OPEN_TOPIC,
+      fields: {},
+    });
+    expect(openWaitFromLines([bare], run)).toEqual({
+      waitId: "",
+      reason: "",
+      name: "",
+      duration: "",
+      iteration: "",
+    });
   });
 
   it("reopens after a close when a later wait.open appears", () => {
