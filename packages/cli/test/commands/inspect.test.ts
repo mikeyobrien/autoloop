@@ -18,9 +18,11 @@ vi.mock("../../src/cli/render.js", () => ({
   renderOutput: vi.fn(),
 }));
 
-vi.mock("@mobrienv/autoloop-core/memory", () => ({
-  rawProject: vi.fn(() => "{}"),
-  listProject: vi.fn(() => ""),
+vi.mock("@mobrienv/autoloop-core/memory-plugin", () => ({
+  resolveMemoryPluginForProject: vi.fn(() => ({
+    raw: vi.fn(() => "{}"),
+    list: vi.fn(() => ""),
+  })),
 }));
 
 vi.mock("../../src/chains.js", () => ({

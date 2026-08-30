@@ -9,7 +9,7 @@ import {
   readLines,
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
-import * as memory from "@mobrienv/autoloop-core/memory";
+import { resolveMemoryPlugin } from "@mobrienv/autoloop-core/memory-plugin";
 import type { TwoTierMemoryStats } from "@mobrienv/autoloop-core/memory-render";
 import { materialize as materializeTasks } from "@mobrienv/autoloop-core/tasks";
 import { renderTasksPrompt } from "@mobrienv/autoloop-core/tasks-render";
@@ -122,12 +122,12 @@ function deriveRunContext(
   );
   return {
     scratchpadText: renderRunScratchpadPrompt(runLines),
-    memoryText: memory.renderTwoTier(
+    memoryText: resolveMemoryPlugin(loop.memory.kind).render(
       loop.paths.memoryFile,
       loop.paths.runMemoryFile,
       loop.memory.budgetChars,
     ),
-    memoryStats: memory.statsTwoTier(
+    memoryStats: resolveMemoryPlugin(loop.memory.kind).stats(
       loop.paths.memoryFile,
       loop.paths.runMemoryFile,
       loop.memory.budgetChars,

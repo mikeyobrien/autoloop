@@ -94,23 +94,22 @@ for (const path of packagePaths) {
   console.log(`  ✓ ${path.slice(ROOT.length + 1)} → ${newVersion}`);
 }
 
-// Keep plugins/autoloop/.claude-plugin/plugin.json in sync (pre-existing
+// Keep plugins/*/.claude-plugin/plugin.json in sync (pre-existing
 // root `scripts.version` hook does this on `npm version`; we replicate
 // here so callers don't have to go through `npm version`).
-const pluginPath = join(
-  ROOT,
-  "plugins",
-  "autoloop",
-  ".claude-plugin",
-  "plugin.json",
-);
-try {
-  const plugin = readJson(pluginPath);
-  plugin.version = newVersion;
-  writeJson(pluginPath, plugin);
-  console.log(`  ✓ plugins/autoloop/.claude-plugin/plugin.json → ${newVersion}`);
-} catch {
-  /* plugin file missing — skip */
+const pluginsDir = join(ROOT, "plugins");
+for (const entry of readdirSync(pluginsDir)) {
+  const pluginPath = join(pluginsDir, entry, ".claude-plugin", "plugin.json");
+  try {
+    const plugin = readJson(pluginPath);
+    plugin.version = newVersion;
+    writeJson(pluginPath, plugin);
+    console.log(
+      `  ✓ plugins/${entry}/.claude-plugin/plugin.json → ${newVersion}`,
+    );
+  } catch {
+    /* plugin file missing — skip */
+  }
 }
 
 console.log("\nrefreshing lockfile via `npm install`...");

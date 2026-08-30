@@ -20,7 +20,7 @@ node bin/release 0.7.0
 The script:
 - updates `version` in the root and every `packages/*/package.json`
 - rewrites cross-workspace deps (`*`, or older pins) to the new exact version
-- syncs `plugins/autoloop/.claude-plugin/plugin.json`
+- syncs `plugins/*/.claude-plugin/plugin.json`
 - runs `npm install` to refresh the lockfile
 - runs `npm run check` (biome + tsc --noEmit + vitest with coverage)
 
@@ -105,7 +105,9 @@ The root `files` field controls the tarball:
 
 - `bin/autoloop` — Node.js entry point (`#!/usr/bin/env node`, imports `@mobrienv/autoloop-cli`)
 - `dist/` — compiled root TypeScript output (SDK entry re-exporting from workspace packages)
-- `plugins/autoloop` — Claude plugin metadata and bundled skill assets
+- `plugins/autoloop` — Claude plugin metadata; skills symlink to `.agents/skills`
+- `plugins/autoloop-memory` — memory plugin metadata; skills symlink to `.agents/skills`
+- `.agents/skills` — canonical skill sources
 - `README.md`
 
 ### Workspace packages

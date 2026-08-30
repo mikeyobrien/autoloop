@@ -48,6 +48,11 @@ describe("load", () => {
     expect(get(cfg, "backend.environment_policy", "unset")).toBe("inherit");
   });
 
+  it("defaults memory.kind to jsonl", () => {
+    const cfg = load("/nonexistent/path/autoloops.toml");
+    expect(get(cfg, "memory.kind", "unset")).toBe("jsonl");
+  });
+
   it("parses an explicit hardened backend environment policy", () => {
     const dir = tmpDir("environment-policy");
     writeFileSync(

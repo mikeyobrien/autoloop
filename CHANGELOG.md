@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- **Memory plugins.** Loop memory is selected by `memory.kind` (default
+  `jsonl`, same `.autoloop/memory.jsonl` store). A second plugin can be
+  registered without changing harness internals. The Claude marketplace
+  lists `autoloop-memory`; canonical skills live in `.agents/skills`.
 - **Durable waits (`wait.request`).** An agent can park a named run without a
   live backend: emit `wait.request`, the harness journals `wait.open`, registry
   status becomes `waiting`, and the process exits 0. `autoloop resume <run-id>`

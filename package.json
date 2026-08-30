@@ -20,6 +20,8 @@
     "bin/autoloop",
     "dist",
     "plugins/autoloop",
+    "plugins/autoloop-memory",
+    ".agents/skills",
     "README.md"
   ],
   "engines": {
@@ -73,7 +75,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "prepare": "husky",
-    "version": "node -e \"const p=require('./plugins/autoloop/.claude-plugin/plugin.json');p.version=require('./package.json').version;require('fs').writeFileSync('./plugins/autoloop/.claude-plugin/plugin.json',JSON.stringify(p,null,2)+'\\n')\" && git add plugins/autoloop/.claude-plugin/plugin.json"
+    "version": "node -e \"const fs=require('fs');const v=require('./package.json').version;for (const dir of ['plugins/autoloop','plugins/autoloop-memory']){const f=dir+'/.claude-plugin/plugin.json';const p=JSON.parse(fs.readFileSync(f,'utf8'));p.version=v;fs.writeFileSync(f,JSON.stringify(p,null,2)+'\\n')}\" && git add plugins/autoloop/.claude-plugin/plugin.json plugins/autoloop-memory/.claude-plugin/plugin.json"
   },
   "lint-staged": {
     "*.{ts,js,json}": [

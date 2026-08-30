@@ -7,6 +7,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { MemoryPlugin } from "@mobrienv/autoloop-core/memory-plugin";
+import {
+  registerMemoryPlugin,
+  resetMemoryPlugins,
+} from "@mobrienv/autoloop-core/memory-plugin";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchMemory } from "../../src/commands/memory.js";
 
@@ -15,6 +20,7 @@ let memFile: string;
 let lines: string[];
 let savedMemoryFileEnv: string | undefined;
 let savedStateDirEnv: string | undefined;
+let savedProjectDirEnv: string | undefined;
 
 function writeMem(entries: string[]) {
   mkdirSync(join(projectDir, ".autoloop"), { recursive: true });
@@ -31,8 +37,11 @@ beforeEach(() => {
   memFile = join(projectDir, ".autoloop", "memory.jsonl");
   savedMemoryFileEnv = process.env.AUTOLOOP_MEMORY_FILE;
   savedStateDirEnv = process.env.AUTOLOOP_STATE_DIR;
+  savedProjectDirEnv = process.env.AUTOLOOP_PROJECT_DIR;
   delete process.env.AUTOLOOP_MEMORY_FILE;
   delete process.env.AUTOLOOP_STATE_DIR;
+  process.env.AUTOLOOP_PROJECT_DIR = projectDir;
+  resetMemoryPlugins();
   lines = [];
   vi.spyOn(console, "log").mockImplementation((...args) => {
     lines.push(args.join(" "));
@@ -51,7 +60,90 @@ afterEach(() => {
   } else {
     process.env.AUTOLOOP_STATE_DIR = savedStateDirEnv;
   }
+  if (savedProjectDirEnv === undefined) {
+    delete process.env.AUTOLOOP_PROJECT_DIR;
+  } else {
+    process.env.AUTOLOOP_PROJECT_DIR = savedProjectDirEnv;
+  }
+  resetMemoryPlugins();
   rmSync(projectDir, { recursive: true, force: true });
+});
+
+describe("default jsonl memory CLI", () => {
+  it("adds a learning and preference, then lists the prompt render", () => {
+    expect(dispatchMemory(["add", "learning", "use vitest"])).toBe(true);
+    expect(
+      dispatchMemory(["add", "preference", "Workflow", "run tests first"]),
+    ).toBe(true);
+    lines.length = 0;
+    dispatchMemory(["list", projectDir]);
+    const output = lines.join("\n");
+    expect(output).toContain("Loop memory:");
+    expect(output).toContain("use vitest");
+    expect(output).toContain("[Workflow]");
+    expect(output).toContain("run tests first");
+    const raw = readFileSync(memFile, "utf-8");
+    expect(raw).toContain('"type": "learning"');
+    expect(raw).toContain('"type": "preference"');
+  });
+});
+
+describe("registered memory plugin", () => {
+  it("invokes the configured plugin for add and list", () => {
+    const calls: string[] = [];
+    const empty = { preferences: [], learnings: [], meta: [] };
+    const stub: MemoryPlugin = {
+      kind: "recording",
+      addLearning: () => {
+        calls.push("addLearning");
+      },
+      addPreference: () => {
+        calls.push("addPreference");
+      },
+      addMeta: () => {},
+      addRunLearning: () => {},
+      addRunMeta: () => {},
+      remove: () => {},
+      removeFromEither: () => {},
+      promote: () => {},
+      list: () => {
+        calls.push("list");
+        return "from-recording-plugin";
+      },
+      find: () => "",
+      status: () => "",
+      render: () => "",
+      stats: () => ({
+        project: empty,
+        run: empty,
+        combinedRenderedChars: 0,
+        budgetChars: 0,
+        truncated: false,
+      }),
+      statsProject: () => ({
+        preferences: 0,
+        learnings: 0,
+        meta: 0,
+        totalEntries: 0,
+        renderedChars: 0,
+        budgetChars: 0,
+        truncated: false,
+      }),
+      raw: () => "",
+      compact: () => ({ scanned: 0, duplicatesRemoved: 0, ids: [] }),
+      prune: () => ({ scanned: 0, pruned: 0, ids: [] }),
+    };
+    registerMemoryPlugin(stub);
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      '[memory]\nkind = "recording"\n',
+    );
+    dispatchMemory(["add", "learning", "should hit stub"]);
+    dispatchMemory(["list", projectDir]);
+    expect(calls).toEqual(["addLearning", "list"]);
+    expect(lines.join("\n")).toContain("from-recording-plugin");
+    expect(() => readFileSync(memFile, "utf-8")).toThrow();
+  });
 });
 
 describe("memory compact", () => {

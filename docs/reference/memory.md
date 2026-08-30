@@ -236,8 +236,13 @@ autoloop inspect memory --format json   # raw JSONL content
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| `memory.kind` | string | `"jsonl"` | Memory plugin. Built-ins: `jsonl` (default) and `file` (same jsonl store). Additional plugins register by kind. |
 | `memory.prompt_budget_chars` | int | `8000` | Character budget for prompt injection. `0` disables truncation. |
 | `core.memory_file` | string | `".autoloop/memory.jsonl"` | Path to the memory file, relative to the project directory. |
+
+## Plugins
+
+Memory backends are plugins selected by `memory.kind`. The default `jsonl` plugin is the existing append-only file store; `file` is the same store under a second kind so a host can switch without editing harness internals. Additional plugins register with `registerMemoryPlugin` and expose add / list / find / render (plus the current CLI verbs).
 
 ## Environment
 

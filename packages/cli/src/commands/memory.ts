@@ -1,4 +1,4 @@
-import * as memory from "@mobrienv/autoloop-core/memory";
+import { resolveMemoryPluginForProject } from "@mobrienv/autoloop-core/memory-plugin";
 import { failUnknown } from "../cli/fail.js";
 import { printMemoryAddUsage, printMemoryUsage } from "../usage.js";
 
@@ -7,45 +7,15 @@ export function dispatchMemory(args: string[]): boolean {
 
   switch (sub) {
     case "list": {
-      const stateDir = resolveRuntimeStateDir();
-      if (stateDir) {
-        console.log(
-          memory.renderTwoTier(
-            memory.resolveFile(resolveRuntimeProjectDir()),
-            memory.resolveRunFile(stateDir),
-            0,
-          ),
-        );
-      } else {
-        console.log(memory.listProject(args[1] ?? resolveRuntimeProjectDir()));
-      }
+      const projectDir = args[1] ?? resolveRuntimeProjectDir();
+      const plugin = resolveMemoryPluginForProject(projectDir);
+      console.log(plugin.list(projectDir, resolveRuntimeStateDir()));
       return true;
     }
     case "status": {
-      const stateDir = resolveRuntimeStateDir();
-      if (stateDir) {
-        const stats = memory.statsTwoTier(
-          memory.resolveFile(resolveRuntimeProjectDir()),
-          memory.resolveRunFile(stateDir),
-          0,
-        );
-        const p = stats.project;
-        const r = stats.run;
-        const total =
-          p.preferences.length +
-          p.learnings.length +
-          p.meta.length +
-          r.preferences.length +
-          r.learnings.length +
-          r.meta.length;
-        console.log(
-          `Memory: ${stats.combinedRenderedChars} chars rendered. ${total} entries active (project: ${p.preferences.length} prefs, ${p.learnings.length} learnings, ${p.meta.length} meta; run: ${r.learnings.length} learnings, ${r.meta.length} meta).`,
-        );
-      } else {
-        console.log(
-          memory.statusProject(args[1] ?? resolveRuntimeProjectDir()),
-        );
-      }
+      const projectDir = args[1] ?? resolveRuntimeProjectDir();
+      const plugin = resolveMemoryPluginForProject(projectDir);
+      console.log(plugin.status(projectDir, resolveRuntimeStateDir()));
       return true;
     }
     case "find": {
@@ -54,23 +24,9 @@ export function dispatchMemory(args: string[]): boolean {
         return true;
       }
       const pattern = args.slice(1).join(" ");
-      const projResult = memory.findProject(
-        resolveRuntimeProjectDir(),
-        pattern,
-      );
-      const stateDir = resolveRuntimeStateDir();
-      if (stateDir) {
-        const runResult = memory.findInFile(
-          memory.resolveRunFile(stateDir),
-          pattern,
-        );
-        const parts = [projResult, runResult].filter(
-          (r) => !r.startsWith("No active"),
-        );
-        console.log(parts.length > 0 ? parts.join("\n") : projResult);
-      } else {
-        console.log(projResult);
-      }
+      const projectDir = resolveRuntimeProjectDir();
+      const plugin = resolveMemoryPluginForProject(projectDir);
+      console.log(plugin.find(projectDir, pattern, resolveRuntimeStateDir()));
       return true;
     }
     case "add":
@@ -88,7 +44,12 @@ export function dispatchMemory(args: string[]): boolean {
         );
         return true;
       }
-      memory.promote(resolveRuntimeProjectDir(), stateDir, args[1]);
+      const projectDir = resolveRuntimeProjectDir();
+      resolveMemoryPluginForProject(projectDir).promote(
+        projectDir,
+        stateDir,
+        args[1],
+      );
       return true;
     }
     case "compact": {
@@ -97,7 +58,8 @@ export function dispatchMemory(args: string[]): boolean {
         return true;
       }
       const projectDir = args[1] ?? resolveRuntimeProjectDir();
-      const summary = memory.compactMemory(projectDir);
+      const summary =
+        resolveMemoryPluginForProject(projectDir).compact(projectDir);
       if (summary.duplicatesRemoved === 0) {
         console.log(
           `Scanned ${summary.scanned} learnings; no duplicates found.`,
@@ -134,7 +96,10 @@ export function dispatchMemory(args: string[]): boolean {
         (_, i) => i !== flagIndex && i !== flagIndex + 1,
       );
       const projectDir = positional[0] ?? resolveRuntimeProjectDir();
-      const summary = memory.pruneMemory(projectDir, maxAgeDays);
+      const summary = resolveMemoryPluginForProject(projectDir).prune(
+        projectDir,
+        maxAgeDays,
+      );
       if (summary.pruned === 0) {
         console.log(
           `Scanned ${summary.scanned} learnings; none older than ${maxAgeDays} days.`,
@@ -153,16 +118,13 @@ export function dispatchMemory(args: string[]): boolean {
         return true;
       }
       const reason = args.slice(2).join(" ") || "manual";
+      const projectDir = resolveRuntimeProjectDir();
+      const plugin = resolveMemoryPluginForProject(projectDir);
       const stateDir = resolveRuntimeStateDir();
       if (stateDir) {
-        memory.removeFromEither(
-          resolveRuntimeProjectDir(),
-          stateDir,
-          args[1],
-          reason,
-        );
+        plugin.removeFromEither(projectDir, stateDir, args[1], reason);
       } else {
-        memory.remove(resolveRuntimeProjectDir(), args[1], reason);
+        plugin.remove(projectDir, args[1], reason);
       }
       return true;
     }
@@ -191,6 +153,8 @@ export function dispatchMemory(args: string[]): boolean {
 
 function dispatchMemoryAdd(args: string[]): void {
   const kind = args[0] ?? "";
+  const projectDir = resolveRuntimeProjectDir();
+  const plugin = resolveMemoryPluginForProject(projectDir);
 
   switch (kind) {
     case "learning": {
@@ -205,9 +169,9 @@ function dispatchMemoryAdd(args: string[]): void {
       const text = textArgs.join(" ");
       const stateDir = resolveRuntimeStateDir();
       if (isProject || !stateDir) {
-        memory.addLearning(resolveRuntimeProjectDir(), text, "manual");
+        plugin.addLearning(projectDir, text, "manual");
       } else {
-        memory.addRunLearning(stateDir, text, "manual");
+        plugin.addRunLearning(stateDir, text, "manual");
       }
       return;
     }
@@ -218,11 +182,7 @@ function dispatchMemoryAdd(args: string[]): void {
         );
         return;
       }
-      memory.addPreference(
-        resolveRuntimeProjectDir(),
-        args[1],
-        args.slice(2).join(" "),
-      );
+      plugin.addPreference(projectDir, args[1], args.slice(2).join(" "));
       return;
     case "meta": {
       if (!args[1] || args[1] === "--help") {
@@ -231,13 +191,9 @@ function dispatchMemoryAdd(args: string[]): void {
       }
       const stateDir = resolveRuntimeStateDir();
       if (stateDir) {
-        memory.addRunMeta(stateDir, args[1], args.slice(2).join(" "));
+        plugin.addRunMeta(stateDir, args[1], args.slice(2).join(" "));
       } else {
-        memory.addMeta(
-          resolveRuntimeProjectDir(),
-          args[1],
-          args.slice(2).join(" "),
-        );
+        plugin.addMeta(projectDir, args[1], args.slice(2).join(" "));
       }
       return;
     }
