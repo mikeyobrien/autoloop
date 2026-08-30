@@ -49,5 +49,6 @@ describe("memory plugin packaging", () => {
     expect(skill).toContain("autoloop memory list");
     expect(skill).toContain("autoloop memory find");
     expect(skill).toContain("memory.kind");
+    expect(skill).toContain("memory.module");
   });
 });

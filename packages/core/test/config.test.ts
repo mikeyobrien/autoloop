@@ -51,6 +51,7 @@ describe("load", () => {
   it("defaults memory.kind to jsonl", () => {
     const cfg = load("/nonexistent/path/autoloops.toml");
     expect(get(cfg, "memory.kind", "unset")).toBe("jsonl");
+    expect(get(cfg, "memory.module", "unset")).toBe("");
   });
 
   it("parses an explicit hardened backend environment policy", () => {
@@ -73,6 +74,17 @@ describe("load", () => {
     expect(get(cfg, "backend.usage_from", "")).toBe("file");
     expect(get(cfg, "backend.command", "")).toBe("my-tool");
     expect(get(cfg, "backend.kind", "")).toBe("command");
+  });
+
+  it("parses memory.module from a project file", () => {
+    const dir = tmpDir("memory-module");
+    writeFileSync(
+      join(dir, "config.toml"),
+      '[memory]\nkind = "mnemosyne"\nmodule = "./memory/mnemosyne.cjs"\n',
+    );
+    const cfg = load(join(dir, "config.toml"));
+    expect(get(cfg, "memory.kind", "")).toBe("mnemosyne");
+    expect(get(cfg, "memory.module", "")).toBe("./memory/mnemosyne.cjs");
   });
 
   it("parses TOML config", () => {

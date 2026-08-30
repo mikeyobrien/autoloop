@@ -235,7 +235,7 @@ export interface LoopContext {
      */
     specs: HookSpec[];
   };
-  memory: { budgetChars: number; kind?: string };
+  memory: { budgetChars: number; kind?: string; module?: string };
   tasks: { budgetChars: number };
   harness: { instructions: string };
   /**

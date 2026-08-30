@@ -82,7 +82,7 @@ export function defaults(): Config {
       post_run: "",
       strict: "false",
     },
-    memory: { prompt_budget_chars: "8000", kind: "jsonl" },
+    memory: { prompt_budget_chars: "8000", kind: "jsonl", module: "" },
     core: {
       state_dir: ".autoloop",
       journal_file: "",

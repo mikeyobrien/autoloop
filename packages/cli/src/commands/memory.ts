@@ -15,7 +15,10 @@ export function dispatchMemory(args: string[]): boolean {
     case "status": {
       const projectDir = args[1] ?? resolveRuntimeProjectDir();
       const plugin = resolveMemoryPluginForProject(projectDir);
-      console.log(plugin.status(projectDir, resolveRuntimeStateDir()));
+      const status =
+        plugin.status?.(projectDir, resolveRuntimeStateDir()) ??
+        plugin.list(projectDir, resolveRuntimeStateDir());
+      console.log(status);
       return true;
     }
     case "find": {
@@ -45,11 +48,12 @@ export function dispatchMemory(args: string[]): boolean {
         return true;
       }
       const projectDir = resolveRuntimeProjectDir();
-      resolveMemoryPluginForProject(projectDir).promote(
-        projectDir,
-        stateDir,
-        args[1],
-      );
+      const plugin = resolveMemoryPluginForProject(projectDir);
+      if (!plugin.promote) {
+        console.log("error: this memory plugin does not support promote");
+        return true;
+      }
+      plugin.promote(projectDir, stateDir, args[1]);
       return true;
     }
     case "compact": {
@@ -58,8 +62,12 @@ export function dispatchMemory(args: string[]): boolean {
         return true;
       }
       const projectDir = args[1] ?? resolveRuntimeProjectDir();
-      const summary =
-        resolveMemoryPluginForProject(projectDir).compact(projectDir);
+      const plugin = resolveMemoryPluginForProject(projectDir);
+      if (!plugin.compact) {
+        console.log("error: this memory plugin does not support compact");
+        return true;
+      }
+      const summary = plugin.compact(projectDir);
       if (summary.duplicatesRemoved === 0) {
         console.log(
           `Scanned ${summary.scanned} learnings; no duplicates found.`,
@@ -96,10 +104,12 @@ export function dispatchMemory(args: string[]): boolean {
         (_, i) => i !== flagIndex && i !== flagIndex + 1,
       );
       const projectDir = positional[0] ?? resolveRuntimeProjectDir();
-      const summary = resolveMemoryPluginForProject(projectDir).prune(
-        projectDir,
-        maxAgeDays,
-      );
+      const plugin = resolveMemoryPluginForProject(projectDir);
+      if (!plugin.prune) {
+        console.log("error: this memory plugin does not support prune");
+        return true;
+      }
+      const summary = plugin.prune(projectDir, maxAgeDays);
       if (summary.pruned === 0) {
         console.log(
           `Scanned ${summary.scanned} learnings; none older than ${maxAgeDays} days.`,
@@ -121,7 +131,7 @@ export function dispatchMemory(args: string[]): boolean {
       const projectDir = resolveRuntimeProjectDir();
       const plugin = resolveMemoryPluginForProject(projectDir);
       const stateDir = resolveRuntimeStateDir();
-      if (stateDir) {
+      if (stateDir && plugin.removeFromEither) {
         plugin.removeFromEither(projectDir, stateDir, args[1], reason);
       } else {
         plugin.remove(projectDir, args[1], reason);
@@ -168,7 +178,7 @@ function dispatchMemoryAdd(args: string[]): void {
       }
       const text = textArgs.join(" ");
       const stateDir = resolveRuntimeStateDir();
-      if (isProject || !stateDir) {
+      if (isProject || !stateDir || !plugin.addRunLearning) {
         plugin.addLearning(projectDir, text, "manual");
       } else {
         plugin.addRunLearning(stateDir, text, "manual");
@@ -190,10 +200,12 @@ function dispatchMemoryAdd(args: string[]): void {
         return;
       }
       const stateDir = resolveRuntimeStateDir();
-      if (stateDir) {
+      if (stateDir && plugin.addRunMeta) {
         plugin.addRunMeta(stateDir, args[1], args.slice(2).join(" "));
-      } else {
+      } else if (plugin.addMeta) {
         plugin.addMeta(projectDir, args[1], args.slice(2).join(" "));
+      } else {
+        console.log("error: this memory plugin does not support meta");
       }
       return;
     }

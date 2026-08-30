@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MemoryPlugin } from "../src/memory-plugin.js";
@@ -141,6 +142,41 @@ describe("memory plugin registry", () => {
   it("throws on an unknown kind", () => {
     expect(() => resolveMemoryPlugin("mem0")).toThrow(
       "unknown memory plugin kind: mem0",
+    );
+  });
+
+  it("loads an external module from memory.module", () => {
+    const fixture = join(
+      import.meta.dirname ?? ".",
+      "fixtures",
+      "external-memory-plugin.cjs",
+    );
+    writeFileSync(
+      join(tmpDir, "autoloops.toml"),
+      `[memory]\nkind = "honcho"\nmodule = "${fixture}"\n`,
+    );
+    const plugin = resolveMemoryPluginForProject(tmpDir);
+    expect(plugin.kind).toBe("honcho");
+    expect(plugin.list(tmpDir)).toBe("external-list");
+    expect(plugin.render("", "", 0)).toBe("external-render");
+    plugin.addLearning(tmpDir, "from honcho", "manual");
+    const loaded = createRequire(import.meta.url)(fixture) as {
+      calls: string[];
+      resetCalls: () => void;
+    };
+    expect(loaded.calls).toContain("addLearning:from honcho");
+    expect(loaded.calls).toContain("list");
+    expect(loaded.calls).toContain("render");
+    loaded.resetCalls();
+  });
+
+  it("rejects a missing memory.module path", () => {
+    writeFileSync(
+      join(tmpDir, "autoloops.toml"),
+      '[memory]\nkind = "honcho"\nmodule = "./no-such-plugin.cjs"\n',
+    );
+    expect(() => resolveMemoryPluginForProject(tmpDir)).toThrow(
+      "failed to load memory plugin module",
     );
   });
 

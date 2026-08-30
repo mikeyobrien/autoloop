@@ -40,13 +40,18 @@ Unless `memory.kind` is set, Autoloop uses the built-in `jsonl` plugin:
 - Entries: learning, preference, meta, tombstone
 - Prompt injection is truncated to `memory.prompt_budget_chars` (default 8000)
 
-`file` is a second built-in plugin with the same jsonl file store. Register additional plugins in process (tests or a host) and select them with `memory.kind` — harness internals stay unchanged.
+`file` is a second built-in plugin with the same jsonl file store.
+
+To **replace** jsonl with Honcho, SuperMemory, Mnemosyne, or another store, install that product's Autoloop adapter and set `memory.module`. Autoloop does not ship those products.
 
 ```toml
 [memory]
-kind = "jsonl"
+kind = "honcho"
+module = "@example/autoloop-memory-honcho"   # or "./memory/honcho.cjs"
 prompt_budget_chars = 8000
 ```
+
+The module exports `createMemoryPlugin({ projectDir, kind })` (or `default` / `plugin`) implementing add / list / find / render. API keys stay in the adapter env. `registerMemoryPlugin` still works in-process.
 
 ## When to write memory
 

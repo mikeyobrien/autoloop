@@ -144,6 +144,21 @@ describe("registered memory plugin", () => {
     expect(lines.join("\n")).toContain("from-recording-plugin");
     expect(() => readFileSync(memFile, "utf-8")).toThrow();
   });
+
+  it("loads memory.module and invokes that plugin", () => {
+    const fixture = join(
+      import.meta.dirname ?? ".",
+      "../../../core/test/fixtures/external-memory-plugin.cjs",
+    );
+    writeFileSync(
+      join(projectDir, "autoloops.toml"),
+      `[memory]\nkind = "supermemory"\nmodule = "${fixture}"\n`,
+    );
+    dispatchMemory(["add", "learning", "remember this"]);
+    dispatchMemory(["list", projectDir]);
+    expect(lines.join("\n")).toContain("external-list");
+    expect(() => readFileSync(memFile, "utf-8")).toThrow();
+  });
 });
 
 describe("memory compact", () => {

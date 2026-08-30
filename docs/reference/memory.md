@@ -236,13 +236,36 @@ autoloop inspect memory --format json   # raw JSONL content
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `memory.kind` | string | `"jsonl"` | Memory plugin. Built-ins: `jsonl` (default) and `file` (same jsonl store). Additional plugins register by kind. |
+| `memory.kind` | string | `"jsonl"` | Memory plugin. Built-ins: `jsonl` (default) and `file` (same jsonl store). Set this to `honcho`, `supermemory`, `mnemosyne`, or any other kind when `memory.module` loads that store. |
+| `memory.module` | string | `""` | Package name or path that exports a `MemoryPlugin`. Empty keeps the built-in registry. |
 | `memory.prompt_budget_chars` | int | `8000` | Character budget for prompt injection. `0` disables truncation. |
 | `core.memory_file` | string | `".autoloop/memory.jsonl"` | Path to the memory file, relative to the project directory. |
 
 ## Plugins
 
-Memory backends are plugins selected by `memory.kind`. The default `jsonl` plugin is the existing append-only file store; `file` is the same store under a second kind so a host can switch without editing harness internals. Additional plugins register with `registerMemoryPlugin` and expose add / list / find / render (plus the current CLI verbs).
+Memory backends are plugins selected by `memory.kind`. The default `jsonl` plugin is the existing append-only file store. To **replace** that store with Honcho, SuperMemory, Mnemosyne, or any other product, install its Autoloop adapter and point `memory.module` at it. Autoloop does not vendor those products.
+
+```toml
+[memory]
+kind = "honcho"
+module = "@example/autoloop-memory-honcho"
+```
+
+`module` is a Node specifier resolved from the project directory: a relative path (`./memory/honcho.cjs`) or a package name. The module must export one of:
+
+- `createMemoryPlugin({ projectDir, kind })` → plugin
+- `default` / `plugin` — the plugin object (or a factory)
+- the plugin object itself
+
+Required verbs: `addLearning`, `addPreference`, `remove`, `list`, `find`, `render`. Optional: run-scoped writes, `promote`, `compact`, `prune`, `stats` (harness synthesizes stats from `render` when omitted). Credentials stay in the adapter's own env (`HONCHO_API_KEY`, `SUPERMEMORY_API_KEY`, …).
+
+| Autoloop verb | Typical mapping |
+|---------------|-----------------|
+| `add` / `list` / `render` | Honcho `context()` / conclusions; SuperMemory `add` + `profile`; Mnemosyne `remember` + `get_context` |
+| `find` | Honcho search; SuperMemory `search`; Mnemosyne `recall` |
+| `remove` | Honcho delete conclusion; SuperMemory delete; Mnemosyne `forget` |
+
+`registerMemoryPlugin` still works for in-process hosts and tests. `compact` / `prune` / `promote` are jsonl-only; other plugins should omit them.
 
 ## Environment
 

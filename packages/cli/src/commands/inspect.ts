@@ -64,7 +64,9 @@ export function dispatchInspect(args: string[]): boolean {
     case "memory": {
       const plugin = resolveMemoryPluginForProject(projectDir);
       console.log(
-        format === "json" ? plugin.raw(projectDir) : plugin.list(projectDir),
+        format === "json"
+          ? (plugin.raw?.(projectDir) ?? plugin.list(projectDir))
+          : plugin.list(projectDir),
       );
       return true;
     }

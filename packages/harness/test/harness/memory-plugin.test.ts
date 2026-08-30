@@ -197,4 +197,16 @@ describe("harness memory plugin", () => {
     expect(ctx.memoryText).toBe("STUB MEMORY RENDER");
     expect(ctx.prompt).toContain("STUB MEMORY RENDER");
   });
+
+  it("loads memory.module and injects that plugin's render", () => {
+    const fixture = join(
+      import.meta.dirname ?? ".",
+      "../../../core/test/fixtures/external-memory-plugin.cjs",
+    );
+    const loop = makeLoop(workDir, "mnemosyne");
+    loop.memory.module = fixture;
+    const ctx = buildIterationContext(loop, 1);
+    expect(ctx.memoryText).toBe("external-render");
+    expect(ctx.prompt).toContain("external-render");
+  });
 });

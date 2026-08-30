@@ -179,15 +179,17 @@ export function collectArtifacts(
   // Memory stats
   let memStats = { learnings: 0, meta: 0, preferences: 0 };
   try {
-    const stats = resolveMemoryPluginForProject(projectDir).statsProject(
+    const stats = resolveMemoryPluginForProject(projectDir).statsProject?.(
       projectDir,
       8000,
     );
-    memStats = {
-      learnings: stats.learnings,
-      meta: stats.meta,
-      preferences: stats.preferences,
-    };
+    if (stats) {
+      memStats = {
+        learnings: stats.learnings,
+        meta: stats.meta,
+        preferences: stats.preferences,
+      };
+    }
   } catch {
     // memory file may not exist
   }
