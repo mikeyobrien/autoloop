@@ -1,0 +1,24 @@
+{
+  "description": "Pinned Tier A package export subpaths and documented public named imports. Removing an entry is a breaking change that must bump this pin intentionally with a major/deprecation note.",
+  "exports": {
+    "@mobrienv/autoloop-core": [
+      ".",
+      "./journal",
+      "./journal-format",
+      "./registry",
+      "./topology",
+      "./config-schema",
+      "./hooks-schema"
+    ]
+  },
+  "namedImports": [
+    {
+      "specifier": "@mobrienv/autoloop-core/journal",
+      "names": ["readRunLines"]
+    },
+    {
+      "specifier": "@mobrienv/autoloop-harness/prompt",
+      "names": ["buildIterationContext"]
+    }
+  ]
+}

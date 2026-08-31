@@ -363,6 +363,9 @@ export function runtimeEnvLines(
     "export AUTOLOOP_JOURNAL_FILE=" +
     shellQuote(loop.paths.journalFile) +
     "\n" +
+    "export AUTOLOOP_EMIT_REQUEST_FILE=" +
+    shellQuote(loop.emitAuthority?.current?.requestFile ?? "") +
+    "\n" +
     "export AUTOLOOP_EVENTS_FILE=" +
     shellQuote(loop.paths.journalFile) +
     "\n" +

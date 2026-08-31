@@ -73,7 +73,9 @@ export function installKanban(
 
   const runtime = opts.runtime ?? createKanbanRuntime(ctx, store);
   const app = createApp(ctx, store, runtime);
-  const ws = installKanbanWs(server, store, runtime);
+  const ws = installKanbanWs(server, store, runtime, {
+    trustProxy: ctx.trustProxy === true,
+  });
 
   // 3) Stall-timeout sweeper. Re-read config every tick so live edits to
   //    kanban.toml apply without a dashboard restart. `stall_timeout_ms <= 0`

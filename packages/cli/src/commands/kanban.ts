@@ -17,6 +17,7 @@ export function dispatchKanban(
   let port = 4801;
   let host = "127.0.0.1";
   let projectDir = ".";
+  let trustProxy = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -29,6 +30,8 @@ export function dispatchKanban(
     } else if (arg === "--project-dir" && args[i + 1]) {
       projectDir = args[i + 1];
       i++;
+    } else if (arg === "--trust-proxy") {
+      trustProxy = true;
     } else if (arg === "--help" || arg === "-h") {
       printUsage();
       return;
@@ -47,6 +50,7 @@ export function dispatchKanban(
     autoloopBin,
     host,
     port,
+    trustProxy,
     listPresets: (dir) => listPresetsWithDescriptions(dir),
   };
 
@@ -114,5 +118,8 @@ function printUsage(): void {
   console.log("  --port, -p <port>       Port to listen on (default: 4801)");
   console.log("  --host <host>           Host to bind to (default: 127.0.0.1)");
   console.log("  --project-dir <dir>     Project directory (default: .)");
+  console.log(
+    "  --trust-proxy           Trust X-Forwarded-Proto for origin scheme",
+  );
   console.log("  --help, -h              Show this help");
 }

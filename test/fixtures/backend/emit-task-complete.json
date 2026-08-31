@@ -1,0 +1,7 @@
+{
+  "output": "Emitting task.complete for completion test.",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "task.complete",
+  "emit_payload": "Legitimate completion"
+}
