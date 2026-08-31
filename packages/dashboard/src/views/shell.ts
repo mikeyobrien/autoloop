@@ -10,7 +10,7 @@ export function htmlShell(projectName?: string): string {
 :root {
   --bg: #fff; --fg: #1a1a1a; --muted: #666; --border: #e0e0e0;
   --card-bg: #fafafa; --badge-bg: #eee;
-  --active: #2563eb; --watching: #d97706; --stuck: #dc2626;
+  --active: #2563eb; --waiting: #0891b2; --watching: #d97706; --stuck: #dc2626;
   --failed: #dc2626; --completed: #16a34a;
   --cat-loop: #06b6d4; --cat-iteration: #d97706; --cat-backend: #666;
   --cat-review: #c026d3; --cat-coordination: #2563eb; --cat-error: #dc2626;
@@ -40,6 +40,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 .section[open] summary::before { content: "\\25bc "; }
 .badge { display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 8px; background: var(--badge-bg); margin-left: 0.3rem; font-weight: normal; }
 .badge[data-status="active"] { background: var(--active); color: #fff; }
+.badge[data-status="waiting"] { background: var(--waiting); color: #fff; }
 .badge[data-status="watching"] { background: var(--watching); color: #fff; }
 .badge[data-status="stuck"] { background: var(--stuck); color: #fff; }
 .badge[data-status="failed"] { background: var(--failed); color: #fff; }
@@ -489,7 +490,7 @@ header .updated { font-size: 0.75rem; color: var(--muted); font-family: monospac
 <script>
 function dashboard() {
   return {
-    runs: { active: [], watching: [], stuck: [], recentFailed: [], recentCompleted: [] },
+    runs: { waiting: [], active: [], watching: [], stuck: [], recentFailed: [], recentCompleted: [] },
     presets: [],
     selectedRun: null,
     selectedRunDetail: null,
@@ -500,7 +501,7 @@ function dashboard() {
     eventSource: null,
     streamRetryDelay: 1000,
     lastUpdated: null,
-    sectionOpen: { active: false, watching: false, stuck: false, failed: false, completed: false },
+    sectionOpen: { waiting: false, active: false, watching: false, stuck: false, failed: false, completed: false },
     sectionUserToggled: {},
     sectionShowAll: {},
     showVerbose: false,
@@ -541,8 +542,10 @@ function dashboard() {
       };
       const fc = cap("failed", this.runs.recentFailed);
       const cc = cap("completed", this.runs.recentCompleted);
+      const wc = cap("waiting", this.runs.waiting || []);
       return [
         { key: "active", label: "Active", items: this.runs.active, total: this.runs.active.length, capped: false },
+        { key: "waiting", label: "Waiting", items: wc.items, total: wc.total, capped: wc.capped },
         { key: "watching", label: "Watching", items: this.runs.watching, total: this.runs.watching.length, capped: false },
         { key: "stuck", label: "Stuck", items: this.runs.stuck, total: this.runs.stuck.length, capped: false },
         { key: "failed", label: "Failed", items: fc.items, total: fc.total, capped: fc.capped },
@@ -588,12 +591,12 @@ function dashboard() {
 
     applyRuns(data) {
       const byRecent = (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
-      for (const key of ['active', 'watching', 'stuck', 'recentFailed', 'recentCompleted']) {
+      for (const key of ['waiting', 'active', 'watching', 'stuck', 'recentFailed', 'recentCompleted']) {
         if (data[key]) data[key].sort(byRecent);
       }
       this.runs = data;
       this.lastUpdated = new Date().toLocaleTimeString();
-      const defaultOpen = ['active', 'watching', 'stuck'];
+      const defaultOpen = ['active', 'waiting', 'watching', 'stuck'];
       for (const cat of this.categories) {
         if (!this.sectionUserToggled[cat.key]) {
           this.sectionOpen[cat.key] = cat.items.length > 0 && defaultOpen.includes(cat.key);

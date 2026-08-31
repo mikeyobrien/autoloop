@@ -27,6 +27,10 @@
   compile time.
 
 ### Fixed
+- **Parked waiting runs appear in run health.** `categorizeRecords` now
+  buckets `status=waiting` (no PID required) instead of dropping them, so
+  `autoloop loops health` and `GET /api/runs` list a `waiting` bucket
+  alongside active, watching, stuck, failed, and completed.
 - **Configured prompt files cannot escape their declared roots.** Objective,
   review, harness-instruction, and topology role paths now reject parent
   traversal and symlink escapes while preserving optional and explicitly empty

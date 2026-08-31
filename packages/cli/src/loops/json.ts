@@ -160,6 +160,7 @@ export function healthJson(stateDir: string): string {
   });
   return JSON.stringify(
     {
+      waiting: bucket(h.waiting),
       active: bucket(h.active),
       watching: bucket(h.watching),
       stuck: bucket(h.stuck),
@@ -177,8 +178,8 @@ export function healthJson(stateDir: string): string {
  * Categorization runs on a copy so the reported record is never mutated.
  */
 function healthBucketFor(r: RunRecord): string | null {
-  if (r.status === "waiting") return "waiting";
   const h = categorizeRecords([{ ...r }]);
+  if (h.waiting.length > 0) return "waiting";
   if (h.stuck.length > 0) return "stuck";
   if (h.watching.length > 0) return "watching";
   if (h.active.length > 0) return "active";

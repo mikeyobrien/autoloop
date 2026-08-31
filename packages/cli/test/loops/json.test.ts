@@ -282,11 +282,32 @@ describe("healthJson", () => {
       count: 1,
       run_ids: ["run-completed"],
     });
+    expect(parsed.waiting).toEqual({ count: 0, run_ids: [] });
+  });
+
+  it("includes a parked waiting run in the waiting bucket", () => {
+    writeRecords([
+      makeRecord("run-wait-health", {
+        status: "waiting",
+        stop_reason: "waiting",
+        latest_event: "wait.open",
+        updated_at: isoAgo(0),
+      }),
+    ]);
+    const parsed = JSON.parse(healthJson(tmpDir));
+    expect(parsed.waiting).toEqual({
+      count: 1,
+      run_ids: ["run-wait-health"],
+    });
+    expect(parsed.active).toEqual({ count: 0, run_ids: [] });
+    expect(parsed.watching).toEqual({ count: 0, run_ids: [] });
+    expect(parsed.stuck).toEqual({ count: 0, run_ids: [] });
   });
 
   it("returns zeroed buckets when no registry exists", () => {
     const parsed = JSON.parse(healthJson(tmpDir));
     for (const key of [
+      "waiting",
       "active",
       "watching",
       "stuck",

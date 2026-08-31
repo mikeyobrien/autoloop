@@ -1,7 +1,8 @@
 /**
- * Run-health classification: bucket `RunRecord`s into active / watching /
- * stuck / recently-failed / recently-completed based on preset-specific
- * age thresholds.
+ * Run-health classification: bucket `RunRecord`s into waiting / active /
+ * watching / stuck / recently-failed / recently-completed. Age bands use
+ * preset-specific thresholds; parked `status=waiting` runs are a live
+ * bucket of their own (no PID required).
  *
  * Pure-ish — reads the registry via `readMergedRegistry` but otherwise is
  * a deterministic function of (records, nowMs). Used by the CLI `loops
@@ -70,6 +71,7 @@ export function policyForPreset(preset: string): SupervisionPolicy {
 }
 
 export interface HealthResult {
+  waiting: RunRecord[];
   active: RunRecord[];
   watching: RunRecord[];
   stuck: RunRecord[];
@@ -91,6 +93,7 @@ export function categorizeRecords(
   records: RunRecord[],
   nowMs: number = Date.now(),
 ): HealthResult {
+  const waiting: RunRecord[] = [];
   const active: RunRecord[] = [];
   const watching: RunRecord[] = [];
   const stuck: RunRecord[] = [];
@@ -98,6 +101,13 @@ export function categorizeRecords(
   const recentCompleted: RunRecord[] = [];
 
   for (const r of records) {
+    // Parked durable waits are live without a PID. Always surface them —
+    // they are not aged into watching/stuck and not gated by the 24h window.
+    if (r.status === "waiting") {
+      waiting.push(r);
+      continue;
+    }
+
     if (r.status === "running") {
       // If PID is recorded and the process is dead, treat as stopped
       if (r.pid != null && !isProcessAlive(r.pid)) {
@@ -131,7 +141,7 @@ export function categorizeRecords(
     }
   }
 
-  return { active, watching, stuck, recentFailed, recentCompleted };
+  return { waiting, active, watching, stuck, recentFailed, recentCompleted };
 }
 
 function elapsedMs(r: RunRecord, nowMs: number): number | null {
