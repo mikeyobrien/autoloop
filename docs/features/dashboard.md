@@ -31,7 +31,7 @@ The SPA has four zones:
 
 1. **Header** — title and last-updated timestamp.
 2. **Chat box** — preset dropdown, prompt textarea, and Start button. Submit with the button or `Cmd/Ctrl+Enter`.
-3. **Run list** — collapsible sections grouped by health status: active, watching, stuck, failed, completed. Each entry shows run ID prefix, preset, iteration count, latest event, and age. Worktree runs display a `WT` badge; merged worktrees show a checkmark.
+3. **Run list** — collapsible sections grouped by health status: active, waiting, watching, stuck, failed, completed. Each entry shows run ID prefix, preset, iteration count, latest event, and age. Worktree runs display a `WT` badge; merged worktrees show a checkmark. Parked durable waits (`status=waiting`, no live PID) land in the waiting section.
 4. **Detail pane** — appears when a run is clicked. Shows status, preset, objective, iteration, workspace path, timestamps, duration, and merge info (for worktree runs). Below, an events timeline lists journal entries with color-coded left borders by category (system, backend, review, error, coordination, completion). A "Show backend events" toggle controls verbose event visibility.
 
 ### Event rendering
@@ -50,7 +50,7 @@ All routes are under `/api/` and return JSON. The SPA polls these on a 3-second 
 
 Returns all runs categorized by health status using the same `categorizeRuns()` logic as `autoloop loops`.
 
-Response buckets: `active`, `watching`, `stuck`, `recentFailed`, `recentCompleted`. Each run record includes worktree merge metadata when applicable.
+Response buckets: `waiting`, `active`, `watching`, `stuck`, `recentFailed`, `recentCompleted`. Each run record includes worktree merge metadata when applicable. Parked durable waits (`status=waiting`) appear in `waiting`.
 
 ### `GET /api/runs/:id`
 

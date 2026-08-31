@@ -328,6 +328,13 @@ describe("section open/close state preservation", () => {
     const html = htmlShell();
     expect(html).toContain("!this.sectionUserToggled[cat.key]");
   });
+
+  it("includes waiting alongside the other run-list buckets", () => {
+    const html = htmlShell();
+    expect(html).toContain('key: "waiting"');
+    expect(html).toContain('label: "Waiting"');
+    expect(html).toContain("this.runs.waiting");
+  });
 });
 
 describe("POST /api/runs input validation", () => {

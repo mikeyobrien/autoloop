@@ -108,6 +108,56 @@ describe("dashboard /api/runs", () => {
     expect(body.stuck).toHaveLength(1);
     expect(body.watching).toHaveLength(0);
   });
+
+  it("returns waiting bucket for parked status=waiting runs with no PID", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+
+    const updatedAt = new Date().toISOString();
+    const record = JSON.stringify({
+      run_id: "run-api-wait-001",
+      status: "waiting",
+      preset: "autocode",
+      objective: "parked durable wait",
+      trigger: "cli",
+      project_dir: projectDir,
+      work_dir: projectDir,
+      state_dir: join(projectDir, ".autoloop"),
+      journal_file: join(projectDir, ".autoloop", "journal.jsonl"),
+      parent_run_id: "",
+      backend: "mock",
+      backend_args: [],
+      created_at: updatedAt,
+      updated_at: updatedAt,
+      iteration: 2,
+      max_iterations: 10,
+      stop_reason: "waiting",
+      latest_event: "wait.open",
+    });
+    writeFileSync(registryPath, `${record}\n`, "utf-8");
+
+    const app = createApp({
+      registryPath,
+      journalPath: join(projectDir, ".autoloop", "journal.jsonl"),
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+      listPresets: () => [],
+    });
+
+    const res = await app.request("/api/runs");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.waiting).toHaveLength(1);
+    expect(body.waiting[0].run_id).toBe("run-api-wait-001");
+    expect(body.waiting[0].status).toBe("waiting");
+    expect(body.waiting[0].pid).toBeUndefined();
+    expect(body.active).toHaveLength(0);
+    expect(body.watching).toHaveLength(0);
+    expect(body.stuck).toHaveLength(0);
+    expect(body.recentFailed).toHaveLength(0);
+    expect(body.recentCompleted).toHaveLength(0);
+  });
 });
 
 describe("dashboard /api/runs max_iterations", () => {
@@ -152,6 +202,7 @@ describe("dashboard /api/runs max_iterations", () => {
     const body = await res.json();
     // Find our run in one of the buckets
     const allRuns = [
+      ...(body.waiting || []),
       ...(body.active || []),
       ...(body.watching || []),
       ...(body.stuck || []),
@@ -232,6 +283,7 @@ describe("dashboard /api/runs worktree merge enrichment", () => {
     expect(listRes.status).toBe(200);
     const listBody = await listRes.json();
     const allRuns = [
+      ...(listBody.waiting || []),
       ...(listBody.active || []),
       ...(listBody.watching || []),
       ...(listBody.stuck || []),

@@ -32,7 +32,7 @@ function renderHealth(h: HealthResult, verbose: boolean): string {
   const hasExceptions =
     h.stuck.length > 0 || h.recentFailed.length > 0 || h.watching.length > 0;
 
-  if (!hasExceptions && h.active.length === 0) {
+  if (!hasExceptions && h.active.length === 0 && h.waiting.length === 0) {
     return (
       "All clear. 0 active, " +
       h.recentCompleted.length +
@@ -40,7 +40,7 @@ function renderHealth(h: HealthResult, verbose: boolean): string {
     );
   }
 
-  if (!hasExceptions) {
+  if (!hasExceptions && h.waiting.length === 0) {
     return (
       "All clear. " +
       h.active.length +
@@ -56,6 +56,8 @@ function renderHealth(h: HealthResult, verbose: boolean): string {
     "Health: " +
       h.active.length +
       " active, " +
+      h.waiting.length +
+      " waiting, " +
       h.watching.length +
       " watching, " +
       h.stuck.length +
@@ -76,6 +78,13 @@ function renderHealth(h: HealthResult, verbose: boolean): string {
     lines.push("WATCHING:");
     lines.push(renderListHeader());
     for (const r of h.watching) lines.push(renderRunLine(r));
+    lines.push("");
+  }
+
+  if (h.waiting.length > 0) {
+    lines.push("WAITING:");
+    lines.push(renderListHeader());
+    for (const r of h.waiting) lines.push(renderRunLine(r));
     lines.push("");
   }
 

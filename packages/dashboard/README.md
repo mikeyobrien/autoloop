@@ -32,7 +32,7 @@ interface DashboardContext {
 }
 ```
 
-Run classification (`active` / `watching` / `stuck`) is provided by
+Run classification (`waiting` / `active` / `watching` / `stuck`) is provided by
 `@mobrienv/autoloop-core/runs-health::categorizeRuns` directly — no
 injection needed there.
 

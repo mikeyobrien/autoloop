@@ -7,6 +7,7 @@ The health system classifies running loops into buckets using preset-specific th
 | Bucket | Meaning |
 |--------|---------|
 | **Active** | Running and recently updated — no concern. |
+| **Waiting** | Parked durable wait (`status=waiting`). No live PID; resume the same `run_id` to continue. |
 | **Watching** | Quiet longer than the preset's warning threshold but not yet stuck. Investigate soon. |
 | **Stuck** | Quiet longer than the preset's stuck threshold. Likely needs intervention. |
 | **Failed** | Failed or timed out within the last 24 hours. |
@@ -29,9 +30,9 @@ Unknown presets fall back to the default policy.
 
 All operator surfaces share the same classification logic from `packages/core/src/runs-health.ts`, which exports `categorizeRuns`, `categorizeRecords`, and `policyForPreset`:
 
-- **`autoloop loops health`** (`packages/cli/src/loops/health.ts`) — prints a summary with stuck, watching, failed, and active sections.
+- **`autoloop loops health`** (`packages/cli/src/loops/health.ts`) — prints a summary with stuck, watching, waiting, failed, and active sections.
 - **`autoloop loops watch <run-id>`** (`packages/cli/src/loops/watch.ts`) — prints a one-line advisory when a run transitions into the watching or stuck band.
-- **Dashboard `/api/runs`** (`packages/dashboard/src/routes/api.ts`) — returns JSON with `active`, `watching`, `stuck`, `recentFailed`, and `recentCompleted` arrays.
+- **Dashboard `/api/runs`** (`packages/dashboard/src/routes/api.ts`) — returns JSON with `waiting`, `active`, `watching`, `stuck`, `recentFailed`, and `recentCompleted` arrays.
 
 ## Design Notes
 

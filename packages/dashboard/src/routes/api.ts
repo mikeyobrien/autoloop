@@ -35,6 +35,7 @@ export function buildRunsPayload(
 ): ReturnType<typeof categorizeRuns> {
   const result = categorizeRuns(ctx.stateDir);
   for (const bucket of [
+    result.waiting,
     result.active,
     result.watching,
     result.stuck,
