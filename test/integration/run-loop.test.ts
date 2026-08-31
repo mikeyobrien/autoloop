@@ -292,21 +292,29 @@ describe("integration: run loop with mock backend", () => {
     expect(result.stopReason).toBeTruthy();
   });
 
-  it("fails cleanly (no stack trace) when the --events path is unwritable", () => {
-    const project = makeTempProject("events-unwritable");
+  it("creates parent dirs for a nested --events path and writes the stream (#72)", () => {
+    const project = makeTempProject("events-nested");
     const fixture = join(FIXTURES_DIR, "complete-success.json");
-    // Parent directories do not exist -> openSync('a') throws ENOENT.
-    const badPath = join(project, "no", "such", "dir", "events.ndjson");
+    // Nested path whose parents do not exist; ndjsonEventSink mkdir -p's them
+    // so the loop runs and writes the stream (was ENOENT before #72).
+    const nestedPath = join(project, "no", "such", "dir", "events.ndjson");
     const res = runCli(
-      ["run", project, "events unwritable", "--events", badPath],
+      ["run", project, "events nested", "--events", nestedPath],
       { MOCK_FIXTURE_PATH: fixture },
     );
 
-    expect(res.stderr).toContain("cannot open --events file");
-    // Clean message, not a raw thrown stack.
-    expect(res.stderr).not.toMatch(/\n\s+at\s+.+:\d+:\d+/);
-    // The loop never started.
-    expect(pathExists(join(project, ".autoloop/journal.jsonl"))).toBe(false);
+    expect(res.status).toBe(0);
+    // Parent directories were created and the NDJSON stream was written.
+    expect(pathExists(nestedPath)).toBe(true);
+    const lines = readText(nestedPath)
+      .split("\n")
+      .filter((l) => l.trim() !== "");
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(() => JSON.parse(line)).not.toThrow();
+    }
+    // The loop actually ran.
+    expect(pathExists(join(project, ".autoloop/journal.jsonl"))).toBe(true);
   });
 
   it("stamps every journal line with the versioned, timestamped contract (#31)", () => {
