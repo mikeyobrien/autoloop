@@ -408,7 +408,7 @@ describe("buildLoopContext", () => {
     });
   });
 
-  it("defaults completion.mustBeLast and policy.fileModAudit to false", () => {
+  it("defaults completion.mustBeLast, policy.fileModAudit, and frozen paths to off", () => {
     const projectDir = makeProject("event_loop.max_iterations = 1\n");
 
     const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
@@ -417,6 +417,8 @@ describe("buildLoopContext", () => {
 
     expect(loop.completion.mustBeLast).toBe(false);
     expect(loop.policy.fileModAudit).toBe(false);
+    expect(loop.policy.frozenPaths).toEqual([]);
+    expect(loop.policy.frozenPathsBlock).toBe(false);
   });
 
   it("inherits backend environments by default", () => {
@@ -471,6 +473,23 @@ describe("buildLoopContext", () => {
 
     expect(loop.completion.mustBeLast).toBe(true);
     expect(loop.policy.fileModAudit).toBe(true);
+  });
+
+  it("reads event_loop.frozen_paths and event_loop.frozen_paths_block from TOML", () => {
+    const projectDir = makeProject(
+      [
+        "event_loop.max_iterations = 1",
+        'event_loop.frozen_paths = "vision.md, docs/owner.md"',
+        "event_loop.frozen_paths_block = true",
+      ].join("\n"),
+    );
+
+    const loop = buildLoopContext(projectDir, null, "node dist/main.js", {
+      workDir: projectDir,
+    });
+
+    expect(loop.policy.frozenPaths).toEqual(["vision.md", "docs/owner.md"]);
+    expect(loop.policy.frozenPathsBlock).toBe(true);
   });
 
   it("normalizes legacy kiro backend config to the ACP kiro provider", () => {

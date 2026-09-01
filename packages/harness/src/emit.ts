@@ -77,6 +77,16 @@ const CORE_SYSTEM_TOPICS = new Set([
   // role's emit and reject them against topology.
   "wait.open",
   "wait.close",
+  // Policy guards (harness-written at the emit boundary). Omitting these
+  // made latestAgentEventRecord treat an audit violation as the acting
+  // role's emit and reject it against topology, resetting routing.
+  "policy.file_modification_violation",
+  "policy.frozen_path_violation",
+  // Harness-written guidance consumption marker (prompt.ts journals it
+  // whenever operator guidance is delivered into a prompt). Omitting it let
+  // latestAgentEventRecord treat it as the acting role's emit, rejecting the
+  // completion claim on the very iteration that consumed the guidance.
+  "operator.guidance.consumed",
 ]);
 
 export function coreSystemTopic(topic: string): boolean {

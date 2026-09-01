@@ -109,6 +109,18 @@ export interface LoopContext {
      * observational — never alters loop control flow on its own.
      */
     fileModAudit: boolean;
+    /**
+     * T-009 frozen-paths guard: global CSV of workdir-relative glob paths
+     * (e.g. "vision.md,docs/owner.md") that loop roles must not modify.
+     * Empty disables the guard entirely. Per-role opt-in via topology
+     * Role.frozenPaths; a role without the field never matches. Guard runs
+     * inside the emit-boundary audit, so it also requires audit_file_mods
+     * to be enabled. Observational by default; `frozen_paths_block` upgrades
+     * a violation to deny the acting role's completion claim.
+     */
+    frozenPaths: string[];
+    /** Deny the completion claim on a frozen-path violation. Default false. */
+    frozenPathsBlock: boolean;
   };
   /**
    * Out-of-band acceptance gate. On a done-claim the HARNESS (not the agent's

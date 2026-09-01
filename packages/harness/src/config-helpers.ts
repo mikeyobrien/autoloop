@@ -638,6 +638,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
       fileModAudit: truthySetting(
         config.get(cfg, "event_loop.audit_file_mods", "false"),
       ),
+      frozenPaths: splitCsv(config.get(cfg, "event_loop.frozen_paths", "")),
+      frozenPathsBlock: truthySetting(
+        config.get(cfg, "event_loop.frozen_paths_block", "false"),
+      ),
     },
     acceptance: {
       // Accept either a single `verify_cmd` or a `verify_cmds` list; merge both.

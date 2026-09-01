@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { readdirSync, type Stats, statSync } from "node:fs";
+import { join } from "node:path";
 
 export interface AddedLine {
   file: string;
@@ -77,4 +79,60 @@ export function changedFiles(workDir: string): string[] {
 export function porcelainStatus(workDir: string): string[] {
   const res = git(workDir, ["status", "--porcelain"]);
   return res.ok ? res.stdout.split("\n").filter(Boolean) : [];
+}
+
+const WALK_SKIP = new Set([".git", "node_modules"]);
+
+/** Bounded recursive file listing used when git is unavailable (non-repo). */
+function walkFiles(workDir: string): string[] {
+  const out: string[] = [];
+  const visit = (dir: string, depth: number): void => {
+    if (depth > 20) return;
+    let names: string[] = [];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const absolute = join(dir, name);
+      let stat: Stats | undefined;
+      try {
+        stat = statSync(absolute);
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        if (!WALK_SKIP.has(name)) visit(absolute, depth + 1);
+      } else if (stat.isFile()) {
+        out.push(absolute.slice(workDir.length + 1));
+      }
+    }
+  };
+  visit(workDir, 0);
+  return out;
+}
+
+/**
+ * Every file currently in the work tree (tracked + untracked, non-ignored),
+ * as workdir-relative paths with forward slashes. Falls back to a bounded
+ * recursive walk outside a git repo so the frozen-paths snapshot stays
+ * functional without git.
+ */
+export function listWorkTreeFiles(workDir: string): string[] {
+  const res = git(workDir, [
+    "ls-files",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "--",
+    ".",
+  ]);
+  if (res.ok) {
+    return res.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((f) => f.replaceAll("\\", "/"));
+  }
+  return walkFiles(workDir);
 }

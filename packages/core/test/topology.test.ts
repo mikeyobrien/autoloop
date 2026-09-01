@@ -175,6 +175,30 @@ emits = ["review.ready"]
     expect(topo.roles[1].disallowedTools).toBeUndefined();
     expect(topo.roles[1].readOnly).toBeUndefined();
   });
+
+  it("parses role frozen_paths permissions", () => {
+    const dir = tmpDir("role-frozen-paths");
+    writeFileSync(
+      join(dir, "topology.toml"),
+      `
+[[role]]
+id = "critic"
+prompt = "Review."
+emits = ["review.ready"]
+frozen_paths = ["vision.md", "docs/owner.md"]
+
+[[role]]
+id = "builder"
+prompt = "Build."
+emits = ["review.ready"]
+`,
+    );
+
+    const topo = loadTopology(dir);
+
+    expect(topo.roles[0].frozenPaths).toEqual(["vision.md", "docs/owner.md"]);
+    expect(topo.roles[1].frozenPaths).toBeUndefined();
+  });
 });
 
 describe("suggestedRoles", () => {

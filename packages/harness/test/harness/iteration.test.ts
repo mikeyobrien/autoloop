@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -863,5 +864,116 @@ describe("completionEmittedLast", () => {
     ];
     // completion was emitted in turn 1; step.done followed it in that turn.
     expect(completionEmittedLast(lines, "task.complete")).toBe(false);
+  });
+});
+
+describe("runIteration T-009 frozen-paths deny gate", () => {
+  function frozenLoop(): LoopContext {
+    const loop = makeAcpLoop();
+    const vision = join(loop.paths.workDir, "vision.md");
+    writeFileSync(vision, "# Vision v1\n");
+    git(loop.paths.workDir, ["init", "-q"]);
+    git(loop.paths.workDir, ["config", "user.email", "t@t.t"]);
+    git(loop.paths.workDir, ["config", "user.name", "t"]);
+    git(loop.paths.workDir, ["add", "."]);
+    git(loop.paths.workDir, ["commit", "-qm", "vision"]);
+    loop.topology = {
+      name: "",
+      completion: "",
+      roles: [{ id: "builder", prompt: "Build.", emits: ["task.complete"] }],
+      handoff: { "loop.start": ["builder"] },
+      handoffKeys: ["loop.start"],
+    };
+    loop.policy = {
+      fileModAudit: false,
+      frozenPaths: ["vision.md"],
+      frozenPathsBlock: true,
+    };
+    loop.completion.mustBeLast = false;
+    return loop;
+  }
+
+  function git(cwd: string, args: string[]): void {
+    spawnSync("git", args, { cwd, encoding: "utf-8" });
+  }
+
+  it("denies a done-claim after a frozen-path write and re-injects guidance", async () => {
+    const loop = frozenLoop();
+    const vision = join(loop.paths.workDir, "vision.md");
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    } as unknown as AcpSession);
+    // Backend mutates the frozen file, then claims DONE.
+    acpMocks.runAcpIteration.mockImplementation(async () => {
+      writeFileSync(vision, "# hijacked by builder\n");
+      return { output: "DONE", exitCode: 0, timedOut: false };
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    // Claim denied: loop continues instead of completing.
+    expect(summary.stopReason).toBe("continued");
+    expect(readFileSync(vision, "utf-8")).toBe("# Vision v1\n");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain("policy.frozen_path_violation");
+    expect(journal).toContain("Completion was blocked: frozen-path files");
+    expect(journal).not.toContain('"state": "accepted"');
+  });
+
+  it("accepts a clean done-claim when frozen paths are untouched", async () => {
+    const loop = frozenLoop();
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    } as unknown as AcpSession);
+    acpMocks.runAcpIteration.mockResolvedValue({
+      output: "DONE",
+      exitCode: 0,
+      timedOut: false,
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(summary.stopReason).toBe("completion_promise");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain('"state": "accepted"');
+    expect(journal).not.toContain("policy.frozen_path_violation");
+  });
+
+  it("observational mode (frozen_paths_block=false) journals but still completes", async () => {
+    const loop = frozenLoop();
+    loop.policy = {
+      ...loop.policy,
+      frozenPathsBlock: false,
+    } as LoopContext["policy"];
+    const vision = join(loop.paths.workDir, "vision.md");
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    } as unknown as AcpSession);
+    acpMocks.runAcpIteration.mockImplementation(async () => {
+      writeFileSync(vision, "# hijacked\n");
+      return { output: "DONE", exitCode: 0, timedOut: false };
+    });
+
+    const summary = await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(summary.stopReason).toBe("completion_promise");
+    const journal = readFileSync(loop.paths.journalFile, "utf-8");
+    expect(journal).toContain("policy.frozen_path_violation");
+    expect(journal).toContain('"state": "accepted"');
   });
 });
