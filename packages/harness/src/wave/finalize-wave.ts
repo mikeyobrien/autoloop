@@ -5,6 +5,7 @@ import {
 } from "@mobrienv/autoloop-core/journal";
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { parallelDispatchBase, parallelJoinedTopic } from "../emit.js";
+import { acceptParentJournalRecord } from "../emit-authority.js";
 import type { IterationContext } from "../prompt.js";
 import type { LoopContext, RunSummary, StopReason } from "../types.js";
 import type {
@@ -177,12 +178,18 @@ export async function continueAfterParallelJoin(
     joinedTopic,
     totalElapsedMs,
   );
+  const authorityId = acceptParentJournalRecord(
+    loop,
+    String(iter.iteration),
+    joinedTopic,
+  );
   appendHarnessEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
     String(iter.iteration),
     joinedTopic,
     waveId,
+    authorityId,
   );
   return iterateFn(loop, iter.iteration + 1);
 }
@@ -266,6 +273,11 @@ function appendWaveJoinFinish(
     emittedTopic,
     routingBasis,
   );
+  const authorityId = acceptParentJournalRecord(
+    loop,
+    String(iter.iteration),
+    "wave.join.finish",
+  );
   appendEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
@@ -285,6 +297,8 @@ function appendWaveJoinFinish(
       ", " +
       jsonField("resume_events", joinCsv(resumeEvents)) +
       ", " +
-      jsonField("elapsed_ms", String(totalElapsed)),
+      jsonField("elapsed_ms", String(totalElapsed)) +
+      ", " +
+      jsonField("authority_id", authorityId),
   );
 }

@@ -32,6 +32,7 @@ export function extractField(line: string, key: string): string {
     if (decoded.shape === "payload") {
       if (key === "payload") return decoded.payload;
       if (key === "source") return decoded.source ?? "";
+      if (key === "authority_id") return decoded.authorityId ?? "";
       return "";
     }
     const value = decoded.fields[key];

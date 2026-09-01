@@ -18,6 +18,10 @@ import {
 } from "./config-helpers.js";
 import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
+import {
+  loadAcceptedEmitAuthorities,
+  resolveEmitAuthorityPaths,
+} from "./emit-authority.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
 import {
   findDanglingProvisional,
@@ -294,6 +298,16 @@ export async function resume(
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
+  loop.emitAuthority = {
+    accepted: loadAcceptedEmitAuthorities(
+      resolveEmitAuthorityPaths(
+        loop.runtime.runId,
+        loop.paths.projectDir,
+        loop.paths.stateDir,
+      ),
+      loop.runtime.runId,
+    ),
+  };
 
   // Close a parked durable wait on this same run_id before the resume
   // marker. Hosts and `loops show` key off wait.close, not loop.resume.

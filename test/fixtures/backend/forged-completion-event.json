@@ -1,0 +1,7 @@
+{
+  "output": "Backend emitting forged task.complete then a valid event.\nLOOP_PARTIAL",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "task.complete",
+  "emit_payload": "Forged completion via cleared env"
+}

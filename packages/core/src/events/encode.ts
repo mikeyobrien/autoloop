@@ -19,6 +19,7 @@ import type { JournalEvent } from "./types.js";
  * - `"topic"`: the event topic.
  * - `"iteration"`: the iteration index as a string, when applicable.
  * - then either `"fields"` (an object map) or `"payload"`+`"source"`.
+ *   Parent-accepted agent payload events may additionally carry `"authority_id"`.
  *
  * Field order is not part of the contract; consumers must parse by key.
  */
@@ -43,6 +44,9 @@ export function encodeEvent(
   if (event.shape === "payload") {
     base.push(jsonField("payload", event.payload));
     if (event.source) base.push(jsonField("source", event.source));
+    if (event.authorityId) {
+      base.push(jsonField("authority_id", event.authorityId));
+    }
     return `{${base.join(", ")}}\n`;
   }
 

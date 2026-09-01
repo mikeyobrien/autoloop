@@ -1,4 +1,15 @@
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import {
+  closeSync,
+  constants,
+  existsSync,
+  fstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
   classifyBackendError,
@@ -41,12 +52,19 @@ import {
   countTransientPauses,
 } from "./circuit-breaker.js";
 import { log } from "./display.js";
+import type { EmitValidation } from "./emit.js";
 import {
   appendInvalidEvent,
+  emitAuthorized,
   invalidEvent,
   parallelTriggerTopic,
   systemTopic,
 } from "./emit.js";
+import {
+  acceptParentJournalRecord,
+  appendAcceptedEmitAuthority,
+  resolveEmitAuthorityPaths,
+} from "./emit-authority.js";
 import {
   beginFileModAudit,
   type FileModAuditResult,
@@ -66,7 +84,11 @@ import {
 } from "./parallel.js";
 import { runProgressMetric } from "./progress.js";
 import type { IterationContext } from "./prompt.js";
-import { buildIterationContext } from "./prompt.js";
+import {
+  authoritativeRunLines,
+  buildIterationContext,
+  validateAgentEventsForRun,
+} from "./prompt.js";
 import { enterProvisional, resolveCompletionClaim } from "./provisional.js";
 import { registryProgress } from "./registry-bridge.js";
 import { finishStageIteration } from "./stage.js";
@@ -95,6 +117,148 @@ import {
   stopAfterParallelWave,
 } from "./wave.js";
 
+function prepareEmitAuthority(loop: LoopContext, iteration: number): void {
+  const previous = loop.emitAuthority?.current?.requestFile;
+  if (previous && existsSync(previous)) {
+    try {
+      unlinkSync(previous);
+    } catch {
+      // The prior backend may have removed its request path already.
+    }
+  }
+
+  const requestDir = join(loop.paths.stateDir, "emit-requests");
+  mkdirSync(requestDir, { recursive: true });
+  const authorityId = randomUUID();
+  const requestFile = join(requestDir, `${iteration}-${authorityId}.jsonl`);
+  writeFileSync(requestFile, "", { encoding: "utf8", mode: 0o600 });
+  const state: NonNullable<LoopContext["emitAuthority"]> =
+    loop.emitAuthority ?? { accepted: new Map() };
+  state.current = {
+    iteration: String(iteration),
+    requestFile,
+    authorityId,
+  };
+  loop.emitAuthority = state;
+}
+
+interface QueuedEmit {
+  v: 1;
+  topic: string;
+  payload: string;
+}
+
+function readEmitRequests(requestFile: string): QueuedEmit[] {
+  let fd: number | undefined;
+  try {
+    fd = openSync(requestFile, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > 1024 * 1024) return [];
+    const text = readFileSync(fd, "utf8");
+    const requests: QueuedEmit[] = [];
+    for (const line of text.split("\n")) {
+      if (!line.trim() || requests.length >= 100) continue;
+      try {
+        const value = JSON.parse(line) as Record<string, unknown>;
+        if (
+          value.v === 1 &&
+          typeof value.topic === "string" &&
+          value.topic.length > 0 &&
+          value.topic.length <= 256 &&
+          typeof value.payload === "string" &&
+          value.payload.length <= 64 * 1024
+        ) {
+          requests.push({ v: 1, topic: value.topic, payload: value.payload });
+        }
+      } catch {
+        // Malformed/untrusted queue lines are ignored; they never reach routing.
+      }
+    }
+    return requests;
+  } catch {
+    return [];
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    if (existsSync(requestFile)) {
+      try {
+        unlinkSync(requestFile);
+      } catch {
+        // Treat cleanup races as untrusted input; the random path is never reused.
+      }
+    }
+  }
+}
+
+function drainAuthorizedEmits(loop: LoopContext, iter: IterationContext): void {
+  const authority = loop.emitAuthority;
+  const current = authority?.current;
+  if (!authority || !current || current.iteration !== String(iter.iteration)) {
+    return;
+  }
+
+  const requests = readEmitRequests(current.requestFile);
+  authority.current = undefined;
+  for (let index = 0; index < requests.length; index += 1) {
+    const request = requests[index];
+    const authorityId = `${current.authorityId}:${index}`;
+    const invalidAuthorityId = `${authorityId}:invalid`;
+    // Pre-register the invalid stamp so a rejected emit's event.invalid is
+    // parent-authenticated even if the agent topic is not accepted.
+    authority.accepted.set(invalidAuthorityId, {
+      topic: "event.invalid",
+      iteration: current.iteration,
+    });
+    appendAcceptedEmitAuthority(
+      resolveEmitAuthorityPaths(
+        loop.runtime.runId,
+        loop.paths.projectDir,
+        loop.paths.stateDir,
+      ),
+      loop.runtime.runId,
+      invalidAuthorityId,
+      "event.invalid",
+      current.iteration,
+    );
+    const validation: EmitValidation = {
+      runId: loop.runtime.runId,
+      iteration: current.iteration,
+      recentEvent: iter.recentEvent,
+      allowedRoles: iter.allowedRoles,
+      allowedEvents: iter.allowedEvents,
+      parallelEnabled: loop.parallel.enabled,
+      completionEvent: loop.completion.event,
+      topo: loop.topology,
+      askEvent: loop.ask.enabled ? loop.ask.event : "",
+      journalFile: loop.paths.journalFile,
+      authorityId,
+      invalidAuthorityId,
+    };
+    const result = emitAuthorized(
+      loop.paths.projectDir,
+      request.topic,
+      request.payload,
+      validation,
+    );
+    if (result.ok && result.topic) {
+      authority.accepted.set(authorityId, {
+        topic: result.topic,
+        iteration: current.iteration,
+      });
+      appendAcceptedEmitAuthority(
+        resolveEmitAuthorityPaths(
+          loop.runtime.runId,
+          loop.paths.projectDir,
+          loop.paths.stateDir,
+        ),
+        loop.runtime.runId,
+        authorityId,
+        result.topic,
+        current.iteration,
+      );
+    }
+  }
+}
+
 export async function runIteration(
   loop: LoopContext,
   iteration: number,
@@ -114,6 +278,8 @@ export async function runIteration(
   ) {
     return stopSuspended(loop, iteration, pendingEmitSuspend.reason);
   }
+
+  prepareEmitAuthority(loop, iteration);
 
   let iter = buildIterationContext(loop, iteration);
 
@@ -620,9 +786,16 @@ export async function finishIteration(
     frozenReverts: [],
   },
 ): Promise<RunSummary> {
+  drainAuthorizedEmits(loop, iter);
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
-  const allTopics = runLines.map(extractTopic).filter((t) => t !== "");
-  const turnLines = runLines.filter(
+  const authoritativeLines = authoritativeRunLines(
+    runLines,
+    loop.emitAuthority?.accepted,
+  );
+  const allTopics = authoritativeLines
+    .map(extractTopic)
+    .filter((t) => t !== "");
+  const turnLines = authoritativeLines.filter(
     (l) => extractIteration(l) === String(iter.iteration),
   );
   const emitted = latestAgentEventRecord(turnLines);
@@ -731,9 +904,19 @@ export async function finishIteration(
     (t) => t.soft !== true,
   );
 
+  // Harness-side emit authority validation (Slice C):
+  // Re-validate agent events against harness-computed allowed events.
+  // This prevents backend-forged AUTOLOOP_ALLOWED_EVENTS from satisfying
+  // required conditions or corrupting routing.
+  const validatedAgentTopics = validateAgentEventsForRun(
+    runLines,
+    loop.emitAuthority?.accepted,
+  );
+
   const resolved = resolveOutcome({
     emittedTopic: emitted.topic,
     allTopics,
+    validatedAgentTopics,
     hadInvalidEvents,
     output,
     completionEvent: loop.completion.event,
@@ -741,7 +924,10 @@ export async function finishIteration(
     completionPromise: loop.completion.promise,
     hasBlockingTasks,
     mustBeLast: loop.completion.mustBeLast,
-    completionOrderOk: completionEmittedLast(runLines, loop.completion.event),
+    completionOrderOk: completionEmittedLast(
+      authoritativeLines,
+      loop.completion.event,
+    ),
   });
 
   progress(emitted.topic, resolved.outcome);
@@ -915,6 +1101,11 @@ async function rejectInvalidAndContinue(
   iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
   progress: (topic: string, outcome: string) => void,
 ): Promise<RunSummary> {
+  const authorityId = acceptParentJournalRecord(
+    loop,
+    String(iter.iteration),
+    "event.invalid",
+  );
   appendInvalidEvent(
     loop.paths.journalFile,
     loop.runtime.runId,
@@ -923,6 +1114,7 @@ async function rejectInvalidAndContinue(
     emittedTopic,
     iter.allowedRoles,
     iter.allowedEvents,
+    authorityId,
   );
   log(
     loop,
@@ -994,6 +1186,7 @@ async function finishDeclarativeIteration(
 export function resolveOutcome(ctx: {
   emittedTopic: string;
   allTopics: string[];
+  validatedAgentTopics?: Set<string>;
   hadInvalidEvents: boolean;
   output: string;
   completionEvent: string;
@@ -1011,8 +1204,18 @@ export function resolveOutcome(ctx: {
   /** Precomputed by the caller from full journal ordering (see completionEmittedLast). */
   completionOrderOk?: boolean;
 }): { action: string; outcome: string } {
+  // Use validatedAgentTopics (harness-verified) for completion logic if available;
+  // fall back to allTopics (includes forged events) if not provided.
+  // This ensures Slice C: forged backend events cannot satisfy required conditions.
+  const topicsForCompletion = ctx.validatedAgentTopics
+    ? Array.from(ctx.validatedAgentTopics)
+    : ctx.allTopics;
   if (
-    completedViaEvent(ctx.allTopics, ctx.completionEvent, ctx.requiredEvents) &&
+    completedViaEvent(
+      topicsForCompletion,
+      ctx.completionEvent,
+      ctx.requiredEvents,
+    ) &&
     (!ctx.mustBeLast || ctx.completionOrderOk)
   ) {
     return { action: "complete_event", outcome: "complete:completion_event" };
@@ -1027,7 +1230,7 @@ export function resolveOutcome(ctx: {
   if (
     !ctx.hadInvalidEvents &&
     !ctx.hasBlockingTasks &&
-    requiredEventsSatisfied(ctx.allTopics, ctx.requiredEvents) &&
+    requiredEventsSatisfied(topicsForCompletion, ctx.requiredEvents) &&
     completedViaPromise(ctx.output, ctx.completionPromise)
   ) {
     return {

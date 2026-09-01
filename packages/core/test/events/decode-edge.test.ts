@@ -71,6 +71,16 @@ describe("decodeEvent edge cases", () => {
       expect(event?.source).toBeUndefined();
     }
   });
+
+  it("decodes an optional harness authority id", () => {
+    const event = decodeEvent(
+      '{"run":"r1","topic":"t","payload":"hello","source":"agent","authority_id":"issuance-1"}',
+    );
+    expect(event?.shape).toBe("payload");
+    if (event?.shape === "payload") {
+      expect(event.authorityId).toBe("issuance-1");
+    }
+  });
 });
 
 describe("encodeEvent edge cases", () => {

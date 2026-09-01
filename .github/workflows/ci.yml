@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Need full history so base…HEAD / base HEAD diffs resolve on PRs.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -31,5 +34,29 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm test
+      - name: Check (package lint, typecheck, exports, coverage)
+        run: npm run check
+
+      - name: Build documentation
+        run: npm run docs:build
+
+      - name: Contract tests (Tier A compatibility)
+        run: npm test -- test/integration/compat-contract.test.ts
+
+      - name: Contract fixtures are reproducible
+        run: |
+          npm run fixtures:contracts
+          git diff --exit-code test/fixtures/contracts
+
+      - name: Check trailing whitespace
+        run: |
+          # Inspect committed PR/base bytes, not just working-tree drift.
+          # Two-dot form needs both tips present (fetch-depth: 0 above) and does
+          # not require a merge-base the way three-dot form does.
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}" HEAD
+          elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            git diff --check HEAD~1 HEAD
+          else
+            git diff --check
+          fi

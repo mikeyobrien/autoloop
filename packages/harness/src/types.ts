@@ -57,6 +57,16 @@ export interface CommandSession {
   pid: number;
 }
 
+export interface EmitAuthorityState {
+  current?: {
+    iteration: string;
+    requestFile: string;
+    authorityId: string;
+  };
+  /** Issuance id -> canonical topic/iteration, shared across context reloads. */
+  accepted: Map<string, { topic: string; iteration: string }>;
+}
+
 export interface LoopContext {
   objective: string;
   topology: topo.Topology;
@@ -294,6 +304,8 @@ export interface LoopContext {
   };
   launch: LaunchMetadata;
   store: Record<string, unknown>;
+  /** Parent-owned live ingress state for canonical agent emits. */
+  emitAuthority?: EmitAuthorityState;
   agentMap: AgentMap | null;
   /**
    * Live ACP session holder. Aliased (not copied) across context reloads so

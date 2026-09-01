@@ -14,11 +14,62 @@ export interface InstallWsResult {
   close(): void;
 }
 
+export interface InstallWsOptions {
+  /**
+   * When true, honor the first `X-Forwarded-Proto` hop for origin scheme.
+   * Default false: only the direct socket TLS state is trusted. Enable only
+   * behind a reverse proxy that strips client-supplied forwarded headers.
+   */
+  trustProxy?: boolean;
+}
+
+function requestScheme(
+  req: IncomingMessage,
+  trustProxy: boolean,
+): "http" | "https" {
+  const socket = req.socket as { encrypted?: boolean };
+  if (socket.encrypted) return "https";
+  if (!trustProxy) return "http";
+
+  const forwarded = req.headers["x-forwarded-proto"];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const proto = raw?.split(",")[0]?.trim().toLowerCase();
+  if (proto === "https") return "https";
+  if (proto === "http") return "http";
+  return "http";
+}
+
+function isOriginAllowed(
+  requestOrigin: string | undefined,
+  requestHost: string | undefined,
+  scheme: "http" | "https",
+): boolean {
+  // Non-browser/native clients often omit Origin. Preserve that behavior while
+  // rejecting cross-origin browser upgrades.
+  if (!requestOrigin) return true;
+  if (!requestHost) return false;
+
+  try {
+    const originUrl = new URL(requestOrigin);
+    // Require a true same-origin match: scheme + host[:port]. Reject values
+    // that are merely same-host across http/https, and reject non-origin forms.
+    return (
+      originUrl.origin === requestOrigin &&
+      originUrl.protocol === `${scheme}:` &&
+      originUrl.host.toLowerCase() === requestHost.toLowerCase()
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function installKanbanWs(
   server: HttpServer,
   store: TaskStore,
   runtime: KanbanRuntime,
+  opts: InstallWsOptions = {},
 ): InstallWsResult {
+  const trustProxy = opts.trustProxy === true;
   const wss = new WebSocketServer({ noServer: true });
   const onUpgrade = (
     req: IncomingMessage,
@@ -27,6 +78,20 @@ export function installKanbanWs(
   ): void => {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== "/ws/kanban-pty") return;
+
+    // Validate browser Origin as true same-origin against Host + request scheme.
+    // Forwarded scheme is used only when trustProxy is explicitly enabled.
+    if (
+      !isOriginAllowed(
+        req.headers.origin,
+        req.headers.host,
+        requestScheme(req, trustProxy),
+      )
+    ) {
+      socket.destroy();
+      return;
+    }
+
     const taskId = url.searchParams.get("taskId") ?? "";
     const cols = Math.max(
       20,

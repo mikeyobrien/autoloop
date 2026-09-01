@@ -51,7 +51,9 @@ interface Harness {
   wsCloseHandle: { close(): void };
 }
 
-async function boot(opts: { throwOnEnsure?: boolean } = {}): Promise<Harness> {
+async function boot(
+  opts: { throwOnEnsure?: boolean; host?: string; trustProxy?: boolean } = {},
+): Promise<Harness> {
   const store = freshStore();
   const pty = new FakePty();
   const session = new PtySession(pty, () => {});
@@ -75,8 +77,11 @@ async function boot(opts: { throwOnEnsure?: boolean } = {}): Promise<Harness> {
     openSockets.add(s);
     s.on("close", () => openSockets.delete(s));
   });
-  const wsCloseHandle = installKanbanWs(server, store, runtime);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const wsCloseHandle = installKanbanWs(server, store, runtime, {
+    trustProxy: opts.trustProxy === true,
+  });
+  const host = opts.host ?? "127.0.0.1";
+  await new Promise<void>((resolve) => server.listen(0, host, resolve));
   const addr = server.address();
   if (!addr || typeof addr === "string")
     throw new Error("unexpected server address");
@@ -217,5 +222,166 @@ describe("installKanbanWs", () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 200));
     expect(harness.ensureCalls).toEqual([]);
     ws.terminate();
+  });
+});
+
+describe("installKanbanWs: origin enforcement (Slice B)", () => {
+  let harness: Harness | undefined;
+
+  beforeEach(() => {
+    harness = undefined;
+  });
+
+  afterEach(async () => {
+    if (harness) await harness.close();
+  }, 20_000);
+
+  it("accepts localhost upgrade without Origin header", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "no-origin" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.on("open", () => resolve());
+      ws.on("error", reject);
+    });
+    expect(harness.ensureCalls.length).toBe(1);
+    ws.close();
+    await new Promise<void>((resolve) => ws.on("close", () => resolve()));
+  });
+
+  it("rejects upgrade with cross-origin Origin header", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "cross-origin" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: { Origin: "http://attacker.example.com" },
+      },
+    );
+    const closeOrError = await new Promise<string>((resolve) => {
+      ws.on("error", () => resolve("error"));
+      ws.on("close", () => resolve("close"));
+      setTimeout(() => resolve("timeout"), 500);
+    });
+    // Cross-origin should be rejected (close or error before open)
+    expect(["error", "close"]).toContain(closeOrError);
+    // Runtime should NOT have been invoked
+    expect(harness?.ensureCalls).toEqual([]);
+  });
+
+  it("accepts upgrade from matching localhost origin", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "matching-origin" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: { Origin: `http://127.0.0.1:${harness.port}` },
+      },
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.on("open", () => resolve());
+      ws.on("error", reject);
+    });
+    expect(harness.ensureCalls.length).toBe(1);
+    ws.close();
+    await new Promise<void>((resolve) => ws.on("close", () => resolve()));
+  });
+
+  it("rejects same-host Origin with mismatched scheme", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "scheme-mismatch" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: { Origin: `https://127.0.0.1:${harness.port}` },
+      },
+    );
+    const closeOrError = await new Promise<string>((resolve) => {
+      ws.on("error", () => resolve("error"));
+      ws.on("close", () => resolve("close"));
+      setTimeout(() => resolve("timeout"), 500);
+    });
+    expect(["error", "close"]).toContain(closeOrError);
+    expect(harness?.ensureCalls).toEqual([]);
+  });
+
+  it("rejects forged X-Forwarded-Proto https Origin without trustProxy", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "forged-forwarded" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: {
+          Origin: `https://127.0.0.1:${harness.port}`,
+          "X-Forwarded-Proto": "https",
+        },
+      },
+    );
+    const closeOrError = await new Promise<string>((resolve) => {
+      ws.on("error", () => resolve("error"));
+      ws.on("close", () => resolve("close"));
+      setTimeout(() => resolve("timeout"), 500);
+    });
+    expect(["error", "close"]).toContain(closeOrError);
+    expect(harness?.ensureCalls).toEqual([]);
+  });
+
+  it("accepts https Origin when trustProxy honors X-Forwarded-Proto", async () => {
+    harness = await boot({ host: "127.0.0.1", trustProxy: true });
+    const t = harness.store.add({ title: "forwarded-https" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: {
+          Origin: `https://127.0.0.1:${harness.port}`,
+          "X-Forwarded-Proto": "https",
+        },
+      },
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.on("open", () => resolve());
+      ws.on("error", reject);
+    });
+    expect(harness.ensureCalls.length).toBe(1);
+    ws.close();
+    await new Promise<void>((resolve) => ws.on("close", () => resolve()));
+  });
+
+  it("accepts same-origin upgrade when bound to all interfaces", async () => {
+    harness = await boot({ host: "0.0.0.0" });
+    const t = harness.store.add({ title: "wildcard-bind-origin" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: { Origin: `http://127.0.0.1:${harness.port}` },
+      },
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.on("open", () => resolve());
+      ws.on("error", reject);
+    });
+    expect(harness.ensureCalls.length).toBe(1);
+    ws.close();
+    await new Promise<void>((resolve) => ws.on("close", () => resolve()));
+  });
+
+  it("rejects upgrade with malformed Origin header", async () => {
+    harness = await boot({ host: "127.0.0.1" });
+    const t = harness.store.add({ title: "malformed-origin" });
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${harness.port}/ws/kanban-pty?taskId=${t.id}`,
+      {
+        headers: { Origin: "not-a-url" },
+      },
+    );
+    const closeOrError = await new Promise<string>((resolve) => {
+      ws.on("error", () => resolve("error"));
+      ws.on("close", () => resolve("close"));
+      setTimeout(() => resolve("timeout"), 500);
+    });
+    expect(["error", "close"]).toContain(closeOrError);
+    expect(harness?.ensureCalls).toEqual([]);
   });
 });

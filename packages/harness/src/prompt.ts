@@ -131,6 +131,10 @@ function deriveRunContext(
     tasksMaterialized,
     loop.tasks.budgetChars,
   );
+  const authoritative = authoritativeRunLines(
+    runLines,
+    loop.emitAuthority?.accepted,
+  );
   return {
     scratchpadText: renderRunScratchpadPrompt(runLines),
     memoryText: resolveLoopMemory(loop).render(
@@ -151,10 +155,10 @@ function deriveRunContext(
       total: tasksMaterialized.open.length + tasksMaterialized.done.length,
     },
     guidanceMessages: drainGuidance(runLines),
-    routing: iterationRoutingContext(loop.topology, runLines),
-    backpressure: latestInvalidNote(runLines),
-    invalidCount: invalidEventCount(runLines),
-    lastRejected: lastRejectedTopic(runLines),
+    routing: iterationRoutingContext(loop.topology, authoritative),
+    backpressure: latestInvalidNote(authoritative),
+    invalidCount: invalidEventCount(authoritative),
+    lastRejected: lastRejectedTopic(authoritative),
   };
 }
 
@@ -250,11 +254,13 @@ function latestWaveJoinFinishLine(
 ): string {
   let current = "";
   for (const line of lines) {
-    if (extractTopic(line) === "wave.join.finish") {
-      if (extractField(line, "joined_topic") === joinedTopic) {
-        current = line;
-      }
-    }
+    if (extractTopic(line) !== "wave.join.finish") continue;
+    if (extractField(line, "joined_topic") !== joinedTopic) continue;
+    // Under emit-authority filtering, only parent-stamped join finish lines
+    // remain. Still require an authority_id field so a raw forged line cannot
+    // win if filtering is bypassed.
+    if (!extractField(line, "authority_id")) continue;
+    current = line;
   }
   return current;
 }
@@ -286,20 +292,6 @@ function csvFieldList(line: string, field: string): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s !== "");
-}
-
-export function routingEventFromLines(lines: string[]): string {
-  let current = "loop.start";
-  for (const line of lines) {
-    const topic = extractTopic(line);
-    if (topic === "event.invalid") {
-      const extracted = extractField(line, "recent_event");
-      if (extracted) current = extracted;
-    } else if (routingTopic(topic)) {
-      current = topic;
-    }
-  }
-  return current;
 }
 
 export function latestInvalidNote(runLines: string[]): string {
@@ -708,4 +700,170 @@ function maxReviewPromptIteration(runLines: string[]): number {
     }
   }
   return current;
+}
+
+/**
+ * Validate agent-emitted events against harness-computed allowed events.
+ * Returns a set of topics that passed validation.
+ *
+ * This is the core of Slice C: harness-side authority enforcement.
+ * Backend-controlled environment variables (AUTOLOOP_ALLOWED_EVENTS) are hints,
+ * not authority. The harness re-validates by replaying the journal and checking
+ * against its own routing state, preventing a forged backend from satisfying
+ * required events, corrupting routing, or falsely completing the loop.
+ *
+ * Coordination and ask topics are excluded (non-routing, already bypassed in emit).
+ */
+export function acceptedAuthoritiesFromRun(
+  runLines: string[],
+): Map<string, { topic: string; iteration: string }> {
+  const allowedByIteration = new Map<string, Set<string>>();
+  for (const line of runLines) {
+    if (extractTopic(line) !== "iteration.start") continue;
+    allowedByIteration.set(
+      extractIteration(line),
+      new Set(csvFieldList(line, "allowed_events")),
+    );
+  }
+
+  const accepted = new Map<string, { topic: string; iteration: string }>();
+  for (const line of runLines) {
+    if (extractField(line, "source") !== "agent") continue;
+    const authorityId = extractField(line, "authority_id");
+    if (!authorityId || accepted.has(authorityId)) continue;
+    // Parent issuance ids are `${uuid}:${index}`. Reject free-form forgeries.
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:\d+$/i.test(
+        authorityId,
+      )
+    ) {
+      continue;
+    }
+    const topic = extractTopic(line);
+    const iteration = extractIteration(line);
+    if (!allowedByIteration.get(iteration)?.has(topic)) continue;
+    accepted.set(authorityId, { topic, iteration });
+  }
+  return accepted;
+}
+
+function trustedNonAgentTopic(topic: string): boolean {
+  // Non-agent journal lines without parent authority_id are not a trust boundary.
+  // Only non-routing harness telemetry may pass through unstamped. Routing-capable
+  // system topics, parallel joins, and event.invalid require parent acceptance.
+  if (topic === "event.invalid") return false;
+  if (!systemTopic(topic)) return false;
+  return !routingTopic(topic);
+}
+
+export function authoritativeRunLines(
+  runLines: string[],
+  acceptedAuthorities?: Map<string, { topic: string; iteration: string }>,
+): string[] {
+  if (!acceptedAuthorities) return runLines;
+  const seen = new Set<string>();
+  return runLines.filter((line) => {
+    const topic = extractTopic(line);
+    const authorityId = extractField(line, "authority_id");
+
+    // Parent-stamped records (agent emits, harness joins, parent invalids).
+    if (authorityId) {
+      if (seen.has(authorityId)) return false;
+      const accepted = acceptedAuthorities.get(authorityId);
+      if (
+        !accepted ||
+        accepted.topic !== topic ||
+        accepted.iteration !== extractField(line, "iteration")
+      ) {
+        return false;
+      }
+      seen.add(authorityId);
+      return true;
+    }
+
+    // Unstamped non-agent lines: non-routing telemetry only.
+    if (extractField(line, "source") === "agent") return false;
+    return trustedNonAgentTopic(topic);
+  });
+}
+
+/**
+ * Derive routing position. Defaults to `loop.start`. Only routing topics move
+ * the position. `event.invalid` is intentionally ignored: the prior routing
+ * event remains in the journal, and forged invalid records must not steer.
+ * Callers under emit authority should pass already-filtered authoritative lines
+ * so routing-capable system forgeries never appear.
+ */
+export function routingEventFromLines(lines: string[]): string {
+  let current = "loop.start";
+  for (const line of lines) {
+    const topic = extractTopic(line);
+    if (topic === "event.invalid") continue;
+    if (routingTopic(topic)) {
+      current = topic;
+    }
+  }
+  return current;
+}
+
+export function validateAgentEventsForRun(
+  runLines: string[],
+  acceptedAuthorities?: Map<string, { topic: string; iteration: string }>,
+): Set<string> {
+  const authoritativeLines = authoritativeRunLines(
+    runLines,
+    acceptedAuthorities,
+  );
+  const allowedByIteration = new Map<string, Set<string>>();
+  for (const line of authoritativeLines) {
+    if (extractTopic(line) !== "iteration.start") continue;
+    allowedByIteration.set(
+      extractIteration(line),
+      new Set(csvFieldList(line, "allowed_events")),
+    );
+  }
+
+  // Completion and required-event membership are agent-ingress concerns.
+  // System topics stay available for routing/projections via authoritative lines,
+  // but they never satisfy completion.requiredEvents / completion.event.
+  const validatedTopics = new Set<string>();
+  for (const line of authoritativeLines) {
+    const topic = extractTopic(line);
+    if (!topic) continue;
+    if (extractField(line, "source") !== "agent") continue;
+    if (coordinationTopic(topic) || topic === "human.ask") continue;
+    if (allowedByIteration.get(extractIteration(line))?.has(topic)) {
+      validatedTopics.add(topic);
+    }
+  }
+  return validatedTopics;
+}
+
+export function validateAgentEventsForTurn(
+  turnLines: string[],
+  allowedEvents: string[],
+): Set<string> {
+  const validatedTopics = new Set<string>();
+  const allowedSet = new Set(allowedEvents);
+
+  for (const line of turnLines) {
+    const source = extractField(line, "source");
+    const topic = extractTopic(line);
+
+    // Only validate agent-emitted events; harness/operator events are trusted.
+    if (source !== "agent") continue;
+
+    // Skip coordination and ask topics (non-routing, excluded from completion logic).
+    if (coordinationTopic(topic) || topic === "human.ask") continue;
+
+    // Check if this agent event is in the harness-computed allowed set.
+    if (allowedSet.has(topic)) {
+      validatedTopics.add(topic);
+    }
+    // Note: invalid agent events are *not* added to the set.
+    // They remain in the journal for audit but are excluded from
+    // completion/routing logic below.
+  }
+
+  return validatedTopics;
 }

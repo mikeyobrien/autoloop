@@ -73,6 +73,18 @@ describe("encodeEvent edge cases", () => {
     expect(line).toContain('"source": "agent"');
   });
 
+  it("encodes an optional harness authority id", () => {
+    const line = encodeEvent({
+      shape: "payload",
+      run: "r1",
+      topic: "tasks.ready",
+      payload: "done",
+      source: "agent",
+      authorityId: "issuance-1",
+    });
+    expect(JSON.parse(line).authority_id).toBe("issuance-1");
+  });
+
   it("appends a newline to the encoded output", () => {
     const line = encodeEvent({
       shape: "fields",
