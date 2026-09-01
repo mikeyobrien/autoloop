@@ -47,7 +47,12 @@ import {
   parallelTriggerTopic,
   systemTopic,
 } from "./emit.js";
-import { runFileModAudit } from "./file-mod-audit.js";
+import {
+  beginFileModAudit,
+  type FileModAuditResult,
+  type FrozenPathSnapshot,
+  runFileModAudit,
+} from "./file-mod-audit.js";
 import { loopStartMs } from "./guards.js";
 import { buildHookEnv, captureGitSha, runPhaseHooks } from "./hooks.js";
 import {
@@ -111,6 +116,14 @@ export async function runIteration(
   }
 
   let iter = buildIterationContext(loop, iteration);
+
+  // T-009 frozen-paths guard (open phase): when frozen patterns apply to the
+  // acting role, snapshot the matching files before the backend runs so
+  // runFileModAudit can detect + revert in-iteration modifications.
+  const frozenSnapshot: FrozenPathSnapshot | null = beginFileModAudit(
+    loop,
+    iter,
+  );
 
   // Clamp the iteration timeout to the remaining loop wall-clock budget so a
   // long iteration never overshoots event_loop.max_runtime. Applied before
@@ -279,7 +292,10 @@ export async function runIteration(
   // Emit-boundary file-mod audit (opt-in): flag file writes by a role with
   // disallowed_tools/read_only. Purely observational — journals/emits a typed
   // event for parent orchestrators; never alters control flow itself.
-  runFileModAudit(loop, iter, iteration);
+  // T-009 frozen-paths guard: when frozen patterns apply, in-iteration
+  // modifications of frozen paths are reverted to the pre-iteration bytes and
+  // journaled/emitted as policy.frozen_path_violation.
+  const fileModAudit = runFileModAudit(loop, iter, iteration, frozenSnapshot);
   log(loop, "debug", `iteration ${iteration} finish exit_code=${exitCode}`);
   loop.onEvent?.({
     type: "iteration.footer",
@@ -303,7 +319,7 @@ export async function runIteration(
   if (exitCode !== 0) {
     return handleBackendFailure(loop, iteration, output, iterate);
   }
-  return finishIteration(loop, iter, output, iterate);
+  return finishIteration(loop, iter, output, iterate, fileModAudit);
 }
 
 /**
@@ -592,6 +608,17 @@ export async function finishIteration(
   iter: IterationContext,
   output: string,
   iterate: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
+  // Result of the emit-boundary audit run just before this call (same
+  // iteration). Carries the T-009 frozen-path violations used by the
+  // frozen_paths_block deny gate below.
+  fileModAudit: FileModAuditResult = {
+    ran: false,
+    violated: false,
+    violations: [],
+    frozenViolated: false,
+    frozenViolations: [],
+    frozenReverts: [],
+  },
 ): Promise<RunSummary> {
   const runLines = readRunLines(loop.paths.journalFile, loop.runtime.runId);
   const allTopics = runLines.map(extractTopic).filter((t) => t !== "");
@@ -723,6 +750,29 @@ export async function finishIteration(
     resolved.action === "complete_event" ||
     resolved.action === "complete_promise"
   ) {
+    // T-009 frozen-paths guard (block mode): a frozen-path violation denies
+    // the done-claim outright — before the acceptance gate — so a completion
+    // announced on top of reverted writes is never accepted. The violation is
+    // re-injected as operator guidance for the next iteration.
+    if (loop.policy?.frozenPathsBlock === true && fileModAudit.frozenViolated) {
+      const denied = fileModAudit.frozenViolations
+        .map((v) => `- \`${v.role}\`: ${v.files.join(", ")}`)
+        .join("\n");
+      const message =
+        "Completion was blocked: frozen-path files were modified during " +
+        "this iteration and have been restored to their prior state. " +
+        "Do not modify frozen paths; re-route the work instead. " +
+        `Frozen-path violations:\n\n${denied}`;
+      appendOperatorEvent(
+        loop.paths.journalFile,
+        loop.runtime.runId,
+        String(iter.iteration),
+        "operator.guidance",
+        message,
+      );
+      progress(emitted.topic, "blocked:frozen_path");
+      return iterate(loop, iter.iteration + 1);
+    }
     const reason =
       resolved.action === "complete_event"
         ? "completion_event"

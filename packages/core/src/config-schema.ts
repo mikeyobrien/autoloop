@@ -46,6 +46,13 @@ export function defaults(): Config {
       // the working tree against HEAD and emit a policy.file_modification_violation
       // event if the acting role has disallowed_tools/read_only and files changed.
       audit_file_mods: "false",
+      // T-009 frozen-paths guard (opt-in): CSV of workdir-relative glob paths
+      // (e.g. "vision.md,docs/owner.md") that loop roles must not modify.
+      // Empty disables the guard entirely.
+      frozen_paths: "",
+      // When true, a frozen-path violation additionally denies the acting
+      // role's completion claim (observational by default).
+      frozen_paths_block: "false",
     },
     backend: {
       kind: "",

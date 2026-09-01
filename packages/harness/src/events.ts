@@ -104,6 +104,15 @@ export type LoopEvent =
       files: string[];
       reason: "disallowed_tools" | "read_only";
     }
+  // T-009 frozen-paths guard: the acting role changed files matching its
+  // frozen_paths globs (or the run-wide event_loop.frozen_paths list).
+  | {
+      type: "policy.frozen_path_violation";
+      runId: string;
+      iteration: number;
+      role: string;
+      files: string[];
+    }
   | {
       type: "summary";
       runId: string;

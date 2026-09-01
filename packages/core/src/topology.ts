@@ -45,6 +45,15 @@ export interface Role {
    * by the emit-boundary file-mod audit alongside `disallowedTools`.
    */
   readOnly?: boolean;
+  /**
+   * Glob paths (workdir-relative, e.g. "docs/vision.md") this loop role must
+   * not modify. Consulted by the emit-boundary file-mod audit: a role with a
+   * frozen_paths list that changes a matching file is flagged (and, under
+   * `event_loop.frozen_paths_block`, its completion claim is denied). Roles
+   * without the field are unrestricted, so writes made outside any loop role
+   * (e.g. operator/owner edits) are unaffected.
+   */
+  frozenPaths?: string[];
 }
 
 export interface RoleAggregate {
@@ -503,6 +512,10 @@ function parseRolePermissions(r: Record<string, unknown>): Partial<Role> {
   if (typeof r.read_only === "boolean") {
     out.readOnly = r.read_only;
   }
+  if (Array.isArray(r.frozen_paths)) {
+    const paths = r.frozen_paths.map(String).filter((t) => t !== "");
+    if (paths.length > 0) out.frozenPaths = paths;
+  }
   return out;
 }
 
@@ -611,11 +624,18 @@ function renderRoleBackendLines(role: Role, indent: string): string[] {
   if (role.readOnly !== undefined) {
     lines.push(`${indent}read_only: ${role.readOnly}`);
   }
+  if (role.frozenPaths !== undefined) {
+    lines.push(`${indent}frozen_paths: ${listText(role.frozenPaths)}`);
+  }
   return lines;
 }
 
 function roleHasPermissions(role: Role): boolean {
-  return role.disallowedTools !== undefined || role.readOnly !== undefined;
+  return (
+    role.disallowedTools !== undefined ||
+    role.readOnly !== undefined ||
+    role.frozenPaths !== undefined
+  );
 }
 
 function rolePrompt(role: Role, projectDir: string): string {

@@ -70,6 +70,17 @@ describe("coreSystemTopic", () => {
     expect(coreSystemTopic("wait.request")).toBe(false);
   });
 
+  it("recognizes guidance consumption markers as system topics", () => {
+    // Regression: operator.guidance.consumed is harness-written (prompt.ts
+    // journals it whenever operator guidance is delivered into a prompt).
+    // Missing from the system set, latestAgentEventRecord treated it as the
+    // acting role's emit and rejected the completion claim on the very
+    // iteration that consumed the guidance (observed in the T-009 frozen-
+    // paths deny-gate E2E: a compliant retry iteration never completed).
+    expect(coreSystemTopic("operator.guidance.consumed")).toBe(true);
+    expect(systemTopic("operator.guidance.consumed")).toBe(true);
+  });
+
   it("rejects non-system topics", () => {
     expect(coreSystemTopic("task.complete")).toBe(false);
     expect(coreSystemTopic("gaps.identified")).toBe(false);
