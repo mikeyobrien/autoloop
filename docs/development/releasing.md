@@ -5,7 +5,7 @@ Every workspace package publishes in lock-step with the root package.
 
 ## Prerequisites
 
-- `main` branch is green (CI passes).
+- `main` is green locally (`npm run check`) and the merge commit has `signoff` (see [Local CI signoff](../ci-local.md)).
 - All workspace `package.json` files are on the same version.
 - `CHANGELOG.md` has an entry for the new version.
 
@@ -66,16 +66,19 @@ npm view @mobrienv/autoloop-dashboard@0.7.0
 npm view @mobrienv/autoloop-presets@0.7.0
 ```
 
-## CI pipeline
+## CI / merge gate
 
-Every push to `main` and every PR triggers `.github/workflows/ci.yml`:
+Pull requests do **not** run GitHub Actions. Prove green locally, then
+`gh signoff` (status context `signoff`). See [Local CI signoff](../ci-local.md).
 
-| Step | Command |
-|------|---------|
-| Build | `npm run build` (every workspace + root `tsc`) |
-| Test | `npm test` (Vitest) |
+Tag and docs deploy still use Actions:
 
-Node 24 is used in both CI and publish workflows.
+| Workflow | When |
+|----------|------|
+| `.github/workflows/publish-npm.yml` | `v*` tags / `workflow_dispatch` — npm + GitHub Release + binaries |
+| `.github/workflows/docs.yml` | `main` docs paths / `workflow_dispatch` — GitHub Pages |
+
+Node 24 is used in the remaining publish and docs workflows.
 
 ## Local quality checks
 
