@@ -84,7 +84,10 @@ export default defineConfig({
         },
         {
           text: "Development",
-          items: [{ text: "Releasing", link: "/development/releasing" }],
+          items: [
+            { text: "Releasing", link: "/development/releasing" },
+            { text: "Local CI signoff", link: "/ci-local" },
+          ],
         },
       ],
     },

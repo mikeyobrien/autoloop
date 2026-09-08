@@ -16,3 +16,18 @@ Run `npm run test:coverage` before committing to verify coverage thresholds.
 Run `npm run check` for the full gate (lint + types + coverage).
 
 If a hook fails, fix the underlying issue rather than bypassing it.
+
+## Local CI signoff (no PR runners)
+
+This repo does not run GitHub Actions on pull requests. After the gates
+above are green and the commit is pushed, post the merge receipt:
+
+```sh
+gh extension install basecamp/gh-signoff
+gh signoff
+```
+
+That writes commit status context `signoff`. Hayes/Mikey require it for merge
+(`gh signoff install` or the ruleset equivalent). Exact commands and what
+Actions remain: [docs/ci-local.md](docs/ci-local.md). Do not add a PR `ci.yml`
+back.

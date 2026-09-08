@@ -329,8 +329,25 @@ See [CLI reference](https://mikeyobrien.github.io/autoloop/reference/cli#mock-ba
 - [Worktree isolation](https://mikeyobrien.github.io/autoloop/features/worktree)
 - [Releasing](https://mikeyobrien.github.io/autoloop/development/releasing)
 
+## Local CI / merge gate
+
+No GitHub Actions on PRs. Prove green locally, then sign off. Full pattern:
+[docs/ci-local.md](docs/ci-local.md).
+
+```sh
+npm ci
+npm run build
+npm run check          # biome + tsc --noEmit + vitest coverage
+
+gh extension install basecamp/gh-signoff
+gh signoff             # posts context `signoff` — required to merge
+```
+
+Publish and docs deploy still run on tags / `main` (`publish-npm.yml`,
+`docs.yml`). Do not add a PR `ci.yml` back.
+
 ## Contributing
 
 Bug reports and pull requests are welcome at [github.com/mikeyobrien/autoloop](https://github.com/mikeyobrien/autoloop/issues).
 
-Prerequisites for development: Node.js >= 18, npm. Run `npm install && npm run build` to get started, then `npm test` to verify.
+Prerequisites for development: Node.js >= 18, npm. Run `npm install && npm run build` to get started, then `npm run check` to verify. Merge requires local proof plus `gh signoff` (see [docs/ci-local.md](docs/ci-local.md)).
