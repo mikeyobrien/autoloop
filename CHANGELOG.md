@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-10
+
 ### Added
 - **Memory plugins.** Loop memory is selected by `memory.kind` (default
   `jsonl`, same `.autoloop/memory.jsonl` store). A second plugin can be
@@ -20,11 +22,10 @@
   `backend.environment_policy = "hardened"` (or the review-specific override)
   removes process-injection and Git-authority variables, repository-owned or
   relative `PATH` entries, and rejects credential-bearing proxy URLs.
-- **Standalone binaries provide a Node-free installation channel.** GitHub
-  releases now attach Bun-compiled executables for macOS and Linux on arm64
-  and x64, plus a `SHA256SUMS` file. `scripts/build-standalone.sh` builds all
-  four targets (or a selected host/target) and embeds the package version at
-  compile time.
+- **Frozen-paths guard.** Opt-in `event_loop.frozen_paths` lists workdir-relative
+  globs that loop roles must not modify. In-iteration writes are reverted and
+  journaled as `policy.frozen_path_violation`. `event_loop.frozen_paths_block`
+  also denies the acting role's completion claim and injects operator guidance.
 
 ### Fixed
 - **Parked waiting runs appear in run health.** `categorizeRecords` now
@@ -35,6 +36,21 @@
   review, harness-instruction, and topology role paths now reject parent
   traversal and symlink escapes while preserving optional and explicitly empty
   file semantics.
+- **`--events` creates missing parent directories** instead of failing when the
+  events path's parent does not exist.
+- **Dashboard `POST /runs` spawn no longer crashes** when the CLI self-command
+  contains quoted arguments.
+
+## [0.10.1] - 2026-07-19
+
+### Added
+- **Standalone binaries provide a Node-free installation channel.** GitHub
+  releases now attach Bun-compiled executables for macOS and Linux on arm64
+  and x64, plus a `SHA256SUMS` file. `scripts/build-standalone.sh` builds all
+  four targets (or a selected host/target) and embeds the package version at
+  compile time.
+
+### Fixed
 - **Generated tool wrappers reliably re-invoke every CLI distribution.**
   Checkout builds now use the Node interpreter instead of asking `/bin/sh` to
   execute the ESM entry point, while standalone builds re-invoke their binary
