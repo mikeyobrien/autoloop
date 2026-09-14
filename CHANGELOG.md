@@ -35,6 +35,13 @@
   compile time.
 
 ### Fixed
+- **Trailing emits no longer nullify `wait.request` parks (T-031).** The
+  finished-turn park is now order-insensitive: routing no longer keys on the
+  LAST agent event only, so a `wait.request` followed by an allowed emit
+  (e.g. `step.done`) parks exactly as if the request were last — `wait.open`
+  journaled, registry `waiting`, process-free — instead of silently starting
+  the next iteration with no park. When `wait.request` is already the last
+  event, behavior is unchanged.
 - **Test suite is hermetic inside an autoloop run.** The hermetic test setup
   scrubs inherited `AUTOLOOP_*` environment before tests, so `npm test` no
   longer mis-resolves the active project when run from within a loop run.

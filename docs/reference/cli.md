@@ -490,6 +490,8 @@ Fixture schema:
 | `delay_ms` | number | no | Delay before output (for timeout testing) |
 | `emit_event` | string | no | Event topic to emit via `autoloop emit` |
 | `emit_payload` | string | no | Payload for the emitted event |
+| `trailing_emit_event` | string | no | Second event topic emitted after the primary (T-031 trailing-emit gate) |
+| `trailing_emit_payload` | string | no | Payload for the trailing emitted event |
 
 Bundled fixtures in `test/fixtures/backend/`:
 
@@ -500,6 +502,7 @@ Bundled fixtures in `test/fixtures/backend/`:
 | `no-completion.json` | No event, no promise, exits 0 |
 | `timeout.json` | 30s delay (exceeds typical test timeout) |
 | `non-zero-exit.json` | Exits 1 |
+| `wait-request-trailing.json` | Emits `wait.request` then an allowed trailing event (parks via T-031 order-insensitive gate) |
 
 ## Developer Scripts
 
