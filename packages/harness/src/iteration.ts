@@ -35,6 +35,7 @@ import {
 import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { awaitHumanResponse } from "./ask.js";
+import { armAutoResume } from "./auto-resume.js";
 import {
   backoffDelayMs,
   circuitDecision,
@@ -905,7 +906,13 @@ function finishWaitIteration(
     duration: request.duration || undefined,
   });
   progress("wait.request", "wait:open");
-  return stopWaiting(loop, iter.iteration, waitId, request.reason);
+  const summary = stopWaiting(loop, iter.iteration, waitId, request.reason);
+  // T-030: a park carrying a positive duration arms the detached auto-resume
+  // timer, which re-invokes the existing resume path (wait.close +
+  // loop.resume, same run_id) after durationMs. Indefinite parks (durationMs
+  // == 0) spawn nothing — process-free waiting behavior is unchanged.
+  armAutoResume(loop, waitId, request);
+  return summary;
 }
 
 async function rejectInvalidAndContinue(

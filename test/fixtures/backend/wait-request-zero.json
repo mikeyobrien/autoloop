@@ -1,0 +1,7 @@
+{
+  "output": "Parking indefinitely.",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "wait.request",
+  "emit_payload": "name=auto-zero; duration=0s; reason=indefinite control;"
+}
