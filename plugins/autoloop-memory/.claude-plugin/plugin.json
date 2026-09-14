@@ -1,6 +1,6 @@
 {
   "name": "autoloop-memory",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "Persist and recall Autoloop loop memory — add, list, find, and render learnings and preferences.",
   "homepage": "https://github.com/mikeyobrien/autoloop",
   "repository": "https://github.com/mikeyobrien/autoloop",
