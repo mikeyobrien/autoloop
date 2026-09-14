@@ -1,0 +1,9 @@
+{
+  "output": "Parking after a trailing emit.",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "wait.request",
+  "emit_payload": "name=trailing-park; duration=0s; reason=trailing emit gate;",
+  "trailing_emit_event": "tasks.ready",
+  "trailing_emit_payload": "verify step complete;"
+}

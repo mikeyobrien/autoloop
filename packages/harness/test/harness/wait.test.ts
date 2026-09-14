@@ -326,4 +326,98 @@ describe("finishIteration parks on wait.request", () => {
     expect(record.status).toBe("waiting");
     expect(record.pid).toBeUndefined();
   });
+
+  it("still parks when another allowed event trails the request (T-031)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "autoloop-wait-trailing-"));
+    const stateDir = join(dir, ".autoloop");
+    mkdirSync(stateDir, { recursive: true });
+    const journalFile = join(stateDir, "journal.jsonl");
+    const registryFile = join(stateDir, "registry.jsonl");
+    appendEvent(journalFile, "swift-agent", "1", "loop.start", "");
+    appendAgentEvent(
+      journalFile,
+      "swift-agent",
+      "1",
+      "wait.request",
+      "name=trailing-park; duration=300s; reason=between steps;",
+    );
+    // Bug repro (T-031): routing used to key on the LAST agent event only,
+    // so this trailing allowed emit silently nullified the wait.request.
+    appendAgentEvent(
+      journalFile,
+      "swift-agent",
+      "1",
+      "step.done",
+      "repro complete;",
+    );
+
+    const events: Array<{ type: string }> = [];
+    const loop = {
+      ask: { enabled: true, event: "human.ask", timeoutMs: 0, pollMs: 0 },
+      parallel: { enabled: false },
+      completion: {
+        promise: "LOOP_COMPLETE",
+        event: "task.complete",
+        requiredEvents: [],
+        mustBeLast: false,
+      },
+      topology: {
+        roles: [],
+        handoff: {},
+        handoffKeys: [],
+        gates: [],
+        stages: [],
+      },
+      paths: {
+        journalFile,
+        registryFile,
+        tasksFile: join(stateDir, "tasks.jsonl"),
+        stateDir,
+      },
+      runtime: { runId: "swift-agent" },
+      launch: {
+        preset: "test",
+        trigger: "cli",
+        createdAt: new Date().toISOString(),
+        parentRunId: "",
+      },
+      objective: "park with trailing emit",
+      backend: { kind: "command", command: "echo", args: [] },
+      limits: { maxIterations: 5 },
+      lastVerdict: undefined,
+      onEvent: (e: { type: string }) => {
+        events.push(e);
+      },
+    } as unknown as LoopContext;
+
+    const iterate = vi.fn();
+    const summary = await finishIteration(
+      loop,
+      {
+        iteration: 1,
+        recentEvent: "loop.start",
+        allowedRoles: ["builder"],
+        allowedEvents: ["step.done"],
+      },
+      "parking",
+      iterate,
+    );
+
+    // The park must win over the trailing emit: no next iteration starts.
+    expect(iterate).not.toHaveBeenCalled();
+    expect(summary.stopReason).toBe("waiting");
+    expect(summary.iterations).toBe(1);
+    const journal = readFileSync(journalFile, "utf-8");
+    expect(journal).toContain('"topic": "wait.open"');
+    expect(journal).toContain('"wait_id": "trailing-park"');
+    expect(journal).toContain('"duration_ms": "300000"');
+    expect(journal).toContain('"topic": "loop.stop"');
+    expect(journal).toContain('"reason": "waiting"');
+    expect(events.some((e) => e.type === "wait.open")).toBe(true);
+    const record = JSON.parse(
+      readFileSync(registryFile, "utf-8").trim().split("\n").at(-1) ?? "{}",
+    );
+    expect(record.status).toBe("waiting");
+    expect(record.pid).toBeUndefined();
+  });
 });

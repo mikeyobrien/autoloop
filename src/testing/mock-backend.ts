@@ -41,6 +41,13 @@ interface Fixture {
    * without an endless park/re-park cycle.
    */
   emit_once?: boolean;
+  /**
+   * Optional second event emitted AFTER the primary emit in the same
+   * backend run — drives the trailing-emit park gate (a wait.request
+   * followed by a trailing allowed event must still park).
+   */
+  trailing_emit_event?: string;
+  trailing_emit_payload?: string;
 }
 
 function fixturePathFromArgs(): string {
@@ -68,6 +75,8 @@ function loadFixture(): Fixture {
       usage: parsed.usage,
       trap_usr1: parsed.trap_usr1 ?? false,
       emit_once: parsed.emit_once ?? false,
+      trailing_emit_event: parsed.trailing_emit_event,
+      trailing_emit_payload: parsed.trailing_emit_payload,
     };
   } catch (err) {
     process.stderr.write(`mock-backend: failed to load fixture: ${err}\n`);
@@ -127,6 +136,13 @@ async function main(): Promise<void> {
 
   if (fixture.emit_event && shouldEmit(fixture)) {
     emitEvent(fixture.emit_event, fixture.emit_payload ?? "");
+  }
+
+  // T-031 gate: a trailing allow emit after wait.request must not nullify
+  // the park — the harness must still listen for the wait regardless of
+  // event order inside the turn.
+  if (fixture.trailing_emit_event && shouldEmit(fixture)) {
+    emitEvent(fixture.trailing_emit_event, fixture.trailing_emit_payload ?? "");
   }
 
   if (fixture.output) {
