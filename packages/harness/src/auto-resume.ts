@@ -56,10 +56,20 @@ export function armAutoResume(
     loop.runtime.selfCommand,
     loop.paths.stateDir,
   ];
+  // The sleeper (and the resume engine it spawns) may outlive the test
+  // suite. Keep inherited NODE_V8_COVERAGE out of their environment:
+  // vitest's v8 provider deletes its .tmp dir at suite end, and a late
+  // child exiting afterwards would ENOENT trying to dump its coverage.
+  const childEnv = { ...process.env };
+  delete childEnv.NODE_V8_COVERAGE;
   const child = spawn(
     process.execPath,
     [autoResumeChildPath(), JSON.stringify(spec)],
-    { detached: true, stdio: "ignore" },
+    {
+      detached: true,
+      stdio: "ignore",
+      env: childEnv,
+    },
   );
   child.unref();
   log(
