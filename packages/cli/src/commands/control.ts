@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { appendOperatorEvent } from "@mobrienv/autoloop-core/journal";
 import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
+import { abandonRun } from "@mobrienv/autoloop-harness/abandon";
 import {
   appendRequest,
   buildRequest,
@@ -39,6 +40,10 @@ export function dispatchControl(args: string[]): void {
   }
   if (sub === "interrupt") {
     handleInterrupt(stateDir, args.slice(1));
+    return;
+  }
+  if (sub === "abandon") {
+    handleAbandon(stateDir, args.slice(1));
     return;
   }
   if (sub === "guide") {
@@ -178,6 +183,36 @@ function handleInterrupt(stateDir: string, args: string[]): void {
   }
 }
 
+function handleAbandon(stateDir: string, args: string[]): void {
+  const { runArg, reason } = parseReason(args);
+  if (!runArg) {
+    console.log("Usage: autoloop control abandon <run-id> [-m <reason>]");
+    process.exitCode = 1;
+    return;
+  }
+  const res = resolveRun(stateDir, runArg);
+  if ("error" in res) {
+    console.log(res.error);
+    process.exitCode = 1;
+    return;
+  }
+  const record = res;
+  const result = abandonRun(record, {
+    registryFile: join(stateDir, "registry.jsonl"),
+    journalFile: record.journal_file || join(stateDir, "journal.jsonl"),
+    reason,
+  });
+  if ("error" in result) {
+    console.log(result.error);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(
+    `Abandoned ${result.runId} (waiting -> stopped, stop_reason=abandoned). ` +
+      `Registry + journal appended at ${result.registryFile}.`,
+  );
+}
+
 function handleGuide(stateDir: string, args: string[]): void {
   let runArg = "";
   let noInterrupt = false;
@@ -292,6 +327,7 @@ function printUsage(): void {
     "  autoloop control capabilities <run-id>       Show backend capabilities only",
   );
   console.log("  autoloop control interrupt <run-id> [-m <reason>]");
+  console.log("  autoloop control abandon <run-id> [-m <reason>]");
   console.log('  autoloop control guide <run-id> "<message>" [--no-interrupt]');
   console.log(
     '  autoloop control respond <run-id> <question-id> "<answer>"  Answer a human.ask',
