@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Merge gate determinism (T-032).** `npm run check` no longer false-reds when
+  the coverage temp directory disappears mid-run: the coverage leg ensures
+  `coverage/.tmp` exists before every chunk write and falls back to an
+  in-memory payload copy if an already-written chunk file is gone at read time
+  (upstream Vitest classes #10111/#9758). If Vitest itself dies without
+  reporting any test failure — worker module-resolution crash, unhandled
+  rejection — the gate retries once, and only then exits non-zero; real test
+  failures and coverage threshold misses still exit 1 on the first report.
+  The `duration=0` wait park test tolerates one retry (`--retry 1`).
+
 ### Added
 - **Memory plugins.** Loop memory is selected by `memory.kind` (default
   `jsonl`, same `.autoloop/memory.jsonl` store). A second plugin can be
