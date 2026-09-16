@@ -44,7 +44,12 @@ import {
 import { piControlAdapter } from "./control/pi-adapter.js";
 import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
-import { checkCostBudget, checkRuntimeBudget, detectStall } from "./guards.js";
+import {
+  checkCostBudget,
+  checkRuntimeBudget,
+  detectNoEvent,
+  detectStall,
+} from "./guards.js";
 import { buildHookEnv, runPhaseHooks } from "./hooks.js";
 import { journalAcceptanceContract } from "./intent.js";
 import { runIteration } from "./iteration.js";
@@ -71,6 +76,7 @@ import {
   stopError,
   stopMaxIterations,
   stopMaxRuntime,
+  stopNoEvent,
   stopPrematureQuit,
   stopReviewUnknown,
   stopStalled,
@@ -656,6 +662,13 @@ async function runReviewThenIterate(
         return stopPrematureQuit(reviewed, iteration - 1, pq.reasons);
       }
       return stopStalled(reviewed, iteration - 1, stall.repeats);
+    }
+    const noEvent = detectNoEvent(
+      runLines,
+      reviewed.limits.noEventIterations ?? 0,
+    );
+    if (noEvent.tripped) {
+      return stopNoEvent(reviewed, iteration - 1, noEvent.consecutive);
     }
     const budget = checkCostBudget(runLines, reviewed.limits.maxCostUsd ?? 0);
     if (budget.exceeded) {

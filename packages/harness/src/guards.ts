@@ -1,14 +1,80 @@
 // Run-level guard checks evaluated between iterations.
 //
-// Both guards are journal-derived (no in-memory counters), so they survive
+// Guards are journal-derived (no in-memory counters), so they survive
 // context reloads and apply uniformly to every continue path — routed events,
 // rejected emits, and plain continues alike.
 
 import { collectUsage, decodeEvent } from "@mobrienv/autoloop-core";
+import { systemTopic } from "./emit.js";
 
 export interface StallCheck {
   stalled: boolean;
   repeats: number;
+}
+
+export interface NoEventCheck {
+  tripped: boolean;
+  consecutive: number;
+}
+
+/**
+ * Detect a silent loop: `threshold` (or more) consecutive COMPLETED
+ * iterations (an iteration.finish present) with no accepted routing event.
+ * A threshold of 0 disables the check. Grouped by iteration identity; a
+ * trailing incomplete iteration is ignored (neither counted nor a break).
+ * Journal-derived (no in-memory counters), so it survives context reloads
+ * and resume.
+ *
+ * An accepted routing event is any journaled line with a non-empty topic that
+ * is neither `event.invalid` nor a system topic (harness-written, incl.
+ * coordination) — the exact predicates latestAgentEventRecord uses, so the
+ * guard cannot drift from routing. Coordination topics (e.g.
+ * `issue.discovered`) are harness-written and do NOT reset the counter.
+ */
+export function detectNoEvent(
+  runLines: string[],
+  threshold: number,
+): NoEventCheck {
+  if (threshold <= 0) return { tripped: false, consecutive: 0 };
+  const perIteration = new Map<
+    string,
+    { completed: boolean; hasEvent: boolean }
+  >();
+  for (const line of runLines) {
+    const event = decodeEvent(line);
+    if (!event) continue;
+    const iter = event.iteration ?? "";
+    if (!iter) continue;
+    const entry = perIteration.get(iter) ?? {
+      completed: false,
+      hasEvent: false,
+    };
+    if (event.topic === "iteration.finish") {
+      if (event.shape === "fields") entry.completed = true;
+    } else if (
+      event.topic !== "" &&
+      event.topic !== "event.invalid" &&
+      !systemTopic(event.topic)
+    ) {
+      entry.hasEvent = true;
+    }
+    perIteration.set(iter, entry);
+  }
+  let consecutive = 0;
+  const iterations = [...perIteration.keys()].sort(
+    (a, b) => Number(a) - Number(b),
+  );
+  for (let i = iterations.length - 1; i >= 0; i--) {
+    const entry = perIteration.get(iterations[i]);
+    if (!entry) continue;
+    // A trailing incomplete iteration is ignored (not counted, not a
+    // break): it neither proves nor disproves silence, so counting
+    // resumes at the last completed iteration.
+    if (!entry.completed) continue;
+    if (entry.hasEvent) break;
+    consecutive++;
+  }
+  return { tripped: consecutive >= threshold, consecutive };
 }
 
 /**

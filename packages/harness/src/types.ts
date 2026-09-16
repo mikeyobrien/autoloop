@@ -64,6 +64,11 @@ export interface LoopContext {
     maxIterations: number;
     /** Stop after N consecutive identical backend outputs (0 = disabled). */
     stallIterations?: number;
+    /**
+     * Stop after N consecutive completed iterations whose journal shows no
+     * accepted routing event (0 = disabled). Mirrors event_loop.no_event_iterations.
+     */
+    noEventIterations?: number;
     /** Stop once journaled run cost reaches this USD budget (0 = disabled). */
     maxCostUsd?: number;
     /** Per-iteration runtime cap in ms (0 = fall back to backend.timeoutMs). */
@@ -412,8 +417,8 @@ export interface RunOptions {
  * - success (3): `completed`, `completion_event`, `completion_promise`
  * - failures (7): `backend_failed`, `backend_timeout`, `auth_failed`,
  *   `quota_exhausted`, `rate_limited`, `transient_error`, `review_unknown`
- * - stops (8): `max_iterations`, `stalled`, `cost_budget`, `max_runtime`,
- *   `premature_quit`, `interrupted`, `suspended`, `waiting`
+ * - stops (9): `max_iterations`, `stalled`, `no_event`, `cost_budget`,
+ *   `max_runtime`, `premature_quit`, `interrupted`, `suspended`, `waiting`
  * - verdicts (3): `verdict_exit`, `verdict_takeover`, `verdict_unknown`
  * - held (1): `completion_held`
  * - parallel (3): `parallel_wave_timeout`, `parallel_wave_failed`,
@@ -442,9 +447,10 @@ export const STOP_REASONS = [
   "rate_limited",
   "transient_error",
   "review_unknown",
-  // stops (8)
+  // stops (9)
   "max_iterations",
   "stalled",
+  "no_event",
   "cost_budget",
   "max_runtime",
   "premature_quit",

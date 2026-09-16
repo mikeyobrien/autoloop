@@ -595,6 +595,11 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     limits: {
       maxIterations: config.getInt(cfg, "event_loop.max_iterations", 3),
       stallIterations: config.getInt(cfg, "event_loop.stall_iterations", 0),
+      noEventIterations: config.getInt(
+        cfg,
+        "event_loop.no_event_iterations",
+        0,
+      ),
       maxCostUsd: config.getFloat(cfg, "event_loop.max_cost_usd", 0),
       maxIterationRuntimeMs,
       maxRuntimeMs: config.getDuration(cfg, "event_loop.max_runtime", 0),
