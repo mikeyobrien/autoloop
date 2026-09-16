@@ -304,8 +304,18 @@ export interface LoopContext {
    * Live ACP session holder. Aliased (not copied) across context reloads so
    * loop-exit, abort, and interrupt handlers always see the current session
    * even though iterations run on reloaded context clones.
+   *
+   * `operatorInterrupted` rides on the same shared holder: the ACP control
+   * adapter sets it (before signaling the process group) when an operator
+   * interrupt is applied, and `runIteration` consumes it when the backend
+   * returns so the turn stops as `interrupted` instead of being misclassified
+   * as a backend failure. Deleted at the start of each backend turn; the
+   * holder aliasing means the flag survives `reloadLoop` like the session.
    */
-  acpSession: { current: AcpSession | undefined };
+  acpSession: {
+    current: AcpSession | undefined;
+    operatorInterrupted?: boolean;
+  };
   /**
    * Live pi RPC session holder. Same aliasing rules as acpSession: the
    * process persists across iterations (context resets via `new_session`),

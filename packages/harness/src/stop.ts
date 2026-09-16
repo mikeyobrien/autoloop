@@ -433,6 +433,48 @@ export function stopPrematureQuit(
 }
 
 /**
+ * Stop because the operator interrupted the in-flight turn via live control
+ * (guide with `interrupt: true`). The ACP adapter recorded the request on the
+ * shared session holder before signaling; this journals the typed
+ * `interrupted` reason and registry status so the run is not misclassified
+ * as a backend failure. Mirrors stopSuspended's shape.
+ */
+export function stopOperatorInterrupted(
+  loop: LoopContext,
+  iteration: number,
+  output: string,
+): RunSummary {
+  log(
+    loop,
+    "info",
+    `loop stop reason=interrupted iteration=${iteration} detail=operator interrupt`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:interrupted",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    String(iteration),
+    "loop.stop",
+    jsonField("reason", "interrupted") +
+      ", " +
+      jsonField("iteration", String(iteration)) +
+      ", " +
+      jsonField("detail", "operator interrupt") +
+      ", " +
+      jsonField("output_tail", lastNChars(output, 500)),
+  );
+  registryStop(loop, iteration, "interrupted");
+  return { iterations: iteration, stopReason: "interrupted" };
+}
+
+/**
  * Stop for a `suspend`-policy hook that fired and could not (or was not
  * configured to) block in-process. Durable suspend state has already been
  * written by the hooks engine (`writeSuspendState`); this only journals the
