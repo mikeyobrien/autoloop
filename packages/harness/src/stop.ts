@@ -228,6 +228,47 @@ export function stopStalled(
   return { iterations: completed, stopReason: "stalled" };
 }
 
+/**
+ * Stop after N consecutive completed iterations with no accepted routing
+ * event (issue #71): the agent finished its turn but never emitted anything
+ * the topology could route on, so continuing would repeat blindly until
+ * max_iterations. Mirrors stopStalled's journal/registry shape.
+ */
+export function stopNoEvent(
+  loop: LoopContext,
+  completed: number,
+  consecutive: number,
+): RunSummary {
+  log(
+    loop,
+    "warn",
+    `loop stop reason=no_event no_event_iterations=${consecutive} threshold=${loop.limits.noEventIterations ?? 0}`,
+  );
+  loop.onEvent?.({
+    type: "progress",
+    runId: loop.runtime.runId,
+    iteration: completed,
+    recentEvent: "loop.stop",
+    allowedRoles: [],
+    outcome: "stop:no_event",
+  });
+  appendEvent(
+    loop.paths.journalFile,
+    loop.runtime.runId,
+    "",
+    "loop.stop",
+    jsonField("reason", "no_event") +
+      ", " +
+      jsonField("completed_iterations", String(completed)) +
+      ", " +
+      jsonField("no_event_iterations", String(consecutive)) +
+      ", " +
+      jsonField("threshold", String(loop.limits.noEventIterations ?? 0)),
+  );
+  registryStop(loop, completed, "no_event");
+  return { iterations: completed, stopReason: "no_event" };
+}
+
 export function stopCostBudget(
   loop: LoopContext,
   completed: number,

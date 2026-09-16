@@ -2,6 +2,7 @@ import { encodeEvent } from "@mobrienv/autoloop-core";
 import {
   checkCostBudget,
   checkRuntimeBudget,
+  detectNoEvent,
   detectStall,
   loopStartMs,
 } from "@mobrienv/autoloop-harness/guards";
@@ -14,6 +15,27 @@ function finishLine(iteration: string, output: string): string {
     iteration,
     topic: "iteration.finish",
     fields: { exit_code: "0", timed_out: "false", output },
+  });
+}
+
+function agentEventLine(iteration: string, topic: string): string {
+  return encodeEvent({
+    shape: "payload",
+    run: "r1",
+    iteration,
+    topic,
+    payload: "done",
+    source: "agent",
+  });
+}
+
+function invalidEventLine(iteration: string): string {
+  return encodeEvent({
+    shape: "fields",
+    run: "r1",
+    iteration,
+    topic: "event.invalid",
+    fields: { emitted: "bogus.event" },
   });
 }
 
@@ -85,6 +107,183 @@ describe("detectStall", () => {
       stalled: false,
       repeats: 0,
     });
+  });
+});
+
+describe("detectNoEvent", () => {
+  it("is disabled when threshold is zero", () => {
+    const lines = [finishLine("1", "out"), finishLine("2", "out")];
+    expect(detectNoEvent(lines, 0)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("is disabled when threshold is negative", () => {
+    const lines = [finishLine("1", "out")];
+    expect(detectNoEvent(lines, -1)).toEqual({
+      tripped: false,
+      consecutive: 0,
+    });
+  });
+
+  it("does not trip on an empty journal", () => {
+    expect(detectNoEvent([], 2)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("counts varied-prose no-event iterations and trips at threshold", () => {
+    const lines = [
+      finishLine("1", "I looked at the code."),
+      finishLine("2", "I thought about it more."),
+      finishLine("3", "Still pondering."),
+    ];
+    const check = detectNoEvent(lines, 3);
+    expect(check.tripped).toBe(true);
+    expect(check.consecutive).toBe(3);
+  });
+
+  it("does not trip below threshold", () => {
+    const lines = [finishLine("1", "prose"), finishLine("2", "other prose")];
+    expect(detectNoEvent(lines, 3)).toEqual({ tripped: false, consecutive: 2 });
+  });
+
+  it("trips at threshold 1 with a single silent iteration", () => {
+    const lines = [finishLine("1", "prose")];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: true, consecutive: 1 });
+  });
+
+  it("does not trip at threshold 2 with a single silent iteration", () => {
+    const lines = [finishLine("1", "prose")];
+    expect(detectNoEvent(lines, 2)).toEqual({ tripped: false, consecutive: 1 });
+  });
+
+  it("resets the counter when an accepted routing event is emitted", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "step.done"),
+      finishLine("2", "did the step"),
+      finishLine("3", "prose again"),
+    ];
+    expect(detectNoEvent(lines, 2)).toEqual({ tripped: false, consecutive: 1 });
+  });
+
+  it("resets when the accepted event follows iteration.finish in the journal", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      finishLine("2", "prose"),
+      agentEventLine("2", "step.done"),
+    ];
+    expect(detectNoEvent(lines, 2)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("resets on step.done payload events", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "step.done"),
+      finishLine("2", "did the step"),
+    ];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("resets on ask.question payload events", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "ask.question"),
+      finishLine("2", "need input"),
+    ];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("resets on wait.request payload events", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "wait.request"),
+      finishLine("2", "parking"),
+    ];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("resets on task.complete payload events", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "task.complete"),
+      finishLine("2", "done"),
+    ];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("resets on work.parallel payload events", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "work.parallel"),
+      finishLine("2", "fanning out"),
+    ];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: false, consecutive: 0 });
+  });
+
+  it("does not reset on coordination-only events (issue.discovered)", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "issue.discovered"),
+      finishLine("2", "prose"),
+      finishLine("3", "prose"),
+    ];
+    const check = detectNoEvent(lines, 3);
+    expect(check.tripped).toBe(true);
+    expect(check.consecutive).toBe(3);
+  });
+
+  it("never counts system or iteration.finish lines as events", () => {
+    const lines = [
+      agentEventLine("1", "backend.start"),
+      agentEventLine("1", "iteration.finish"),
+      finishLine("1", "prose"),
+      agentEventLine("2", "loop.start"),
+      finishLine("2", "prose"),
+    ];
+    const check = detectNoEvent(lines, 2);
+    expect(check.tripped).toBe(true);
+    expect(check.consecutive).toBe(2);
+  });
+
+  it("ignores a trailing incomplete iteration without breaking the count", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "iteration.start"),
+    ];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: true, consecutive: 1 });
+  });
+
+  it("ignores a trailing incomplete iteration after several silent ones", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      finishLine("2", "prose"),
+      agentEventLine("3", "iteration.start"),
+    ];
+    expect(detectNoEvent(lines, 2)).toEqual({ tripped: true, consecutive: 2 });
+  });
+
+  it("ignores an incomplete iteration in the middle of the count", () => {
+    const lines = [
+      finishLine("1", "prose"),
+      agentEventLine("2", "iteration.start"),
+      finishLine("3", "prose"),
+    ];
+    expect(detectNoEvent(lines, 2)).toEqual({ tripped: true, consecutive: 2 });
+  });
+
+  it("counts event.invalid-only turns as no-event", () => {
+    const lines = [
+      invalidEventLine("1"),
+      finishLine("1", "prose"),
+      invalidEventLine("2"),
+      finishLine("2", "prose"),
+    ];
+    const check = detectNoEvent(lines, 2);
+    expect(check.tripped).toBe(true);
+    expect(check.consecutive).toBe(2);
+  });
+
+  it("ignores malformed lines", () => {
+    const lines = ["not json", finishLine("1", "prose"), "{"];
+    expect(detectNoEvent(lines, 1)).toEqual({ tripped: true, consecutive: 1 });
   });
 });
 

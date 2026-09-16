@@ -17,6 +17,12 @@ import { join } from "node:path";
 
 interface Fixture {
   output: string;
+  /**
+   * Optional per-iteration outputs: `output_by_iteration[i]` is used when
+   * AUTOLOOP_ITERATION is the string form of `i` (1-based); falls back to
+   * `output` when absent or the env var is unset/unparseable.
+   */
+  output_by_iteration?: string[];
   exit_code: number;
   delay_ms: number;
   emit_event?: string;
@@ -68,6 +74,7 @@ function loadFixture(): Fixture {
     const parsed = JSON.parse(raw) as Partial<Fixture>;
     return {
       output: parsed.output ?? "",
+      output_by_iteration: parsed.output_by_iteration,
       exit_code: parsed.exit_code ?? 0,
       delay_ms: parsed.delay_ms ?? 0,
       emit_event: parsed.emit_event,
@@ -145,8 +152,13 @@ async function main(): Promise<void> {
     emitEvent(fixture.trailing_emit_event, fixture.trailing_emit_payload ?? "");
   }
 
-  if (fixture.output) {
-    process.stdout.write(fixture.output);
+  const iteration = Number.parseInt(process.env.AUTOLOOP_ITERATION ?? "", 10);
+  const output =
+    Number.isInteger(iteration) && iteration >= 1
+      ? (fixture.output_by_iteration?.[iteration - 1] ?? fixture.output)
+      : fixture.output;
+  if (output) {
+    process.stdout.write(output);
   }
 
   if (fixture.usage) {

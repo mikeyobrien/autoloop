@@ -48,6 +48,7 @@ function isKnownStopReason(reason: StopReason): true {
     case "review_unknown":
     case "max_iterations":
     case "stalled":
+    case "no_event":
     case "cost_budget":
     case "max_runtime":
     case "premature_quit":
@@ -71,8 +72,8 @@ function isKnownStopReason(reason: StopReason): true {
 }
 
 describe("StopReason exhaustiveness", () => {
-  it("has exactly the 26 documented literals (23 from the issue + parallel_wave_invalid + suspended + waiting)", () => {
-    expect(STOP_REASONS.length).toBe(26);
+  it("has exactly the 27 documented literals (23 from the issue + parallel_wave_invalid + suspended + waiting + no_event)", () => {
+    expect(STOP_REASONS.length).toBe(27);
     expect(new Set(STOP_REASONS).size).toBe(STOP_REASONS.length);
   });
 

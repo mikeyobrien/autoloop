@@ -28,6 +28,9 @@ export function defaults(): Config {
       required_events: "",
       // Stop after N consecutive identical backend outputs (0 = disabled).
       stall_iterations: "0",
+      // Stop after N consecutive completed iterations with no accepted routing
+      // event (0 = disabled).
+      no_event_iterations: "0",
       // Stop once journaled run cost reaches this USD budget (0 = disabled).
       max_cost_usd: "0",
       // Per-iteration runtime cap ("3d", "90m", or ms int; 0 = use backend.timeout_ms).
