@@ -1,0 +1,8 @@
+{
+  "output": "Task completed successfully.\n\nLOOP_COMPLETE",
+  "exit_code": 0,
+  "delay_ms": 0,
+  "emit_event": "wait.request",
+  "emit_payload": "name=auto-demo; duration=2s; reason=auto-resume gate;",
+  "emit_once": true
+}

@@ -80,6 +80,7 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/control/pi-adapter": `${HARNESS}/control/pi-adapter.ts`,
       "@mobrienv/autoloop-harness/control": `${HARNESS}/control/index.ts`,
       "@mobrienv/autoloop-harness/types": `${HARNESS}/types.ts`,
+      "@mobrienv/autoloop-harness/abandon": `${HARNESS}/abandon.ts`,
       "@mobrienv/autoloop-harness/events": `${HARNESS}/events.ts`,
       "@mobrienv/autoloop-harness/emit": `${HARNESS}/emit.ts`,
       "@mobrienv/autoloop-harness/wait": `${HARNESS}/wait.ts`,

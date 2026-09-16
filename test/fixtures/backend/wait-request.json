@@ -3,5 +3,5 @@
   "exit_code": 0,
   "delay_ms": 0,
   "emit_event": "wait.request",
-  "emit_payload": "name=company-nap; duration=300s; reason=between company steps;"
+  "emit_payload": "name=company-nap; duration=0s; reason=between company steps;"
 }

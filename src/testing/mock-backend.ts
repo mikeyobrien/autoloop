@@ -11,8 +11,9 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 interface Fixture {
   output: string;
@@ -32,6 +33,21 @@ interface Fixture {
    * end-to-end against a real cooperating child process.
    */
   trap_usr1?: boolean;
+  /**
+   * When true, the fixture's event is emitted at most once per run state
+   * dir: a `<stateDir>/wait-request-once` sentinel is written on the first
+   * emission and suppresses later emissions. Lets a single fixture drive
+   * both the parking iteration and the auto-resumed completion iteration
+   * without an endless park/re-park cycle.
+   */
+  emit_once?: boolean;
+  /**
+   * Optional second event emitted AFTER the primary emit in the same
+   * backend run — drives the trailing-emit park gate (a wait.request
+   * followed by a trailing allowed event must still park).
+   */
+  trailing_emit_event?: string;
+  trailing_emit_payload?: string;
 }
 
 function fixturePathFromArgs(): string {
@@ -58,6 +74,9 @@ function loadFixture(): Fixture {
       emit_payload: parsed.emit_payload,
       usage: parsed.usage,
       trap_usr1: parsed.trap_usr1 ?? false,
+      emit_once: parsed.emit_once ?? false,
+      trailing_emit_event: parsed.trailing_emit_event,
+      trailing_emit_payload: parsed.trailing_emit_payload,
     };
   } catch (err) {
     process.stderr.write(`mock-backend: failed to load fixture: ${err}\n`);
@@ -81,6 +100,22 @@ function emitEvent(event: string, payload: string): void {
   }
 }
 
+/**
+ * One-shot gate for `emit_once` fixtures: the sentinel lives under the run
+ * state dir (exported to the backend by the harness), so the same fixture
+ * can park once and let the auto-resumed iteration complete instead of
+ * parking forever.
+ */
+function shouldEmit(fixture: Fixture): boolean {
+  if (!fixture.emit_once) return true;
+  const sentinel = process.env.AUTOLOOP_STATE_DIR
+    ? join(process.env.AUTOLOOP_STATE_DIR, "wait-request-once")
+    : "wait-request-once";
+  if (existsSync(sentinel)) return false;
+  writeFileSync(sentinel, "");
+  return true;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -99,8 +134,15 @@ async function main(): Promise<void> {
     await sleep(fixture.delay_ms);
   }
 
-  if (fixture.emit_event) {
+  if (fixture.emit_event && shouldEmit(fixture)) {
     emitEvent(fixture.emit_event, fixture.emit_payload ?? "");
+  }
+
+  // T-031 gate: a trailing allow emit after wait.request must not nullify
+  // the park — the harness must still listen for the wait regardless of
+  // event order inside the turn.
+  if (fixture.trailing_emit_event && shouldEmit(fixture)) {
+    emitEvent(fixture.trailing_emit_event, fixture.trailing_emit_payload ?? "");
   }
 
   if (fixture.output) {

@@ -35,6 +35,7 @@ import {
 import { materializeOpenFrom } from "@mobrienv/autoloop-core/tasks";
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { awaitHumanResponse } from "./ask.js";
+import { armAutoResume } from "./auto-resume.js";
 import {
   backoffDelayMs,
   circuitDecision,
@@ -651,8 +652,12 @@ export async function finishIteration(
 
   // Durable wait: park the run without a live backend. Handled before
   // routing so wait.request is never treated as a topology/invalid event.
-  if (isWaitRequestTopic(emitted.topic)) {
-    return finishWaitIteration(loop, iter, emitted.payload, progress);
+  // Order-insensitive on purpose (T-031): a journaled wait.request in the
+  // finished turn always parks — a trailing allowed emit (e.g. step.done)
+  // must not nullify the request, and the trailing event is incidental.
+  const turnWait = waitRequestRecord(turnLines);
+  if (turnWait) {
+    return finishWaitIteration(loop, iter, turnWait.payload, progress);
   }
 
   if (
@@ -905,7 +910,13 @@ function finishWaitIteration(
     duration: request.duration || undefined,
   });
   progress("wait.request", "wait:open");
-  return stopWaiting(loop, iter.iteration, waitId, request.reason);
+  const summary = stopWaiting(loop, iter.iteration, waitId, request.reason);
+  // T-030: a park carrying a positive duration arms the detached auto-resume
+  // timer, which re-invokes the existing resume path (wait.close +
+  // loop.resume, same run_id) after durationMs. Indefinite parks (durationMs
+  // == 0) spawn nothing — process-free waiting behavior is unchanged.
+  armAutoResume(loop, waitId, request);
+  return summary;
 }
 
 async function rejectInvalidAndContinue(
@@ -1049,6 +1060,30 @@ function latestAgentEventRecord(lines: string[]): {
     }
   }
   return { topic: "", payload: "" };
+}
+
+/**
+ * Last agent-emitted `wait.request` in the given (single-turn) lines, or
+ * null when the turn never requested a wait. Unlike `latestAgentEventRecord`
+ * — which routes on the LAST agent event only — the park is intentionally
+ * order-insensitive (T-031): a follow-up allowed emit in the same turn used
+ * to silently nullify the request, routing the loop past the park and
+ * starting the next iteration with no wait.open. A journaled wait.request
+ * in the finished turn must ALWAYS park; trailing events are incidental.
+ * wait.request is an agent topic, never a system topic, so no system-topic
+ * filter is required.
+ */
+function waitRequestRecord(lines: string[]): {
+  topic: string;
+  payload: string;
+} | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const topic = extractTopic(lines[i]);
+    if (isWaitRequestTopic(topic)) {
+      return { topic, payload: extractField(lines[i], "payload") };
+    }
+  }
+  return null;
 }
 
 /**

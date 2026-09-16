@@ -11,6 +11,15 @@ import { join } from "node:path";
 // Pin the timezone (some renderers format timestamps in local time).
 process.env.TZ = "UTC";
 
+// A suite run from inside an autoloop run inherits the harness's AUTOLOOP_*
+// exports (project/state/journal/run-id/etc). In-process dispatcher tests
+// read process.env directly — scrub them so hermetic stays hermetic.
+// Individual tests that need one (e.g. AUTOLOOP_PROJECT_DIR) set it
+// explicitly, and runCli's cleanEnv already strips them for spawned CLIs.
+for (const key of Object.keys(process.env)) {
+  if (key.startsWith("AUTOLOOP_")) delete process.env[key];
+}
+
 // Point autoloop at an empty config so the developer's global [backend]/[profiles]
 // defaults can't leak into unit tests. An explicit AUTOLOOP_CONFIG is left untouched
 // so individual tests can still supply their own config when they need one.

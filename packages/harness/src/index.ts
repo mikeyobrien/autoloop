@@ -456,6 +456,8 @@ export async function driveLoop(
   return { ...summary, runId: loop.runtime.runId };
 }
 
+export type { AbandonFailure, AbandonResult } from "./abandon.js";
+export { abandonRun } from "./abandon.js";
 export {
   buildResumeContext,
   determineResumeIteration,
