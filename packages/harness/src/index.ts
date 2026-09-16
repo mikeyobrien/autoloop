@@ -705,11 +705,18 @@ export function buildControlAdapter(
   if (loop.backend.kind === "acp") {
     return acpControlAdapter(loop.runtime.runId, loop.backend.provider, {
       triggerInterrupt: () => {
-        if (loop.acpSession.current?.process.pid) {
+        const holder = loop.acpSession;
+        if (holder.current?.process.pid) {
+          // Mark operator-requested BEFORE signaling so the in-flight turn is
+          // classified as `interrupted` (not a backend failure) when it ends.
+          // On a failed kill, restore the previous value: no signal means no
+          // operator interrupt actually took effect.
+          const previous = holder.operatorInterrupted;
+          holder.operatorInterrupted = true;
           try {
-            process.kill(-loop.acpSession.current.process.pid, "SIGINT");
+            process.kill(-holder.current.process.pid, "SIGINT");
           } catch {
-            /* best-effort */
+            holder.operatorInterrupted = previous;
           }
         }
       },

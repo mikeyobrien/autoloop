@@ -77,6 +77,7 @@ import {
   stopBackendFailed,
   stopBackendTimeout,
   stopMaxRuntime,
+  stopOperatorInterrupted,
   stopSuspended,
   stopWaiting,
 } from "./stop.js";
@@ -263,6 +264,12 @@ export async function runIteration(
     );
   }
 
+  // A fresh turn starts with no operator interrupt pending. The session
+  // holder is aliased across reloadLoop, so deleting here deletes the shared
+  // property the control adapter writes to; the flag stays genuinely absent
+  // (undefined) until an adapter sets it.
+  delete loop.acpSession.operatorInterrupted;
+
   const { output, exitCode, timedOut } = await runBackendIteration(loop, iter);
   const elapsedS = Math.floor(Date.now() / 1000) - startEpoch;
 
@@ -304,6 +311,22 @@ export async function runIteration(
     elapsedS,
   });
   loop.onEvent?.({ type: "backend.output", output });
+
+  // Operator-requested interrupt wins over every backend-derived
+  // classification (timeout, non-zero exit, completion): the operator asked
+  // for this turn to end, so even a clean exit after the signal stops the
+  // run as `interrupted`. Consumed here — after the backend.finish /
+  // iteration.finish journals, post_iteration hooks, registry progress,
+  // file-mod audit, and footer/backend.output events (so none of those are
+  // skipped) — but before the timeout/nonzero/outcome checks below. Gated on
+  // the ACP backend; other backends never set the flag.
+  if (
+    iter.backend.kind === "acp" &&
+    loop.acpSession.operatorInterrupted === true
+  ) {
+    delete loop.acpSession.operatorInterrupted;
+    return stopOperatorInterrupted(loop, iteration, output);
+  }
 
   if (timedOut && clampedByLoopBudget && loopStartedMs !== null) {
     // The loop budget, not the per-iteration limit, was the binding
