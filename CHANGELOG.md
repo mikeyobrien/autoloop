@@ -3,15 +3,12 @@
 ## [Unreleased]
 
 ### Fixed
-- **Merge gate determinism (T-032).** `npm run check` no longer false-reds when
-  the coverage temp directory disappears mid-run: the coverage leg ensures
-  `coverage/.tmp` exists before every chunk write and falls back to an
-  in-memory payload copy if an already-written chunk file is gone at read time
-  (upstream Vitest classes #10111/#9758). If Vitest itself dies without
-  reporting any test failure — worker module-resolution crash, unhandled
-  rejection — the gate retries once, and only then exits non-zero; real test
-  failures and coverage threshold misses still exit 1 on the first report.
-  The `duration=0` wait park test tolerates one retry (`--retry 1`).
+- **Merge gate determinism (T-032).** `npm run check` no longer false-reds when  the coverage temp directory disappears mid-run: the coverage leg ensures  `coverage/.tmp` exists before every chunk write and falls back to an  in-memory payload copy if an already-written chunk file is gone at read time  (upstream Vitest classes #10111/#9758). If Vitest itself dies without  reporting any test failure — worker module-resolution crash, unhandled  rejection — the gate retries once, and only then exits non-zero; real test  failures and coverage threshold misses still exit 1 on the first report.  The `duration=0` wait park test tolerates one retry (`--retry 1`).  journals `wait.close` and continues on the same `run_id`. Nothing sleeps  in-process or burns `backend.timeout_ms`; a host may wake the run any time.
+- **Timed waits auto-resume (T-030).** A `wait.request` carrying a positive  `duration` (e.g. `duration=300s`) arms a detached engine-spawned timer that  re-invokes the existing resume path after the duration — `wait.close` +  `loop.resume` on the same `run_id`, with no `/ops` POST and no owner Wake.  The timer re-checks before firing (registry still `waiting` and the exact  `wait_id` still open) so a manual Wake/steer resume is never double-closed,  and one `wait.close` per `wait.open` is preserved. A park without a duration  (or `duration=0`) keeps the indefinite-park behavior exactly as before.
+- **Trailing emits no longer nullify `wait.request` parks (T-031).** The  finished-turn park is now order-insensitive: routing no longer keys on the  LAST agent event only, so a `wait.request` followed by an allowed emit  (e.g. `step.done`) parks exactly as if the request were last — `wait.open`  journaled, registry `waiting`, process-free — instead of silently starting  the next iteration with no park. When `wait.request` is already the last  event, behavior is unchanged.
+- **Test suite is hermetic inside an autoloop run.** The hermetic test setup  scrubs inherited `AUTOLOOP_*` environment before tests, so `npm test` no  longer mis-resolves the active project when run from within a loop run.
+
+## [0.11.0] - 2026-09-10
 
 ### Added
 - **Memory plugins.** Loop memory is selected by `memory.kind` (default
@@ -24,38 +21,19 @@
 - **Durable waits (`wait.request`).** An agent can park a named run without a
   live backend: emit `wait.request`, the harness journals `wait.open`, registry
   status becomes `waiting`, and the process exits 0. `autoloop resume <run-id>`
-  journals `wait.close` and continues on the same `run_id`. Nothing sleeps
-  in-process or burns `backend.timeout_ms`; a host may wake the run any time.
-- **Timed waits auto-resume (T-030).** A `wait.request` carrying a positive
-  `duration` (e.g. `duration=300s`) arms a detached engine-spawned timer that
-  re-invokes the existing resume path after the duration — `wait.close` +
-  `loop.resume` on the same `run_id`, with no `/ops` POST and no owner Wake.
-  The timer re-checks before firing (registry still `waiting` and the exact
-  `wait_id` still open) so a manual Wake/steer resume is never double-closed,
-  and one `wait.close` per `wait.open` is preserved. A park without a duration
-  (or `duration=0`) keeps the indefinite-park behavior exactly as before.
+  journals `wait.close` and continues on the same `run_id`. Duration on the
+  request is advisory — nothing sleeps in-process or burns `backend.timeout_ms`.
 - **Backend environment hardening is available as an opt-in policy.** Existing
   presets continue to inherit their process environment unchanged. Setting
   `backend.environment_policy = "hardened"` (or the review-specific override)
   removes process-injection and Git-authority variables, repository-owned or
   relative `PATH` entries, and rejects credential-bearing proxy URLs.
-- **Standalone binaries provide a Node-free installation channel.** GitHub
-  releases now attach Bun-compiled executables for macOS and Linux on arm64
-  and x64, plus a `SHA256SUMS` file. `scripts/build-standalone.sh` builds all
-  four targets (or a selected host/target) and embeds the package version at
-  compile time.
+- **Frozen-paths guard.** Opt-in `event_loop.frozen_paths` lists workdir-relative
+  globs that loop roles must not modify. In-iteration writes are reverted and
+  journaled as `policy.frozen_path_violation`. `event_loop.frozen_paths_block`
+  also denies the acting role's completion claim and injects operator guidance.
 
 ### Fixed
-- **Trailing emits no longer nullify `wait.request` parks (T-031).** The
-  finished-turn park is now order-insensitive: routing no longer keys on the
-  LAST agent event only, so a `wait.request` followed by an allowed emit
-  (e.g. `step.done`) parks exactly as if the request were last — `wait.open`
-  journaled, registry `waiting`, process-free — instead of silently starting
-  the next iteration with no park. When `wait.request` is already the last
-  event, behavior is unchanged.
-- **Test suite is hermetic inside an autoloop run.** The hermetic test setup
-  scrubs inherited `AUTOLOOP_*` environment before tests, so `npm test` no
-  longer mis-resolves the active project when run from within a loop run.
 - **Parked waiting runs appear in run health.** `categorizeRecords` now
   buckets `status=waiting` (no PID required) instead of dropping them, so
   `autoloop loops health` and `GET /api/runs` list a `waiting` bucket
@@ -64,6 +42,21 @@
   review, harness-instruction, and topology role paths now reject parent
   traversal and symlink escapes while preserving optional and explicitly empty
   file semantics.
+- **`--events` creates missing parent directories** instead of failing when the
+  events path's parent does not exist.
+- **Dashboard `POST /runs` spawn no longer crashes** when the CLI self-command
+  contains quoted arguments.
+
+## [0.10.1] - 2026-07-19
+
+### Added
+- **Standalone binaries provide a Node-free installation channel.** GitHub
+  releases now attach Bun-compiled executables for macOS and Linux on arm64
+  and x64, plus a `SHA256SUMS` file. `scripts/build-standalone.sh` builds all
+  four targets (or a selected host/target) and embeds the package version at
+  compile time.
+
+### Fixed
 - **Generated tool wrappers reliably re-invoke every CLI distribution.**
   Checkout builds now use the Node interpreter instead of asking `/bin/sh` to
   execute the ESM entry point, while standalone builds re-invoke their binary
