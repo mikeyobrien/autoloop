@@ -7,6 +7,7 @@ import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import type { LoopEventEmitter } from "./events.js";
+import type { JevRoutingConfig } from "./jev-routing.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
 
@@ -58,6 +59,7 @@ export interface CommandSession {
 }
 
 export interface LoopContext {
+  jevRouting?: JevRoutingConfig;
   objective: string;
   topology: topo.Topology;
   limits: {

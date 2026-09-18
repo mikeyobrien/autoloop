@@ -56,6 +56,7 @@ import {
 } from "./file-mod-audit.js";
 import { loopStartMs } from "./guards.js";
 import { buildHookEnv, captureGitSha, runPhaseHooks } from "./hooks.js";
+import { resolveJevRouting } from "./jev-routing.js";
 import {
   appendBackendFinish,
   appendBackendStart,
@@ -117,6 +118,7 @@ export async function runIteration(
     return stopSuspended(loop, iteration, pendingEmitSuspend.reason);
   }
 
+  const jevWorkflow = await resolveJevRouting(loop);
   let iter = buildIterationContext(loop, iteration);
 
   // T-009 frozen-paths guard (open phase): when frozen patterns apply to the
@@ -192,6 +194,8 @@ export async function runIteration(
   if (preIterResult.mutatedPrompt !== undefined) {
     iter = { ...iter, prompt: preIterResult.mutatedPrompt };
   }
+
+  iter = { ...iter, prompt: iter.prompt + jevWorkflow };
 
   // Fresh ACP session per iteration — ensures each role (researcher, critic,
   // etc.) starts with a clean context window for truly independent review.

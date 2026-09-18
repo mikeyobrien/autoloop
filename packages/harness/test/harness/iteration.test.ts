@@ -6,7 +6,7 @@ import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import { encodeEvent } from "@mobrienv/autoloop-core";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const acpMocks = vi.hoisted(() => ({
   initAcpSession: vi.fn(),
@@ -975,5 +975,132 @@ describe("runIteration T-009 frozen-paths deny gate", () => {
     const journal = readFileSync(loop.paths.journalFile, "utf-8");
     expect(journal).toContain("policy.frozen_path_violation");
     expect(journal).toContain('"state": "accepted"');
+  });
+});
+
+describe("Jev routing iteration boundary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv("TYPESAFE_API_KEY", "fixture-key");
+    acpMocks.initAcpSession.mockResolvedValue({
+      provider: { id: "claude-agent-acp" },
+      process: { pid: 1234 },
+    });
+    acpMocks.runAcpIteration.mockResolvedValue({
+      output: "DONE",
+      exitCode: 0,
+      timedOut: false,
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+  function routedLoop() {
+    const loop = makeAcpLoop();
+    loop.jevRouting = {
+      model: "jev-1.13.0",
+      timeoutMs: 1000,
+      minConfidence: 0.8,
+      routes: [
+        {
+          id: "investigate",
+          description: "Investigate an issue",
+          instructions: "First capture runtime evidence.",
+        },
+      ],
+    };
+    return loop;
+  }
+  it("adds the selected workflow without changing role, backend, or existing prompt", async () => {
+    const loop = routedLoop();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          model: "jev-1.13.0",
+          answers: {
+            route: {
+              type: "choice",
+              choice: "investigate",
+              confidence: 0.99,
+              probabilities: { investigate: 0.99, no_match: 0.01 },
+            },
+          },
+          usage: { input_tokens: 50, output_tokens: 10 },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    loop.harness.instructions = "Keep original harness instructions.";
+    const result = await runIteration(loop, 1, vi.fn());
+    expect(result.stopReason).toBe("completion_promise");
+    const prompt = acpMocks.runAcpIteration.mock.calls[0][1];
+    expect(prompt).toContain("Use ACP");
+    expect(prompt).toContain("Keep original harness instructions.");
+    expect(prompt).toContain("First capture runtime evidence.");
+    expect(prompt).not.toContain("Recent routing event: routing.jev.selected");
+    expect(acpMocks.initAcpSession).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: "sonnet", agentName: "reviewer" }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("retains the workflow after a pre_iteration prompt replacement", async () => {
+    const loop = routedLoop();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            model: "jev-1.13.0",
+            answers: {
+              route: {
+                type: "choice",
+                choice: "investigate",
+                confidence: 0.99,
+                probabilities: { investigate: 0.99, no_match: 0.01 },
+              },
+            },
+            usage: { input_tokens: 50, output_tokens: 10 },
+          }),
+        ),
+      ),
+    );
+    loop.hooks.specs = [
+      {
+        phase: "pre_iteration",
+        command: "printf 'replacement prompt'",
+        mutate: "prompt",
+        onError: "block",
+        source: "hook[0]",
+      },
+    ];
+    await runIteration(loop, 1, vi.fn());
+    const prompt = acpMocks.runAcpIteration.mock.calls[0][1];
+    expect(prompt).toContain("replacement prompt");
+    expect(prompt).toContain("First capture runtime evidence.");
+  });
+  it("stops before any backend execution when routing fails", async () => {
+    const loop = routedLoop();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("unavailable", { status: 529 })),
+    );
+    await expect(runIteration(loop, 1, vi.fn())).rejects.toThrow(
+      "no fallback was attempted",
+    );
+    expect(acpMocks.initAcpSession).not.toHaveBeenCalled();
+    expect(acpMocks.runAcpIteration).not.toHaveBeenCalled();
+    expect(readFileSync(loop.paths.journalFile, "utf-8")).not.toContain(
+      "backend.start",
+    );
+  });
+  it("makes no routing request when opt-in is absent", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await runIteration(makeAcpLoop(), 1, vi.fn());
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(acpMocks.runAcpIteration.mock.calls[0][1]).not.toContain(
+      "Jev workflow route",
+    );
   });
 });

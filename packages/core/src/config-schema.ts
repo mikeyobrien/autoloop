@@ -85,6 +85,7 @@ export function defaults(): Config {
         timeout_ms: "0",
       },
     },
+    routing: { jev: { enabled: "false" } },
     hooks: {
       pre_run: "",
       pre_iteration: "",
