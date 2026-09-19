@@ -418,3 +418,10 @@ All `auto*` presets share the same structure. The only value that typically vari
 | autoideas | `analysis.validated` |
 
 See `presets/<preset>/autoloops.toml` for complete files.
+
+## Jev workflow routing
+
+`[routing.jev]` enables optional task-to-workflow selection through TypeSafe. It is
+off by default and stops on routing failure when enabled; there is no fallback.
+See [Jev workflow routing](jev-routing.md) for the route catalog, credential setup,
+confidence gate, deadline, and durable decision records.

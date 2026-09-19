@@ -70,6 +70,7 @@ export default defineConfig({
           items: [
             { text: "CLI", link: "/reference/cli" },
             { text: "Configuration", link: "/reference/configuration" },
+            { text: "Jev routing", link: "/reference/jev-routing" },
             { text: "Topology & Routing", link: "/reference/topology" },
             { text: "Memory System", link: "/reference/memory" },
             { text: "Journal Format", link: "/reference/journal" },

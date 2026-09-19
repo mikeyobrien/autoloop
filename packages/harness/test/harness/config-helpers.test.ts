@@ -1169,3 +1169,61 @@ describe("buildLoopContext with backendOverride.timeout_ms", () => {
     expect(reloaded.backend.timeoutMs).toBe(60000);
   });
 });
+
+describe("Jev routing configuration wiring", () => {
+  it("loads routes relative to the preset and preserves opt-in on reload", () => {
+    const projectDir = makeProject(
+      '[routing.jev]\nenabled = true\nroutes_file = "routes.json"\n',
+      {
+        files: {
+          "routes.json": JSON.stringify([
+            {
+              id: "fix",
+              description: "Fix bugs",
+              instructions: "Reproduce first.",
+            },
+          ]),
+        },
+      },
+    );
+    const loop = buildLoopContext(
+      projectDir,
+      "Fix a bug",
+      "node dist/main.js",
+      {},
+    );
+    expect(loop.jevRouting?.routes[0].id).toBe("fix");
+    expect(reloadLoop(loop).jevRouting).toEqual(loop.jevRouting);
+  });
+  it("keeps routing absent by default", () => {
+    const projectDir = makeProject("");
+    expect(
+      buildLoopContext(projectDir, "test", "node dist/main.js", {}).jevRouting,
+    ).toBeUndefined();
+  });
+});
+
+it("loads a single-file preset's Jev catalog from beside the preset", () => {
+  const workDir = makeProject("");
+  const presetDir = makeProject(
+    '[routing.jev]\nenabled = true\nroutes_file = "routes.json"\n',
+    {
+      files: {
+        "routes.json": JSON.stringify([
+          {
+            id: "fix",
+            description: "Repair a defect",
+            instructions: "Verify the repair.",
+          },
+        ]),
+      },
+    },
+  );
+  const loop = buildLoopContext(
+    workDir,
+    "Fix the defect",
+    "node dist/main.js",
+    { workDir, presetFile: join(presetDir, "autoloops.toml") },
+  );
+  expect(loop.jevRouting?.routes[0].id).toBe("fix");
+});

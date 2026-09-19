@@ -5,7 +5,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   isAcpBackendKind,
   resolveAcpProvider,
@@ -46,6 +46,7 @@ import {
   resolveGitRoot,
   tryResolveGitRoot,
 } from "@mobrienv/autoloop-core/worktree";
+import { readJevRoutingConfig } from "./jev-routing.js";
 import { emitToolScript, piAdapterScript } from "./tools.js";
 import type { LoopContext, ReviewOnError, RunOptions } from "./types.js";
 
@@ -586,6 +587,10 @@ export function reloadLoop(loop: LoopContext): LoopContext {
   );
 
   const updated: LoopContext = {
+    jevRouting: readJevRoutingConfig(
+      cfg,
+      presetFile ? dirname(presetFile) : pd,
+    ),
     objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride, {
       workDir: wd,
       stateDir: loop.paths.stateDir,

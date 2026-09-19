@@ -54,6 +54,7 @@ export function operatorTopic(topic: string): boolean {
 }
 
 const CORE_SYSTEM_TOPICS = new Set([
+  "routing.jev.selected",
   "iteration.start",
   "iteration.finish",
   "loop.start",
@@ -569,6 +570,7 @@ export function routingTopic(topic: string): boolean {
     // letting the agent self-route and skip required intermediate steps.
     "backend.usage",
     "hook.output",
+    "routing.jev.selected",
     "hook.suspend",
     "event.invalid",
     "operator.guidance",
