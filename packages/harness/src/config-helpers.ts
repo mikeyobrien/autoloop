@@ -591,6 +591,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     jevRouting: readJevRoutingConfig(
       cfg,
       presetFile ? dirname(presetFile) : pd,
+      updatedTopology.roles.map((role) => role.id),
     ),
     objective: resolvePrompt(pd, cfg, loop.runtime.promptOverride, {
       workDir: wd,
