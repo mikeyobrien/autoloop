@@ -560,6 +560,9 @@ export function routingTopic(topic: string): boolean {
     "iteration.finish",
     "loop.complete",
     "loop.stop",
+    // A resume continues from where the run stopped; routing from the marker
+    // itself would allow every role on the first resumed iteration.
+    "loop.resume",
     "review.start",
     "review.finish",
     "backend.start",
