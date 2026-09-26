@@ -56,6 +56,7 @@ vi.mock("../../src/registry-bridge.js", () => ({
   registryStop,
   registryComplete: vi.fn(),
   registryProgress: vi.fn(),
+  registryStepStart: vi.fn(),
 }));
 
 import { run } from "@mobrienv/autoloop-harness";

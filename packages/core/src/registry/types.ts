@@ -60,6 +60,21 @@ export interface RunRecord {
   cost_usd?: number;
   /** True iff the run completed through the verified gate chain. */
   acceptance_verified?: boolean;
+  /**
+   * The step in flight, written at step start and dropped by terminal writes.
+   * `iteration` above stays the last completed step; resume relies on that.
+   */
+  current_step?: RunCurrentStep;
+}
+
+export interface RunCurrentStep {
+  iteration: number;
+  /** The single allowed role, or the allowed roles joined with ",". */
+  role: string;
+  backend_kind: string;
+  /** "" means the harness default model. */
+  model: string;
+  started_at: string;
 }
 
 export type RunOutcome = "verified" | "held" | "failed" | "stopped" | "running";

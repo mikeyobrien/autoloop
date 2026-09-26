@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { collectUsage, lineSep, listText } from "@mobrienv/autoloop-core";
 import { readRunLines } from "@mobrienv/autoloop-core/journal";
+import type { StepBackend } from "./events.js";
 import type { IterationContext } from "./prompt.js";
 import type { LoopContext, RunSummary, StopReason } from "./types.js";
 
@@ -63,7 +64,7 @@ export function printIterationBanner(
   loop: LoopContext,
   iter: IterationContext,
 ): void {
-  const roleLine = `role: ${listText(iter.allowedRoles)} │ event: ${iter.recentEvent} │ next: ${listText(iter.allowedEvents)}`;
+  const roleLine = `role: ${listText(iter.allowedRoles)} │ ${stepBackendLabel(iter.backend)} │ event: ${iter.recentEvent} │ next: ${listText(iter.allowedEvents)}`;
   if (!decorativeOutputEnabled()) {
     console.log(`iteration ${iter.iteration}/${loop.limits.maxIterations}`);
     console.log(roleLine);
@@ -86,6 +87,31 @@ export function printIterationBanner(
     );
   }
   console.log("━".repeat(width));
+}
+
+function stepBackendLabel(backend: StepBackend): string {
+  return `${backend.kind} · ${backend.model || "default"}`;
+}
+
+/**
+ * One line naming the Jev route the run follows and why, e.g.
+ * `jev → feature (choice · conf 1.00 · complexity 1.00) · plan.ready → builder-opus`.
+ */
+export function printRoutingSelected(data: {
+  route: string;
+  reason: string;
+  confidence: number;
+  complexity?: number;
+  handoff?: Record<string, string[]>;
+}): void {
+  const why = [data.reason, `conf ${data.confidence.toFixed(2)}`];
+  if (data.complexity !== undefined)
+    why.push(`complexity ${data.complexity.toFixed(2)}`);
+  const parts = [`jev → ${data.route} (${why.join(" · ")})`];
+  for (const [event, roles] of Object.entries(data.handoff ?? {})) {
+    parts.push(`${event} → ${listText(roles)}`);
+  }
+  console.log(parts.join(" · "));
 }
 
 export function printIterationFooter(

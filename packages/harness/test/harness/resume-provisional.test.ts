@@ -62,6 +62,7 @@ vi.mock("../../src/registry-bridge.js", () => ({
   registryStop: vi.fn(),
   registryComplete: vi.fn(),
   registryProgress: vi.fn(),
+  registryStepStart: vi.fn(),
 }));
 
 const RUN = "run-provisional-resume";

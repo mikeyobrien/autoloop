@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { appendEvent } from "@mobrienv/autoloop-core/journal";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { coreSystemTopic, routingTopic } from "../../src/emit.js";
+import type { LoopEvent } from "../../src/events.js";
 import {
   type JevRoutingConfig,
   readJevRoutingConfig,
@@ -171,6 +172,24 @@ describe("routing decisions", () => {
     );
     expect(coreSystemTopic("routing.jev.selected")).toBe(true);
     expect(routingTopic("routing.jev.selected")).toBe(false);
+  });
+  it("announces a route without complexity or handoff and journals no handoff", async () => {
+    const events: LoopEvent[] = [];
+    loop.onEvent = (event) => events.push(event);
+    await resolveJevRouting(loop);
+    expect(events).toEqual([
+      {
+        type: "routing.selected",
+        runId: "test",
+        route: "bug-fix",
+        reason: "choice",
+        choice: "bug-fix",
+        confidence: 0.95,
+      },
+    ]);
+    expect(readFileSync(loop.paths.journalFile, "utf-8")).not.toContain(
+      '"handoff"',
+    );
   });
   it("invalidates decisions on objective, config, or run changes", async () => {
     await resolveJevRouting(loop);
@@ -434,6 +453,49 @@ describe("lane routing", () => {
     expect(journalEvent().fields).toMatchObject({
       route: "feature",
       reason: "choice",
+    });
+  });
+
+  it("announces the route once per run and journals its handoff", async () => {
+    reply(
+      laneResponse({
+        choice: "feature",
+        probabilities: { "bug-fix": 0.02, feature: 0.97, no_match: 0.01 },
+      }),
+    );
+    const events: LoopEvent[] = [];
+    loop.onEvent = (event) => events.push(event);
+    await resolveJevRouting(loop);
+    await resolveJevRouting(loop);
+    expect(events).toEqual([
+      {
+        type: "routing.selected",
+        runId: "test",
+        route: "feature",
+        reason: "choice",
+        choice: "feature",
+        confidence: 0.95,
+        complexity: 0.6,
+        handoff: { "plan.ready": ["builder-opus"] },
+      },
+    ]);
+    expect(JSON.parse(journalEvent().fields.handoff)).toEqual({
+      "plan.ready": ["builder-opus"],
+    });
+  });
+
+  it("announces a decision replayed from the journal", async () => {
+    reply(laneResponse());
+    await resolveJevRouting(loop);
+    vi.stubEnv("TYPESAFE_API_KEY", "");
+    const events: LoopEvent[] = [];
+    await resolveJevRouting({ ...loop, onEvent: (e) => events.push(e) });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "routing.selected",
+      route: "bug-fix",
+      handoff: { "plan.ready": ["builder-sol"] },
     });
   });
 

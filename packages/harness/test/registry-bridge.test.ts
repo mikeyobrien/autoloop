@@ -6,6 +6,7 @@ import {
   registryComplete,
   registryProgress,
   registryStart,
+  registryStepStart,
   registryStop,
 } from "@mobrienv/autoloop-harness/registry-bridge";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
@@ -153,6 +154,61 @@ describe("registryProgress", () => {
     expect(records[1].iteration).toBe(3);
     expect(records[1].latest_event).toBe("iteration.finish");
     expect(records[1].status).toBe("running");
+  });
+});
+
+describe("registryStepStart", () => {
+  const step = {
+    allowedRoles: ["builder-opus"],
+    backend: { kind: "claude-sdk", model: "claude-opus-5-5" },
+  };
+
+  it("records the step in flight without advancing the completed iteration", () => {
+    const loop = makeLoopContext();
+    registryStart(loop);
+    registryProgress(loop, 2);
+    registryStepStart(loop, 3, step);
+    const r = readLines()[2];
+    expect(r.iteration).toBe(2);
+    expect(r.latest_event).toBe("iteration.finish");
+    expect(r.status).toBe("running");
+    expect(r.current_step).toMatchObject({
+      iteration: 3,
+      role: "builder-opus",
+      backend_kind: "claude-sdk",
+      model: "claude-opus-5-5",
+    });
+    expect(r.current_step?.started_at).toBe(r.updated_at);
+  });
+
+  it("joins several allowed roles and writes a fresh record when none exists", () => {
+    const loop = makeLoopContext();
+    registryStepStart(loop, 1, {
+      allowedRoles: ["planner", "builder"],
+      backend: { kind: "pi", model: "" },
+    });
+    const r = readLines()[0];
+    expect(r.iteration).toBe(0);
+    expect(r.current_step?.role).toBe("planner,builder");
+    expect(r.current_step?.model).toBe("");
+  });
+
+  it("drops the step once it finishes", () => {
+    const loop = makeLoopContext();
+    registryStart(loop);
+    registryStepStart(loop, 1, step);
+    registryProgress(loop, 1);
+    expect(readLines()[2].current_step).toBeUndefined();
+  });
+
+  it("drops the step from terminal records", () => {
+    const loop = makeLoopContext();
+    registryStart(loop);
+    registryStepStart(loop, 1, step);
+    registryComplete(loop, 1, "task.complete");
+    const r = readLines()[2];
+    expect(r.status).toBe("completed");
+    expect(r.current_step).toBeUndefined();
   });
 });
 

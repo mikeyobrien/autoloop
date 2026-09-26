@@ -72,7 +72,7 @@ import { runProgressMetric } from "./progress.js";
 import type { IterationContext } from "./prompt.js";
 import { buildIterationContext } from "./prompt.js";
 import { enterProvisional, resolveCompletionClaim } from "./provisional.js";
-import { registryProgress } from "./registry-bridge.js";
+import { registryProgress, registryStepStart } from "./registry-bridge.js";
 import { finishStageIteration } from "./stage.js";
 import {
   completeLoop,
@@ -164,6 +164,11 @@ export async function runIteration(
     recentEvent: iter.recentEvent,
     allowedEvents: iter.allowedEvents,
     lastRejected: iter.lastRejected,
+    backend: { kind: iter.backend.kind, model: iter.backend.model },
+  });
+  registryStepStart(loop, iteration, {
+    allowedRoles: iter.allowedRoles,
+    backend: { kind: iter.backend.kind, model: iter.backend.model },
   });
   appendIterationStart(loop, iter);
   log(loop, "debug", `iteration ${iteration} start`);

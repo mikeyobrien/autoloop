@@ -5,6 +5,9 @@ import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
 import type { PiSession } from "@mobrienv/autoloop-backends/pi-rpc-client";
 import { encodeEvent } from "@mobrienv/autoloop-core";
+import { getRun } from "@mobrienv/autoloop-core/registry/read";
+import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
+import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -415,6 +418,39 @@ describe("runIteration pi RPC execution", () => {
     );
     expect(loop.piSession.current).toBe(fakeSession);
     expect(summary.stopReason).toBe("completion_promise");
+  });
+
+  it("announces the step backend and records it in the registry before the backend runs", async () => {
+    const loop = makePiLoop();
+    loop.piSession.current = {
+      process: { pid: 99 },
+      options: PI_SPAWN,
+    } as unknown as PiSession;
+    piMocks.resetPiSession.mockResolvedValue(undefined);
+    const events: LoopEvent[] = [];
+    loop.onEvent = (event) => events.push(event);
+    let during: RunRecord | undefined;
+    piMocks.runPiIteration.mockImplementation(async () => {
+      during = getRun(loop.paths.registryFile, loop.runtime.runId);
+      return { output: "DONE", exitCode: 0, timedOut: false };
+    });
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    const banner = events.find((e) => e.type === "iteration.banner");
+    expect(banner).toMatchObject({ backend: { kind: "pi", model: "gpt-5" } });
+    expect(during?.iteration).toBe(0);
+    expect(during?.current_step).toMatchObject({
+      iteration: 1,
+      backend_kind: "pi",
+      model: "gpt-5",
+    });
+    const final = getRun(loop.paths.registryFile, loop.runtime.runId);
+    expect(final?.current_step).toBeUndefined();
   });
 
   it("journals a backend.usage event when pi reports session stats", async () => {

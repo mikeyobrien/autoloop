@@ -341,6 +341,30 @@ async function requestDecision(
   }
 }
 
+// Runs already announced by this process, keyed by journal and run id.
+const announced = new Set<string>();
+
+function announceRoute(
+  loop: LoopContext,
+  decision: JevDecision,
+  route: JevRoute,
+): void {
+  if (!loop.onEvent) return;
+  const key = `${loop.paths.journalFile}\0${loop.runtime.runId}`;
+  if (announced.has(key)) return;
+  announced.add(key);
+  loop.onEvent({
+    type: "routing.selected",
+    runId: loop.runtime.runId,
+    route: route.id,
+    reason: decision.reason,
+    choice: decision.choice,
+    confidence: decision.confidence,
+    ...(decision.complexity ? { complexity: decision.complexity.score } : {}),
+    ...(route.handoff ? { handoff: route.handoff } : {}),
+  });
+}
+
 export async function resolveJevRouting(loop: LoopContext): Promise<string> {
   const cfg = loop.jevRouting;
   if (!cfg) return "";
@@ -372,6 +396,9 @@ export async function resolveJevRouting(loop: LoopContext): Promise<string> {
     response = await requestDecision(loop, cfg);
   }
   const decision = parseDecision(response, cfg);
+  const route = cfg.routes.find(
+    (candidate) => candidate.id === decision.routeId,
+  ) as JevRoute;
   if (!cached) {
     const safeResponse = {
       model: decision.model,
@@ -393,12 +420,10 @@ export async function resolveJevRouting(loop: LoopContext): Promise<string> {
       loop.runtime.runId,
       "",
       SELECTED,
-      `"state_hash":${JSON.stringify(stateHash)},"route":${JSON.stringify(decision.routeId)},"reason":${JSON.stringify(decision.reason)},"elapsed_ms":${Date.now() - started},"response":${JSON.stringify(JSON.stringify(safeResponse))}`,
+      `"state_hash":${JSON.stringify(stateHash)},"route":${JSON.stringify(decision.routeId)},"reason":${JSON.stringify(decision.reason)},"elapsed_ms":${Date.now() - started},"response":${JSON.stringify(JSON.stringify(safeResponse))}${route.handoff ? `,"handoff":${JSON.stringify(JSON.stringify(route.handoff))}` : ""}`,
     );
   }
-  const route = cfg.routes.find(
-    (candidate) => candidate.id === decision.routeId,
-  ) as JevRoute;
+  announceRoute(loop, decision, route);
   if (route.handoff && loop.topology) {
     for (const [event, targets] of Object.entries(route.handoff)) {
       if (!loop.topology.handoffKeys.includes(event))

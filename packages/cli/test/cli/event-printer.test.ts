@@ -17,6 +17,7 @@ vi.mock("@mobrienv/autoloop-harness/display", () => ({
   printIterationFooter: vi.fn(),
   printProgressLine: vi.fn(),
   printReviewBanner: vi.fn(),
+  printRoutingSelected: vi.fn(),
   printSummary: vi.fn(),
 }));
 
@@ -27,6 +28,7 @@ import {
   printIterationFooter,
   printProgressLine,
   printReviewBanner,
+  printRoutingSelected,
   printSummary,
 } from "@mobrienv/autoloop-harness/display";
 
@@ -61,6 +63,7 @@ describe("cliPrintEvent", () => {
       recentEvent: "loop.start",
       allowedEvents: ["code.written"],
       lastRejected: "oops",
+      backend: { kind: "claude-sdk", model: "claude-opus-5-5" },
     });
     expect(printIterationBanner).toHaveBeenCalledTimes(1);
     const [loopStub, iterStub] = (
@@ -72,6 +75,23 @@ describe("cliPrintEvent", () => {
     expect(iterStub.recentEvent).toBe("loop.start");
     expect(iterStub.allowedEvents).toEqual(["code.written"]);
     expect(iterStub.lastRejected).toBe("oops");
+    expect(iterStub.backend).toEqual({
+      kind: "claude-sdk",
+      model: "claude-opus-5-5",
+    });
+  });
+
+  it("routing.selected forwards the route to printRoutingSelected", () => {
+    const event = {
+      type: "routing.selected" as const,
+      runId: "r",
+      route: "feature",
+      reason: "choice" as const,
+      choice: "feature",
+      confidence: 1,
+    };
+    cliPrintEvent(event);
+    expect(printRoutingSelected).toHaveBeenCalledWith(event);
   });
 
   it("iteration.banner defaults lastRejected to empty string", () => {
@@ -82,6 +102,7 @@ describe("cliPrintEvent", () => {
       allowedRoles: [],
       recentEvent: "",
       allowedEvents: [],
+      backend: { kind: "pi", model: "" },
     });
     const [, iterStub] = (
       printIterationBanner as unknown as ReturnType<typeof vi.fn>

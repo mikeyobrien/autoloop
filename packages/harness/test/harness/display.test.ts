@@ -3,6 +3,7 @@ import {
   printIterationBanner,
   printIterationFooter,
   printReviewBanner,
+  printRoutingSelected,
 } from "@mobrienv/autoloop-harness/display";
 import type { IterationContext } from "@mobrienv/autoloop-harness/prompt";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
@@ -102,7 +103,8 @@ function makeIterationContext(): IterationContext {
     scratchpadText: "",
     memoryText: "",
     prompt: "",
-  };
+    backend: { kind: "claude-sdk", model: "claude-opus-5-5" },
+  } as IterationContext;
 }
 
 describe("display formatting", () => {
@@ -173,8 +175,50 @@ describe("display formatting", () => {
     printIterationBanner(makeLoopContext(), makeIterationContext());
     expect(logged).toEqual([
       "iteration 2/6",
-      "role: builder │ event: task.start │ next: design.ready",
+      "role: builder │ claude-sdk · claude-opus-5-5 │ event: task.start │ next: design.ready",
     ]);
+  });
+
+  it("renders the step backend between role and event on a tty", () => {
+    printIterationBanner(makeLoopContext(), makeIterationContext());
+    expect(logged).toContain(
+      "role: builder │ claude-sdk · claude-opus-5-5 │ event: task.start │ next: design.ready",
+    );
+  });
+
+  it("renders an unset model as the harness default", () => {
+    setIsTTY(false);
+    const iter = makeIterationContext();
+    iter.backend = { ...iter.backend, kind: "pi", model: "" };
+    printIterationBanner(makeLoopContext(), iter);
+    expect(logged[1]).toContain("│ pi · default │");
+  });
+
+  describe("printRoutingSelected", () => {
+    it("renders route, reason, confidence, complexity, and handoff", () => {
+      printRoutingSelected({
+        route: "feature",
+        reason: "choice",
+        confidence: 1,
+        complexity: 1,
+        handoff: {
+          "plan.ready": ["builder-opus"],
+          "review.rejected": ["planner", "critic"],
+        },
+      });
+      expect(logged).toEqual([
+        "jev → feature (choice · conf 1.00 · complexity 1.00) · plan.ready → builder-opus · review.rejected → planner, critic",
+      ]);
+    });
+
+    it("omits complexity and handoff when absent", () => {
+      printRoutingSelected({
+        route: "bug-fix",
+        reason: "fallback",
+        confidence: 0.4,
+      });
+      expect(logged).toEqual(["jev → bug-fix (fallback · conf 0.40)"]);
+    });
   });
 
   it("omits decorative review banner when stdout is not a tty", () => {
