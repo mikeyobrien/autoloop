@@ -81,6 +81,7 @@ Every field is optional. Names and semantics mirror the CLI flags they parallel.
 | `keepWorktree`      | `boolean`                     | Skip worktree cleanup at end of run.                                     |
 | `signal`            | `AbortSignal`                 | Caller-owned cancellation. See below.                                    |
 | `onEvent`           | `(e: LoopEvent) => void`      | Structured event listener. See below.                                    |
+| `host`              | `HostWorker`                  | Run every iteration in-process instead of the backend. See below.        |
 
 ### Cancellation with `signal`
 
@@ -100,6 +101,49 @@ Without a signal, the harness runs to completion and nothing intercepts Ctrl-C o
 ### Listening with `onEvent`
 
 `onEvent` is invoked alongside the harness's existing terminal output. SDK consumers can drive custom UIs from this stream (or ignore display variants entirely). See the [`LoopEvent`](#loopevent-variants) reference below.
+
+### In-process iterations with `host`
+
+A `host` worker replaces the configured backend. Each iteration becomes one call to `host.runTurn(turn)`, awaited before the next one starts. Routing, guards, gates, completion, the journal, the registry, and hooks behave as they do for a spawned backend. This is how an agent harness (for example a pi extension) runs a preset inside its own session.
+
+```ts
+import { run } from "@mobrienv/autoloop-harness";
+import type { HostWorker } from "@mobrienv/autoloop-harness/host";
+
+const host: HostWorker = {
+  label: "host:pi",
+  eventToolHint: "Call the `autoloop_emit` tool with {topic, payload}.",
+  async runTurn(turn) {
+    // Show turn.prompt to the agent. Wire its emit tool to turn.emit(topic, payload).
+    // Stop work when turn.signal aborts.
+    const output = await agent.run(turn.prompt, { signal: turn.signal });
+    return { status: "completed", output };
+  },
+};
+
+const summary = await run(projectDir, prompt, "autoloop", { workDir, host, signal });
+```
+
+What the turn carries:
+
+- `turn.prompt` is the text journaled as `iteration.start.prompt`. In host mode it also carries the full prompt of each suggested role (`turn.roles`), and its `Event tool:` line is `host.eventToolHint` instead of the shell shim. CLI prompts are unchanged.
+- `turn.emit(topic, payload)` validates synchronously against this iteration's allowed events, evidence gates, the task gate, and `pre_emit`/`post_emit` hooks. It then journals the event (or `event.invalid`) and returns `{ ok, topic, error }`. A rejected emit can be retried in the same turn. It reads the live loop, so single-file presets keep their gates.
+- `turn.signal` aborts when the run's `signal` aborts or when the iteration deadline (`backend.timeout_ms`, clamped to `event_loop.max_runtime`) passes.
+
+How the result maps:
+
+| `runTurn` result                  | Harness outcome                                 |
+|-----------------------------------|-------------------------------------------------|
+| `completed`                       | Normal outcome decision (routing, completion).  |
+| `error`                           | Backend failure path (`backend_failed` or a retry for transient errors). |
+| `interrupted`                     | Stops the run as `interrupted`.                 |
+| any status after the deadline     | Stops the run as `backend_timeout`.             |
+
+`usage` on the result is journaled as `backend.usage`, so `event_loop.max_cost_usd` still applies.
+
+Host mode refuses, before `loop.start` is journaled, any preset that would start a second worker or park on a human: metareview enabled, `parallel.enabled`, topology `[[stage]]`s, or roles with `concurrency`. Most bundled presets enable metareview, so pass `configOverride: { review: { enabled: false } }` to run them. `turn.emit` rejects `*.parallel`, `wait.request`, and the ask event with a reason.
+
+`resume(record, { host })` continues a run the same way.
 
 ## `LoopEvent` variants
 
