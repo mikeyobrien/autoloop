@@ -5,7 +5,7 @@ import {
   table,
 } from "@mobrienv/autoloop-core";
 
-interface MetricsRow {
+export interface MetricsRow {
   iteration: string;
   role: string;
   event: string;
@@ -13,10 +13,29 @@ interface MetricsRow {
   exitCode: string;
   timedOut: string;
   outcome: string;
+  /** Event that triggered the step (iteration.start recent_event). */
+  recentEvent: string;
+  backendKind: string;
+  model: string;
+  costUsd: number;
+  /** ISO timestamp of the step's iteration.start. */
+  startedAt: string;
+  /** False for a step that has started but not yet finished. */
+  finished: boolean;
 }
 
+/**
+ * Fold one run's journal lines into one row per step (iteration). The
+ * in-flight step, if any, is the last row with `finished: false`.
+ */
 export function collectMetricsRows(lines: string[]): MetricsRow[] {
   const rows: MetricsRow[] = [];
+  const findRow = (iter: string): MetricsRow | undefined => {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i].iteration === iter) return rows[i];
+    }
+    return undefined;
+  };
 
   for (const line of lines) {
     const event = decodeEvent(line);
@@ -33,7 +52,30 @@ export function collectMetricsRows(lines: string[]): MetricsRow[] {
         exitCode: "",
         timedOut: "false",
         outcome: "continue",
+        recentEvent: event.fields.recent_event ?? "",
+        backendKind: "",
+        model: "",
+        costUsd: 0,
+        startedAt: readTs(line),
+        finished: false,
       });
+      continue;
+    }
+
+    if (event.topic === "backend.start" && event.shape === "fields") {
+      const row = findRow(event.iteration ?? "");
+      if (row) {
+        row.backendKind = event.fields.backend_kind ?? "";
+        if (event.fields.role) row.role = event.fields.role;
+        row.model = event.fields.model ?? "";
+      }
+      continue;
+    }
+
+    if (event.topic === "backend.usage" && event.shape === "fields") {
+      const row = findRow(event.iteration ?? "");
+      const cost = Number(event.fields.cost_usd);
+      if (row && Number.isFinite(cost)) row.costUsd += cost;
       continue;
     }
 
@@ -49,6 +91,7 @@ export function collectMetricsRows(lines: string[]): MetricsRow[] {
             rows[i].timedOut,
             rows[i].event,
           );
+          rows[i].finished = true;
           break;
         }
       }
@@ -90,6 +133,8 @@ function formatMetricsMd(rows: MetricsRow[]): string {
     "exit_code",
     "timed_out",
     "outcome",
+    "model",
+    "cost_usd",
   ];
   const tableRows = rows.map((r) => [
     r.iteration,
@@ -99,6 +144,8 @@ function formatMetricsMd(rows: MetricsRow[]): string {
     r.exitCode,
     r.timedOut,
     r.outcome,
+    r.model,
+    formatCost(r.costUsd),
   ]);
   return `${table(headers, tableRows)}\n\n${metricsSummary(rows)}`;
 }
@@ -138,7 +185,8 @@ function countDistinctEvents(rows: MetricsRow[]): number {
 }
 
 function formatMetricsCsv(rows: MetricsRow[]): string {
-  const header = "iteration,role,event,elapsed_s,exit_code,timed_out,outcome";
+  const header =
+    "iteration,role,event,elapsed_s,exit_code,timed_out,outcome,model,cost_usd";
   if (rows.length === 0) return header;
   const csvRows = rows.map(
     (r) =>
@@ -154,7 +202,11 @@ function formatMetricsCsv(rows: MetricsRow[]): string {
       "," +
       csvQuote(r.timedOut) +
       "," +
-      csvQuote(r.outcome),
+      csvQuote(r.outcome) +
+      "," +
+      csvQuote(r.model) +
+      "," +
+      formatCost(r.costUsd),
   );
   return `${header}\n${csvRows.join("\n")}`;
 }
@@ -184,9 +236,17 @@ function formatMetricsJson(rows: MetricsRow[]): string {
       jsonBoolField("timed_out", r.timedOut) +
       ", " +
       jsonField("outcome", r.outcome) +
+      ", " +
+      jsonField("model", r.model) +
+      `, "cost_usd": ${formatCost(r.costUsd)}` +
       "}",
   );
   return `[${items.join(", ")}]`;
+}
+
+// Round to micro-dollars so float sums print cleanly.
+function formatCost(cost: number): string {
+  return String(Math.round(cost * 1e6) / 1e6);
 }
 
 function jsonNumberOrNull(key: string, value: string): string {
@@ -212,4 +272,11 @@ function firstCsvValue(csv: string): string {
   if (!csv) return "";
   const first = csv.split(",")[0];
   return first?.trim() ?? "";
+}
+
+// decodeEvent drops the envelope `ts`; iteration.start is once per step, so
+// re-parsing that one line is cheap.
+function readTs(line: string): string {
+  const ts = (JSON.parse(line) as { ts?: unknown }).ts;
+  return typeof ts === "string" ? ts : "";
 }

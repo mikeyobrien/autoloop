@@ -324,9 +324,9 @@ Watch a run live by polling the registry.
 autoloop loops watch <run-id>
 ```
 
-Polls the registry every 2 seconds and prints a compact progress line whenever the run's state changes (iteration, event, or status). When a run transitions into the watching or stuck health band for its preset, an advisory line is printed (e.g. `[watch] autosimplify: no progress for 3m — investigate soon`). When the run reaches a terminal status (completed, failed, timed_out, stopped), prints a full detail view and exits.
+Polls every 2 seconds and prints a per-step timeline from the run's journal (`RunRecord.journal_file`). Each finished step prints once, e.g. `#3  builder-opus   claude-opus-5-5   plan.ready → review.ready   2m14s   $0.14` (model falls back to the backend kind, and cost is omitted when zero). The running step shows as a live line, e.g. `▶ #4  critic   xai/grok-4.7   running 0m42s`. On a TTY that line is rewritten in place; otherwise it prints once each time a new step starts. When a run transitions into the watching or stuck health band for its preset, an advisory line is printed (e.g. `[watch] autosimplify: no progress for 3m — investigate soon`). When the run reaches a terminal status (completed, failed, timed_out, stopped), prints a full detail view and exits.
 
-If the run is already in a terminal state when watch starts, prints the detail view immediately and exits. Supports partial run-ID matching.
+If the run is already in a terminal state when watch starts, prints the full timeline and the detail view, then exits. Supports partial run-ID matching.
 
 Press Ctrl+C to stop watching.
 
