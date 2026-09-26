@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   allEmittedEvents,
   allowedEvents,
+  applyHandoffPatch,
   buildTopology,
   completionEvent,
   concurrentRolesForEvent,
   eventMatchesAny,
   getRoleIds,
+  jevLaneFromLines,
   loadTopology,
   render,
   renderTopologyInspect,
@@ -1027,5 +1029,183 @@ timeout_ms = 60000
       timeout_ms: 60000,
     });
     spy.mockRestore();
+  });
+});
+
+const LANES_TOML = `
+name = "lanes"
+completion = "task.complete"
+
+[[role]]
+id = "planner"
+prompt = "Plan."
+emits = ["plan.ready"]
+
+[[role]]
+id = "builder-opus"
+prompt = "Build."
+emits = ["task.complete"]
+backend_kind = "claude-sdk"
+backend_model = "claude-opus-5-5"
+
+[[role]]
+id = "builder-sol"
+prompt = "Build."
+emits = ["task.complete"]
+backend_model = "gpt-6-sol"
+
+[[role]]
+id = "timed"
+prompt = "Wait."
+emits = ["task.complete"]
+backend_timeout_ms = 5
+
+[handoff]
+"loop.start" = ["planner"]
+"plan.ready" = ["builder-sol"]
+`;
+
+function jevLine(run: string, fields: Record<string, unknown>): string {
+  return JSON.stringify({
+    run,
+    topic: "routing.jev.selected",
+    ts: "2026-09-26T00:00:00.000Z",
+    v: 1,
+    fields,
+  });
+}
+
+function captureTopology(
+  dir: string,
+  format: string,
+  jev?: Parameters<typeof renderTopologyInspect>[2],
+): string {
+  const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+  renderTopologyInspect(dir, format, jev);
+  const output = spy.mock.calls.map((c) => c[0]).join("\n");
+  spy.mockRestore();
+  return output;
+}
+
+describe("topology role legend and Jev lane", () => {
+  const lane = {
+    route: "feature",
+    reason: "choice",
+    handoff: { "plan.ready": ["builder-opus"], "plan.hard": ["builder-opus"] },
+  };
+
+  function lanesDir(name: string): string {
+    const dir = tmpDir(name);
+    writeFileSync(join(dir, "topology.toml"), LANES_TOML);
+    return dir;
+  }
+
+  it("prints a legend line per role after unchanged edges", () => {
+    const output = captureTopology(lanesDir("legend"), "graph");
+    expect(output).toContain("[planner] --plan.ready--> [builder-sol]\n");
+    expect(output).toContain("  planner       inherits base backend");
+    expect(output).toContain("  builder-opus  claude-sdk · claude-opus-5-5");
+    expect(output).toContain("  builder-sol   base kind · gpt-6-sol");
+    expect(output).toContain("  timed         base kind · base model");
+    expect(output).not.toContain("Jev lane");
+    expect(output).not.toContain("(jev)");
+  });
+
+  it("applies the Jev patch, prints the lane header, and marks patched edges", () => {
+    const output = captureTopology(lanesDir("graph-jev"), "graph", lane);
+    const lines = output.split("\n");
+    expect(lines[0]).toBe("Jev lane: feature (choice)");
+    expect(lines).toContain("[planner] --plan.ready--> [builder-opus]  (jev)");
+    expect(lines).toContain("[builder-opus] --task.complete--> (done)");
+  });
+
+  it("renders the legend for a single-file preset", () => {
+    const file = join(tmpDir("single-legend"), "lanes.toml");
+    writeFileSync(file, LANES_TOML);
+    const output = captureTopology(file, "graph", lane);
+    expect(output).toContain("[planner] --plan.ready--> [builder-opus]  (jev)");
+    expect(output).toContain("  builder-opus  claude-sdk · claude-opus-5-5");
+  });
+
+  it("prints Jev lane: none when the run has no record", () => {
+    const graph = captureTopology(lanesDir("graph-none"), "graph", null);
+    expect(graph.split("\n")[0]).toBe("Jev lane: none");
+    expect(graph).toContain("[planner] --plan.ready--> [builder-sol]\n");
+    const terminal = captureTopology(lanesDir("term-none"), "terminal", null);
+    expect(terminal).toContain("Jev lane: none");
+  });
+
+  it("marks patched handoff entries in terminal format", () => {
+    const output = captureTopology(lanesDir("term-jev"), "terminal", lane);
+    expect(output).toContain("Jev lane: feature (choice)");
+    expect(output).toContain("- plan.ready → [builder-opus]  (jev)");
+    expect(output).toContain("- plan.hard → [builder-opus]  (jev)");
+    expect(output).toContain("- loop.start → [planner]\n");
+  });
+
+  it("adds a jev object to json only when a run was asked for", () => {
+    const withLane = JSON.parse(
+      captureTopology(lanesDir("json-jev"), "json", lane),
+    );
+    expect(withLane.jev).toEqual(lane);
+    expect(withLane.handoff["plan.ready"]).toEqual(["builder-opus"]);
+    const none = JSON.parse(
+      captureTopology(lanesDir("json-none"), "json", null),
+    );
+    expect(none.jev).toBeNull();
+    const plain = JSON.parse(captureTopology(lanesDir("json-plain"), "json"));
+    expect(plain).not.toHaveProperty("jev");
+    expect(plain.handoff["plan.ready"]).toEqual(["builder-sol"]);
+  });
+});
+
+describe("applyHandoffPatch", () => {
+  it("replaces targets, adds new events, and leaves the input untouched", () => {
+    const topo: Topology = {
+      name: "t",
+      completion: "done",
+      roles: [],
+      handoff: { a: ["x"], b: ["y"] },
+      handoffKeys: ["a", "b"],
+      gates: [],
+      stages: [],
+    };
+    const patched = applyHandoffPatch(topo, { a: ["z"], c: ["w"] });
+    expect(patched.handoff).toEqual({ a: ["z"], b: ["y"], c: ["w"] });
+    expect(patched.handoffKeys).toEqual(["a", "b", "c"]);
+    expect(topo.handoff).toEqual({ a: ["x"], b: ["y"] });
+    expect(topo.handoffKeys).toEqual(["a", "b"]);
+  });
+});
+
+describe("jevLaneFromLines", () => {
+  it("returns the run's last record with its parsed handoff", () => {
+    const lines = [
+      jevLine("other", { route: "perf", reason: "choice" }),
+      JSON.stringify({ run: "r1", topic: "loop.start", fields: {} }),
+      jevLine("r1", { route: "bugfix", reason: "choice" }),
+      jevLine("r1", {
+        route: "feature",
+        reason: "choice",
+        handoff: JSON.stringify({ "plan.ready": ["builder-opus"], bad: 3 }),
+      }),
+    ];
+    expect(jevLaneFromLines(lines, "r1")).toEqual({
+      route: "feature",
+      reason: "choice",
+      handoff: { "plan.ready": ["builder-opus"] },
+    });
+  });
+
+  it("returns null without a record and tolerates records without a patch", () => {
+    expect(jevLaneFromLines([], "r1")).toBeNull();
+    for (const handoff of ["not json", "[1]", "null"]) {
+      expect(
+        jevLaneFromLines(
+          [jevLine("r1", { route: "unrouted", reason: "low", handoff })],
+          "r1",
+        ),
+      ).toEqual({ route: "unrouted", reason: "low", handoff: {} });
+    }
   });
 });

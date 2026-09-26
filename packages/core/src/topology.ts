@@ -8,6 +8,7 @@ import type {
   JoinKind,
   VoteThreshold,
 } from "./fanout.js";
+import { extractField, extractTopic } from "./json.js";
 import { lineSep, listContains, listText } from "./utils.js";
 
 export interface Role {
@@ -935,31 +936,118 @@ function validateStages(topology: Topology, warnings: TopologyWarning[]): void {
   }
 }
 
-export function renderTopologyInspect(target: string, format: string): void {
+/** The lane Jev picked for a run, read from its `routing.jev.selected` record. */
+export interface JevLane {
+  route: string;
+  reason: string;
+  /** The route's event -> roles patch; empty when the route has none. */
+  handoff: Record<string, string[]>;
+}
+
+/**
+ * Overlay a Jev route's handoff patch onto a topology, the same way the
+ * harness does at run time: each patched event's targets are replaced, and
+ * events the topology does not route yet are added.
+ */
+export function applyHandoffPatch(
+  topology: Topology,
+  patch: Record<string, string[]>,
+): Topology {
+  const handoff = { ...topology.handoff };
+  const handoffKeys = [...topology.handoffKeys];
+  for (const [event, targets] of Object.entries(patch)) {
+    if (!handoffKeys.includes(event)) handoffKeys.push(event);
+    handoff[event] = [...targets];
+  }
+  return { ...topology, handoff, handoffKeys };
+}
+
+/** The last `routing.jev.selected` record for `runId`, or null when absent. */
+export function jevLaneFromLines(
+  lines: string[],
+  runId: string,
+): JevLane | null {
+  let lane: JevLane | null = null;
+  for (const line of lines) {
+    if (extractTopic(line) !== "routing.jev.selected") continue;
+    if (extractField(line, "run") !== runId) continue;
+    lane = {
+      route: extractField(line, "route"),
+      reason: extractField(line, "reason"),
+      handoff: parseHandoffPatch(extractField(line, "handoff")),
+    };
+  }
+  return lane;
+}
+
+function parseHandoffPatch(raw: string): Record<string, string[]> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
+    const patch: Record<string, string[]> = {};
+    for (const [event, targets] of Object.entries(parsed)) {
+      if (Array.isArray(targets)) patch[event] = targets.map(String);
+    }
+    return patch;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Render a preset's topology. `jev` is omitted when no run was asked for,
+ * null when the run has no Jev record, and otherwise the run's lane, whose
+ * handoff patch is applied before rendering.
+ */
+export function renderTopologyInspect(
+  target: string,
+  format: string,
+  jev?: JevLane | null,
+): void {
   const singleFile = isSingleFilePresetPath(target);
-  const topology = singleFile
+  const loaded = singleFile
     ? loadTopologyFromFile(target)
     : loadTopology(target);
 
-  if (topology.roles.length === 0) {
+  if (loaded.roles.length === 0) {
     console.log("No topology defined.");
     return;
   }
 
+  const patch = jev?.handoff ?? {};
+  const topology = applyHandoffPatch(loaded, patch);
+  const patched = Object.keys(patch);
+
   switch (format) {
     case "json":
-      renderTopologyJson(topology, singleFile);
+      renderTopologyJson(topology, singleFile, jev);
       break;
     case "graph":
-      renderTopologyGraph(topology);
+      renderTopologyGraph(topology, jev, patched);
       break;
     default:
-      renderTopologyTerminal(topology, singleFile);
+      renderTopologyTerminal(topology, singleFile, jev, patched);
       break;
   }
 }
 
-function renderTopologyJson(topology: Topology, singleFile: boolean): void {
+function jevLaneLine(jev: JevLane | null): string {
+  return jev ? `Jev lane: ${jev.route} (${jev.reason})` : "Jev lane: none";
+}
+
+function jevMark(event: string, patched: string[]): string {
+  return patched.some((key) => eventMatchesPattern(event, key))
+    ? "  (jev)"
+    : "";
+}
+
+function renderTopologyJson(
+  topology: Topology,
+  singleFile: boolean,
+  jev: JevLane | null | undefined,
+): void {
   const warnings = validateTopology(topology, { singleFile });
   const out = {
     name: topology.name,
@@ -972,6 +1060,7 @@ function renderTopologyJson(topology: Topology, singleFile: boolean): void {
       ...roleConcurrencyJson(r),
     })),
     handoff: topology.handoff,
+    ...(jev === undefined ? {} : { jev }),
     warnings: warnings.map((w) => ({ kind: w.kind, message: w.message })),
   };
   console.log(JSON.stringify(out, null, 2));
@@ -1012,28 +1101,54 @@ function roleConcurrencyJson(role: Role): Record<string, unknown> {
   return out;
 }
 
-function renderTopologyGraph(topology: Topology): void {
+function renderTopologyGraph(
+  topology: Topology,
+  jev: JevLane | null | undefined,
+  patched: string[],
+): void {
   const lines: string[] = [];
+  if (jev !== undefined) lines.push(jevLaneLine(jev));
   for (const role of topology.roles) {
     for (const event of role.emits) {
       const targets = collectMatchingRoles(topology, event);
       if (event === topology.completion) {
         lines.push(`[${role.id}] --${event}--> (done)`);
       } else if (targets.length > 0) {
-        lines.push(`[${role.id}] --${event}--> [${targets.join(", ")}]`);
+        lines.push(
+          `[${role.id}] --${event}--> [${targets.join(", ")}]${jevMark(event, patched)}`,
+        );
       } else {
         lines.push(`[${role.id}] --${event}--> (?)`);
       }
     }
   }
+  lines.push("");
+  const width = Math.max(...topology.roles.map((r) => r.id.length));
+  for (const role of topology.roles) {
+    lines.push(`  ${role.id.padEnd(width)}  ${roleBackendLegend(role)}`);
+  }
   console.log(lines.join("\n"));
 }
 
-function renderTopologyTerminal(topology: Topology, singleFile: boolean): void {
+/** `<kind> · <model>` from a role's overrides, naming what it leaves to the base. */
+function roleBackendLegend(role: Role): string {
+  if (!roleHasBackendOverride(role)) return "inherits base backend";
+  const kind = role.backendKind ?? "base kind";
+  const model = role.backendModel ?? "base model";
+  return `${kind} · ${model}`;
+}
+
+function renderTopologyTerminal(
+  topology: Topology,
+  singleFile: boolean,
+  jev: JevLane | null | undefined,
+  patched: string[],
+): void {
   const lines: string[] = [];
   lines.push(`## Topology: ${topology.name || "(unnamed)"}`);
   lines.push("");
   lines.push(`Completion event: ${topology.completion || "(none)"}`);
+  if (jev !== undefined) lines.push(jevLaneLine(jev));
   lines.push("");
 
   lines.push("### Roles");
@@ -1054,7 +1169,8 @@ function renderTopologyTerminal(topology: Topology, singleFile: boolean): void {
     const targets = topology.handoff[key] ?? [];
     const isRegex = key.startsWith("/") && key.endsWith("/");
     const annotation = isRegex ? " (regex)" : "";
-    lines.push(`- ${key}${annotation} → [${targets.join(", ")}]`);
+    const mark = patched.includes(key) ? "  (jev)" : "";
+    lines.push(`- ${key}${annotation} → [${targets.join(", ")}]${mark}`);
   }
   lines.push("");
 

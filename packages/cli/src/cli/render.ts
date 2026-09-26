@@ -15,6 +15,10 @@ import {
 } from "@mobrienv/autoloop-core/journal";
 import { formatTimeline } from "@mobrienv/autoloop-core/journal-format";
 import {
+  type JevLane,
+  jevLaneFromLines,
+} from "@mobrienv/autoloop-core/topology";
+import {
   collectArtifacts,
   formatArtifacts,
 } from "@mobrienv/autoloop-harness/artifacts";
@@ -294,4 +298,21 @@ function resolveJournalAndRun(
   }
   const journalFile = resolveEmitJournalFile(projectDir);
   return { journalFile, runId: ensureRenderRunId(journalFile) };
+}
+
+/**
+ * The Jev lane recorded for `runId`. The topology target is often a preset
+ * directory rather than the project the run launched from, so each candidate
+ * directory's journal for the run is searched in order.
+ */
+export function readJevLane(
+  projectDirs: string[],
+  runId: string,
+): JevLane | null {
+  for (const dir of projectDirs) {
+    const { journalFile } = resolveJournalFileForRun(dir, runId);
+    const lane = jevLaneFromLines(readRunLines(journalFile, runId), runId);
+    if (lane) return lane;
+  }
+  return null;
 }
