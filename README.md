@@ -252,6 +252,7 @@ Bundled presets give you opinionated starting points for common workflows like c
 | `automerge` | Merge a completed worktree branch back into its base branch |
 | `autopr` | Turn the current branch into a reviewable pull request |
 | `autowiki` | Ingest a queue of source URLs into an OKF-conformant LLM wiki of cross-linked concept pages |
+| `autorigor` | Rigor-mode playbooks with per-lane model and harness routing (pi, Claude SDK) |
 
 ## Creating custom presets
 

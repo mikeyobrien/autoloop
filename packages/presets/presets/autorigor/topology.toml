@@ -1,0 +1,104 @@
+name = "autorigor"
+completion = "task.complete"
+
+# Multi-model / multi-harness routing, mirroring ~/.pi/agent/rigor-models.md.
+# The harness picks the backend from the FIRST role a handoff names
+# (harness prompt.ts resolveIterationBackend), so every lane event below
+# routes to exactly one role. The planner selects the playbook lane by
+# which plan.* event it emits.
+#
+#   role           harness      model                          rigor role
+#   explorer       pi           spark/qwen3.8-flash-next       how explorer
+#   planner        pi           openai-codex/gpt-6-sol         judgment (inherits)
+#   builder-opus   claude-sdk   claude-opus-5-5                feature, refactoring
+#   builder-sol    pi           openai-codex/gpt-6-sol         bug-fix, hillclimb
+#   builder-astra  pi           openai-codex/gpt-6-astra       perf-issue, hardest tasks
+#   critic         pi           xai/grok-4.7                   interrogate reviewer (cross-family)
+#   finalizer      pi           openai-codex/gpt-6-sol         judgment (inherits)
+
+[[role]]
+id = "explorer"
+emits = ["context.ready"]
+prompt_file = "roles/explorer.md"
+backend_kind = "pi"
+backend_model = "spark/qwen3.8-flash-next"
+
+[[role]]
+id = "planner"
+emits = [
+  "plan.feature",
+  "plan.refactor",
+  "plan.bugfix",
+  "plan.hillclimb",
+  "plan.perf",
+  "plan.hard",
+  "context.needed",
+]
+prompt_file = "roles/planner.md"
+
+[[role]]
+id = "builder-opus"
+emits = ["review.ready", "build.blocked"]
+prompt_file = "roles/build.md"
+backend_kind = "claude-sdk"
+backend_command = "claude"
+backend_model = "claude-opus-5-5"
+
+[[role]]
+id = "builder-sol"
+emits = ["review.ready", "build.blocked"]
+prompt_file = "roles/build.md"
+backend_kind = "pi"
+backend_model = "openai-codex/gpt-6-sol"
+
+[[role]]
+id = "builder-astra"
+emits = ["review.ready", "build.blocked"]
+prompt_file = "roles/build.md"
+backend_kind = "pi"
+backend_model = "openai-codex/gpt-6-astra"
+
+[[role]]
+id = "critic"
+emits = ["review.passed", "review.rejected"]
+prompt_file = "roles/critic.md"
+backend_kind = "pi"
+backend_model = "xai/grok-4.7"
+
+[[role]]
+id = "finalizer"
+emits = ["queue.advance", "finalization.failed", "task.complete"]
+prompt_file = "roles/finalizer.md"
+
+[[gate]]
+event = "review.passed"
+blocked = "review.evidence.blocked"
+failed = "review.rejected"
+evidence = [
+  { key = "tests", type = "test" },
+  { key = "lint", type = "lint" },
+  { key = "typecheck", type = "typecheck" },
+  { key = "coverage", type = "coverage", min = 80 },
+]
+
+[handoff]
+"loop.start" = ["explorer"]
+"context.needed" = ["explorer"]
+"context.ready" = ["planner"]
+"queue.advance" = ["planner"]
+"plan.feature" = ["builder-opus"]
+"plan.refactor" = ["builder-opus"]
+"plan.bugfix" = ["builder-sol"]
+"plan.hillclimb" = ["builder-sol"]
+"plan.perf" = ["builder-astra"]
+"plan.hard" = ["builder-astra"]
+"review.ready" = ["critic"]
+"review.evidence.blocked" = ["critic"]
+# Rejections return to the planner, which owns lane choice and may re-route
+# (e.g. escalate a failed sol/qwen slice to plan.hard).
+"review.rejected" = ["planner"]
+"finalization.failed" = ["planner"]
+"review.passed" = ["finalizer"]
+# Planner and finalizer share the default backend, so the two-role fan-in
+# does not change which model runs.
+"build.blocked" = ["planner", "finalizer"]

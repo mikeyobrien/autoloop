@@ -1,0 +1,26 @@
+event_loop.max_iterations = 100
+event_loop.completion_event = "task.complete"
+event_loop.completion_promise = "LOOP_COMPLETE"
+event_loop.required_events = ["review.passed"]
+
+# Default lane: pi on the rigor "judgment and prose" model. Planner and
+# finalizer inherit this; every other role overrides harness and/or model
+# in topology.toml.
+backend.kind = "pi"
+backend.command = "pi"
+backend.args = []
+backend.model = "openai-codex/gpt-6-sol"
+backend.trust_all_tools = true
+backend.timeout_ms = 3000000
+
+review.enabled = true
+review.every_iterations = 10
+review.adversarial_first = false
+review.timeout_ms = 300000
+
+memory.prompt_budget_chars = 8000
+harness.instructions_file = "harness.md"
+
+core.state_dir = ".autoloop"
+core.journal_file = ".autoloop/journal.jsonl"
+core.memory_file = ".autoloop/memory.jsonl"
