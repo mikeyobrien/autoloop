@@ -30,6 +30,7 @@ import {
   routingTopic,
   systemTopic,
 } from "./emit.js";
+import { activeRoles } from "./host.js";
 import type { LoopContext } from "./index.js";
 import { renderRunScratchpadPrompt } from "./scratchpad.js";
 
@@ -54,6 +55,8 @@ function resolveIterationBackend(
   allowedRoles: string[],
 ): ResolvedIterationBackend {
   const resolved = resolvedFromLoopBackend(loop);
+  // The host runs every role in-process, so per-role backend overrides do not apply.
+  if (loop.host) return { ...resolved, kind: "host", command: loop.host.label };
   if (allowedRoles.length === 0) return resolved;
   const backendRole = allowedRoles[0];
   const role = loop.topology.roles.find((r) => r.id === backendRole);
@@ -390,6 +393,7 @@ export function renderIterationPromptText(
       allowedEvents,
     ) +
     "\n" +
+    (loop.host ? activeRoleSection(loop, allowedRoles) : "") +
     parallelPromptText(loop, allowedEvents) +
     `Iteration: ${iteration}/${loop.limits.maxIterations}\n` +
     `Log level: ${loop.runtime.logLevel}\n` +
@@ -401,21 +405,13 @@ export function renderIterationPromptText(
     `Suggested next roles now: ${listText(allowedRoles)}\n` +
     `Allowed next events now: ${listText(allowedEvents)}\n` +
     "Event tool: " +
-    loop.paths.toolPath +
+    (loop.host ? loop.host.eventToolHint : loop.paths.toolPath) +
     "\n\n" +
     "Current scratchpad:\n" +
     (scratchpadText || "(empty)") +
     "\n\n" +
     "Use the event tool to publish your allowed handoff or completion event.\n" +
-    "Examples:\n" +
-    loop.paths.toolPath +
-    ' emit <allowed-topic> "brief handoff summary"\n' +
-    loop.paths.toolPath +
-    " emit " +
-    loop.completion.event +
-    ' "brief completion summary"\n' +
-    loop.paths.toolPath +
-    ' emit wait.request "reason=nap; duration=300s"\n' +
+    (loop.host ? "Memory and task commands:\n" : shellEmitExamples(loop)) +
     loop.paths.toolPath +
     ' memory add learning "durable lesson"\n' +
     loop.paths.toolPath +
@@ -433,8 +429,34 @@ export function renderIterationPromptText(
     loop.paths.toolPath +
     " inspect memory --format md`.\n" +
     "Plain text alone does not publish an event. Prefer the event tool over the stdout completion promise.\n" +
-    "To park this run without a live backend (same run_id, process exits 0), emit `wait.request`. Resume later with `autoloop resume <run-id>`. Do not sleep or backoff in-process — that burns backend.timeout_ms.\n"
+    (loop.host
+      ? ""
+      : "To park this run without a live backend (same run_id, process exits 0), emit `wait.request`. Resume later with `autoloop resume <run-id>`. Do not sleep or backoff in-process — that burns backend.timeout_ms.\n")
   );
+}
+
+function shellEmitExamples(loop: LoopContext): string {
+  return (
+    "Examples:\n" +
+    loop.paths.toolPath +
+    ' emit <allowed-topic> "brief handoff summary"\n' +
+    loop.paths.toolPath +
+    " emit " +
+    loop.completion.event +
+    ' "brief completion summary"\n' +
+    loop.paths.toolPath +
+    ' emit wait.request "reason=nap; duration=300s"\n'
+  );
+}
+
+/** The role deck only shows each prompt's first line; host turns get the full text. */
+function activeRoleSection(
+  loop: LoopContext,
+  allowedRoles: readonly string[],
+): string {
+  return activeRoles(loop.topology, allowedRoles)
+    .map((role) => `## Active role: ${role.id}\n${role.prompt}\n\n`)
+    .join("");
 }
 
 export function renderReviewPromptText(

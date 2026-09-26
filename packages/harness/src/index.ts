@@ -51,6 +51,7 @@ import {
   detectStall,
 } from "./guards.js";
 import { buildHookEnv, runPhaseHooks } from "./hooks.js";
+import { assertHostCompatible } from "./host.js";
 import { journalAcceptanceContract } from "./intent.js";
 import { runIteration } from "./iteration.js";
 import { maybeRunMetareview } from "./metareview.js";
@@ -107,6 +108,8 @@ export async function run(
   );
   loop.onEvent = runOptions.onEvent;
   loop.signal = runOptions.signal;
+  loop.host = runOptions.host;
+  if (loop.host) assertHostCompatible(loop);
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   // Self-heal a journal poisoned by a prior crash (torn last record) before we
@@ -264,7 +267,7 @@ export async function driveLoop(
     workDir: loop.paths.workDir,
     projectDir: loop.paths.projectDir,
     preset: loop.launch.preset,
-    backend: normalizeBackendLabel(loop.backend.command),
+    backend: loop.host?.label ?? normalizeBackendLabel(loop.backend.command),
     maxIterations: loop.limits.maxIterations,
     completionEvent: loop.completion.event,
     completionPromise: loop.completion.promise,
@@ -702,6 +705,8 @@ function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
 export function buildControlAdapter(
   loop: LoopContext,
 ): LiveControlAdapter | undefined {
+  // The host owns its own turn control; the configured backend never runs.
+  if (loop.host) return undefined;
   if (loop.backend.kind === "acp") {
     return acpControlAdapter(loop.runtime.runId, loop.backend.provider, {
       triggerInterrupt: () => {

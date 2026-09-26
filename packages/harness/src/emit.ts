@@ -28,7 +28,9 @@ import {
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { printHookOutput } from "./display.js";
 import { parseMutationDirective } from "./hooks.js";
+import type { IterationContext } from "./prompt.js";
 import { writeSuspendState } from "./suspend-state.js";
+import type { LoopContext } from "./types.js";
 
 const COORDINATION_TOPICS = new Set([
   "issue.discovered",
@@ -132,7 +134,8 @@ interface EmitHookOutcome {
 
 /**
  * Everything the emit pipeline reads. `emit()` builds it from env + disk
- * because it runs out-of-process.
+ * because it runs out-of-process; `emitForIteration()` builds it from the live
+ * loop and iteration.
  */
 interface EmitScope {
   projectDir: string;
@@ -141,6 +144,8 @@ interface EmitScope {
   tasksFile: string;
   hookSpecs: HookSpec[];
   validation: EmitValidation;
+  /** In-process host turns cannot fan out or park, so those topics are rejected. */
+  hostMode: boolean;
 }
 
 /**
@@ -250,6 +255,43 @@ export function emit(
   return emitInScope(envEmitScope(projectDir, journalFile), topic, payload);
 }
 
+/**
+ * In-process emit for one live iteration. Same pipeline as `emit()`, but the
+ * validation context comes from `loop` and `iter` (so single-file presets keep
+ * their gates and the routing check always has the iteration's allowed
+ * events) and nothing is read from or written to `process.env`.
+ */
+export function emitForIteration(
+  loop: LoopContext,
+  iter: IterationContext,
+  topic: string,
+  payload: string,
+): EmitResult {
+  return emitInScope(
+    {
+      projectDir: loop.paths.projectDir,
+      journalFile: loop.paths.journalFile,
+      stateDir: loop.paths.stateDir,
+      tasksFile: loop.paths.tasksFile,
+      hookSpecs: loop.hooks.specs ?? [],
+      hostMode: loop.host !== undefined,
+      validation: {
+        runId: loop.runtime.runId,
+        iteration: String(iter.iteration),
+        recentEvent: iter.recentEvent,
+        allowedRoles: iter.allowedRoles,
+        allowedEvents: iter.allowedEvents,
+        parallelEnabled: loop.parallel.enabled,
+        completionEvent: loop.completion.event,
+        topo: loop.topology,
+        askEvent: loop.ask.event,
+      },
+    },
+    topic,
+    payload,
+  );
+}
+
 function emitInScope(
   scope: EmitScope,
   topic: string,
@@ -297,6 +339,11 @@ function emitCore(
       topic,
       error: preEmit.blockedMessage ?? "pre_emit hook blocked this event",
     };
+  }
+
+  if (scope.hostMode) {
+    const reason = hostUnsupportedTopic(topic, validation.askEvent);
+    if (reason) return rejectEmit(journalFile, topic, validation, reason);
   }
 
   // Evidence gate (opt-in): applies to ANY configured event, BEFORE routing /
@@ -599,6 +646,16 @@ interface EmitValidation {
   askEvent: string;
 }
 
+function hostUnsupportedTopic(topic: string, askEvent: string): string {
+  if (parallelTopic(topic))
+    return `\`${topic}\` is not supported in host mode: parallel fan-out would launch another worker`;
+  if (topic === "wait.request")
+    return "`wait.request` is not supported in host mode: the run cannot park without a live session";
+  if (askEvent !== "" && topic === askEvent)
+    return `\`${topic}\` is not supported in host mode: ask the operator in the conversation instead`;
+  return "";
+}
+
 /**
  * Scope for out-of-process `emit()`: run identity and routing come from the
  * env the `autoloops` shim exports; config, topology, and hooks are re-read
@@ -618,6 +675,7 @@ function envEmitScope(projectDir: string, journalFile: string): EmitScope {
     // here would silently read a different file and miss open tasks.
     tasksFile: resolveFile(projectDir),
     hookSpecs: config.loadHookSpecs(projectDir),
+    hostMode: false,
     validation: emitValidationContext(projectDir, journalFile),
   };
 }

@@ -18,6 +18,7 @@ import {
 } from "./config-helpers.js";
 import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
+import { assertHostCompatible, type HostWorker } from "./host.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
 import {
   findDanglingProvisional,
@@ -71,6 +72,8 @@ export interface ResumeOptions {
    * journaled `stage.branch.finish` record from an interrupted prior attempt.
    */
   noResume?: boolean;
+  /** In-process worker that runs every resumed iteration (see RunOptions.host). */
+  host?: HostWorker;
 }
 
 export interface ResumeResult extends RunSummary {
@@ -291,6 +294,9 @@ export async function resume(
 
   let loop = built;
   loop.onEvent = options.onEvent;
+  loop.signal = options.signal;
+  loop.host = options.host;
+  if (loop.host) assertHostCompatible(loop);
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
@@ -393,6 +399,7 @@ export async function resume(
     logLevel: options.logLevel,
     signal: options.signal,
     onEvent: options.onEvent,
+    host: options.host,
   };
 
   const summary = await driveLoop(loop, runOptions, resumeIteration);
