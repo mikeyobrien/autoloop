@@ -35,6 +35,9 @@ export function emitToolScript(loop: LoopContext): string {
     "export AUTOLOOP_BIN=" +
     shellQuote(loop.paths.toolPath) +
     "\n" +
+    (loop.host
+      ? "export AUTOLOOP_HOST=" + shellQuote(loop.host.label) + "\n"
+      : "") +
     "stdout_file=$(mktemp)\n" +
     "stderr_file=$(mktemp)\n" +
     "cleanup() {\n" +

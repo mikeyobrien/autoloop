@@ -251,6 +251,15 @@ export function emit(
   topic: string,
   payload: string,
 ): EmitResult {
+  // A host run validates events in-process against the live iteration; a
+  // shell emit has no routing context and would bypass that check.
+  const host = process.env.AUTOLOOP_HOST;
+  if (host) {
+    return {
+      ok: false,
+      error: `this run is driven in-process by ${host}; publish events with its event tool`,
+    };
+  }
   const journalFile = resolveEmitJournalFile(projectDir);
   mkdirSync(dirname(journalFile), { recursive: true });
   return emitInScope(envEmitScope(projectDir, journalFile), topic, payload);

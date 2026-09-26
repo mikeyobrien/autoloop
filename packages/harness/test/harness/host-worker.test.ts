@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -285,6 +286,36 @@ mutate = "event"
     const summary = await runHost(dir, host);
 
     expect(result).toEqual({ ok: true, topic: "plan.ready" });
+    expect(summary.stopReason).toBe("completion_event");
+  });
+
+  it("refuses shell emits through the generated tool during a host run", async () => {
+    const dir = makePreset();
+    const cli = join(__dirname, "../../../../bin/autoloop");
+    let shell: ReturnType<typeof spawnSync> | undefined;
+    const host = scriptedHost([
+      () => {
+        shell = spawnSync(
+          join(dir, ".autoloop", "runs", host.turns[0].runId, "autoloops"),
+          ["emit", "wait.request", "reason=nap"],
+          { encoding: "utf-8" },
+        );
+        return { status: "completed", output: "" };
+      },
+      emitting("plan.ready"),
+      emitting("task.complete"),
+    ]);
+
+    const summary = await run(dir, "Ship", `node ${cli}`, {
+      workDir: dir,
+      host,
+    });
+
+    expect(shell?.status).not.toBe(0);
+    expect(`${shell?.stdout}${shell?.stderr}`).toContain(
+      "driven in-process by host:test",
+    );
+    expect(topics(dir)).not.toContain("wait.request");
     expect(summary.stopReason).toBe("completion_event");
   });
 
