@@ -325,6 +325,7 @@ interface BackendExecLoopOpts {
   backendArgs?: string[];
   backendPromptMode?: string;
   backendTimeoutMs?: number;
+  backendModel?: string;
 }
 
 function makeBackendExecLoop(
@@ -363,6 +364,7 @@ function makeBackendExecLoop(
       args: opts.backendArgs ?? ["--global-flag"],
       promptMode: opts.backendPromptMode ?? "stdin",
       timeoutMs: opts.backendTimeoutMs ?? 2000,
+      ...(opts.backendModel !== undefined && { model: opts.backendModel }),
     },
     review: {
       enabled: false,
@@ -548,5 +550,68 @@ describe("appendBackendStart honors iter.backend", () => {
     expect(startLine).not.toContain('"backend_kind": "command"');
     expect(startLine).not.toContain('"args": "--global-flag"');
     expect(startLine).not.toContain('"timeout_ms": "2000"');
+  });
+});
+
+describe("appendBackendStart records role and model", () => {
+  function backendStartFields(loop: LoopContext): Record<string, string> {
+    const line = readFileSync(loop.paths.journalFile, "utf-8")
+      .trim()
+      .split("\n")
+      .find((l) => l.includes('"backend.start"'));
+    return JSON.parse(line as string).fields;
+  }
+
+  it("records the sole active role and its role-overlaid model", () => {
+    const loop = makeBackendExecLoop("role-model-overlay", {
+      backendModel: "base-model",
+      roles: [
+        {
+          id: "builder",
+          prompt: "",
+          promptFile: "",
+          emits: ["review.ready"],
+          backendModel: "role-model",
+        },
+      ],
+    });
+
+    appendBackendStart(loop, buildIterationContext(loop, 1));
+
+    const fields = backendStartFields(loop);
+    expect(fields.role).toBe("builder");
+    expect(fields.model).toBe("role-model");
+  });
+
+  it("records the base model when the active role has no model overlay", () => {
+    const loop = makeBackendExecLoop("role-model-base", {
+      backendModel: "base-model",
+    });
+
+    appendBackendStart(loop, buildIterationContext(loop, 1));
+
+    const fields = backendStartFields(loop);
+    expect(fields.role).toBe("builder");
+    expect(fields.model).toBe("base-model");
+  });
+
+  it("records empty role and model with no single active role and no model", () => {
+    const emptyRole = (id: string): Role => ({
+      id,
+      prompt: "",
+      promptFile: "",
+      emits: ["review.ready"],
+    });
+    const loop = makeBackendExecLoop("role-model-empty", {
+      roles: [emptyRole("builder"), emptyRole("critic")],
+      handoff: { "loop.start": ["builder", "critic"] },
+    });
+
+    appendBackendStart(loop, buildIterationContext(loop, 1));
+
+    const fields = backendStartFields(loop);
+    expect(fields.role).toBe("");
+    expect(fields.model).toBe("");
+    expect(fields.backend_kind).toBe("command");
   });
 });
