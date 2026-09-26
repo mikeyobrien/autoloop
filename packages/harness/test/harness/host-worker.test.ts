@@ -289,6 +289,30 @@ mutate = "event"
     expect(summary.stopReason).toBe("completion_event");
   });
 
+  it("stops before metareview when a turn edits the preset to enable it", async () => {
+    const dir = makePreset();
+    const host = scriptedHost([
+      (turn) => {
+        const cfg = join(dir, "autoloops.toml");
+        writeFileSync(
+          cfg,
+          readFileSync(cfg, "utf-8").replace(
+            "review.enabled = false",
+            "review.enabled = true\nreview.every_iterations = 1",
+          ),
+        );
+        return emitting("plan.ready")(turn);
+      },
+    ]);
+
+    await expect(runHost(dir, host)).rejects.toThrow("metareview is enabled");
+
+    expect(host.turns).toHaveLength(1);
+    expect(topics(dir)).not.toContain("review.start");
+    const stop = journal(dir).find((l) => l.topic === "loop.stop");
+    expect(stop?.fields?.reason).toBe("error");
+  });
+
   it("refuses shell emits through the generated tool during a host run", async () => {
     const dir = makePreset();
     const cli = join(__dirname, "../../../../bin/autoloop");

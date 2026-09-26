@@ -594,6 +594,9 @@ function iterateWith(
   recurse: (loop: LoopContext, iteration: number) => Promise<RunSummary>,
 ): Promise<RunSummary> {
   const liveLoop = reloadLoop(loop);
+  // The preset is re-read every iteration; an edit must not let a host run
+  // reach metareview or fan-out.
+  if (liveLoop.host) assertHostCompatible(liveLoop);
   liveLoop.controlAdapter = loop.controlAdapter;
   installRuntimeTools(liveLoop);
   return runReviewThenIterate(liveLoop, iteration, recurse);
