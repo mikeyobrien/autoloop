@@ -266,6 +266,9 @@ export function printInspectUsage(): void {
     "  diff           <run> <a> <b> terminal, json          terminal",
   );
   console.log(
+    "  handoffs       <run_id>      terminal, json          terminal",
+  );
+  console.log(
     "  profiles       —             terminal                terminal",
   );
   console.log(
@@ -278,6 +281,7 @@ export function printInspectUsage(): void {
   console.log("  autoloop inspect topology");
   console.log("  autoloop inspect topology --format graph");
   console.log("  autoloop inspect topology --format json");
+  console.log("  autoloop inspect handoffs <run-id> --json");
 }
 
 export function printMemoryUsage(): void {

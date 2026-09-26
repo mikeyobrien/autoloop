@@ -52,6 +52,38 @@ autoloop inspect usage --run <id>   # a specific run
 autoloop inspect usage --json       # machine-readable
 ```
 
+## Inspecting handoffs
+
+`inspect handoffs` lists the routing evidence one run journaled, in journal order. It needs an explicit run id and reads run-scoped and worktree journals the same way other inspect targets do.
+
+```bash
+autoloop inspect handoffs <run-id>          # terminal rows
+autoloop inspect handoffs --run <run-id>    # same run, flag form
+autoloop inspect handoffs <run-id> --json   # one versioned JSON document
+```
+
+The JSON document has `schema_version: 1`, `run_id`, `ordering: "journal_input"`, `completeness: "not_established"`, and an `observations` array. Each observation has an `ordinal`, a nullable `iteration` and `timestamp`, and a `kind`:
+
+| kind | Source record | Fields |
+|---|---|---|
+| `decision` | `iteration.start` | `recent_event`, `suggested_roles`, `allowed_events`, `backpressure_present` |
+| `accepted` | agent emit | `event`, `source` |
+| `validation` | `event.invalid` | `emitted`, `recent_event`, `suggested_roles`, `allowed_events` |
+| `retry` | `backend.transient` | `pause_count`, `backoff_ms` |
+| `usage` | `backend.usage` | token counts, `cost_usd` |
+| `finish` | `backend.finish`, `iteration.finish` | `scope`, `exit_code`, `timed_out`, `elapsed_s` |
+| `terminal` | `loop.complete`, `loop.stop` | `event`, `reason` |
+
+Read the report as recorded observations, not a causal chain:
+
+- `actor_role` and `decision_maker` are always `{"status": "unknown"}`. The journal does not record which role ran or who chose it. `suggested_roles` lists candidates.
+- Rows keep journal order, including duplicates and interleaved parallel records. The report does not pair starts with finishes, link an emit to the next iteration, or sum usage, retries, or durations.
+- `null` means the field was absent or malformed. Usage values are copied as journaled, and some backends journal `0` for a count they did not report.
+- The journal reader skips unparseable lines, so the report cannot claim to be complete.
+- An unknown run id exits with code 2. A known run with no routing records returns an empty `observations` array.
+
+The report copies identifiers only: topics, role names, stop reasons, counts, and timestamps. It omits prompts, emit payloads, backend output, error text, commands, and backpressure prose. Topic and role names come from your topology, so treat the report as project metadata rather than anonymized data.
+
 ## `autoloop stats`
 
 Cross-run analytics grouped by preset, derived from the registry plus journaled usage:

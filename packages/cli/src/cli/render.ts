@@ -41,6 +41,7 @@ import {
 import { readProgressMetrics } from "@mobrienv/autoloop-harness/progress";
 import { renderRunScratchpadFull } from "@mobrienv/autoloop-harness/scratchpad";
 import { EXIT_ENV, fail } from "./fail.js";
+import { formatHandoffs, handoffsFromLines } from "./handoffs.js";
 
 export function renderScratchpadFormat(
   projectDir: string,
@@ -220,6 +221,25 @@ export function renderIterationDiffInspect(args: string[]): void {
   } else {
     console.log(renderIterationDiff(runId, diff));
   }
+}
+
+export function renderHandoffs(
+  projectDir: string,
+  format: "terminal" | "json",
+  runId: string,
+): void {
+  const { journalFile } = resolveJournalFileForRun(projectDir, runId);
+  const lines = readRunLines(journalFile, runId);
+  if (lines.length === 0) {
+    fail(`error: run \`${runId}\` not found in ${projectDir}`, EXIT_ENV);
+    return;
+  }
+  const report = handoffsFromLines(runId, lines);
+  console.log(
+    format === "json"
+      ? JSON.stringify(report, null, 2)
+      : formatHandoffs(report),
+  );
 }
 
 export function renderJournalTimeline(

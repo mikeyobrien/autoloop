@@ -1,6 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -127,8 +134,54 @@ describe("inspect --help", () => {
       "coordination",
       "chain",
       "metrics",
+      "handoffs",
     ]) {
       expect(out).toContain(artifact);
+    }
+  });
+});
+
+describe("inspect handoffs", () => {
+  it("prints the run report from a journal fixture", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "autoloop-cli-handoffs-"));
+    const runDir = join(projectDir, ".autoloop", "runs", "r1");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, "journal.jsonl"),
+      `${JSON.stringify({
+        run: "r1",
+        iteration: "1",
+        topic: "task.done",
+        ts: "2026-09-26T10:00:00.000Z",
+        payload: "CANARY-SECRET",
+        source: "agent",
+      })}\n`,
+    );
+    try {
+      const out = execFileSync(
+        "node",
+        [ENTRY, "inspect", "handoffs", "--run", "r1", "--json"],
+        {
+          encoding: "utf-8",
+          timeout: 10_000,
+          env: { ...process.env, AUTOLOOP_PROJECT_DIR: projectDir },
+        },
+      );
+      expect(JSON.parse(out).observations).toEqual([
+        {
+          ordinal: 1,
+          iteration: "1",
+          timestamp: "2026-09-26T10:00:00.000Z",
+          actor_role: { status: "unknown" },
+          decision_maker: { status: "unknown" },
+          kind: "accepted",
+          event: "task.done",
+          source: "agent",
+        },
+      ]);
+      expect(out).not.toContain("CANARY-SECRET");
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
     }
   });
 });
