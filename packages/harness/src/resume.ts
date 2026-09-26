@@ -74,6 +74,8 @@ export interface ResumeOptions {
   noResume?: boolean;
   /** In-process worker that runs every resumed iteration (see RunOptions.host). */
   host?: HostWorker;
+  /** Config layered under the resume budget, e.g. `{ review: { enabled: false } }` for a host. */
+  configOverride?: Record<string, unknown>;
 }
 
 export interface ResumeResult extends RunSummary {
@@ -213,7 +215,7 @@ export function buildResumeContext(
   // in as a run config override so each reload sees the additive budget rather
   // than the static config value.
   const configOverride = config.put(
-    {},
+    config.deepMerge({}, options.configOverride ?? {}),
     "event_loop.max_iterations",
     String(newMaxIterations),
   );

@@ -29,6 +29,7 @@ function registryPath(loop: LoopContext): string {
 }
 
 function registryBackendLabel(loop: LoopContext): string {
+  if (loop.host) return loop.host.label;
   if (loop.backend.kind === "acp") {
     return `acp:${loop.backend.provider || "generic"}`;
   }
@@ -49,7 +50,7 @@ function baseRecord(loop: LoopContext): RunRecord {
     journal_file: loop.paths.journalFile,
     parent_run_id: loop.launch.parentRunId,
     backend: registryBackendLabel(loop),
-    backend_args: loop.backend.args,
+    backend_args: loop.host ? [] : loop.backend.args,
     created_at: loop.launch.createdAt,
     updated_at: new Date().toISOString(),
     iteration: 0,

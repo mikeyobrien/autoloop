@@ -18,7 +18,7 @@ import {
   runHostIteration,
 } from "@mobrienv/autoloop-harness/host";
 import { buildIterationContext } from "@mobrienv/autoloop-harness/prompt";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const PLANNER_PROMPT =
   "You are the planner.\n\nWrite the plan in three numbered steps.\nThen hand off with plan.ready.";
@@ -172,9 +172,16 @@ describe("host worker run", () => {
     const backendStart = journal(dir).find((l) => l.topic === "backend.start");
     expect(backendStart?.fields?.backend_kind).toBe("host");
     expect(backendStart?.fields?.command).toBe("host:test");
+    expect(backendStart?.fields?.args).toBe("");
     expect(
       journal(dir).find((l) => l.topic === "loop.start")?.fields?.backend,
     ).toBe("host:test");
+    const record = getRun(
+      join(dir, ".autoloop", "registry.jsonl"),
+      summary.runId ?? "",
+    );
+    expect(record?.backend).toBe("host:test");
+    expect(record?.backend_args).toEqual([]);
     expect(existsSync(join(dir, ".autoloop", "pi-adapter"))).toBe(false);
   });
 
@@ -279,6 +286,39 @@ mutate = "event"
 
     expect(result).toEqual({ ok: true, topic: "plan.ready" });
     expect(summary.stopReason).toBe("completion_event");
+  });
+
+  it("keeps hook output in the journal and off the host's terminal", async () => {
+    const dir = makePreset(
+      `${BASE_CONFIG}
+[[hook]]
+phase = "pre_iteration"
+command = "echo iteration-hook-ran"
+
+[[hook]]
+phase = "pre_emit"
+command = "echo emit-hook-ran; exit 0"
+`,
+    );
+    const printed: unknown[] = [];
+    const spy = vi
+      .spyOn(console, "log")
+      .mockImplementation((...args) => void printed.push(...args));
+    try {
+      await runHost(
+        dir,
+        scriptedHost([emitting("plan.ready"), emitting("task.complete")]),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(printed.join("\n")).not.toContain("hook-ran");
+    const hookOutputs = journal(dir)
+      .filter((l) => l.topic === "hook.output")
+      .map((l) => l.fields?.output);
+    expect(hookOutputs).toContain("iteration-hook-ran");
+    expect(hookOutputs).toContain("emit-hook-ran");
   });
 
   it("suspends the run when a post_emit hook fails with on_error=suspend", async () => {
@@ -415,6 +455,38 @@ on_error = "suspend"
     expect(host.turns.map((t) => [t.runId, t.iteration])).toEqual([
       [first.runId, 2],
     ]);
+  });
+
+  it("resumes a review-enabled preset when the caller overrides review off", async () => {
+    const dir = makePreset(
+      BASE_CONFIG.replace("max_iterations = 4", "max_iterations = 1").replace(
+        "review.enabled = false",
+        "review.enabled = true",
+      ),
+    );
+    const reviewOff = { review: { enabled: false } };
+    const first = await run(dir, "Ship", "autoloop", {
+      workDir: dir,
+      host: scriptedHost([emitting("plan.ready")]),
+      configOverride: reviewOff,
+    });
+    const record = getRun(
+      join(dir, ".autoloop", "registry.jsonl"),
+      first.runId ?? "",
+    );
+    if (!record) throw new Error("run not registered");
+
+    await expect(
+      resume(record, { host: scriptedHost([]), selfCommand: "autoloop" }),
+    ).rejects.toThrow("metareview is enabled");
+    const resumed = await resume(record, {
+      host: scriptedHost([emitting("task.complete")]),
+      addIterations: 1,
+      selfCommand: "autoloop",
+      configOverride: reviewOff,
+    });
+    expect(resumed.stopReason).toBe("completion_event");
+    expect(resumed.newMaxIterations).toBe(2);
   });
 
   it("enforces a single-file preset's evidence gate on host emits", async () => {

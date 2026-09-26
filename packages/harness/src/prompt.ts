@@ -56,7 +56,8 @@ function resolveIterationBackend(
 ): ResolvedIterationBackend {
   const resolved = resolvedFromLoopBackend(loop);
   // The host runs every role in-process, so per-role backend overrides do not apply.
-  if (loop.host) return { ...resolved, kind: "host", command: loop.host.label };
+  if (loop.host)
+    return { ...resolved, kind: "host", command: loop.host.label, args: [] };
   if (allowedRoles.length === 0) return resolved;
   const backendRole = allowedRoles[0];
   const role = loop.topology.roles.find((r) => r.id === backendRole);

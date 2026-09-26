@@ -199,7 +199,8 @@ function runEmitPhaseHooks(
       "hook.output",
       `"hook": ${JSON.stringify(phase)}, "exit_code": ${status}, "output": ${JSON.stringify(combined.trim())}`,
     );
-    printHookOutput(phase, status, combined.trim(), failed);
+    if (!scope.hostMode)
+      printHookOutput(phase, status, combined.trim(), failed);
 
     if (!failed && spec.mutate === "event") {
       const directive = parseMutationDirective(

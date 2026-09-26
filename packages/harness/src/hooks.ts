@@ -126,7 +126,8 @@ export function runHook(
     `"hook": ${JSON.stringify(name)}, "exit_code": ${status}, "output": ${JSON.stringify(combined.trim())}`,
   );
 
-  printHookOutput(name, status, combined.trim(), failed);
+  // A host owns the terminal; hook output stays in the journal.
+  if (!loop.host) printHookOutput(name, status, combined.trim(), failed);
 
   if (failed) {
     const msg = firstFailureLine(name, status, combined);
@@ -267,7 +268,7 @@ export async function runPhaseHooks(
       "hook.output",
       `"hook": ${JSON.stringify(phase)}, "exit_code": ${status}, "output": ${JSON.stringify(combined.trim())}`,
     );
-    printHookOutput(phase, status, combined.trim(), failed);
+    if (!loop.host) printHookOutput(phase, status, combined.trim(), failed);
 
     if (!failed && spec.mutate !== "none") {
       const stdoutOnly = combined.split("\n[stderr]\n")[0];
