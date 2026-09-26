@@ -545,11 +545,150 @@ describe("formatClaudeSdkStreamingEvent", () => {
     expect(text).toBe("chunk");
   });
 
-  it("formats assistant tool_use blocks as markers", () => {
+  it("formats assistant tool_use blocks as start lines with args", () => {
     const text = formatClaudeSdkStreamingEvent(
-      assistantMsg("", ["Bash"]) as never,
+      {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "text", text: "looking" },
+            {
+              type: "tool_use",
+              id: "tu-1",
+              name: "Bash",
+              input: { command: "git status\n--short" },
+            },
+            {
+              type: "tool_use",
+              id: "tu-2",
+              name: "Read",
+              input: { file_path: "src/a.ts" },
+            },
+          ],
+        },
+      } as never,
+      new Map(),
+      120,
     );
-    expect(text).toBe("[tool:Bash]\n");
+    expect(text).toBe("→ Bash  git status --short\n→ Read  src/a.ts\n");
+    expect(
+      formatClaudeSdkStreamingEvent(assistantMsg("", ["Bash"]) as never),
+    ).toBe("→ Bash\n");
+    expect(formatClaudeSdkStreamingEvent(assistantMsg("hi") as never)).toBe(
+      null,
+    );
+  });
+
+  it("formats failed tool_result blocks paired to their tool_use", () => {
+    const toolCalls = new Map([
+      ["tu-1", { name: "Write", args: { file_path: "notes.md" } }],
+    ]);
+    const text = formatClaudeSdkStreamingEvent(
+      {
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tu-1",
+              is_error: true,
+              content: "File has not been read yet.\nRead it first.",
+            },
+            { type: "tool_result", tool_use_id: "tu-9", content: "ok" },
+            {
+              type: "tool_result",
+              tool_use_id: "tu-unknown",
+              is_error: true,
+              content: [{ type: "text", text: "denied" }],
+            },
+            { type: "tool_result", is_error: true, content: [] },
+          ],
+        },
+      } as never,
+      toolCalls,
+      120,
+    );
+    expect(text).toBe(
+      "✗ Write  notes.md — File has not been read yet.\n✗ tool  denied\n✗ tool\n",
+    );
+    expect(
+      formatClaudeSdkStreamingEvent({
+        type: "user",
+        message: { role: "user", content: "plain prompt" },
+      } as never),
+    ).toBeNull();
+    expect(
+      formatClaudeSdkStreamingEvent({
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "tu-1", content: "ok" },
+          ],
+        },
+      } as never),
+    ).toBeNull();
+  });
+
+  it("streams tool starts and paired failures to stderr when verbose", async () => {
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    try {
+      const session = await startSession({ verbose: true });
+      const pending = runClaudeSdkIteration(session, "go", 5000);
+      await settle();
+      lastQuery.emit({
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "a",
+              name: "Edit",
+              input: { file_path: "x.ts", old_string: "1", new_string: "2" },
+            },
+            { type: "tool_use", name: "Glob", input: { pattern: "**/*.ts" } },
+          ],
+        },
+        session_id: "sess-1",
+      });
+      await settle();
+      expect(session.toolCalls.get("a")).toEqual({
+        name: "Edit",
+        args: { file_path: "x.ts", old_string: "1", new_string: "2" },
+      });
+      lastQuery.emit({
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "a",
+              is_error: true,
+              content: "String to replace not found in file.",
+            },
+          ],
+        },
+        parent_tool_use_id: null,
+        session_id: "sess-1",
+      });
+      lastQuery.emit(resultMsg());
+      await pending;
+
+      const written = stderrSpy.mock.calls.map((call) => String(call[0]));
+      expect(written).toEqual([
+        "→ Edit  x.ts\n→ Glob  **/*.ts\n",
+        "✗ Edit  x.ts — String to replace not found in file.\n",
+      ]);
+      expect(session.toolCalls.size).toBe(0);
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 
   it("silences other messages", () => {

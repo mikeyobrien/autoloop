@@ -4,6 +4,13 @@ import {
   type BackendEnvironmentPolicy,
   resolveBackendEnvironment,
 } from "./environment.js";
+import {
+  formatToolFailure,
+  formatToolStart,
+  type ToolCallInfo,
+  toolLineWidth,
+  toolResultText,
+} from "./tool-line.js";
 
 export interface PiClientOptions {
   command: string;
@@ -53,6 +60,8 @@ export interface PiSession {
   streamLines: string[];
   /** Where to persist the raw RPC stream for the current prompt, if anywhere. */
   streamLogPath?: string;
+  /** In-flight tool calls by toolCallId, so a failure line can show its args. */
+  toolCalls: Map<string, ToolCallInfo>;
 }
 
 export interface PiPromptResult {
@@ -74,9 +83,14 @@ export interface PiUsageStats {
 
 /**
  * Format a pi RPC event for verbose stderr output.
- * Returns null for event types that should be silenced.
+ * Returns null for event types that should be silenced. `toolCalls` maps
+ * in-flight toolCallIds to their start, used to show args on failure.
  */
-export function formatPiStreamingEvent(event: PiRpcMessage): string | null {
+export function formatPiStreamingEvent(
+  event: PiRpcMessage,
+  toolCalls: ReadonlyMap<string, ToolCallInfo> = new Map(),
+  width: number = toolLineWidth(),
+): string | null {
   if (event.type === "message_update") {
     const delta = event.assistantMessageEvent as
       | { type?: string; delta?: string }
@@ -85,14 +99,39 @@ export function formatPiStreamingEvent(event: PiRpcMessage): string | null {
     return null;
   }
   if (event.type === "tool_execution_start") {
-    const name = typeof event.toolName === "string" ? event.toolName : "tool";
-    return `[tool:${name}]\n`;
+    return formatToolStart(piToolName(event), event.args, width);
   }
   if (event.type === "tool_execution_end") {
-    const name = typeof event.toolName === "string" ? event.toolName : "tool";
-    return event.isError ? `[tool:✗] ${name}\n` : `[tool:✓] ${name}\n`;
+    if (!event.isError) return null;
+    const start =
+      typeof event.toolCallId === "string"
+        ? toolCalls.get(event.toolCallId)
+        : undefined;
+    return formatToolFailure(
+      start?.name ?? piToolName(event),
+      start?.args ?? event.args,
+      toolResultText(event.result),
+      width,
+    );
   }
   return null;
+}
+
+function piToolName(event: PiRpcMessage): string {
+  return typeof event.toolName === "string" ? event.toolName : "tool";
+}
+
+/** Track tool starts/ends by toolCallId after the event has been formatted. */
+function trackPiToolCall(session: PiSession, msg: PiRpcMessage): void {
+  if (typeof msg.toolCallId !== "string") return;
+  if (msg.type === "tool_execution_start") {
+    session.toolCalls.set(msg.toolCallId, {
+      name: piToolName(msg),
+      args: msg.args,
+    });
+  } else if (msg.type === "tool_execution_end") {
+    session.toolCalls.delete(msg.toolCallId);
+  }
 }
 
 /**
@@ -130,6 +169,7 @@ export async function initPiSession(opts: PiClientOptions): Promise<PiSession> {
     pending: new Map(),
     agentEndWaiters: [],
     streamLines: [],
+    toolCalls: new Map(),
   };
 
   if (child.stderr) {
@@ -255,6 +295,7 @@ export async function resetPiSession(session: PiSession): Promise<void> {
   }
   session.textBuffer = "";
   session.lastError = "";
+  session.toolCalls.clear();
 }
 
 export async function terminatePiSession(session: PiSession): Promise<void> {
@@ -423,11 +464,13 @@ function handlePiLine(session: PiSession, line: string): void {
   }
 
   if (session.options.verbose) {
-    const text = formatPiStreamingEvent(msg);
+    const text = formatPiStreamingEvent(msg, session.toolCalls);
     if (text) process.stderr.write(text);
   }
+  trackPiToolCall(session, msg);
 
   if (msg.type === "agent_end") {
+    session.toolCalls.clear();
     const waiters = session.agentEndWaiters;
     session.agentEndWaiters = [];
     for (const waiter of waiters) waiter(msg);

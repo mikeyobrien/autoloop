@@ -17,6 +17,13 @@ import {
   type BackendEnvironmentPolicy,
   resolveBackendEnvironment,
 } from "./environment.js";
+import {
+  formatToolFailure,
+  formatToolStart,
+  type ToolCallInfo,
+  toolLineWidth,
+  toolResultText,
+} from "./tool-line.js";
 
 export interface ClaudeSdkClientOptions {
   /** Path to the Claude Code executable when it isn't the bare `claude` on PATH. */
@@ -86,6 +93,8 @@ export interface ClaudeSdkSession {
   streamLines: string[];
   /** Where to persist the raw message stream for the current prompt, if anywhere. */
   streamLogPath?: string;
+  /** In-flight tool_use blocks by id, so a failed tool_result can show its args. */
+  toolCalls: Map<string, ToolCallInfo>;
 }
 
 export interface ClaudeSdkPromptResult {
@@ -210,6 +219,7 @@ export async function initClaudeSdkSession(
     lastError: "",
     closed: false,
     streamLines: [],
+    toolCalls: new Map(),
   };
 
   // Handshake: the SDK's control-channel initialize round trip confirms the
@@ -294,6 +304,7 @@ export async function sendClaudeSdkPrompt(
   session.lastError = "";
   session.lastResult = undefined;
   session.streamLines = [];
+  session.toolCalls.clear();
   session.pendingSteers = 0;
   session.turnActive = true;
 
@@ -442,9 +453,14 @@ export function getClaudeSdkUsage(
 
 /**
  * Format an SDK message for verbose stderr output.
- * Returns null for message types that should be silenced.
+ * Returns null for message types that should be silenced. `toolCalls` maps
+ * in-flight tool_use ids to their start, used to show args on failure.
  */
-export function formatClaudeSdkStreamingEvent(msg: SDKMessage): string | null {
+export function formatClaudeSdkStreamingEvent(
+  msg: SDKMessage,
+  toolCalls: ReadonlyMap<string, ToolCallInfo> = new Map(),
+  width: number = toolLineWidth(),
+): string | null {
   if (msg.type === "stream_event") {
     const event = msg.event as {
       type?: string;
@@ -459,14 +475,80 @@ export function formatClaudeSdkStreamingEvent(msg: SDKMessage): string | null {
     return null;
   }
   if (msg.type === "assistant") {
-    const blocks = assistantBlocks(msg);
-    const tools = blocks
-      .filter((block) => block.type === "tool_use")
-      .map((block) => `[tool:${(block as { name?: string }).name ?? "tool"}]\n`)
+    const tools = toolUseBlocks(msg)
+      .map((block) => formatToolStart(block.name ?? "tool", block.input, width))
       .join("");
     return tools || null;
   }
+  if (msg.type === "user") {
+    const failures = toolResultBlocks(msg)
+      .filter((block) => block.is_error === true)
+      .map((block) => {
+        const start =
+          typeof block.tool_use_id === "string"
+            ? toolCalls.get(block.tool_use_id)
+            : undefined;
+        return formatToolFailure(
+          start?.name ?? "tool",
+          start?.args,
+          toolResultText(block),
+          width,
+        );
+      })
+      .join("");
+    return failures || null;
+  }
   return null;
+}
+
+interface ToolUseBlock {
+  type?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+}
+
+interface ToolResultBlock {
+  type?: string;
+  tool_use_id?: string;
+  content?: unknown;
+  is_error?: boolean;
+}
+
+function toolUseBlocks(msg: SDKAssistantMessage): ToolUseBlock[] {
+  return (assistantBlocks(msg) as ToolUseBlock[]).filter(
+    (block) => block?.type === "tool_use",
+  );
+}
+
+function toolResultBlocks(msg: SDKMessage): ToolResultBlock[] {
+  const content = (msg as { message?: { content?: unknown } }).message?.content;
+  if (!Array.isArray(content)) return [];
+  return (content as ToolResultBlock[]).filter(
+    (block) => block?.type === "tool_result",
+  );
+}
+
+/** Track tool_use starts and tool_result ends after formatting. */
+function trackClaudeSdkToolCalls(
+  session: ClaudeSdkSession,
+  msg: SDKMessage,
+): void {
+  if (msg.type === "assistant") {
+    for (const block of toolUseBlocks(msg)) {
+      if (typeof block.id !== "string") continue;
+      session.toolCalls.set(block.id, {
+        name: block.name ?? "tool",
+        args: block.input,
+      });
+    }
+  } else if (msg.type === "user") {
+    for (const block of toolResultBlocks(msg)) {
+      if (typeof block.tool_use_id === "string") {
+        session.toolCalls.delete(block.tool_use_id);
+      }
+    }
+  }
 }
 
 function userMessage(text: string): SDKUserMessage {
@@ -504,9 +586,10 @@ function handleMessage(session: ClaudeSdkSession, msg: SDKMessage): void {
   }
 
   if (session.options.verbose) {
-    const text = formatClaudeSdkStreamingEvent(msg);
+    const text = formatClaudeSdkStreamingEvent(msg, session.toolCalls);
     if (text) process.stderr.write(text);
   }
+  trackClaudeSdkToolCalls(session, msg);
 }
 
 function assistantBlocks(

@@ -338,12 +338,14 @@ describe("resetPiSession", () => {
     const session = await startSession();
     session.textBuffer = "stale";
     session.lastError = "stale error";
+    session.toolCalls.set("stale", { name: "bash", args: {} });
 
     await resetPiSession(session);
 
     expect(lastChild.sent.at(-1)).toMatchObject({ type: "new_session" });
     expect(session.textBuffer).toBe("");
     expect(session.lastError).toBe("");
+    expect(session.toolCalls.size).toBe(0);
   });
 
   it("throws when pi refuses the new session", async () => {
@@ -585,22 +587,123 @@ describe("formatPiStreamingEvent", () => {
       }),
     ).toBeNull();
     expect(
-      formatPiStreamingEvent({
-        type: "tool_execution_start",
-        toolName: "bash",
-      }),
-    ).toBe("[tool:bash]\n");
+      formatPiStreamingEvent(
+        {
+          type: "tool_execution_start",
+          toolCallId: "c1",
+          toolName: "bash",
+          args: { command: "rg -n registryProgress packages/" },
+        },
+        new Map(),
+        120,
+      ),
+    ).toBe("→ bash  rg -n registryProgress packages/\n");
     expect(
-      formatPiStreamingEvent({ type: "tool_execution_end", toolName: "bash" }),
-    ).toBe("[tool:✓] bash\n");
+      formatPiStreamingEvent({ type: "tool_execution_start" }, new Map(), 120),
+    ).toBe("→ tool\n");
     expect(
       formatPiStreamingEvent({
         type: "tool_execution_end",
+        toolCallId: "c1",
         toolName: "bash",
-        isError: true,
+        isError: false,
       }),
-    ).toBe("[tool:✗] bash\n");
+    ).toBeNull();
     expect(formatPiStreamingEvent({ type: "queue_update" })).toBeNull();
+  });
+
+  it("pairs a failed end to its start args and shows the reason", () => {
+    const toolCalls = new Map([
+      ["c2", { name: "write", args: { path: ".autoloop/how.md" } }],
+    ]);
+    expect(
+      formatPiStreamingEvent(
+        {
+          type: "tool_execution_end",
+          toolCallId: "c2",
+          toolName: "write",
+          isError: true,
+          result: {
+            content: [
+              { type: "text", text: "\n  EACCES: permission denied\nstack" },
+            ],
+          },
+        },
+        toolCalls,
+        120,
+      ),
+    ).toBe("✗ write  .autoloop/how.md — EACCES: permission denied\n");
+    // Unknown call id: fall back to the end event's own name, string result.
+    expect(
+      formatPiStreamingEvent(
+        {
+          type: "tool_execution_end",
+          toolCallId: 7,
+          isError: true,
+          result: "boom",
+        },
+        toolCalls,
+        120,
+      ),
+    ).toBe("✗ tool  boom\n");
+  });
+
+  it("makes parallel calls distinguishable and failures explain themselves", async () => {
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    try {
+      const session = await startSession({ verbose: true });
+      const pending = sendPiPrompt(session, "parallel", 5000);
+      await settle();
+      lastChild.pushLine({
+        type: "tool_execution_start",
+        toolCallId: "a",
+        toolName: "bash",
+        args: { command: "ls src" },
+      });
+      lastChild.pushLine({
+        type: "tool_execution_start",
+        toolCallId: "b",
+        toolName: "write",
+        args: { path: "out.md", content: "x" },
+      });
+      lastChild.pushLine({
+        type: "tool_execution_start",
+        toolCallId: "c",
+        toolName: "grep",
+        args: { pattern: "TODO", path: "packages/" },
+      });
+      lastChild.pushLine({
+        type: "tool_execution_end",
+        toolCallId: "b",
+        toolName: "write",
+        isError: true,
+        result: { content: [{ type: "text", text: "disk full" }] },
+      });
+      lastChild.pushLine({
+        type: "tool_execution_end",
+        toolCallId: "a",
+        toolName: "bash",
+        isError: false,
+        result: { content: [{ type: "text", text: "a\nb" }] },
+      });
+      await settle();
+      expect(session.toolCalls.size).toBe(1);
+      lastChild.pushLine({ type: "agent_end", messages: [] });
+      await pending;
+
+      const written = stderrSpy.mock.calls.map((call) => String(call[0]));
+      expect(written).toEqual([
+        "→ bash  ls src\n",
+        "→ write  out.md\n",
+        "→ grep  TODO in packages/\n",
+        "✗ write  out.md — disk full\n",
+      ]);
+      expect(session.toolCalls.size).toBe(0);
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 
   it("streams verbose output to stderr when enabled", async () => {

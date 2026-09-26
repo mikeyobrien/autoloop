@@ -18,6 +18,7 @@ const LINEAR_SYNC = resolve(import.meta.dirname, "packages/linear-sync/src");
 export default defineConfig({
   resolve: {
     alias: {
+      "@mobrienv/autoloop-core/terminal-width": `${CORE}/terminal-width.ts`,
       "@mobrienv/autoloop-core/config-schema": `${CORE}/config-schema.ts`,
       "@mobrienv/autoloop-core/config": `${CORE}/config.ts`,
       "@mobrienv/autoloop-core/hooks-schema": `${CORE}/hooks-schema.ts`,

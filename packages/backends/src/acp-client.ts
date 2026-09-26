@@ -64,8 +64,7 @@ export function formatStreamingUpdate(
     case "tool_call":
       return `[tool:${update.kind ?? "other"}] ${update.title}\n`;
     case "tool_call_update":
-      if (update.status === "completed")
-        return `[tool:✓] ${update.title ?? ""}\n`;
+      // Successes print nothing — the tool_call line already said what ran.
       if (update.status === "failed") return `[tool:✗] ${update.title ?? ""}\n`;
       return null;
     default:
