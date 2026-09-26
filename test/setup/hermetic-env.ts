@@ -18,6 +18,8 @@ process.env.TZ = "UTC";
 // explicitly, and runCli's cleanEnv already strips them for spawned CLIs.
 for (const key of Object.keys(process.env)) {
   if (key.startsWith("AUTOLOOP_")) delete process.env[key];
+  // Likewise a suite run inside a herdr pane must not report to that pane.
+  if (key.startsWith("HERDR_")) delete process.env[key];
 }
 
 // Point autoloop at an empty config so the developer's global [backend]/[profiles]
