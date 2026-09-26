@@ -473,6 +473,7 @@ export {
   type ResumeOptions,
   type ResumeResult,
   resume,
+  resumeProblem,
 } from "./resume.js";
 export {
   isWaitLifecycleTopic,

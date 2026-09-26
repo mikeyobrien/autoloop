@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { basename, join } from "node:path";
-import { jsonField } from "@mobrienv/autoloop-core";
+import { basename, dirname, join } from "node:path";
+import { isProcessAlive, jsonField } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import {
   appendEvent,
@@ -76,6 +76,31 @@ export interface ResumeOptions {
   host?: HostWorker;
   /** Config layered under the resume budget, e.g. `{ review: { enabled: false } }` for a host. */
   configOverride?: Record<string, unknown>;
+}
+
+/** Why `record` cannot be resumed, or null when it is safe to resume. */
+export function resumeProblem(record: RunRecord): string | null {
+  const id = record.run_id;
+  if (record.status === "completed") {
+    return `run ${id} already completed; cannot resume`;
+  }
+  if (record.status === "running" && record.pid && isProcessAlive(record.pid)) {
+    return `run ${id} is still running (PID ${record.pid})`;
+  }
+  if (!record.journal_file || !existsSync(record.journal_file)) {
+    return `journal not found for run ${id}`;
+  }
+  const stateDir = record.state_dir || dirname(record.journal_file);
+  if (!existsSync(stateDir)) {
+    return `state directory for run ${id} not found`;
+  }
+  if (
+    record.isolation_mode === "worktree" &&
+    (!record.worktree_path || !existsSync(record.worktree_path))
+  ) {
+    return `worktree for run ${id} was cleaned up; cannot resume`;
+  }
+  return null;
 }
 
 export interface ResumeResult extends RunSummary {

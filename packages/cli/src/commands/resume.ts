@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { findRunByPrefix } from "@mobrienv/autoloop-core/registry/read";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
@@ -119,39 +118,8 @@ function validateResumable(
   record: RunRecord,
   parsed: ResumeArgs,
 ): Validation | null {
-  if (record.status === "completed") {
-    return {
-      message: `error: run ${record.run_id} already completed; cannot resume`,
-      code: EXIT_ENV,
-    };
-  }
-  if (record.status === "running" && record.pid && pidAlive(record.pid)) {
-    return {
-      message: `error: run ${record.run_id} is still running (PID ${record.pid})`,
-      code: EXIT_ENV,
-    };
-  }
-  if (!record.journal_file || !existsSync(record.journal_file)) {
-    return {
-      message: `error: journal not found for run ${record.run_id}`,
-      code: EXIT_ENV,
-    };
-  }
-  const stateDir = record.state_dir || dirOf(record.journal_file);
-  if (!stateDir || !existsSync(stateDir)) {
-    return {
-      message: `error: state directory for run ${record.run_id} not found`,
-      code: EXIT_ENV,
-    };
-  }
-  if (record.isolation_mode === "worktree") {
-    if (!record.worktree_path || !existsSync(record.worktree_path)) {
-      return {
-        message: `error: worktree for run ${record.run_id} was cleaned up; cannot resume`,
-        code: EXIT_ENV,
-      };
-    }
-  }
+  const problem = harness.resumeProblem(record);
+  if (problem) return { message: `error: ${problem}`, code: EXIT_ENV };
   if (parsed.addIterations !== undefined && parsed.addIterations <= 0) {
     return {
       message: "error: no iterations to run (--add-iterations must be > 0)",
@@ -159,20 +127,6 @@ function validateResumable(
     };
   }
   return null;
-}
-
-function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function dirOf(path: string): string {
-  const idx = path.lastIndexOf("/");
-  return idx > 0 ? path.slice(0, idx) : "";
 }
 
 function parseResumeArgs(args: string[]): ResumeArgs {

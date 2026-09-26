@@ -13,7 +13,10 @@ const resumeSpy = vi.fn(async () => ({
   resumedFromIteration: 4,
   newMaxIterations: 5,
 }));
-vi.mock("@mobrienv/autoloop-harness", () => ({
+vi.mock("@mobrienv/autoloop-harness", async (importOriginal) => ({
+  resumeProblem: (
+    await importOriginal<typeof import("@mobrienv/autoloop-harness")>()
+  ).resumeProblem,
   resume: (...args: unknown[]) => resumeSpy(...args),
 }));
 
