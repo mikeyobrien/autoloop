@@ -24,6 +24,7 @@ const INSPECT_TARGETS = [
   "usage",
   "progress",
   "diff",
+  "handoffs",
   "profiles",
   "topology",
 ];
@@ -49,6 +50,20 @@ export function dispatchInspect(args: string[]): boolean {
   // it before the generic spec parse.
   if (args[0] === "diff") {
     render.renderIterationDiffInspect(args.slice(1));
+    return true;
+  }
+
+  if (args[0] === "handoffs") {
+    const request = parseHandoffsArgs(args.slice(1));
+    if ("error" in request) {
+      fail([`error: ${request.error}`, `Usage: ${HANDOFFS_USAGE}`]);
+      return true;
+    }
+    render.renderHandoffs(
+      resolveRuntimeProjectDir(),
+      request.format,
+      request.runId,
+    );
     return true;
   }
 
@@ -203,6 +218,55 @@ function parseInspectArgs(args: string[]): InspectSpec {
     iterFilter,
     allRuns,
   };
+}
+
+const HANDOFFS_USAGE =
+  "autoloop inspect handoffs <run-id> [--json | --format terminal|json]";
+
+type HandoffsRequest =
+  | { runId: string; format: "terminal" | "json" }
+  | { error: string };
+
+function parseHandoffsArgs(args: string[]): HandoffsRequest {
+  let format = "terminal";
+  const selectors: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--json") {
+      format = "json";
+    } else if (arg === "--format") {
+      const value = args[i + 1];
+      if (!value || value.startsWith("-")) {
+        return { error: "--format requires a value (terminal, json)" };
+      }
+      format = value;
+      i++;
+    } else if (arg === "--run") {
+      const value = args[i + 1];
+      if (!value || value.startsWith("-")) {
+        return { error: "--run requires a run id" };
+      }
+      selectors.push(value);
+      i++;
+    } else if (arg === "--all-runs") {
+      return {
+        error: "inspect handoffs reports one run; --all-runs is not supported",
+      };
+    } else if (arg.startsWith("-")) {
+      return { error: `unknown option \`${arg}\`` };
+    } else {
+      selectors.push(arg);
+    }
+  }
+  if (format !== "terminal" && format !== "json") {
+    return { error: `unsupported format \`${format}\` (terminal, json)` };
+  }
+  const runIds = [...new Set(selectors)];
+  if (runIds.length > 1) {
+    return { error: `conflicting run selectors: ${runIds.join(", ")}` };
+  }
+  if (!runIds[0]) return { error: "inspect handoffs requires a run id" };
+  return { runId: runIds[0], format };
 }
 
 function inspectDefaultFormat(artifact: string): string {
