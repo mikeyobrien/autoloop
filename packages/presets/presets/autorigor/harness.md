@@ -16,7 +16,11 @@ Global rules:
 - Prose you write (progress notes, commit messages) is short declarative sentences. Every claim names its evidence or is labeled measured, inferred, or guess.
 - Only the finalizer may emit `task.complete`.
 
-Lanes (planner emits exactly one per slice):
+Lane selection:
+- Before the first iteration, Jev classifies the objective into a lane and rates its complexity. A confident classification preselects the lane. The planner then emits `plan.ready`, which routes to that lane's builder. High complexity preselects the astra lane. Low confidence leaves the choice to the planner.
+- Without a preselected lane, the planner emits one `plan.<lane>` event per slice.
+
+Lanes:
 - `plan.feature` and `plan.refactor` go to builder-opus (Claude harness, claude-opus-5-5).
 - `plan.bugfix` and `plan.hillclimb` go to builder-sol (pi, gpt-6-sol).
 - `plan.perf` and `plan.hard` go to builder-astra (pi, gpt-6-astra).

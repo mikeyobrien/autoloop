@@ -18,6 +18,18 @@ review.every_iterations = 10
 review.adversarial_first = false
 review.timeout_ms = 300000
 
+# First lane choice by Jev (needs TYPESAFE_API_KEY; sends the objective to
+# TypeSafe). Low confidence falls back to the planner choosing; complexity
+# at or above the threshold routes to the astra lane. Set enabled = false
+# to have the planner choose every lane.
+routing.jev.enabled = true
+routing.jev.routes_file = "routes.json"
+routing.jev.model = "jev-1.13.0"
+routing.jev.min_confidence = 0.8
+routing.jev.fallback_route = "unrouted"
+routing.jev.complexity_route = "hard"
+routing.jev.complexity_threshold = 1.5
+
 memory.prompt_budget_chars = 8000
 harness.instructions_file = "harness.md"
 
