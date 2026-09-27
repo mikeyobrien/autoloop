@@ -3,7 +3,9 @@ import { findRunByPrefix } from "@mobrienv/autoloop-core/registry/read";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import * as harness from "@mobrienv/autoloop-harness";
 import { cliPrintEvent } from "../cli/event-printer.js";
+import { teeEvents } from "../cli/events-sink.js";
 import { EXIT_ENV, EXIT_USAGE, fail } from "../cli/fail.js";
+import { herdrEventSink } from "../cli/herdr-sink.js";
 import { backendOverrideSpec } from "./run.js";
 
 interface ResumeArgs {
@@ -83,6 +85,10 @@ export async function dispatchResume(
   };
   process.on("SIGINT", onSig);
   process.on("SIGTERM", onSig);
+  const herdr = herdrEventSink();
+  const onEvent = herdr
+    ? teeEvents(cliPrintEvent, herdr.onEvent)
+    : cliPrintEvent;
 
   try {
     const result = await harness.resume(record, {
@@ -92,7 +98,7 @@ export async function dispatchResume(
       logLevel: parsed.logLevel,
       baseStateDir: stateDir,
       signal: abort.signal,
-      onEvent: cliPrintEvent,
+      onEvent,
       noResume: parsed.noResume,
     });
     console.log(
@@ -104,7 +110,11 @@ export async function dispatchResume(
   } finally {
     process.removeListener("SIGINT", onSig);
     process.removeListener("SIGTERM", onSig);
-    if (caughtSignal) process.kill(process.pid, caughtSignal);
+    if (caughtSignal) {
+      herdr?.release();
+      process.kill(process.pid, caughtSignal);
+    }
+    herdr?.close();
   }
 }
 

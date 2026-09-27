@@ -11,6 +11,7 @@ import { cliPrintEvent } from "../cli/event-printer.js";
 import type { EventSink } from "../cli/events-sink.js";
 import { ndjsonEventSink, teeEvents } from "../cli/events-sink.js";
 import { EXIT_ENV, fail } from "../cli/fail.js";
+import { herdrEventSink } from "../cli/herdr-sink.js";
 import {
   missingPresetError,
   printRunUsage,
@@ -119,9 +120,11 @@ export async function dispatchRun(
       return true;
     }
   }
-  const onEvent = eventSink
+  const printed = eventSink
     ? teeEvents(cliPrintEvent, eventSink.onEvent)
     : cliPrintEvent;
+  const herdr = herdrEventSink();
+  const onEvent = herdr ? teeEvents(printed, herdr.onEvent) : printed;
 
   try {
     if (options.chain) {
@@ -186,6 +189,7 @@ export async function dispatchRun(
       // first since the re-raised signal terminates the process.
       if (caughtSignal) {
         eventSink?.close();
+        herdr?.release();
         process.kill(process.pid, caughtSignal);
       }
     }
@@ -199,6 +203,7 @@ export async function dispatchRun(
     return true;
   } finally {
     eventSink?.close();
+    herdr?.close();
   }
 }
 

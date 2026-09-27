@@ -108,6 +108,17 @@ timeout_ms = 10000
 
 The command receives `AUTOLOOP_RUN_ID`, `AUTOLOOP_STOP_REASON`, `AUTOLOOP_ITERATIONS`, `AUTOLOOP_PRESET`, and `AUTOLOOP_PROJECT_DIR` in its environment, plus the same fields as a JSON payload on stdin. Delivery is best-effort and journaled as `notify.sent` / `notify.failed` — a broken notifier never fails the run.
 
+## herdr pane status
+
+When `autoloop run` or `autoloop resume` runs inside a [herdr](https://herdr.dev) pane (`HERDR_PANE_ID` is set), it reports to that pane automatically — no config needed:
+
+- each iteration sets the pane to **working** with `iter N · <role> · <model>` and titles it `autoloop <run-id> · <role>`;
+- a pending `ask` or durable `wait` sets it to **blocked** (an `ask` also raises a notification);
+- `review.rejected`, `build.blocked`, and `finalization.failed` raise a notification;
+- when the loop finishes, a successful or limit stop leaves the pane **idle** (herdr shows it as done) and a failed stop leaves it **blocked** with the reason. Either way a notification shows the iteration count and cost, and the report stays until something else uses the pane. Stopping the process with Ctrl-C or a signal releases the pane instead.
+
+Reports are fire-and-forget `herdr` subprocesses and never slow or fail the run. Set `AUTOLOOP_HERDR=0` to turn the integration off.
+
 ## `autoloop doctor`
 
 Preflight and state-health diagnostics in one command:

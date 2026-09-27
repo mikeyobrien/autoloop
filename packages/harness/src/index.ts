@@ -91,6 +91,7 @@ import type {
   StopReason,
 } from "./types.js";
 
+export { classifyStopReason } from "./notify.js";
 export { STOP_REASONS } from "./types.js";
 export type { LoopContext, RunOptions, RunSummary, StopReason };
 

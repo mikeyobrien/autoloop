@@ -24,6 +24,13 @@ vi.mock("../../src/cli/event-printer.js", () => ({
   cliPrintEvent: vi.fn(),
 }));
 
+// Stand-in herdr sink: absent by default, supplied by the wiring test.
+const herdr = { onEvent: vi.fn(), release: vi.fn(), close: vi.fn() };
+const herdrEventSink = vi.fn();
+vi.mock("../../src/cli/herdr-sink.js", () => ({
+  herdrEventSink: () => herdrEventSink(),
+}));
+
 import { dispatchResume } from "../../src/commands/resume.js";
 
 let projectDir: string;
@@ -219,5 +226,29 @@ describe("dispatchResume", () => {
       expect.stringContaining("autoloop resume"),
     );
     log.mockRestore();
+  });
+});
+
+describe("dispatchResume herdr wiring", () => {
+  it("tees events into the herdr sink and closes it at a normal exit", async () => {
+    herdrEventSink.mockReturnValueOnce(herdr);
+    const event = { type: "log", level: "info", message: "x" };
+    resumeSpy.mockImplementationOnce(async (...args: unknown[]) => {
+      (args[1] as { onEvent: (e: unknown) => void }).onEvent(event);
+      return {
+        iterations: 5,
+        stopReason: "completed",
+        runId: "run-aaaa",
+        resumedFromIteration: 4,
+        newMaxIterations: 5,
+      };
+    });
+    writeRegistry([baseRecord()]);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await dispatchResume(["run-aaaa"]);
+    log.mockRestore();
+    expect(herdr.onEvent).toHaveBeenCalledWith(event);
+    expect(herdr.close).toHaveBeenCalled();
+    expect(herdr.release).not.toHaveBeenCalled();
   });
 });
