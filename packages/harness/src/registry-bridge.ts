@@ -8,6 +8,7 @@ import type {
 } from "@mobrienv/autoloop-core/registry/types";
 import { appendRegistryEntry } from "@mobrienv/autoloop-core/registry/update";
 import { runCostUsd } from "./display.js";
+import type { StepBackend } from "./events.js";
 import type { LoopContext } from "./types.js";
 
 /**
@@ -75,6 +76,31 @@ export function registryProgress(loop: LoopContext, iteration: number): void {
   record.iteration = iteration;
   record.updated_at = new Date().toISOString();
   record.latest_event = "iteration.finish";
+  delete record.current_step;
+  appendRegistryEntry(path, record);
+}
+
+/**
+ * Record the step now in flight. Leaves `iteration` and `latest_event` alone:
+ * `iteration` means the last completed step, and resume depends on that.
+ */
+export function registryStepStart(
+  loop: LoopContext,
+  iteration: number,
+  step: { allowedRoles: string[]; backend: StepBackend },
+): void {
+  const path = registryPath(loop);
+  const existing = getRun(path, loop.runtime.runId);
+  const record: RunRecord = existing ? { ...existing } : baseRecord(loop);
+  const now = new Date().toISOString();
+  record.updated_at = now;
+  record.current_step = {
+    iteration,
+    role: step.allowedRoles.join(","),
+    backend_kind: step.backend.kind,
+    model: step.backend.model,
+    started_at: now,
+  };
   appendRegistryEntry(path, record);
 }
 
@@ -99,6 +125,7 @@ export function registryTerminal(
   if (status !== "running") {
     delete record.pid;
   }
+  delete record.current_step;
   // Verified-outcome ledger: persist the gate-verified outcome facts so ROI /
   // A-B / regression analytics read a real numerator, not a re-derived one.
   record.outcome = deriveOutcome(status, stopReason);

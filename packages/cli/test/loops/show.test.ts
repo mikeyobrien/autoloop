@@ -85,6 +85,31 @@ describe("showRun", () => {
   });
 });
 
+describe("showRun current step", () => {
+  it("shows the step in flight for a running run", () => {
+    const record: RunRecord = {
+      ...makeRecord("run-live-001"),
+      status: "running",
+      current_step: {
+        iteration: 6,
+        role: "critic",
+        backend_kind: "pi",
+        model: "",
+        started_at: new Date().toISOString(),
+      },
+    };
+    writeFileSync(regPath, `${JSON.stringify(record)}\n`);
+    const result = showRun(tmpDir, "run-live-001");
+    expect(result).toContain("Step:       6 critic · pi · default · started");
+    expect(result).toContain("Iteration:  5");
+  });
+
+  it("has no step line for a finished run", () => {
+    writeFileSync(regPath, `${JSON.stringify(makeRecord("run-done-001"))}\n`);
+    expect(showRun(tmpDir, "run-done-001")).not.toContain("Step:");
+  });
+});
+
 describe("showArtifacts", () => {
   it("returns no-match message for unknown ID", () => {
     writeFileSync(regPath, `${JSON.stringify(makeRecord("abc-123"))}\n`);

@@ -33,6 +33,14 @@ function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
   } as RunRecord;
 }
 
+const step = {
+  iteration: 4,
+  role: "builder-opus",
+  backend_kind: "claude-sdk",
+  model: "claude-opus-5-5",
+  started_at: "2026-04-05T15:40:00.000Z",
+};
+
 describe("renderListHeader", () => {
   it("includes STARTED column", () => {
     const header = renderListHeader();
@@ -88,6 +96,70 @@ describe("renderRunLine", () => {
   it("shows dash indicator for explicit shared mode", () => {
     const line = renderRunLine(makeRun({ isolation_mode: "shared" }));
     expect(line).toContain("──");
+  });
+});
+
+describe("renderRunLine current step", () => {
+  it("shows the step in flight for a running run", () => {
+    const line = renderRunLine(makeRun({ current_step: step }));
+    expect(line).toContain("iter:4");
+    expect(line).toContain("▶ builder-opus");
+    expect(line).not.toContain("build.done");
+  });
+
+  it("truncates a long role list to the column", () => {
+    const line = renderRunLine(
+      makeRun({
+        status: "waiting",
+        current_step: { ...step, role: "planner,builder,critic,finalizer" },
+      }),
+    );
+    expect(line).toContain("▶ planner,build...");
+  });
+
+  it("falls back to the last completed iteration without a step", () => {
+    const line = renderRunLine(makeRun());
+    expect(line).toContain("iter:3");
+    expect(line).toContain("build.done");
+    expect(line).not.toContain("▶");
+  });
+
+  it("ignores a leftover step on a finished run", () => {
+    const line = renderRunLine(
+      makeRun({ status: "completed", current_step: step }),
+    );
+    expect(line).toContain("iter:3");
+    expect(line).not.toContain("▶");
+  });
+});
+
+describe("renderRunDetail current step", () => {
+  it("renders the step with backend, model, start time, and age", () => {
+    const started = new Date(step.started_at);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const clock = `${pad(started.getHours())}:${pad(started.getMinutes())}:${pad(started.getSeconds())}`;
+    const detail = renderRunDetail(
+      makeRun({ current_step: step }),
+      started.getTime() + 125_000,
+    );
+    expect(detail).toContain(
+      `Step:       4 builder-opus · claude-sdk · claude-opus-5-5 · started ${clock} (2m 5s ago)`,
+    );
+    expect(detail).toContain("Iteration:  3");
+  });
+
+  it("renders an unset model as default and skips an unreadable start", () => {
+    const detail = renderRunDetail(
+      makeRun({ current_step: { ...step, model: "", started_at: "soon" } }),
+    );
+    expect(detail).toContain(
+      "Step:       4 builder-opus · claude-sdk · default",
+    );
+    expect(detail).not.toContain("started");
+  });
+
+  it("omits the step line without a step in flight", () => {
+    expect(renderRunDetail(makeRun())).not.toContain("Step:");
   });
 });
 

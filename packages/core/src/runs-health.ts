@@ -180,6 +180,7 @@ export function reapStaleRuns(stateDir: string): number {
           stop_reason: "reaped: pid no longer alive",
           updated_at: new Date().toISOString(),
         };
+        delete reaped.current_step;
         appendRegistryEntry(regPath, reaped);
         changed = true;
         total++;

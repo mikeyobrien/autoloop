@@ -13,6 +13,7 @@ import {
   printIterationFooter,
   printProgressLine,
   printReviewBanner,
+  printRoutingSelected,
   printSummary,
 } from "@mobrienv/autoloop-harness/display";
 import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
@@ -27,7 +28,8 @@ export function cliPrintEvent(event: LoopEvent): void {
       return;
     case "iteration.banner":
       // display.ts only needs { iteration, allowedRoles, recentEvent,
-      // allowedEvents, lastRejected } from iter and maxIterations from loop.
+      // allowedEvents, lastRejected, backend } from iter and maxIterations
+      // from loop.
       printIterationBanner(
         { limits: { maxIterations: event.maxIterations } } as never,
         {
@@ -36,8 +38,12 @@ export function cliPrintEvent(event: LoopEvent): void {
           recentEvent: event.recentEvent,
           allowedEvents: event.allowedEvents,
           lastRejected: event.lastRejected ?? "",
+          backend: event.backend,
         } as never,
       );
+      return;
+    case "routing.selected":
+      printRoutingSelected(event);
       return;
     case "iteration.footer":
       printIterationFooter(

@@ -150,6 +150,25 @@ describe("listRunsJson", () => {
 });
 
 describe("showRunJson", () => {
+  it("passes the step in flight through unchanged", () => {
+    const current_step = {
+      iteration: 4,
+      role: "builder-opus",
+      backend_kind: "claude-sdk",
+      model: "claude-opus-5-5",
+      started_at: "2026-01-01T00:59:00.000Z",
+    };
+    writeRecords([
+      makeRecord("run-step-1", {
+        status: "running",
+        updated_at: isoAgo(0),
+        current_step,
+      }),
+    ]);
+    const parsed = JSON.parse(showRunJson(tmpDir, "run-step-1").output);
+    expect(parsed.current_step).toEqual(current_step);
+  });
+
   it("returns the full record plus a derived health bucket", () => {
     writeRecords([
       makeRecord("run-show-1", {

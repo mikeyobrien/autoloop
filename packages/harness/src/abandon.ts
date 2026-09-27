@@ -95,6 +95,7 @@ export function abandonRun(
   corrected.updated_at = nowIso;
   corrected.latest_event = "loop.stop";
   delete corrected.pid;
+  delete corrected.current_step;
   corrected.outcome = "stopped";
   corrected.acceptance_verified = false;
   appendRegistryEntry(registryFile, corrected);

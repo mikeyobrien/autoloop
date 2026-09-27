@@ -8,6 +8,12 @@
 
 import type { StopReason } from "./types.js";
 
+/** The resolved backend for one step. `model` is "" for the harness default. */
+export interface StepBackend {
+  kind: string;
+  model: string;
+}
+
 export type LoopEvent =
   // Structural — SDK consumers care about these.
   | { type: "log"; level: string; message: string }
@@ -49,6 +55,19 @@ export type LoopEvent =
       recentEvent: string;
       allowedEvents: string[];
       lastRejected?: string;
+      backend: StepBackend;
+    }
+  // Jev picked a workflow route for the run. Emitted once per run per
+  // process, including when the decision is replayed from the journal.
+  | {
+      type: "routing.selected";
+      runId: string;
+      route: string;
+      reason: "choice" | "complexity" | "fallback";
+      choice: string;
+      confidence: number;
+      complexity?: number;
+      handoff?: Record<string, string[]>;
     }
   | { type: "iteration.footer"; iteration: number; elapsedS: number }
   | {

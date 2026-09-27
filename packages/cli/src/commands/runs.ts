@@ -39,11 +39,13 @@ function reconcileStuckRuns(registryPath: string): string[] {
     (r) => r.pid == null || !isProcessAlive(r.pid),
   );
   for (const r of stuck) {
-    appendRegistryEntry(registryPath, {
+    const reconciled = {
       ...r,
-      status: "stopped",
+      status: "stopped" as const,
       stop_reason: "reconciled: process gone",
-    });
+    };
+    delete reconciled.current_step;
+    appendRegistryEntry(registryPath, reconciled);
   }
   return stuck.map((r) => r.run_id);
 }

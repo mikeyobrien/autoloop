@@ -1,4 +1,8 @@
-import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
+import {
+  isLiveStatus,
+  type RunCurrentStep,
+  type RunRecord,
+} from "@mobrienv/autoloop-core/registry/types";
 
 /**
  * Render a concise one-line summary for a run record.
@@ -7,13 +11,16 @@ import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 export function renderRunLine(r: RunRecord): string {
   const shortId = shortRunId(r.run_id);
   const wt = r.isolation_mode === "worktree" ? "WT" : "──";
+  const step = liveStep(r);
+  const iter = step ? step.iteration : r.iteration;
+  const latest = step ? truncate(`▶ ${step.role}`, 18) : r.latest_event;
   const parts = [
     shortId.padEnd(24),
     r.status.padEnd(10),
     r.preset.padEnd(14),
     wt.padEnd(4),
-    `iter:${r.iteration}`.padEnd(8),
-    r.latest_event.padEnd(18),
+    `iter:${iter}`.padEnd(8),
+    latest.padEnd(18),
     formatTime(r.created_at).padEnd(18),
     formatTime(r.updated_at),
   ];
@@ -23,7 +30,7 @@ export function renderRunLine(r: RunRecord): string {
 /**
  * Render a multi-line detail view for a single run.
  */
-export function renderRunDetail(r: RunRecord): string {
+export function renderRunDetail(r: RunRecord, now = Date.now()): string {
   const lines: string[] = [
     field("Run", r.run_id),
     field("Status", r.status),
@@ -35,6 +42,8 @@ export function renderRunDetail(r: RunRecord): string {
     field("Iteration", String(r.iteration)),
     field("Latest", r.latest_event),
   ];
+  const step = liveStep(r);
+  if (step) lines.push(field("Step", renderStep(step, now)));
   if (r.stop_reason) lines.push(field("Stop", r.stop_reason));
   lines.push(field("Isolation", r.isolation_mode || "run-scoped"));
   if (r.worktree_name) lines.push(field("Worktree", r.worktree_name));
@@ -74,6 +83,26 @@ export function renderListHeader(): string {
     "UPDATED",
   ];
   return parts.join("  ");
+}
+
+/** The step in flight, only while the run still owns the loop. */
+function liveStep(r: RunRecord): RunCurrentStep | undefined {
+  return isLiveStatus(r.status) ? r.current_step : undefined;
+}
+
+function renderStep(step: RunCurrentStep, now: number): string {
+  const started = new Date(step.started_at);
+  const facts = [
+    `${step.iteration} ${step.role}`,
+    step.backend_kind,
+    step.model || "default",
+  ];
+  if (Number.isNaN(started.getTime())) return facts.join(" · ");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const clock = `${pad(started.getHours())}:${pad(started.getMinutes())}:${pad(started.getSeconds())}`;
+  const agoS = Math.max(0, Math.floor((now - started.getTime()) / 1000));
+  const ago = `${Math.floor(agoS / 60)}m ${agoS % 60}s`;
+  return [...facts, `started ${clock} (${ago} ago)`].join(" · ");
 }
 
 function field(label: string, value: string): string {
