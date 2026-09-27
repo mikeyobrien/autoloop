@@ -69,6 +69,16 @@ describe("routingEventFromLines", () => {
     expect(routingEventFromLines(lines)).toBe("gaps.identified");
   });
 
+  it("keeps the pre-resume routing position after loop.resume", () => {
+    const lines = [
+      fieldsLine("loop.start"),
+      payloadLine("plan.ready", "plan written"),
+      fieldsLine("loop.stop", { reason: "interrupted" }),
+      fieldsLine("loop.resume", { resumed_from_iteration: "3" }),
+    ];
+    expect(routingEventFromLines(lines)).toBe("plan.ready");
+  });
+
   it("does not treat wait.request as a routing event", () => {
     const lines = [
       payloadLine("gaps.identified", "found stuff"),
