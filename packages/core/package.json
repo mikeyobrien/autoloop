@@ -130,6 +130,10 @@
     "./isolation/run-scope": {
       "types": "./dist/isolation/run-scope.d.ts",
       "default": "./dist/isolation/run-scope.js"
+    },
+    "./terminal-width": {
+      "types": "./dist/terminal-width.d.ts",
+      "default": "./dist/terminal-width.js"
     }
   },
   "files": [
@@ -144,7 +148,8 @@
     "directory": "packages/core"
   },
   "dependencies": {
-    "@iarna/toml": "^2.2.5"
+    "@iarna/toml": "^2.2.5",
+    "get-east-asian-width": "^1.5.0"
   },
   "scripts": {
     "build": "tsc"

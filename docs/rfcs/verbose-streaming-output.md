@@ -64,9 +64,19 @@ Add a `formatAndWriteUpdate(update)` function that handles:
 | `agent_message_chunk` | Raw text (no prefix) | `Here is the implementation...` |
 | `agent_thought_chunk` | `[thinking] {text}` | `[thinking] I need to check the types...` |
 | `tool_call` | `[tool:{kind}] {title}` | `[tool:read] Reading src/main.ts` |
-| `tool_call_update` | `[tool:✓] {title}` or `[tool:✗] {title}` | `[tool:✓] Reading src/main.ts` |
+| `tool_call_update` | `[tool:✗] {title}` on failure; nothing otherwise | `[tool:✗] Reading src/main.ts` |
 
-Only emit `tool_call_update` lines for terminal statuses (`completed`, `failed`) to avoid noise from `pending`/`in_progress` updates.
+Only emit `tool_call_update` lines for failures. Successful completions print nothing — the `tool_call` line already said what ran — and `pending`/`in_progress` updates are noise.
+
+The pi and claude-sdk backends print one line per tool call with its arguments summarized (`packages/backends/src/tool-line.ts`), and a failure line pairing the end back to its start (by `toolCallId` / `tool_use_id`) with the first line of the error:
+
+```
+→ bash  rg -n registryProgress packages/
+→ write  .autoloop/how.md
+✗ write  .autoloop/how.md — EACCES: permission denied
+```
+
+Every tool line is single-line and truncated with `…` to `process.stderr.columns` (120 when unknown).
 
 For `agent_message_chunk`, write the raw text chunk without a newline (the chunks are partial — newlines come naturally in the text). For all other types, write a full line with `\n`.
 
@@ -134,10 +144,8 @@ role: clarifier │ event: loop.start │ next: brief.ready
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [thinking] I need to understand the codebase structure first...
 [tool:read] Reading src/main.ts
-[tool:✓] Reading src/main.ts
 Let me analyze the main entry point. The application uses...
 [tool:read] Reading src/config.ts
-[tool:✓] Reading src/config.ts
 Based on my analysis, here is the brief:
 ...
 ──── end iteration 1 (45s) ─────────────────────────────────────────

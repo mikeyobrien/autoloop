@@ -58,14 +58,14 @@ describe("formatStreamingUpdate", () => {
     );
   });
 
-  it("returns [tool:✓] for completed tool_call_update", () => {
+  it("prints nothing for completed tool_call_update", () => {
     const update = {
       sessionUpdate: "tool_call_update",
       status: "completed",
       title: "Done",
       toolCallId: "1",
     } as SessionUpdate;
-    expect(formatStreamingUpdate(update)).toBe("[tool:✓] Done\n");
+    expect(formatStreamingUpdate(update)).toBeNull();
   });
 
   it("returns [tool:✗] for failed tool_call_update", () => {
@@ -103,12 +103,12 @@ describe("formatStreamingUpdate", () => {
     expect(formatStreamingUpdate(update)).toBeNull();
   });
 
-  it("handles tool_call_update with missing title", () => {
+  it("prints no bare line for a completed update with missing title", () => {
     const update = {
       sessionUpdate: "tool_call_update",
       status: "completed",
       toolCallId: "1",
     } as SessionUpdate;
-    expect(formatStreamingUpdate(update)).toBe("[tool:✓] \n");
+    expect(formatStreamingUpdate(update)).toBeNull();
   });
 });
