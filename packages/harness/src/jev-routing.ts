@@ -8,6 +8,7 @@ import {
   extractTopic,
   readRunLines,
 } from "@mobrienv/autoloop-core/journal";
+import { applyHandoffPatch } from "@mobrienv/autoloop-core/topology";
 import type { LoopContext } from "./types.js";
 
 export interface JevRoute {
@@ -425,11 +426,7 @@ export async function resolveJevRouting(loop: LoopContext): Promise<string> {
   }
   announceRoute(loop, decision, route);
   if (route.handoff && loop.topology) {
-    for (const [event, targets] of Object.entries(route.handoff)) {
-      if (!loop.topology.handoffKeys.includes(event))
-        loop.topology.handoffKeys.push(event);
-      loop.topology.handoff[event] = [...targets];
-    }
+    loop.topology = applyHandoffPatch(loop.topology, route.handoff);
   }
   return `\n## Jev workflow route: ${route.id}\n\nFollow this selected workflow within the existing role, permissions, and completion gates. Do not independently choose a replacement workflow.\n\n${route.instructions}\n`;
 }

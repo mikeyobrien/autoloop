@@ -45,6 +45,14 @@ Before the first iteration, [Jev](../../../../docs/reference/jev-routing.md) cla
 
 The decision is cached for the run and recorded as `routing.jev.selected` with `route` and `reason`. Jev needs `TYPESAFE_API_KEY` and sends the objective text to TypeSafe. Set `routing.jev.enabled = false` in `autoloops.toml` to have the planner choose every lane.
 
+To see which model runs each role and the lane Jev picked for a run:
+
+```sh
+autoloop inspect topology packages/presets/presets/autorigor --format graph --run <run-id>
+```
+
+The header shows `Jev lane: <route> (<reason>)`, and edges the lane rerouted end with `(jev)`.
+
 ## Run
 
 ```sh

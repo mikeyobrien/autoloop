@@ -148,7 +148,12 @@ autoloop inspect metrics run-mn9d3uk0-xi0m --format md
 autoloop inspect topology                      # defaults to terminal
 autoloop inspect topology --format graph       # ASCII directed graph
 autoloop inspect topology --format json        # structured JSON
+autoloop inspect topology presets/autorigor --format graph --run <run-id>
 ```
+
+`inspect topology` reads the preset named by the positional target (or the project dir). The `graph` format prints one edge per role and emitted event, then a role legend: one line per role with its `backend_kind · backend_model` overrides, or `inherits base backend` when the role has none.
+
+With `--run <id>`, the command reads that run's journal from the project dir (`AUTOLOOP_PROJECT_DIR`, or the positional target when it holds the journal). Worktree runs are found at `.autoloop/worktrees/<id>/tree/.autoloop/journal.jsonl`. If the run has a `routing.jev.selected` record, its route's `handoff` patch is applied before rendering, the output starts with `Jev lane: <route> (<reason>)`, and each patched edge or handoff entry ends with `  (jev)`. The `json` format gains `jev: {route, reason, handoff}`. A run without a record prints `Jev lane: none` (`jev: null` in JSON). Records written before the `handoff` field existed show the lane but patch nothing.
 
 ### `memory`
 

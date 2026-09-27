@@ -119,7 +119,18 @@ export function dispatchInspect(args: string[]): boolean {
       console.log(chains.renderChainState(projectDir));
       return true;
     case "topology":
-      topo.renderTopologyInspect(projectDir, format);
+      if (spec.run) {
+        topo.renderTopologyInspect(
+          projectDir,
+          format,
+          render.readJevLane(
+            [projectDir, resolveRuntimeProjectDir()],
+            spec.run,
+          ),
+        );
+      } else {
+        topo.renderTopologyInspect(projectDir, format);
+      }
       return true;
     case "profiles":
       renderProfilesInspect(projectDir);

@@ -16,6 +16,11 @@ vi.mock("../../src/cli/render.js", () => ({
   renderUsage: vi.fn(),
   renderPromptFormat: vi.fn(),
   renderOutput: vi.fn(),
+  readJevLane: vi.fn(() => ({
+    route: "feature",
+    reason: "choice",
+    handoff: {},
+  })),
 }));
 
 vi.mock("@mobrienv/autoloop-core/memory-plugin", () => ({
@@ -181,11 +186,16 @@ describe("dispatchInspect topology", () => {
     );
   });
 
-  it("dispatches 'inspect topology --run <id>' (run ignored, topology is static)", () => {
-    dispatchInspect(["topology", "--run", "run-abc"]);
+  it("dispatches 'inspect topology --run <id>' with the run's Jev lane", () => {
+    dispatchInspect(["topology", "presets/x", "--run", "run-abc"]);
+    expect(render.readJevLane).toHaveBeenCalledWith(
+      ["presets/x", "/tmp/test-project"],
+      "run-abc",
+    );
     expect(topo.renderTopologyInspect).toHaveBeenCalledWith(
-      expect.any(String),
+      "presets/x",
       "terminal",
+      { route: "feature", reason: "choice", handoff: {} },
     );
   });
 });
