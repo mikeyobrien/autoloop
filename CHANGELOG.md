@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-26
+
+### Added
+- **In-process host workers.** SDK callers can pass `host` to `run()` or
+  `resume()`, and every iteration goes to `host.runTurn(turn)` instead of a
+  spawned backend. The harness still owns routing, guards, completion, the
+  journal, and the registry, so host runs appear in `autoloop loops`,
+  `inspect`, and the dashboard. Each turn carries the full active-role
+  prompt and an `emit` bound to that iteration's routing and gates. Host
+  mode refuses metareview, `parallel`, stages, and role concurrency at start
+  and after every config reload. See `docs/guides/sdk-embed.md`.
+- **`resumeProblem(record)`** is exported from `@mobrienv/autoloop-harness`.
+  The CLI uses it for `autoloop resume` checks.
+
 ### Fixed
+- **Resumed runs keep their routing position.** `loop.resume` is no longer a
+  routing topic, so the first resumed iteration routes from the event before
+  the stop instead of allowing every role.
 - **Merge gate determinism (T-032).** `npm run check` no longer false-reds when  the coverage temp directory disappears mid-run: the coverage leg ensures  `coverage/.tmp` exists before every chunk write and falls back to an  in-memory payload copy if an already-written chunk file is gone at read time  (upstream Vitest classes #10111/#9758). If Vitest itself dies without  reporting any test failure — worker module-resolution crash, unhandled  rejection — the gate retries once, and only then exits non-zero; real test  failures and coverage threshold misses still exit 1 on the first report.  The `duration=0` wait park test tolerates one retry (`--retry 1`).  journals `wait.close` and continues on the same `run_id`. Nothing sleeps  in-process or burns `backend.timeout_ms`; a host may wake the run any time.
 - **Timed waits auto-resume (T-030).** A `wait.request` carrying a positive  `duration` (e.g. `duration=300s`) arms a detached engine-spawned timer that  re-invokes the existing resume path after the duration — `wait.close` +  `loop.resume` on the same `run_id`, with no `/ops` POST and no owner Wake.  The timer re-checks before firing (registry still `waiting` and the exact  `wait_id` still open) so a manual Wake/steer resume is never double-closed,  and one `wait.close` per `wait.open` is preserved. A park without a duration  (or `duration=0`) keeps the indefinite-park behavior exactly as before.
 - **Trailing emits no longer nullify `wait.request` parks (T-031).** The  finished-turn park is now order-insensitive: routing no longer keys on the  LAST agent event only, so a `wait.request` followed by an allowed emit  (e.g. `step.done`) parks exactly as if the request were last — `wait.open`  journaled, registry `waiting`, process-free — instead of silently starting  the next iteration with no park. When `wait.request` is already the last  event, behavior is unchanged.
