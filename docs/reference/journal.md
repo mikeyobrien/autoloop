@@ -71,7 +71,7 @@ loop.complete   or   loop.stop
 |-------|------|--------|
 | `loop.start` | Once at the beginning of a run. | `max_iterations`, `completion_promise`, `completion_event`, `review_every`, `objective` |
 | `iteration.start` | Start of each iteration. | `recent_event`, `suggested_roles`, `allowed_events`, `backpressure`, `prompt` |
-| `backend.start` | Before invoking the backend. | `backend_kind`, `command`, `prompt_mode`, `timeout_ms` |
+| `backend.start` | Before invoking the backend. | `backend_kind`, `command`, `args` (comma-joined), `prompt_mode`, `timeout_ms`, `role`, `model`. `role` is the single active role, or `""` when zero or several roles are allowed. `model` is the resolved backend model after any role overlay, or `""` when no model is configured. |
 | `backend.finish` | After backend returns. | `exit_code`, `timed_out` (boolean), `output` |
 | `iteration.finish` | End of each iteration. | `exit_code`, `timed_out` (boolean), `elapsed_s` (integer seconds), `output` |
 | `review.start` | Before a metareview review pass. | `kind` (`"metareview"`), `backend_kind`, `command`, `prompt_mode`, `prompt`, `timeout_ms` |

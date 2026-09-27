@@ -35,6 +35,7 @@ function makeWorkspaceWithGlobalBackend(name: string): {
       'backend.command = "node"',
       `backend.args = [${JSON.stringify(MOCK_BACKEND)}]`,
       'backend.prompt_mode = "arg"',
+      'backend.model = "fixture-model"',
       "review.enabled = false",
       'core.state_dir = ".autoloop"',
       'core.journal_file = ".autoloop/journal.jsonl"',
@@ -241,6 +242,9 @@ describe("integration: run loop with mock backend", () => {
     expect(backendStartLine).toBeTruthy();
     expect(backendStartLine).toContain('"command": "node"');
     expect(backendStartLine).not.toContain('"command": "pi"');
+    const backendStart = JSON.parse(backendStartLine as string);
+    expect(backendStart.fields.role).toBe("planner");
+    expect(backendStart.fields.model).toBe("fixture-model");
     expect(journal).toContain('"topic": "loop.complete"');
   });
 

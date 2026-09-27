@@ -38,6 +38,7 @@ export interface IterationContext {
   iteration: number;
   recentEvent: string;
   allowedRoles: string[];
+  activeRole: string;
   allowedEvents: string[];
   backpressure: string;
   lastRejected: string;
@@ -192,6 +193,7 @@ export function buildIterationContext(
     iteration,
     recentEvent: derived.routing.recentEvent,
     allowedRoles: derived.routing.allowedRoles,
+    activeRole,
     allowedEvents: derived.routing.allowedEvents,
     backpressure: derived.backpressure,
     lastRejected: derived.lastRejected,

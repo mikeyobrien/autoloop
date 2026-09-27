@@ -470,7 +470,11 @@ export function appendBackendStart(
       ", " +
       jsonField("prompt_mode", iter.backend.promptMode) +
       ", " +
-      jsonField("timeout_ms", String(iter.backend.timeoutMs)),
+      jsonField("timeout_ms", String(iter.backend.timeoutMs)) +
+      ", " +
+      jsonField("role", iter.activeRole || "") +
+      ", " +
+      jsonField("model", iter.backend.model || ""),
   );
 }
 
