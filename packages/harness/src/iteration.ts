@@ -20,6 +20,7 @@ import {
 import {
   getPiSessionStats,
   initPiSession,
+  type PiSession,
   resetPiSession,
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
@@ -603,10 +604,23 @@ function recordClaudeSdkUsage(loop: LoopContext, iter: IterationContext): void {
   );
 }
 
+function piSpawnMatches(
+  options: PiSession["options"],
+  backend: IterationContext["backend"],
+): boolean {
+  return (
+    options.command === backend.command &&
+    (options.modelId ?? "") === backend.model &&
+    options.args.length === backend.args.length &&
+    options.args.every((arg, i) => arg === backend.args[i])
+  );
+}
+
 /**
  * Make sure a live pi RPC session with a fresh conversation is available.
  * Prefers a `new_session` reset on the running process; respawns when the
- * process is gone or refuses the reset.
+ * process is gone, refuses the reset, or was spawned for a different
+ * command/model/args (per-role backend routing).
  */
 async function ensurePiSession(
   loop: LoopContext,
@@ -614,7 +628,14 @@ async function ensurePiSession(
   iteration: number,
 ): Promise<void> {
   const existing = loop.piSession.current;
-  if (existing) {
+  if (existing && !piSpawnMatches(existing.options, iter.backend)) {
+    loop.piSession.current = undefined;
+    try {
+      await terminatePiSession(existing);
+    } catch {
+      /* best-effort */
+    }
+  } else if (existing) {
     try {
       await resetPiSession(existing);
       log(loop, "debug", `pi session reset for iteration ${iteration}`);

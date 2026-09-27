@@ -192,6 +192,12 @@ function makeAcpLoop(): LoopContext {
   };
 }
 
+const PI_SPAWN = {
+  command: "pi",
+  args: ["--thinking", "high"],
+  modelId: "gpt-5",
+};
+
 function makePiLoop(): LoopContext {
   const loop = makeAcpLoop();
   loop.objective = "Use pi";
@@ -413,7 +419,10 @@ describe("runIteration pi RPC execution", () => {
 
   it("journals a backend.usage event when pi reports session stats", async () => {
     const loop = makePiLoop();
-    loop.piSession.current = { process: { pid: 99 } } as unknown as PiSession;
+    loop.piSession.current = {
+      process: { pid: 99 },
+      options: PI_SPAWN,
+    } as unknown as PiSession;
     piMocks.resetPiSession.mockResolvedValue(undefined);
     piMocks.getPiSessionStats.mockResolvedValue({
       inputTokens: 100,
@@ -444,7 +453,10 @@ describe("runIteration pi RPC execution", () => {
 
   it("reuses the live session via new_session instead of respawning", async () => {
     const loop = makePiLoop();
-    const liveSession = { process: { pid: 99 } } as unknown as PiSession;
+    const liveSession = {
+      process: { pid: 99 },
+      options: PI_SPAWN,
+    } as unknown as PiSession;
     loop.piSession.current = liveSession;
     piMocks.resetPiSession.mockResolvedValue(undefined);
 
@@ -464,9 +476,79 @@ describe("runIteration pi RPC execution", () => {
     );
   });
 
+  it("respawns instead of reusing when the role routes to a different model", async () => {
+    const loop = makePiLoop();
+    const staleSession = {
+      process: { pid: 99 },
+      options: { ...PI_SPAWN, modelId: "other-model" },
+    } as unknown as PiSession;
+    const freshSession = { process: { pid: 100 } } as unknown as PiSession;
+    loop.piSession.current = staleSession;
+    piMocks.terminatePiSession.mockRejectedValue(new Error("already dead"));
+    piMocks.initPiSession.mockResolvedValue(freshSession);
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(piMocks.resetPiSession).not.toHaveBeenCalled();
+    expect(piMocks.terminatePiSession).toHaveBeenCalledWith(staleSession);
+    expect(piMocks.initPiSession).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: "gpt-5" }),
+    );
+    expect(loop.piSession.current).toBe(freshSession);
+  });
+
+  it("reuses a session spawned without a model when none is configured", async () => {
+    const loop = makePiLoop();
+    loop.backend.model = "";
+    const { modelId: _unused, ...unpinned } = PI_SPAWN;
+    const liveSession = {
+      process: { pid: 99 },
+      options: unpinned,
+    } as unknown as PiSession;
+    loop.piSession.current = liveSession;
+    piMocks.resetPiSession.mockResolvedValue(undefined);
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(piMocks.resetPiSession).toHaveBeenCalledWith(liveSession);
+    expect(piMocks.initPiSession).not.toHaveBeenCalled();
+  });
+
+  it("respawns when the role routes to different pi args", async () => {
+    const loop = makePiLoop();
+    const staleSession = {
+      process: { pid: 99 },
+      options: { ...PI_SPAWN, args: ["--thinking", "low"] },
+    } as unknown as PiSession;
+    loop.piSession.current = staleSession;
+    piMocks.initPiSession.mockResolvedValue({
+      process: { pid: 100 },
+    } as unknown as PiSession);
+
+    await runIteration(loop, 1, async () => ({
+      iterations: 1,
+      stopReason: "continued",
+      runId: loop.runtime.runId,
+    }));
+
+    expect(piMocks.resetPiSession).not.toHaveBeenCalled();
+    expect(piMocks.terminatePiSession).toHaveBeenCalledWith(staleSession);
+  });
+
   it("terminates and respawns when the session reset fails", async () => {
     const loop = makePiLoop();
-    const deadSession = { process: { pid: 99 } } as unknown as PiSession;
+    const deadSession = {
+      process: { pid: 99 },
+      options: PI_SPAWN,
+    } as unknown as PiSession;
     const freshSession = { process: { pid: 100 } } as unknown as PiSession;
     loop.piSession.current = deadSession;
     piMocks.resetPiSession.mockRejectedValue(new Error("process gone"));
@@ -505,7 +587,10 @@ describe("runIteration loop runtime budget clamp", () => {
   ): LoopContext {
     const loop = makePiLoop();
     loop.limits = { maxIterations: 5, maxRuntimeMs };
-    loop.piSession.current = { process: { pid: 99 } } as unknown as PiSession;
+    loop.piSession.current = {
+      process: { pid: 99 },
+      options: PI_SPAWN,
+    } as unknown as PiSession;
     piMocks.resetPiSession.mockResolvedValue(undefined);
     const createdAt = new Date(Date.now() - elapsedMs).toISOString();
     writeFileSync(
