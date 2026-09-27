@@ -33,13 +33,25 @@ flowchart LR
 
 A slice rejected twice in one lane escalates to `plan.hard`.
 
+## Jev lane selection
+
+Before the first iteration, [Jev](../../../../docs/reference/jev-routing.md) classifies the objective into one lane from `routes.json` and rates its complexity from 0 to 2. Code then picks the route.
+
+| Jev answer | Route | Builder for `plan.ready` |
+| --- | --- | --- |
+| Complexity at or above 1.5 | `hard` | builder-astra |
+| Confident lane | that lane | the lane's builder |
+| Low confidence or `no_match` | `unrouted` | none; the planner emits `plan.<lane>` |
+
+The decision is cached for the run and recorded as `routing.jev.selected` with `route` and `reason`. Jev needs `TYPESAFE_API_KEY` and sends the objective text to TypeSafe. Set `routing.jev.enabled = false` in `autoloops.toml` to have the planner choose every lane.
+
 ## Run
 
 ```sh
 autoloop run autorigor "objective" --worktree
 ```
 
-Requires `pi` with the `openai-codex`, `xai`, and `spark` providers configured, and the `claude` CLI signed in.
+Requires `pi` with the `openai-codex`, `xai`, and `spark` providers configured, the `claude` CLI signed in, and `TYPESAFE_API_KEY` unless Jev routing is disabled.
 
 ## Changing a lane
 

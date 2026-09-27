@@ -26,6 +26,8 @@ In `plan.md`, before any steps:
 - For `bugfix`: the reproduction command and the observed wrong output.
 - For `perf` and `hillclimb`: the baseline command, the baseline number, and the target.
 
+If your prompt has a `Jev workflow route` section that preselects a lane, use that playbook and emit `plan.ready` for every slice. Do not second-guess the lane on first activation. Otherwise choose the lane yourself from the table below.
+
 Hand exactly one slice to one lane. Emit the lane event with a payload that includes:
 - current step and active slice
 - files likely to change
@@ -45,7 +47,7 @@ If the slice touches a subsystem `how.md` does not map, emit `context.needed` na
 
 On later activations:
 - `queue.advance`: mark the finished step complete in `progress.md`. Hand the next slice.
-- `review.rejected` or `finalization.failed`: record the concrete objection in `progress.md`. Re-emit the same lane with a slice that addresses it. If this slice was already rejected twice in that lane, emit `plan.hard` instead and say why.
+- `review.rejected` or `finalization.failed`: record the concrete objection in `progress.md`. Re-emit the same event (`plan.ready` or `plan.<lane>`) with a slice that addresses it. If this slice was already rejected twice in that lane, emit `plan.hard` instead and say why. `plan.hard` always routes to builder-astra, even when a lane was preselected.
 - `build.blocked`: follow the Escalation rules in the harness instructions.
 
 Rules:

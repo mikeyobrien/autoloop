@@ -1,0 +1,43 @@
+[
+  {
+    "id": "feature",
+    "description": "Add a capability or behavior that does not exist yet",
+    "instructions": "Lane preselected: feature. Planner: emit `plan.ready` for each slice; it routes to builder-opus. Builder: follow the `feature` playbook duties.",
+    "handoff": { "plan.ready": ["builder-opus"] }
+  },
+  {
+    "id": "refactor",
+    "description": "Restructure existing code without changing its observable behavior",
+    "instructions": "Lane preselected: refactor. Planner: emit `plan.ready` for each slice; it routes to builder-opus. Builder: follow the `refactor` playbook duties.",
+    "handoff": { "plan.ready": ["builder-opus"] }
+  },
+  {
+    "id": "bugfix",
+    "description": "Existing behavior is wrong or broken and must be reproduced and fixed",
+    "instructions": "Lane preselected: bugfix. Planner: emit `plan.ready` for each slice; it routes to builder-sol. Builder: follow the `bugfix` playbook duties.",
+    "handoff": { "plan.ready": ["builder-sol"] }
+  },
+  {
+    "id": "hillclimb",
+    "description": "Repeatedly improve one named metric toward a numeric target over many iterations",
+    "instructions": "Lane preselected: hillclimb. Planner: emit `plan.ready` for each slice; it routes to builder-sol. Builder: follow the `hillclimb` playbook duties.",
+    "handoff": { "plan.ready": ["builder-sol"] }
+  },
+  {
+    "id": "perf",
+    "description": "Something is measurably slow or uses too many resources and must be made faster once",
+    "instructions": "Lane preselected: perf. Planner: emit `plan.ready` for each slice; it routes to builder-astra. Builder: follow the `perf` playbook duties.",
+    "handoff": { "plan.ready": ["builder-astra"] }
+  },
+  {
+    "id": "hard",
+    "description": "Selected by code when the complexity score crosses the threshold",
+    "instructions": "Lane preselected: hard (high complexity). Planner: classify the playbook as usual and record it in `plan.md`, then emit `plan.ready` for each slice; it routes to builder-astra. Builder: follow the duties for the playbook in `plan.md`, and question the premise before building.",
+    "handoff": { "plan.ready": ["builder-astra"] }
+  },
+  {
+    "id": "unrouted",
+    "description": "Selected by code when Jev is not confident",
+    "instructions": "No lane was preselected. Planner: choose the lane yourself and emit the matching `plan.<lane>` event."
+  }
+]

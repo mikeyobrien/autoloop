@@ -4,8 +4,9 @@ completion = "task.complete"
 # Multi-model / multi-harness routing, mirroring ~/.pi/agent/rigor-models.md.
 # The harness picks the backend from the FIRST role a handoff names
 # (harness prompt.ts resolveIterationBackend), so every lane event below
-# routes to exactly one role. The planner selects the playbook lane by
-# which plan.* event it emits.
+# routes to exactly one role. When Jev preselects a lane (routes.json), the
+# planner emits plan.ready and the route's handoff patch picks the builder.
+# Otherwise the planner selects the lane by which plan.<lane> event it emits.
 #
 #   role           harness      model                          rigor role
 #   explorer       pi           spark/qwen3.8-flash-next       how explorer
@@ -26,6 +27,7 @@ backend_model = "spark/qwen3.8-flash-next"
 [[role]]
 id = "planner"
 emits = [
+  "plan.ready",
   "plan.feature",
   "plan.refactor",
   "plan.bugfix",
@@ -86,6 +88,8 @@ evidence = [
 "context.needed" = ["explorer"]
 "context.ready" = ["planner"]
 "queue.advance" = ["planner"]
+# Overridden per run by the selected Jev route.
+"plan.ready" = ["builder-sol"]
 "plan.feature" = ["builder-opus"]
 "plan.refactor" = ["builder-opus"]
 "plan.bugfix" = ["builder-sol"]

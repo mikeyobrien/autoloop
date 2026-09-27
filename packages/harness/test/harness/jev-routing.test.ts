@@ -324,3 +324,282 @@ describe("routing decisions", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("lane routing", () => {
+  const laneRoutes = [
+    {
+      id: "bug-fix",
+      description: "Repair incorrect existing behavior",
+      instructions: "Reproduce, fix, verify.",
+      handoff: { "plan.ready": ["builder-sol"] },
+    },
+    {
+      id: "feature",
+      description: "Add a new behavior",
+      instructions: "Design, implement, verify.",
+      handoff: { "plan.ready": ["builder-opus"] },
+    },
+    {
+      id: "hard",
+      description: "Escalated work",
+      instructions: "Question the premise first.",
+      handoff: {
+        "plan.ready": ["builder-astra"],
+        "review.rejected": ["planner"],
+      },
+    },
+    {
+      id: "unrouted",
+      description: "Planner chooses",
+      instructions: "Choose a plan.<lane> event yourself.",
+    },
+  ];
+  const laneConfig: JevRoutingConfig = {
+    model: "jev-1.13.0",
+    timeoutMs: 1000,
+    minConfidence: 0.8,
+    routes: laneRoutes,
+    fallbackRoute: "unrouted",
+    complexity: { route: "hard", threshold: 1.5 },
+  };
+  function laneResponse(
+    route: Record<string, unknown> = {},
+    complexity: Record<string, unknown> = {},
+  ) {
+    return {
+      model: "jev-1.13.0",
+      answers: {
+        route: {
+          type: "choice",
+          choice: "bug-fix",
+          confidence: 0.95,
+          probabilities: { "bug-fix": 0.96, feature: 0.03, no_match: 0.01 },
+          ...route,
+        },
+        complexity: {
+          type: "score",
+          score: 0.6,
+          confidence: 0.9,
+          legend: { "0": "a", "1": "b", "2": "c" },
+          probabilities: { "0": 0.45, "1": 0.5, "2": 0.05 },
+          ...complexity,
+        },
+      },
+      usage: { input_tokens: 300, output_tokens: 40 },
+    };
+  }
+  function reply(value: unknown) {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(value)));
+  }
+  function topology() {
+    return {
+      handoff: { "plan.ready": ["builder-sol"], "review.rejected": ["critic"] },
+      handoffKeys: ["plan.ready", "review.rejected"],
+    };
+  }
+  function journalEvent() {
+    return JSON.parse(
+      readFileSync(loop.paths.journalFile, "utf-8").trim().split("\n")[0],
+    );
+  }
+  beforeEach(() => {
+    loop.jevRouting = laneConfig;
+    loop.topology = topology() as unknown as LoopContext["topology"];
+  });
+
+  it("asks only for selectable routes plus a complexity score", async () => {
+    reply(laneResponse());
+    await resolveJevRouting(loop);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(Object.keys(body.questions.route.criteria)).toEqual([
+      "bug-fix",
+      "feature",
+      "no_match",
+    ]);
+    expect(body.questions.complexity).toMatchObject({ type: "score" });
+    expect(body.questions.complexity.criteria).toHaveLength(3);
+  });
+
+  it("routes the chosen lane and patches handoff targets for the run", async () => {
+    reply(
+      laneResponse({
+        choice: "feature",
+        probabilities: { "bug-fix": 0.02, feature: 0.97, no_match: 0.01 },
+      }),
+    );
+    const prompt = await resolveJevRouting(loop);
+    expect(prompt).toContain("Jev workflow route: feature");
+    expect(loop.topology.handoff["plan.ready"]).toEqual(["builder-opus"]);
+    expect(loop.topology.handoff["review.rejected"]).toEqual(["critic"]);
+    expect(journalEvent().fields).toMatchObject({
+      route: "feature",
+      reason: "choice",
+    });
+  });
+
+  it("escalates on complexity and adds new handoff keys idempotently", async () => {
+    reply(
+      laneResponse(
+        {},
+        { score: 1.8, probabilities: { "0": 0, "1": 0.2, "2": 0.8 } },
+      ),
+    );
+    await resolveJevRouting(loop);
+    loop.topology = topology() as unknown as LoopContext["topology"];
+    vi.stubEnv("TYPESAFE_API_KEY", "");
+    const prompt = await resolveJevRouting(loop);
+    await resolveJevRouting(loop);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(prompt).toContain("Jev workflow route: hard");
+    expect(loop.topology.handoff["plan.ready"]).toEqual(["builder-astra"]);
+    expect(loop.topology.handoff["review.rejected"]).toEqual(["planner"]);
+    expect(loop.topology.handoffKeys).toEqual([
+      "plan.ready",
+      "review.rejected",
+    ]);
+    expect(journalEvent().fields).toMatchObject({
+      route: "hard",
+      reason: "complexity",
+    });
+  });
+
+  it.each([
+    { confidence: 0.4 },
+    {
+      choice: "no_match",
+      probabilities: { "bug-fix": 0.1, feature: 0.1, no_match: 0.8 },
+    },
+  ])("falls back instead of stopping on %j", async (patch) => {
+    reply(laneResponse(patch));
+    const prompt = await resolveJevRouting(loop);
+    expect(prompt).toContain("Jev workflow route: unrouted");
+    expect(loop.topology.handoff["plan.ready"]).toEqual(["builder-sol"]);
+    expect(journalEvent().fields).toMatchObject({
+      route: "unrouted",
+      reason: "fallback",
+    });
+  });
+
+  it("still fails closed without a fallback route", async () => {
+    loop.jevRouting = { ...laneConfig, fallbackRoute: undefined };
+    reply(
+      laneResponse({
+        confidence: 0.4,
+        probabilities: {
+          "bug-fix": 0.6,
+          feature: 0.2,
+          unrouted: 0.1,
+          no_match: 0.1,
+        },
+      }),
+    );
+    await expect(resolveJevRouting(loop)).rejects.toThrow(
+      "below min_confidence",
+    );
+  });
+
+  it("does not offer code-selected routes to Jev", async () => {
+    reply(
+      laneResponse({
+        choice: "hard",
+        probabilities: { "bug-fix": 0, feature: 0, hard: 1 },
+      }),
+    );
+    await expect(resolveJevRouting(loop)).rejects.toThrow("unknown route");
+  });
+
+  it.each([
+    { type: "choice" },
+    { score: 2.5 },
+    { score: "1" },
+    { confidence: 1.2 },
+    { probabilities: { "0": 0.5, "1": 0.5 } },
+    { probabilities: { "0": 0.5, "1": 0.5, "3": 0 } },
+    { probabilities: { "0": 0.5, "1": 0.6, "2": 0 } },
+    { probabilities: { "0": 0.5, "1": 0.5, "2": "0" } },
+  ])("fails closed on invalid complexity answers %j", async (patch) => {
+    reply(laneResponse({}, patch));
+    await expect(resolveJevRouting(loop)).rejects.toThrow("Jev routing:");
+  });
+
+  it("fails closed when the complexity answer is missing", async () => {
+    const value = laneResponse();
+    delete (value.answers as Record<string, unknown>).complexity;
+    reply(value);
+    await expect(resolveJevRouting(loop)).rejects.toThrow("Jev routing:");
+  });
+});
+
+describe("lane routing configuration", () => {
+  const catalog = [
+    {
+      id: "bug-fix",
+      description: "d",
+      instructions: "i",
+      handoff: { "plan.ready": ["builder-sol"] },
+    },
+    { id: "hard", description: "d", instructions: "i" },
+    { id: "unrouted", description: "d", instructions: "i" },
+  ];
+  function readLanes(
+    overrides: Record<string, unknown> = {},
+    routesFile: unknown = catalog,
+    roleIds: string[] | null = ["builder-sol", "planner"],
+  ) {
+    writeFileSync(join(dir, "routes.json"), JSON.stringify(routesFile));
+    return readJevRoutingConfig(
+      {
+        routing: {
+          jev: { enabled: true, routes_file: "routes.json", ...overrides },
+        },
+      },
+      dir,
+      roleIds ?? undefined,
+    );
+  }
+
+  it("reads handoff patches, fallback, and complexity escalation", () => {
+    expect(
+      readLanes({
+        fallback_route: "unrouted",
+        complexity_route: "hard",
+        complexity_threshold: 1.2,
+      }),
+    ).toMatchObject({
+      routes: [
+        { id: "bug-fix", handoff: { "plan.ready": ["builder-sol"] } },
+        { id: "hard" },
+        { id: "unrouted" },
+      ],
+      fallbackRoute: "unrouted",
+      complexity: { route: "hard", threshold: 1.2 },
+    });
+    expect(readLanes({ complexity_route: "hard" })?.complexity).toEqual({
+      route: "hard",
+      threshold: 1.5,
+    });
+    expect(readLanes()).not.toHaveProperty("fallbackRoute");
+    expect(readLanes()).not.toHaveProperty("complexity");
+  });
+
+  it("skips role validation when no role list is supplied", () => {
+    const routes = [{ ...catalog[0], handoff: { "plan.ready": ["anyone"] } }];
+    expect(readLanes({}, routes, null)?.routes[0].handoff).toEqual({
+      "plan.ready": ["anyone"],
+    });
+  });
+
+  it.each([
+    [{ fallback_route: "missing" }, catalog],
+    [{ complexity_route: "missing" }, catalog],
+    [{ complexity_route: "hard", complexity_threshold: 2.5 }, catalog],
+    [{ complexity_route: "hard", complexity_threshold: "x" }, catalog],
+    [{ fallback_route: "bug-fix" }, [catalog[0]]],
+    [{}, [{ ...catalog[0], handoff: { "plan.ready": ["ghost"] } }]],
+    [{}, [{ ...catalog[0], handoff: { "plan.ready": [] } }]],
+    [{}, [{ ...catalog[0], handoff: { "plan.ready": "builder-sol" } }]],
+    [{}, [{ ...catalog[0], handoff: [] }]],
+  ])("rejects invalid lane configuration %j %j", (overrides, routesFile) => {
+    expect(() => readLanes(overrides, routesFile)).toThrow("Jev routing:");
+  });
+});

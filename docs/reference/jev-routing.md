@@ -2,13 +2,15 @@
 
 Jev routing selects a named workflow, such as a playbook, from a preset-owned
 catalog. The harness adds that workflow's instructions to the backend prompt.
-It does not select agents or models, change topology, or replace completion gates.
+A route may also override topology handoff targets for the run, which is how a
+preset lets Jev choose which role (and so which model) handles an event. It
+does not replace completion gates.
 
 Routing is **off by default**. When enabled, it is **fail-closed**: missing
 credentials, invalid configuration, provider failures, timeouts, malformed answers,
 `no_match`, and confidence below the configured threshold stop the run before the
-backend starts. There is no fallback to another model or to agent-selected routing,
-no retry loop, and no shadow mode.
+backend starts, unless the preset names a `fallback_route` (see Lane selection).
+There is no fallback to another model, no retry loop, and no shadow mode.
 
 ## Configure a preset
 
@@ -62,6 +64,39 @@ Autoloop process or host.
 | `model` | `jev-1.13.0` | Nonempty TypeSafe model ID; pin a version for reproducible evaluation |
 | `min_confidence` | `0.8` | Finite number from 0 to 1; tune on your own labeled tasks |
 | `timeout_ms` | `2000` | Integer from 1 to 60000; covers request and response body |
+| `fallback_route` | none | Route ID selected on `no_match` or low confidence instead of stopping |
+| `complexity_route` | none | Route ID selected when the complexity score reaches the threshold; enables the complexity question |
+| `complexity_threshold` | `1.5` | Number from 0 to 2; used only with `complexity_route` |
+
+## Lane selection
+
+A route may carry a `handoff` object. When the route is selected, each entry
+replaces that event's targets in the run's `[handoff]` table:
+
+```json
+{
+  "id": "bugfix",
+  "description": "Existing behavior is wrong and must be fixed",
+  "instructions": "Planner: emit `plan.ready`. Builder: reproduce first.",
+  "handoff": { "plan.ready": ["builder-sol"] }
+}
+```
+
+Targets must be role IDs in the preset topology; an unknown role fails at load.
+The patch is reapplied from the cached decision on every iteration and resume.
+
+Routes named by `fallback_route` or `complexity_route` are selected by code and
+are not offered to Jev. With `complexity_route`, the same request asks a Score
+question over three fixed levels (local change, several connected changes,
+cross-cutting or unclear design), scored 0 to 2. Selection order:
+
+1. Complexity score at or above `complexity_threshold` selects `complexity_route`.
+2. A confident Choice selects that route.
+3. `no_match` or low confidence selects `fallback_route`, or stops the run if none is set.
+
+The `routing.jev.selected` record adds `route` and `reason` (`choice`,
+`complexity`, or `fallback`). The `autorigor` preset uses this to pick its
+builder lane.
 
 The threshold and deadline are initial configuration defaults, not measured
 accuracy or latency guarantees. Choice confidence summarizes the option
