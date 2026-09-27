@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { basename, join } from "node:path";
-import { jsonField } from "@mobrienv/autoloop-core";
+import { basename, dirname, join } from "node:path";
+import { isProcessAlive, jsonField } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import {
   appendEvent,
@@ -18,6 +18,7 @@ import {
 } from "./config-helpers.js";
 import { publishCapabilities } from "./control/dispatch.js";
 import { log } from "./display.js";
+import { assertHostCompatible, type HostWorker } from "./host.js";
 import { buildControlAdapter, driveLoop } from "./index.js";
 import {
   findDanglingProvisional,
@@ -71,6 +72,35 @@ export interface ResumeOptions {
    * journaled `stage.branch.finish` record from an interrupted prior attempt.
    */
   noResume?: boolean;
+  /** In-process worker that runs every resumed iteration (see RunOptions.host). */
+  host?: HostWorker;
+  /** Config layered under the resume budget, e.g. `{ review: { enabled: false } }` for a host. */
+  configOverride?: Record<string, unknown>;
+}
+
+/** Why `record` cannot be resumed, or null when it is safe to resume. */
+export function resumeProblem(record: RunRecord): string | null {
+  const id = record.run_id;
+  if (record.status === "completed") {
+    return `run ${id} already completed; cannot resume`;
+  }
+  if (record.status === "running" && record.pid && isProcessAlive(record.pid)) {
+    return `run ${id} is still running (PID ${record.pid})`;
+  }
+  if (!record.journal_file || !existsSync(record.journal_file)) {
+    return `journal not found for run ${id}`;
+  }
+  const stateDir = record.state_dir || dirname(record.journal_file);
+  if (!existsSync(stateDir)) {
+    return `state directory for run ${id} not found`;
+  }
+  if (
+    record.isolation_mode === "worktree" &&
+    (!record.worktree_path || !existsSync(record.worktree_path))
+  ) {
+    return `worktree for run ${id} was cleaned up; cannot resume`;
+  }
+  return null;
 }
 
 export interface ResumeResult extends RunSummary {
@@ -210,7 +240,7 @@ export function buildResumeContext(
   // in as a run config override so each reload sees the additive budget rather
   // than the static config value.
   const configOverride = config.put(
-    {},
+    config.deepMerge({}, options.configOverride ?? {}),
     "event_loop.max_iterations",
     String(newMaxIterations),
   );
@@ -291,6 +321,9 @@ export async function resume(
 
   let loop = built;
   loop.onEvent = options.onEvent;
+  loop.signal = options.signal;
+  loop.host = options.host;
+  if (loop.host) assertHostCompatible(loop);
   loop = initStore(loop);
   ensureLayout(loop.paths.stateDir);
   installRuntimeTools(loop);
@@ -393,6 +426,7 @@ export async function resume(
     logLevel: options.logLevel,
     signal: options.signal,
     onEvent: options.onEvent,
+    host: options.host,
   };
 
   const summary = await driveLoop(loop, runOptions, resumeIteration);

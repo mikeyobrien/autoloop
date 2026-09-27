@@ -7,6 +7,7 @@ import type { HookSpec } from "@mobrienv/autoloop-core/hooks-schema";
 import type * as topo from "@mobrienv/autoloop-core/topology";
 import type { LiveControlAdapter } from "./control/adapter.js";
 import type { LoopEventEmitter } from "./events.js";
+import type { HostWorker } from "./host.js";
 import type { JevRoutingConfig } from "./jev-routing.js";
 
 export type TriggerSource = "cli" | "chain" | "branch";
@@ -344,6 +345,8 @@ export interface LoopContext {
   controlAdapter?: LiveControlAdapter;
   /** Abort signal for the run; consulted while blocking on a human ask. */
   signal?: AbortSignal;
+  /** In-process worker that runs every iteration instead of a backend. */
+  host?: HostWorker;
 }
 
 export interface RunOptions {
@@ -386,6 +389,11 @@ export interface RunOptions {
    * terminal output; SDK consumers can drive custom UIs from this stream.
    */
   onEvent?: LoopEventEmitter;
+  /**
+   * Hand every iteration to this in-process worker instead of spawning the
+   * configured backend. See `@mobrienv/autoloop-harness/host`.
+   */
+  host?: HostWorker;
 }
 
 /**

@@ -83,6 +83,7 @@ export default defineConfig({
       "@mobrienv/autoloop-harness/abandon": `${HARNESS}/abandon.ts`,
       "@mobrienv/autoloop-harness/events": `${HARNESS}/events.ts`,
       "@mobrienv/autoloop-harness/emit": `${HARNESS}/emit.ts`,
+      "@mobrienv/autoloop-harness/host": `${HARNESS}/host.ts`,
       "@mobrienv/autoloop-harness/wait": `${HARNESS}/wait.ts`,
       "@mobrienv/autoloop-harness/ask": `${HARNESS}/ask.ts`,
       "@mobrienv/autoloop-harness/artifacts": `${HARNESS}/artifacts.ts`,

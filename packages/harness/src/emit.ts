@@ -28,7 +28,9 @@ import {
 import * as topology from "@mobrienv/autoloop-core/topology";
 import { printHookOutput } from "./display.js";
 import { parseMutationDirective } from "./hooks.js";
+import type { IterationContext } from "./prompt.js";
 import { writeSuspendState } from "./suspend-state.js";
+import type { LoopContext } from "./types.js";
 
 const COORDINATION_TOPICS = new Set([
   "issue.discovered",
@@ -131,11 +133,25 @@ interface EmitHookOutcome {
 }
 
 /**
- * Run pre_emit/post_emit hooks. `emit()` runs out-of-process (the agent
- * invokes the `autoloops emit` tool script, which spawns a fresh CLI process
- * calling `harness.emit()`) so there is no live `LoopContext` to drive
- * `runPhaseHooks` through — this is a disk/config-driven parallel
- * implementation reading `HookSpec`s straight from the project's raw TOML.
+ * Everything the emit pipeline reads. `emit()` builds it from env + disk
+ * because it runs out-of-process; `emitForIteration()` builds it from the live
+ * loop and iteration.
+ */
+interface EmitScope {
+  projectDir: string;
+  journalFile: string;
+  stateDir: string;
+  tasksFile: string;
+  hookSpecs: HookSpec[];
+  validation: EmitValidation;
+  /** In-process host turns cannot fan out or park, so those topics are rejected. */
+  hostMode: boolean;
+}
+
+/**
+ * Run pre_emit/post_emit hooks. Out-of-process `emit()` has no live
+ * `LoopContext` to drive `runPhaseHooks` through, so this reads `HookSpec`s
+ * from the scope instead.
  *
  * `on_error = "suspend"` is honored as `block` here (see design note: the
  * emit subprocess cannot itself block the harness's iteration loop) but ALSO
@@ -144,17 +160,14 @@ interface EmitHookOutcome {
  * silently continuing.
  */
 function runEmitPhaseHooks(
-  projectDir: string,
-  journalFile: string,
+  scope: EmitScope,
   phase: HookPhase,
-  runId: string,
-  iteration: string,
   topic: string,
   payload: string,
 ): EmitHookOutcome {
-  const specs: HookSpec[] = config
-    .loadHookSpecs(projectDir)
-    .filter((s) => s.phase === phase);
+  const { projectDir, journalFile } = scope;
+  const { runId, iteration } = scope.validation;
+  const specs = scope.hookSpecs.filter((s) => s.phase === phase);
   const outcome: EmitHookOutcome = { blocked: false };
 
   for (const spec of specs) {
@@ -186,7 +199,8 @@ function runEmitPhaseHooks(
       "hook.output",
       `"hook": ${JSON.stringify(phase)}, "exit_code": ${status}, "output": ${JSON.stringify(combined.trim())}`,
     );
-    printHookOutput(phase, status, combined.trim(), failed);
+    if (!scope.hostMode)
+      printHookOutput(phase, status, combined.trim(), failed);
 
     if (!failed && spec.mutate === "event") {
       const directive = parseMutationDirective(
@@ -212,10 +226,8 @@ function runEmitPhaseHooks(
     outcome.blocked = true;
     outcome.blockedMessage = msg;
     if (spec.onError === "suspend") {
-      const stateDir =
-        process.env.AUTOLOOP_STATE_DIR || config.stateDirPath(projectDir);
       writeSuspendState(
-        stateDir,
+        scope.stateDir,
         {
           runId,
           phase,
@@ -239,7 +251,63 @@ export function emit(
   topic: string,
   payload: string,
 ): EmitResult {
-  const result = emitCore(projectDir, topic, payload);
+  // A host run validates events in-process against the live iteration; a
+  // shell emit has no routing context and would bypass that check.
+  const host = process.env.AUTOLOOP_HOST;
+  if (host) {
+    return {
+      ok: false,
+      error: `this run is driven in-process by ${host}; publish events with its event tool`,
+    };
+  }
+  const journalFile = resolveEmitJournalFile(projectDir);
+  mkdirSync(dirname(journalFile), { recursive: true });
+  return emitInScope(envEmitScope(projectDir, journalFile), topic, payload);
+}
+
+/**
+ * In-process emit for one live iteration. Same pipeline as `emit()`, but the
+ * validation context comes from `loop` and `iter` (so single-file presets keep
+ * their gates and the routing check always has the iteration's allowed
+ * events) and nothing is read from or written to `process.env`.
+ */
+export function emitForIteration(
+  loop: LoopContext,
+  iter: IterationContext,
+  topic: string,
+  payload: string,
+): EmitResult {
+  return emitInScope(
+    {
+      projectDir: loop.paths.projectDir,
+      journalFile: loop.paths.journalFile,
+      stateDir: loop.paths.stateDir,
+      tasksFile: loop.paths.tasksFile,
+      hookSpecs: loop.hooks.specs ?? [],
+      hostMode: loop.host !== undefined,
+      validation: {
+        runId: loop.runtime.runId,
+        iteration: String(iter.iteration),
+        recentEvent: iter.recentEvent,
+        allowedRoles: iter.allowedRoles,
+        allowedEvents: iter.allowedEvents,
+        parallelEnabled: loop.parallel.enabled,
+        completionEvent: loop.completion.event,
+        topo: loop.topology,
+        askEvent: loop.ask.event,
+      },
+    },
+    topic,
+    payload,
+  );
+}
+
+function emitInScope(
+  scope: EmitScope,
+  topic: string,
+  payload: string,
+): EmitResult {
+  const result = emitCore(scope, topic, payload);
   if (!result.ok) return result;
 
   // post_emit hooks run after a successful accept. They cannot un-journal the
@@ -247,14 +315,9 @@ export function emit(
   // result (visible to the agent/CLI caller) and a `suspend` policy writes
   // durable suspend state for the harness to catch at the next iteration
   // boundary.
-  const journalFile = resolveEmitJournalFile(projectDir);
-  const validation = emitValidationContext(projectDir, journalFile);
   const postEmit = runEmitPhaseHooks(
-    projectDir,
-    journalFile,
+    scope,
     "post_emit",
-    validation.runId,
-    validation.iteration,
     result.topic ?? topic,
     payload,
   );
@@ -269,26 +332,15 @@ export function emit(
 }
 
 function emitCore(
-  projectDir: string,
+  scope: EmitScope,
   topic: string,
   payload: string,
 ): EmitResult {
-  const journalFile = resolveEmitJournalFile(projectDir);
-  mkdirSync(dirname(journalFile), { recursive: true });
-  const validation = emitValidationContext(projectDir, journalFile);
+  const { journalFile, validation } = scope;
 
   // pre_emit hooks: run before any gating so a configured mutation can steer
-  // routing/gate decisions too. Runs disk/config-driven (see
-  // `runEmitPhaseHooks`) since this call is out-of-process from the harness.
-  const preEmit = runEmitPhaseHooks(
-    projectDir,
-    journalFile,
-    "pre_emit",
-    validation.runId,
-    validation.iteration,
-    topic,
-    payload,
-  );
+  // routing/gate decisions too.
+  const preEmit = runEmitPhaseHooks(scope, "pre_emit", topic, payload);
   if (preEmit.mutatedTopic !== undefined) topic = preEmit.mutatedTopic;
   if (preEmit.mutatedPayload !== undefined) payload = preEmit.mutatedPayload;
   if (preEmit.blocked) {
@@ -297,6 +349,11 @@ function emitCore(
       topic,
       error: preEmit.blockedMessage ?? "pre_emit hook blocked this event",
     };
+  }
+
+  if (scope.hostMode) {
+    const reason = hostUnsupportedTopic(topic, validation.askEvent);
+    if (reason) return rejectEmit(journalFile, topic, validation, reason);
   }
 
   // Evidence gate (opt-in): applies to ANY configured event, BEFORE routing /
@@ -364,17 +421,8 @@ function emitCore(
 
   // Task completion gate: block completion if open blocking tasks remain.
   // Soft tasks (soft === true) are advisory and never block completion.
-  //
-  // Resolve via tasks.resolveFile (NOT config.resolveTasksFile) so the gate
-  // honors the AUTOLOOP_TASKS_FILE env override — the same resolver the task
-  // CLI and the agent's `task add`/`task complete` use (tools.ts exports
-  // AUTOLOOP_TASKS_FILE into the agent env). This keeps the gate reading the
-  // exact store the tasks are written to, including when an external parent
-  // (e.g. ralph) points autoloop at a canonical store. Using the config path
-  // here would silently read a different file and miss open tasks.
   if (topic === validation.completionEvent) {
-    const tasksFile = resolveFile(projectDir);
-    const blockingTasks = materializeOpenFrom(tasksFile).filter(
+    const blockingTasks = materializeOpenFrom(scope.tasksFile).filter(
       (t) => t.soft !== true,
     );
     if (blockingTasks.length > 0) {
@@ -611,6 +659,40 @@ interface EmitValidation {
   askEvent: string;
 }
 
+function hostUnsupportedTopic(topic: string, askEvent: string): string {
+  if (parallelTopic(topic))
+    return `\`${topic}\` is not supported in host mode: parallel fan-out would launch another worker`;
+  if (topic === "wait.request")
+    return "`wait.request` is not supported in host mode: the run cannot park without a live session";
+  if (askEvent !== "" && topic === askEvent)
+    return `\`${topic}\` is not supported in host mode: ask the operator in the conversation instead`;
+  return "";
+}
+
+/**
+ * Scope for out-of-process `emit()`: run identity and routing come from the
+ * env the `autoloops` shim exports; config, topology, and hooks are re-read
+ * from `projectDir`.
+ */
+function envEmitScope(projectDir: string, journalFile: string): EmitScope {
+  return {
+    projectDir,
+    journalFile,
+    stateDir: process.env.AUTOLOOP_STATE_DIR || config.stateDirPath(projectDir),
+    // Resolve via tasks.resolveFile (NOT config.resolveTasksFile) so the gate
+    // honors the AUTOLOOP_TASKS_FILE env override — the same resolver the task
+    // CLI and the agent's `task add`/`task complete` use (tools.ts exports
+    // AUTOLOOP_TASKS_FILE into the agent env). This keeps the gate reading the
+    // exact store the tasks are written to, including when an external parent
+    // (e.g. ralph) points autoloop at a canonical store. Using the config path
+    // here would silently read a different file and miss open tasks.
+    tasksFile: resolveFile(projectDir),
+    hookSpecs: config.loadHookSpecs(projectDir),
+    hostMode: false,
+    validation: emitValidationContext(projectDir, journalFile),
+  };
+}
+
 function emitValidationContext(
   projectDir: string,
   journalFile: string,
@@ -679,8 +761,8 @@ function rejectEmit(
   journalFile: string,
   topic: string,
   validation: EmitValidation,
+  message = invalidEmitMessage(topic, validation),
 ): EmitResult {
-  const message = invalidEmitMessage(topic, validation);
   appendInvalidEvent(
     journalFile,
     validation.runId,

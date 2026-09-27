@@ -23,6 +23,10 @@
       "types": "./dist/emit.d.ts",
       "default": "./dist/emit.js"
     },
+    "./host": {
+      "types": "./dist/host.d.ts",
+      "default": "./dist/host.js"
+    },
     "./wait": {
       "types": "./dist/wait.d.ts",
       "default": "./dist/wait.js"

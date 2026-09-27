@@ -143,6 +143,7 @@ export function ensureLayout(stateDir: string): void {
 export function installRuntimeTools(loop: LoopContext): void {
   writeFileSync(loop.paths.toolPath, emitToolScript(loop));
   chmodSync(loop.paths.toolPath, 0o755);
+  if (loop.host) return;
   writeFileSync(loop.paths.piAdapterPath, piAdapterScript(loop));
   chmodSync(loop.paths.piAdapterPath, 0o755);
 }
@@ -765,6 +766,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
     commandSession: loop.commandSession ?? { current: undefined },
     onEvent: loop.onEvent,
     signal: loop.signal,
+    host: loop.host,
   };
   return applyRuntimeModeOverrides(updated);
 }

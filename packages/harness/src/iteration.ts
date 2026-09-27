@@ -56,6 +56,7 @@ import {
 } from "./file-mod-audit.js";
 import { loopStartMs } from "./guards.js";
 import { buildHookEnv, captureGitSha, runPhaseHooks } from "./hooks.js";
+import { runHostIteration } from "./host.js";
 import { resolveJevRouting } from "./jev-routing.js";
 import {
   appendBackendFinish,
@@ -274,7 +275,10 @@ export async function runIteration(
   // (undefined) until an adapter sets it.
   delete loop.acpSession.operatorInterrupted;
 
-  const { output, exitCode, timedOut } = await runBackendIteration(loop, iter);
+  const { output, exitCode, timedOut, interrupted } = await runBackendIteration(
+    loop,
+    iter,
+  );
   const elapsedS = Math.floor(Date.now() / 1000) - startEpoch;
 
   appendBackendFinish(loop, iter, output, exitCode, timedOut);
@@ -322,11 +326,13 @@ export async function runIteration(
   // run as `interrupted`. Consumed here — after the backend.finish /
   // iteration.finish journals, post_iteration hooks, registry progress,
   // file-mod audit, and footer/backend.output events (so none of those are
-  // skipped) — but before the timeout/nonzero/outcome checks below. Gated on
-  // the ACP backend; other backends never set the flag.
+  // skipped) — but before the timeout/nonzero/outcome checks below. The ACP
+  // backend reports it through the session flag; a host worker reports it
+  // directly.
   if (
-    iter.backend.kind === "acp" &&
-    loop.acpSession.operatorInterrupted === true
+    interrupted ||
+    (iter.backend.kind === "acp" &&
+      loop.acpSession.operatorInterrupted === true)
   ) {
     delete loop.acpSession.operatorInterrupted;
     return stopOperatorInterrupted(loop, iteration, output);
@@ -409,7 +415,13 @@ async function handleBackendFailure(
 async function runBackendIteration(
   loop: LoopContext,
   iter: IterationContext,
-): Promise<{ output: string; exitCode: number; timedOut: boolean }> {
+): Promise<{
+  output: string;
+  exitCode: number;
+  timedOut: boolean;
+  interrupted?: boolean;
+}> {
+  if (iter.backend.kind === "host") return runHostIteration(loop, iter);
   if (iter.backend.kind === "acp" && loop.acpSession.current) {
     return runAcpIteration(
       loop.acpSession.current,
