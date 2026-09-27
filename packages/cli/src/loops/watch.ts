@@ -1,7 +1,17 @@
+import {
+  readRunLines,
+  resolveRunJournalPath,
+} from "@mobrienv/autoloop-core/journal";
 import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import { policyForPreset } from "@mobrienv/autoloop-core/runs-health";
-import { renderListHeader, renderRunDetail, renderRunLine } from "./render.js";
+import { resolveColumns } from "@mobrienv/autoloop-core/terminal-width";
+import {
+  collectMetricsRows,
+  type MetricsRow,
+} from "@mobrienv/autoloop-harness/metrics";
+import { renderRunDetail } from "./render.js";
+import { renderLiveLine, renderStepLine } from "./timeline.js";
 
 const DEFAULT_INTERVAL_MS = 2000;
 
@@ -63,11 +73,13 @@ function healthState(r: RunRecord, nowMs: number): HealthState {
 }
 
 /**
- * Watch a run by polling the registry. Prints compact progress lines when
- * state changes, then a full detail view when the run reaches a terminal
- * status.
+ * Watch a run as a per-step timeline. Each tick re-reads the run's journal,
+ * prints every newly finished step once, and shows the running step as a
+ * live line (rewritten in place on a TTY, printed on change otherwise).
+ * The registry is still polled for status, health, and terminal detail.
  *
- * For already-terminal runs, prints the detail view and returns immediately.
+ * For already-terminal runs, prints the full timeline and the detail view
+ * and returns immediately.
  */
 export async function watchRun(
   stateDir: string,
@@ -80,7 +92,57 @@ export async function watchRun(
     return;
   }
 
+  const journalFile =
+    initial.journal_file ||
+    resolveRunJournalPath(stateDir, initial.run_id) ||
+    "";
+  const tty = process.stdout.isTTY === true;
+  const width = (): number => resolveColumns(process.stdout, process.env, 100);
+  const printed = new Set<string>();
+  let liveShown = false;
+  let lastLiveKey = "";
+
+  const clearLive = (): void => {
+    if (!liveShown) return;
+    process.stdout.write("\r\x1b[2K");
+    liveShown = false;
+  };
+  const say = (line: string): void => {
+    clearLive();
+    console.log(line);
+  };
+  const printFinishedSteps = (): MetricsRow | undefined => {
+    const rows = journalFile
+      ? collectMetricsRows(readRunLines(journalFile, initial.run_id))
+      : [];
+    for (const [i, row] of rows.entries()) {
+      const key = `${i}:${row.iteration}`;
+      if (!row.finished || printed.has(key)) continue;
+      printed.add(key);
+      say(renderStepLine(row, width()));
+    }
+    const last = rows[rows.length - 1];
+    return last && !last.finished ? last : undefined;
+  };
+  const showLive = (row: MetricsRow | undefined): void => {
+    if (!row) {
+      clearLive();
+      return;
+    }
+    const key = `${row.iteration}|${row.role}|${row.model}|${row.backendKind}`;
+    if (tty) {
+      process.stdout.write(
+        `\r\x1b[2K${renderLiveLine(row, Date.now(), width())}`,
+      );
+      liveShown = true;
+    } else if (key !== lastLiveKey) {
+      console.log(renderLiveLine(row, Date.now(), width()));
+    }
+    lastLiveKey = key;
+  };
+
   if (isTerminal(initial)) {
+    printFinishedSteps();
     console.log(`[watch] Run already ${initial.status}.`);
     console.log(renderRunDetail(initial));
     return;
@@ -89,21 +151,25 @@ export async function watchRun(
   console.log(
     "[watch] Watching " +
       initial.run_id +
-      " (poll every " +
+      " (" +
+      initial.preset +
+      ", poll every " +
       intervalMs / 1000 +
       "s)",
   );
-  console.log(renderListHeader());
-  console.log(renderRunLine(initial));
+  showLive(printFinishedSteps());
 
-  let prev = snapshot(initial);
   let prevHealth = healthState(initial, Date.now());
 
   return new Promise<void>((resolve) => {
-    const onSigint = (): void => {
-      console.log("\n[watch] Interrupted.");
+    const finish = (): void => {
       clearInterval(timer);
+      process.off("SIGINT", onSigint);
       resolve();
+    };
+    const onSigint = (): void => {
+      say("\n[watch] Interrupted.");
+      finish();
     };
     process.on("SIGINT", onSigint);
 
@@ -111,36 +177,30 @@ export async function watchRun(
       const current = resolveRun(stateDir, initial.run_id);
       if (typeof current === "string") {
         // Run disappeared from registry — unusual but handle gracefully
-        console.log(`[watch] ${current}`);
-        clearInterval(timer);
-        process.off("SIGINT", onSigint);
-        resolve();
+        say(`[watch] ${current}`);
+        finish();
         return;
       }
 
-      const snap = snapshot(current);
-      if (snap !== prev) {
-        prev = snap;
-        console.log(renderRunLine(current));
-      }
+      const running = printFinishedSteps();
 
       // Print advisory on health state transition
       const nowMs = Date.now();
       const currentHealth = healthState(current, nowMs);
       if (currentHealth !== prevHealth && currentHealth !== "active") {
         const advisory = healthAdvisory(current, nowMs);
-        if (advisory) console.log(advisory);
+        if (advisory) say(advisory);
       }
       prevHealth = currentHealth;
 
       if (isTerminal(current)) {
-        console.log("");
-        console.log(`[watch] Run ${current.status}.`);
-        console.log(renderRunDetail(current));
-        clearInterval(timer);
-        process.off("SIGINT", onSigint);
-        resolve();
+        say("");
+        say(`[watch] Run ${current.status}.`);
+        say(renderRunDetail(current));
+        finish();
+        return;
       }
+      showLive(running);
     }, intervalMs);
   });
 }
@@ -159,8 +219,4 @@ function resolveRun(stateDir: string, partial: string): RunRecord | string {
 
 function isTerminal(r: RunRecord): boolean {
   return TERMINAL_STATUSES.has(r.status);
-}
-
-function snapshot(r: RunRecord): string {
-  return `${r.iteration}|${r.latest_event}|${r.status}|${r.updated_at}`;
 }
