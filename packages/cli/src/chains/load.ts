@@ -83,6 +83,7 @@ export function listKnownPresets(): string[] {
     "automerge",
     "autopr",
     "autowiki",
+    "autorigor",
   ];
   const userDir = config.userPresetsDir();
   if (!existsSync(userDir)) return builtIn;
