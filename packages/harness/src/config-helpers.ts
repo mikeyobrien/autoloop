@@ -459,7 +459,9 @@ export function buildLoopContext(
       ? join(effectiveStateDir, "memory.jsonl")
       : join(stateDir, "runs", runId, "memory.jsonl");
 
-  // Only paths, runtime, launch, profiles, and store survive — reloadLoop fills the rest from config.
+  // SAFETY: seed is a partial LoopContext. Only paths, runtime, launch,
+  // profiles, and store are set here; reloadLoop fills every other field from
+  // config before the context reaches any caller.
   const seed = {
     paths: {
       projectDir: resolvedProjectDir,

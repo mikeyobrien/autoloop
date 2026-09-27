@@ -57,6 +57,14 @@ vi.mock("../../src/registry-bridge.js", () => ({
 import { run } from "@mobrienv/autoloop-harness";
 import type { LoopEvent } from "@mobrienv/autoloop-harness/events";
 
+function runInProject(
+  dir: string,
+  prompt: string,
+  options: Parameters<typeof run>[3] = {},
+) {
+  return run(dir, prompt, "autoloop", { workDir: dir, ...options });
+}
+
 function makeProject(maxIterations?: number): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-events-test-"));
   writeFileSync(
@@ -75,7 +83,7 @@ describe("harness.run onEvent (1.3)", () => {
 
   it("emits iteration.start and loop.finish events", async () => {
     const events: LoopEvent[] = [];
-    await run(makeProject(), "prompt", "autoloop", {
+    await runInProject(makeProject(), "prompt", {
       onEvent: (e) => events.push(e),
     });
     const types = events.map((e) => e.type);
@@ -87,7 +95,7 @@ describe("harness.run onEvent (1.3)", () => {
 
   it("emits a loop.start event with the resolved run parameters", async () => {
     const events: LoopEvent[] = [];
-    await run(makeProject(), "build the thing", "autoloop", {
+    await runInProject(makeProject(), "build the thing", {
       onEvent: (e) => events.push(e),
     });
     const start = events.find((e) => e.type === "loop.start");
@@ -117,7 +125,7 @@ describe("harness.run onEvent (1.3)", () => {
     );
 
     const events: LoopEvent[] = [];
-    await run(makeProject(1), "prompt", "autoloop", {
+    await runInProject(makeProject(1), "prompt", {
       onEvent: (e) => events.push(e),
     });
 
@@ -136,7 +144,7 @@ describe("harness.run onEvent (1.3)", () => {
 
   it("emits log events with the message and level", async () => {
     const events: LoopEvent[] = [];
-    await run(makeProject(), "prompt", "autoloop", {
+    await runInProject(makeProject(), "prompt", {
       onEvent: (e) => events.push(e),
     });
     const logs = events.filter((e) => e.type === "log");
@@ -148,7 +156,7 @@ describe("harness.run onEvent (1.3)", () => {
   });
 
   it("does not require onEvent — runs complete without listener", async () => {
-    const summary = await run(makeProject(), "prompt", "autoloop", {});
+    const summary = await runInProject(makeProject(), "prompt", {});
     expect(summary.stopReason).toBe("completed");
   });
 });

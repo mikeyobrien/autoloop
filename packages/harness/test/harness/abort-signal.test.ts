@@ -60,6 +60,14 @@ vi.mock("../../src/registry-bridge.js", () => ({
 
 import { run } from "@mobrienv/autoloop-harness";
 
+function runInProject(
+  dir: string,
+  prompt: string,
+  options: Parameters<typeof run>[3] = {},
+) {
+  return run(dir, prompt, "autoloop", { workDir: dir, ...options });
+}
+
 function makeProject(): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-abort-test-"));
   writeFileSync(join(dir, "autoloops.toml"), '[backend]\ncommand = "echo"\n');
@@ -76,7 +84,7 @@ describe("harness.run abort signal (1.2)", () => {
   it("returns stopReason=interrupted with a pre-aborted signal", async () => {
     const controller = new AbortController();
     controller.abort();
-    const summary = await run(makeProject(), "prompt", "autoloop", {
+    const summary = await runInProject(makeProject(), "prompt", {
       signal: controller.signal,
     });
     expect(summary.stopReason).toBe("interrupted");
@@ -87,7 +95,7 @@ describe("harness.run abort signal (1.2)", () => {
   it("tears down via registryStop when the signal is pre-aborted", async () => {
     const controller = new AbortController();
     controller.abort();
-    await run(makeProject(), "prompt", "autoloop", {
+    await runInProject(makeProject(), "prompt", {
       signal: controller.signal,
     });
     expect(registryStop).toHaveBeenCalledWith(
@@ -98,7 +106,7 @@ describe("harness.run abort signal (1.2)", () => {
   });
 
   it("runs to completion when no signal is provided", async () => {
-    const summary = await run(makeProject(), "prompt", "autoloop", {});
+    const summary = await runInProject(makeProject(), "prompt", {});
     expect(summary.stopReason).toBe("completed");
     expect(runIteration).toHaveBeenCalled();
   });
@@ -117,7 +125,7 @@ describe("harness.run abort signal (1.2)", () => {
       iterations: 1,
       exitCode: 0,
     }));
-    const summary = await run(makeProject(), "prompt", "autoloop", {
+    const summary = await runInProject(makeProject(), "prompt", {
       signal: controller.signal,
     });
     expect(summary.stopReason).toBe("interrupted");
