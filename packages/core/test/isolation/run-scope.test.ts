@@ -15,7 +15,7 @@ function makeTempStateDir(): string {
 describe("runScopedPath", () => {
   it("returns path under runs/<runId>", () => {
     const result = runScopedPath("/tmp/.autoloop", "run-abc");
-    expect(result).toBe("/tmp/.autoloop/runs/run-abc");
+    expect(result).toBe(join("/tmp/.autoloop", "runs", "run-abc"));
   });
 });
 

@@ -1,9 +1,9 @@
-import { execSync } from "node:child_process";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { isProcessAlive, shellQuote } from "@mobrienv/autoloop-core";
+import { isProcessAlive } from "@mobrienv/autoloop-core";
 import { getRun } from "../registry/read.js";
 import { resolveGitRoot } from "./create.js";
+import { runGit } from "./git.js";
 import type { WorktreeStatus } from "./meta.js";
 import { isOrphanWorktree, readMeta, updateStatus } from "./meta.js";
 
@@ -81,14 +81,13 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
     // Remove the git worktree
     if (existsSync(meta.worktree_path)) {
       try {
-        const forceFlag = force ? " --force" : "";
-        execSync(
-          `git worktree remove ${shellQuote(meta.worktree_path)}${forceFlag}`,
-          {
-            cwd: gitRoot,
-            stdio: "pipe",
-          },
-        );
+        const forceArgs = force ? ["--force"] : [];
+        runGit(gitRoot, [
+          "worktree",
+          "remove",
+          meta.worktree_path,
+          ...forceArgs,
+        ]);
       } catch {
         // Worktree may already be gone; try direct removal
         try {
@@ -102,10 +101,7 @@ export function cleanWorktrees(opts: CleanOpts): CleanResult {
     // Remove the branch
     try {
       const deleteFlag = force ? "-D" : "-d";
-      execSync(`git branch ${deleteFlag} ${shellQuote(meta.branch)}`, {
-        cwd: gitRoot,
-        stdio: "pipe",
-      });
+      runGit(gitRoot, ["branch", deleteFlag, meta.branch]);
     } catch {
       /* branch may already be gone */
     }

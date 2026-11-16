@@ -1,7 +1,6 @@
-import { execSync } from "node:child_process";
 import { realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { shellQuote } from "@mobrienv/autoloop-core";
+import { runGit } from "./git.js";
 import type { WorktreeMeta } from "./meta.js";
 import { metaDirForRun, writeMeta } from "./meta.js";
 
@@ -43,13 +42,7 @@ export function createWorktree(opts: CreateWorktreeOpts): CreateWorktreeResult {
   }
 
   try {
-    execSync(
-      `git worktree add ${shellQuote(worktreePath)} -b ${shellQuote(branch)}`,
-      {
-        cwd: gitRoot,
-        stdio: "pipe",
-      },
-    );
+    runGit(gitRoot, ["worktree", "add", worktreePath, "-b", branch]);
   } catch (err: unknown) {
     // Clean up partial state on failure
     try {
@@ -79,11 +72,7 @@ export function createWorktree(opts: CreateWorktreeOpts): CreateWorktreeResult {
 
 export function resolveGitRoot(cwd: string): string {
   try {
-    const result = execSync("git rev-parse --show-toplevel", {
-      cwd,
-      encoding: "utf-8",
-      stdio: "pipe",
-    }).trim();
+    const result = runGit(cwd, ["rev-parse", "--show-toplevel"]).trim();
     return realpathSync(result);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -104,11 +93,7 @@ export function tryResolveGitRoot(cwd: string): string | undefined {
 
 function detectBaseBranch(projectDir: string): string {
   try {
-    return execSync("git rev-parse --abbrev-ref HEAD", {
-      cwd: projectDir,
-      encoding: "utf-8",
-      stdio: "pipe",
-    }).trim();
+    return runGit(projectDir, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
   } catch {
     return "main";
   }
@@ -116,10 +101,7 @@ function detectBaseBranch(projectDir: string): string {
 
 function branchExists(projectDir: string, branch: string): boolean {
   try {
-    execSync(`git rev-parse --verify refs/heads/${shellQuote(branch)}`, {
-      cwd: projectDir,
-      stdio: "pipe",
-    });
+    runGit(projectDir, ["rev-parse", "--verify", `refs/heads/${branch}`]);
     return true;
   } catch {
     return false;

@@ -1,6 +1,5 @@
-import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { shellQuote } from "@mobrienv/autoloop-core";
+import { runGit } from "./git.js";
 import { readMeta } from "./meta.js";
 
 export interface DiffWorktreeOpts {
@@ -53,14 +52,10 @@ export function diffWorktree(opts: DiffWorktreeOpts): DiffWorktreeResult {
 
   const base = meta.base_branch;
   const branch = meta.branch;
-  const range = shellQuote(`${base}...${branch}`);
+  const range = `${base}...${branch}`;
 
-  const numstatOut = gitDiff(cwd, `git diff --numstat ${range}`, meta.run_id);
-  const nameStatusOut = gitDiff(
-    cwd,
-    `git diff --name-status ${range}`,
-    meta.run_id,
-  );
+  const numstatOut = gitDiff(cwd, ["--numstat", range], meta.run_id);
+  const nameStatusOut = gitDiff(cwd, ["--name-status", range], meta.run_id);
 
   let insertions = 0;
   let deletions = 0;
@@ -88,15 +83,15 @@ export function diffWorktree(opts: DiffWorktreeOpts): DiffWorktreeResult {
   };
 
   if (patch) {
-    result.patch = gitDiff(cwd, `git diff ${range}`, meta.run_id);
+    result.patch = gitDiff(cwd, [range], meta.run_id);
   }
 
   return result;
 }
 
-function gitDiff(cwd: string, cmd: string, runId: string): string {
+function gitDiff(cwd: string, diffArgs: string[], runId: string): string {
   try {
-    return execSync(cmd, { cwd, encoding: "utf-8", stdio: "pipe" });
+    return runGit(cwd, ["diff", ...diffArgs]);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`failed to diff worktree for run ${runId}: ${msg}`);

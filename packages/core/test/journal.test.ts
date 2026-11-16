@@ -1,5 +1,5 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readAllJournals, readRunJournal } from "../src/journal.js";
 
@@ -77,7 +77,7 @@ describe("readRunJournal", () => {
 
   it("reads journal from worktree path", () => {
     // stateDir basename is used to find the journal inside the worktree
-    const stateDirName = tmpDir.split("/").pop()!;
+    const stateDirName = basename(tmpDir);
     const wtDir = join(tmpDir, "worktrees", "wt-run-1", "tree", stateDirName);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
@@ -102,7 +102,7 @@ describe("readRunJournal", () => {
       `${journalLine("dual-run", "loop.start", "2026-01-01T00:00:00Z")}\n`,
     );
 
-    const stateDirName = tmpDir.split("/").pop()!;
+    const stateDirName = basename(tmpDir);
     const wtDir = join(tmpDir, "worktrees", "dual-run", "tree", stateDirName);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
@@ -133,7 +133,7 @@ describe("readAllJournals with worktree journals", () => {
     );
 
     // Worktree journal
-    const stateDirName = tmpDir.split("/").pop()!;
+    const stateDirName = basename(tmpDir);
     const wtDir = join(tmpDir, "worktrees", "wt-1", "tree", stateDirName);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(

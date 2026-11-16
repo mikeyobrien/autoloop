@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdtempSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -48,6 +48,32 @@ describe("createWorktree", () => {
     expect(meta?.status).toBe("running");
     expect(meta?.merge_strategy).toBe("squash");
     expect(meta?.base_branch).toBeTruthy();
+  });
+
+  it("creates a worktree when the project path contains a space", () => {
+    const parent = mkdtempSync(join(tmpdir(), "autoloop-ts-wt-space-"));
+    const repo = join(parent, "my project");
+    mkdirSync(repo);
+    execSync("git init && git commit --allow-empty -m init", {
+      cwd: repo,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: "test",
+        GIT_AUTHOR_EMAIL: "t@t",
+        GIT_COMMITTER_NAME: "test",
+        GIT_COMMITTER_EMAIL: "t@t",
+      },
+    });
+
+    const result = createWorktree({
+      mainStateDir: join(repo, ".autoloop"),
+      runId: "run-space",
+      workDir: repo,
+    });
+
+    expect(result.worktreePath).toContain("my project");
+    expect(existsSync(join(result.worktreePath, ".git"))).toBe(true);
   });
 
   it("uses custom branch prefix", () => {
@@ -105,7 +131,7 @@ describe("resolveGitRoot", () => {
   it("resolves git root from within a repo", () => {
     const repo = makeGitRepo();
     const subDir = join(repo, "subdir");
-    execSync("mkdir -p subdir", { cwd: repo, stdio: "pipe" });
+    mkdirSync(subDir, { recursive: true });
 
     const resolved = resolveGitRoot(subDir);
     expect(resolved).toBe(realpathSync(repo));
@@ -113,9 +139,11 @@ describe("resolveGitRoot", () => {
 
   it("returns the same canonical path regardless of subdirectory depth", () => {
     const repo = makeGitRepo();
-    execSync("mkdir -p a/b/c", { cwd: repo, stdio: "pipe" });
+    mkdirSync(join(repo, "a", "b", "c"), { recursive: true });
 
-    expect(resolveGitRoot(repo)).toBe(resolveGitRoot(join(repo, "a/b/c")));
+    expect(resolveGitRoot(repo)).toBe(
+      resolveGitRoot(join(repo, "a", "b", "c")),
+    );
   });
 
   it("throws when called outside a git repo", () => {

@@ -1,6 +1,5 @@
-import { execSync } from "node:child_process";
-import { shellQuote } from "@mobrienv/autoloop-core";
 import { resolveGitRoot } from "./create.js";
+import { runGit } from "./git.js";
 import type { WorktreeMeta } from "./meta.js";
 import { readMeta, updateStatus } from "./meta.js";
 
@@ -33,22 +32,22 @@ export function mergeWorktree(opts: MergeOpts): MergeResult {
   const gitEnv = resolveGitEnv(gitRoot);
 
   // Checkout base branch
-  exec(gitRoot, `git checkout ${shellQuote(baseBranch)}`, gitEnv);
+  runGit(gitRoot, ["checkout", baseBranch], gitEnv);
 
   try {
     if (strategy === "squash") {
-      exec(gitRoot, `git merge --squash ${shellQuote(branch)}`, gitEnv);
-      exec(
+      runGit(gitRoot, ["merge", "--squash", branch], gitEnv);
+      runGit(
         gitRoot,
-        `git commit --no-edit -m ${shellQuote(`merge worktree ${meta.run_id} (squash)`)}`,
+        ["commit", "--no-edit", "-m", `merge worktree ${meta.run_id} (squash)`],
         gitEnv,
       );
     } else if (strategy === "rebase") {
-      exec(gitRoot, `git rebase ${shellQuote(branch)}`, gitEnv);
+      runGit(gitRoot, ["rebase", branch], gitEnv);
     } else {
-      exec(
+      runGit(
         gitRoot,
-        `git merge --no-ff ${shellQuote(branch)} -m ${shellQuote(`merge worktree ${meta.run_id}`)}`,
+        ["merge", "--no-ff", branch, "-m", `merge worktree ${meta.run_id}`],
         gitEnv,
       );
     }
@@ -58,9 +57,9 @@ export function mergeWorktree(opts: MergeOpts): MergeResult {
     const conflicts = detectConflicts(gitRoot);
     try {
       if (strategy === "rebase") {
-        exec(gitRoot, "git rebase --abort", gitEnv);
+        runGit(gitRoot, ["rebase", "--abort"], gitEnv);
       } else {
-        exec(gitRoot, "git merge --abort", gitEnv);
+        runGit(gitRoot, ["merge", "--abort"], gitEnv);
       }
     } catch {
       /* abort best-effort */
@@ -94,11 +93,7 @@ function validateMergeStatus(meta: WorktreeMeta): void {
 
 function detectConflicts(cwd: string): string[] {
   try {
-    const out = execSync("git diff --name-only --diff-filter=U", {
-      cwd,
-      encoding: "utf-8",
-      stdio: "pipe",
-    }).trim();
+    const out = runGit(cwd, ["diff", "--name-only", "--diff-filter=U"]).trim();
     return out ? out.split("\n") : [];
   } catch {
     return [];
@@ -143,11 +138,7 @@ function resolveGitEnv(cwd: string): NodeJS.ProcessEnv | undefined {
 
 function readGitConfig(cwd: string, key: string): string | undefined {
   try {
-    const value = execSync(`git config --get ${shellQuote(key)}`, {
-      cwd,
-      encoding: "utf-8",
-      stdio: "pipe",
-    }).trim();
+    const value = runGit(cwd, ["config", "--get", key]).trim();
     return value === "" ? undefined : value;
   } catch {
     return undefined;
@@ -165,8 +156,4 @@ function textOr(
   if (value === undefined) return fallback;
   const trimmed = value.trim();
   return trimmed === "" ? fallback : trimmed;
-}
-
-function exec(cwd: string, cmd: string, env?: NodeJS.ProcessEnv): string {
-  return execSync(cmd, { cwd, encoding: "utf-8", env, stdio: "pipe" });
 }

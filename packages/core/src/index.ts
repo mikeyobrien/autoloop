@@ -17,6 +17,7 @@ export * from "./events/types.js";
 export * from "./helpers.js";
 export * from "./json.js";
 export * from "./markdown.js";
+export * from "./platform.js";
 export * from "./runs-health.js";
 export * from "./usage.js";
 export * from "./utils.js";

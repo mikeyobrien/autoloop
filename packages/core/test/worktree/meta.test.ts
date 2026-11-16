@@ -32,7 +32,7 @@ function sampleMeta(overrides: Partial<WorktreeMeta> = {}): WorktreeMeta {
 describe("metaDirForRun", () => {
   it("returns path under worktrees/<runId>", () => {
     expect(metaDirForRun("/tmp/.autoloop", "run-abc")).toBe(
-      "/tmp/.autoloop/worktrees/run-abc",
+      join("/tmp/.autoloop", "worktrees", "run-abc"),
     );
   });
 });

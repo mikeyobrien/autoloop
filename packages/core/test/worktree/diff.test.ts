@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,11 +31,9 @@ function addFileAndCommit(
   message: string,
 ): void {
   writeFileSync(join(dir, name), content);
-  execSync(`git add ${name} && git commit -m '${message}'`, {
-    cwd: dir,
-    stdio: "pipe",
-    env: GIT_ENV,
-  });
+  const opts = { cwd: dir, stdio: "pipe", env: GIT_ENV } as const;
+  execFileSync("git", ["add", name], opts);
+  execFileSync("git", ["commit", "-m", message], opts);
 }
 
 describe("diffWorktree", () => {
