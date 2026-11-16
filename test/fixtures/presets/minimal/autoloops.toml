@@ -8,7 +8,9 @@ event_loop.completion_promise = "LOOP_COMPLETE"
 backend.kind = "command"
 # Override at test time via -b flag or env var.
 backend.command = "echo"
-backend.timeout_ms = 10000
+# One mock turn starts node twice (backend + `autoloop emit`); on a loaded
+# Windows test run that can take more than 10s.
+backend.timeout_ms = 30000
 
 review.enabled = false
 

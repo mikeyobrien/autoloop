@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  cpSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -17,6 +11,7 @@ import {
   readText,
   runCli,
 } from "../helpers/runtime.js";
+import { nodeScriptInvocation, writeExecutable } from "../helpers/scripts.js";
 
 beforeAll(() => {
   ensureBuild();
@@ -45,7 +40,8 @@ function runBinCli(
   for (const key of Object.keys(env)) {
     if (key.startsWith("AUTOLOOP_")) delete env[key];
   }
-  const res = spawnSync(join(ROOT, "bin/autoloop"), args, {
+  const bin = nodeScriptInvocation(join(ROOT, "bin/autoloop"), args);
+  const res = spawnSync(bin.command, bin.args, {
     cwd,
     encoding: "utf-8",
     timeout: 60_000,
@@ -68,13 +64,6 @@ function makeBackendProject(name: string, backendToml: string[]): string {
     .join("\n");
   writeFileSync(configPath, `${config}\n${backendToml.join("\n")}\n`, "utf-8");
   return dir;
-}
-
-function writeExecutable(dir: string, name: string, content: string): string {
-  const path = join(dir, name);
-  writeFileSync(path, content, "utf-8");
-  chmodSync(path, 0o755);
-  return path;
 }
 
 /** Shell wrapper so a node script can be addressed as a single executable. */
@@ -200,7 +189,7 @@ process.stdout.write("claude backend handled the iteration. LOOP_COMPLETE\\n");
 
     const project = makeBackendProject("claude", [
       'backend.kind = "command"',
-      `backend.command = "${claudePath}"`,
+      `backend.command = ${JSON.stringify(claudePath)}`,
       "backend.timeout_ms = 30000",
     ]);
     const res = runCli(["run", project, "claude e2e"], {});

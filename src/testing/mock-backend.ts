@@ -98,7 +98,9 @@ function emitEvent(event: string, payload: string): void {
   try {
     execFileSync(process.execPath, [mainEntry, "emit", event, payload], {
       encoding: "utf-8",
-      timeout: 5_000,
+      // A cold CLI start can exceed 5s when a Windows test run is loaded;
+      // backend.timeout_ms still bounds the whole backend turn.
+      timeout: 30_000,
       stdio: ["pipe", "pipe", "inherit"],
       env: process.env,
     });

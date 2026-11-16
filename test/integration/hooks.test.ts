@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { shellQuote } from "@mobrienv/autoloop-core";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
@@ -18,8 +19,8 @@ describe("integration: [hooks] lifecycle", () => {
     const sentinelPre = join(project, "pre_run.sentinel");
     const sentinelPost = join(project, "post_run.sentinel");
 
-    const hooksPre = `touch ${sentinelPre}`;
-    const hooksPost = `touch ${sentinelPost}`;
+    const hooksPre = `touch ${shellQuote(sentinelPre)}`;
+    const hooksPost = `touch ${shellQuote(sentinelPost)}`;
 
     const configPath = join(project, "autoloops.toml");
     const existing = readFileSync(configPath, "utf-8");
@@ -73,8 +74,8 @@ describe("integration: [hooks] lifecycle", () => {
     const project = makeTempProject("hooks-iter");
     const iterDir = join(project, "iter-hooks");
 
-    const hooksPre = `mkdir -p ${iterDir} && echo "$AUTOLOOP_ITERATION" > ${iterDir}/pre_$AUTOLOOP_ITERATION`;
-    const hooksPost = `mkdir -p ${iterDir} && echo "$AUTOLOOP_ITERATION" > ${iterDir}/post_$AUTOLOOP_ITERATION`;
+    const hooksPre = `mkdir -p ${shellQuote(iterDir)} && echo "$AUTOLOOP_ITERATION" > ${shellQuote(iterDir)}/pre_$AUTOLOOP_ITERATION`;
+    const hooksPost = `mkdir -p ${shellQuote(iterDir)} && echo "$AUTOLOOP_ITERATION" > ${shellQuote(iterDir)}/post_$AUTOLOOP_ITERATION`;
 
     const configPath = join(project, "autoloops.toml");
     const existing = readFileSync(configPath, "utf-8");
@@ -105,7 +106,7 @@ describe("integration: [hooks] lifecycle", () => {
     const project = makeTempProject("hooks-env");
     const envFile = join(project, "hook-env.txt");
 
-    const hookCmd = `echo "dir=$AUTOLOOP_PROJECT_DIR run=$AUTOLOOP_RUN_ID tasks=$AUTOLOOP_TASKS_FILE" > ${envFile}`;
+    const hookCmd = `echo "dir=$AUTOLOOP_PROJECT_DIR run=$AUTOLOOP_RUN_ID tasks=$AUTOLOOP_TASKS_FILE" > ${shellQuote(envFile)}`;
 
     const configPath = join(project, "autoloops.toml");
     const existing = readFileSync(configPath, "utf-8");
@@ -134,7 +135,7 @@ describe("integration: [hooks] lifecycle", () => {
     const sentinelAfter = join(project, "after.sentinel");
 
     const hookCmd = "exit 1";
-    const postRun = `touch ${sentinelAfter}`;
+    const postRun = `touch ${shellQuote(sentinelAfter)}`;
 
     const configPath = join(project, "autoloops.toml");
     const existing = readFileSync(configPath, "utf-8");

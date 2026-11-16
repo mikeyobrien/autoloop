@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { canSignalUsr1 } from "@mobrienv/autoloop-core";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
@@ -209,7 +210,11 @@ describe("integration: command backend live-control interrupt", () => {
       await waitForExit(child, 15_000);
 
       const journal = readText(join(project, ".autoloop/journal.jsonl"));
-      expect(journal).toContain("mock-backend: interrupted by SIGUSR1");
+      // win32 has no SIGUSR1: the interrupt terminates the backend process
+      // tree instead, so only the cooperative path journals the trap output.
+      if (canSignalUsr1()) {
+        expect(journal).toContain("mock-backend: interrupted by SIGUSR1");
+      }
       expect(journal).toContain('"topic": "loop.stop"');
       expect(journal).not.toContain('"reason": "completed"');
       expect(journal).not.toContain('"reason": "max_iterations"');
