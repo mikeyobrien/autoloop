@@ -10,17 +10,101 @@ import { execSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve, sep } from "node:path";
+import { resolvePosixShell } from "@mobrienv/autoloop-core";
 import type { KanbanHooksConfig } from "./config.js";
 import type { IPtyLike } from "./pty_session.js";
 import type { Task, TaskStore } from "./task_store.js";
 import {
   shellEscape,
   TMUX_SOCKET,
+  tmuxAvailable,
   tmuxConfPath,
   tmuxHasSession,
   tmuxNewSessionWithCommand,
   tmuxSessionName,
 } from "./tmux.js";
+
+/** Optional dependency that gives kanban its browser terminals. */
+export const NODE_PTY_PACKAGE = "@homebridge/node-pty-prebuilt-multiarch";
+
+/** The part of the node-pty module that kanban uses. */
+export interface NodePtyModule {
+  spawn(
+    file: string,
+    args: string[],
+    options: {
+      name: string;
+      cols: number;
+      rows: number;
+      cwd: string;
+      env: Record<string, string>;
+    },
+  ): IPtyLike & { pid: number };
+}
+
+/**
+ * Load node-pty. It is an optional dependency (no prebuild exists for some
+ * Node versions and platforms), so a missing module becomes a clear error
+ * for the kanban terminal instead of an install or startup failure.
+ */
+export function loadNodePty(
+  requireFn: (id: string) => unknown = createRequire(import.meta.url),
+): NodePtyModule {
+  try {
+    return requireFn(NODE_PTY_PACKAGE) as NodePtyModule;
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `kanban terminals need the optional dependency ${NODE_PTY_PACKAGE}, ` +
+        `which could not be loaded (${detail}). It has no prebuilt binary for ` +
+        `some Node versions and platforms; reinstall autoloop with a Node LTS ` +
+        `release to enable kanban terminals. The rest of autoloop works without it.`,
+    );
+  }
+}
+
+/** Message for a kanban terminal request when `tmux` cannot run. */
+export function tmuxMissingMessage(
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform === "win32") {
+    return (
+      "kanban terminals need tmux, which is not available on native Windows. " +
+      "Kanban terminal features are not supported on Windows; " +
+      "run `autoloop kanban` under WSL to use them."
+    );
+  }
+  return "kanban terminals need tmux, but `tmux -V` failed. Install tmux and make sure it is on PATH.";
+}
+
+/**
+ * Create the tmux session for a task. When creation fails because tmux
+ * itself is missing, throw `tmuxMissingMessage` instead of the raw
+ * shell error.
+ */
+export function startTmuxSession(
+  name: string,
+  cwd: string,
+  cols: number,
+  rows: number,
+  command: string,
+  deps: {
+    newSession: typeof tmuxNewSessionWithCommand;
+    available: () => boolean;
+    platform: NodeJS.Platform;
+  } = {
+    newSession: tmuxNewSessionWithCommand,
+    available: tmuxAvailable,
+    platform: process.platform,
+  },
+): void {
+  try {
+    deps.newSession(name, cwd, cols, rows, command);
+  } catch (err) {
+    if (!deps.available()) throw new Error(tmuxMissingMessage(deps.platform));
+    throw err;
+  }
+}
 
 export interface SpawnAutoloopOptions {
   /** Autoloop binary to exec. Resolved by the caller (e.g. CLI wrapper). */
@@ -110,7 +194,7 @@ export function runHook(
   try {
     execSync(trimmed, {
       cwd,
-      shell: "/bin/sh",
+      shell: resolvePosixShell(),
       timeout: Math.max(1_000, timeoutMs),
       stdio: "pipe",
       env: {
@@ -172,6 +256,9 @@ export function spawnAutoloopForTask(
   const guard = validateWorkspaceCwd(rawCwd);
   if (!guard.ok) throw new Error(`workspace guard: ${guard.error}`);
   const cwd = guard.resolved;
+  // Load node-pty before any side effect (hook, tmux session): it is an
+  // optional dependency, and a late failure would leave an untracked run.
+  const nodePty = loadNodePty();
 
   const hooks = opts.hooks ?? {
     before_run: "",
@@ -193,13 +280,9 @@ export function spawnAutoloopForTask(
       autoloopBin: opts.autoloopBin,
       defaultPreset: opts.defaultPreset,
     });
-    tmuxNewSessionWithCommand(tmuxName, cwd, cols, rows, cmd);
+    startTmuxSession(tmuxName, cwd, cols, rows, cmd);
   }
 
-  const req = createRequire(import.meta.url);
-  const nodePty = req(
-    "@homebridge/node-pty-prebuilt-multiarch",
-  ) as typeof import("@homebridge/node-pty-prebuilt-multiarch");
   const env = {
     ...(process.env as Record<string, string>),
     EDITOR: "nano",
@@ -236,7 +319,7 @@ export function spawnAutoloopForTask(
   }
 
   return {
-    pty: pty as unknown as IPtyLike,
+    pty,
     pid: pty.pid ?? 0,
     runId,
     cwd,

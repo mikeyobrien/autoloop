@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createApp } from "@mobrienv/autoloop-dashboard";
 import { describe, expect, it } from "vitest";
 
@@ -715,6 +715,32 @@ describe("dashboard /api/runs/:id/artifact", () => {
 
     const res = await app.request(
       "/api/runs/run-001/artifact?path=/etc/passwd.md",
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("absolute paths not allowed");
+  });
+
+  it("returns 400 for platform-absolute paths", async () => {
+    const { registryPath, projectDir, stateDir } = makeTempRegistry();
+    const journalPath = join(stateDir, "journal.jsonl");
+    writeFileSync(journalPath, "", "utf-8");
+    writeFileSync(join(projectDir, "plan.md"), "# Plan");
+
+    const app = createApp({
+      registryPath,
+      journalPath,
+      stateDir,
+      bundleRoot: projectDir,
+      projectDir,
+      selfCmd: "autoloop",
+      listPresets: () => [],
+    });
+
+    // On win32 this is "C:\\...\\plan.md", which does not start with "/".
+    const absolute = encodeURIComponent(resolve(projectDir, "plan.md"));
+    const res = await app.request(
+      `/api/runs/run-001/artifact?path=${absolute}`,
     );
     expect(res.status).toBe(400);
     const body = await res.json();

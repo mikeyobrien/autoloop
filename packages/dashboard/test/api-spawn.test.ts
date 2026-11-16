@@ -15,6 +15,7 @@ vi.mock("node:child_process", () => ({
 
 import type { DashboardContext } from "../src/app.js";
 import { createApp } from "../src/app.js";
+import { dashboardRunSpawnOptions } from "../src/routes/api.js";
 
 function makeCtx(selfCmd: string): DashboardContext {
   const projectDir = mkdtempSync(join(tmpdir(), "dashboard-api-spawn-test-"));
@@ -85,9 +86,23 @@ describe("POST /api/runs process launch", () => {
       ["/opt/Auto Loop/bin/autoloop.js", "run", "build a widget"],
       {
         cwd: ctx.projectDir,
-        detached: true,
+        ...dashboardRunSpawnOptions(),
         stdio: "ignore",
       },
     );
+  });
+});
+
+describe("dashboardRunSpawnOptions", () => {
+  it("detaches the run on POSIX so it outlives the dashboard", () => {
+    expect(dashboardRunSpawnOptions("linux")).toEqual({ detached: true });
+    expect(dashboardRunSpawnOptions("darwin")).toEqual({ detached: true });
+  });
+
+  it("stays detached and hides the window on win32", () => {
+    expect(dashboardRunSpawnOptions("win32")).toEqual({
+      detached: true,
+      windowsHide: true,
+    });
   });
 });
