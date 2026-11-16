@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { runPiIteration } from "@mobrienv/autoloop-backends";
 import {
   abortPiTurn,
@@ -14,7 +14,33 @@ import {
   steerPiTurn,
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
+import {
+  killProcessTree,
+  processGroupSpawnOptions,
+} from "@mobrienv/autoloop-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveSpawnTarget } from "../src/spawn-target.js";
+
+// win32: killProcessTree runs `taskkill /T /F`; never aim it at the fake pid.
+vi.mock("@mobrienv/autoloop-core", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@mobrienv/autoloop-core")>();
+  return {
+    ...actual,
+    killProcessTree: vi.fn((pid: number, signal?: NodeJS.Signals) =>
+      process.platform === "win32" ? true : actual.killProcessTree(pid, signal),
+    ),
+  };
+});
+
+// Keep the spawn assertions independent of provider shims installed on the
+// host PATH (e.g. a real `pi.cmd` on win32).
+vi.mock("../src/spawn-target.js", () => ({
+  resolveSpawnTarget: vi.fn((command: string, args: string[]) => ({
+    command,
+    args,
+  })),
+}));
 
 interface MockChild extends ChildProcess {
   sent: Record<string, unknown>[];
@@ -66,6 +92,9 @@ vi.mock("node:child_process", () => {
     child.stderr = new Readable({ read() {} });
     child.pid = 23456;
     child.killed = false;
+    // A live ChildProcess starts with both null.
+    (child as any).exitCode = null;
+    (child as any).signalCode = null;
     child.kill = vi.fn(() => {
       child.killed = true;
       process.nextTick(() => {
@@ -114,6 +143,7 @@ describe("initPiSession", () => {
     const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
     await startSession({ args: ["--thinking", "high"], modelId: "gpt-5" });
 
+    // POSIX: { detached: true }; win32: { detached: false, windowsHide: true }.
     expect(spawnFn).toHaveBeenCalledWith(
       "pi",
       [
@@ -125,9 +155,39 @@ describe("initPiSession", () => {
         "--thinking",
         "high",
       ],
-      expect.objectContaining({ detached: true, cwd: "/tmp" }),
+      expect.objectContaining({ ...processGroupSpawnOptions(), cwd: "/tmp" }),
+    );
+    expect(spawnFn.mock.calls.at(-1)?.[2]).not.toHaveProperty(
+      "windowsVerbatimArguments",
     );
     expect(lastChild.sent[0]).toMatchObject({ type: "get_state" });
+  });
+
+  it("ignores a stdin pipe error so teardown does not crash", async () => {
+    await startSession();
+    const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE" });
+    expect(() => lastChild.stdin?.emit("error", epipe)).not.toThrow();
+  });
+
+  it("spawns a win32 pi.cmd shim through the resolved cmd.exe target", async () => {
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    vi.mocked(resolveSpawnTarget).mockReturnValueOnce({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      args: ["/d", "/s", "/c", '"C:\\npm\\pi.cmd ^"--mode^""'],
+      windowsVerbatimArguments: true,
+    });
+    await startSession({ env: { PATH: "C:\\npm" } });
+
+    expect(resolveSpawnTarget).toHaveBeenLastCalledWith(
+      "pi",
+      ["--mode", "rpc", "--no-session"],
+      { env: { PATH: "C:\\npm" }, cwd: "/tmp" },
+    );
+    expect(spawnFn).toHaveBeenLastCalledWith(
+      "C:\\Windows\\System32\\cmd.exe",
+      ["/d", "/s", "/c", '"C:\\npm\\pi.cmd ^"--mode^""'],
+      expect.objectContaining({ windowsVerbatimArguments: true }),
+    );
   });
 
   it("sanitizes the environment passed to the Pi process", async () => {
@@ -136,7 +196,7 @@ describe("initPiSession", () => {
       cwd: "/tmp/project",
       environmentPolicy: "hardened",
       env: {
-        PATH: "/usr/bin:/tmp/project/bin",
+        PATH: ["/usr/bin", "/tmp/project/bin"].join(delimiter),
         NORMAL_PROJECT_FLAG: "enabled",
         PYTHONPATH: "./owned-python",
       },
@@ -393,7 +453,10 @@ describe("terminatePiSession", () => {
 
     await terminatePiSession(session);
 
-    expect(killSpy).toHaveBeenCalledWith(-23456, "SIGTERM");
+    expect(killProcessTree).toHaveBeenCalledWith(23456, "SIGTERM");
+    if (process.platform !== "win32") {
+      expect(killSpy).toHaveBeenCalledWith(-23456, "SIGTERM");
+    }
     expect(session.process.kill).toHaveBeenCalledWith("SIGTERM");
     const aborts = lastChild.sent.filter((cmd) => cmd.type === "abort");
     expect(aborts).toHaveLength(1);
@@ -408,6 +471,36 @@ describe("terminatePiSession", () => {
     await terminatePiSession(session);
 
     expect(session.process.kill).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["win32", "exitCode", 1],
+    ["win32", "signalCode", "SIGKILL"],
+    ["linux", "exitCode", 1],
+    ["linux", "signalCode", "SIGKILL"],
+  ])("handles a child that already exited on %s (%s set)", async (platform, field, value) => {
+    const session = await startSession();
+    // win32: the pid of an exited child may already belong to another
+    // process -> no kill. POSIX: the pgid stays reserved while tool
+    // subprocesses live -> group kill, no abort, no wait.
+    (session.process as any)[field] = value;
+    vi.mocked(killProcessTree).mockClear();
+    const real = process.platform;
+    Object.defineProperty(process, "platform", { value: platform });
+    try {
+      await terminatePiSession(session);
+    } finally {
+      Object.defineProperty(process, "platform", { value: real });
+    }
+
+    if (platform === "win32") {
+      expect(killProcessTree).not.toHaveBeenCalled();
+    } else {
+      expect(killProcessTree).toHaveBeenCalledWith(23456, "SIGKILL");
+      expect(killProcessTree).toHaveBeenCalledTimes(1);
+    }
+    expect(session.process.kill).not.toHaveBeenCalled();
+    expect(lastChild.sent.filter((cmd) => cmd.type === "abort")).toEqual([]);
   });
 });
 

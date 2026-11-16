@@ -1,9 +1,14 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import {
+  killProcessTree,
+  processGroupSpawnOptions,
+} from "@mobrienv/autoloop-core";
+import {
   type BackendEnvironmentPolicy,
   resolveBackendEnvironment,
 } from "./environment.js";
+import { resolveSpawnTarget } from "./spawn-target.js";
 import {
   formatToolFailure,
   formatToolStart,
@@ -141,19 +146,33 @@ function trackPiToolCall(session: PiSession, msg: PiRpcMessage): void {
  */
 export async function initPiSession(opts: PiClientOptions): Promise<PiSession> {
   const args = buildPiArgs(opts);
-  const child = spawn(opts.command, args, {
+  const env = resolveBackendEnvironment(opts.env ?? process.env, {
+    projectDir: opts.cwd,
+    policy: opts.environmentPolicy,
+  });
+  const target = resolveSpawnTarget(opts.command, args, {
+    env,
+    cwd: opts.cwd,
+  });
+  const child = spawn(target.command, target.args, {
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
-    env: resolveBackendEnvironment(opts.env ?? process.env, {
-      projectDir: opts.cwd,
-      policy: opts.environmentPolicy,
-    }),
-    detached: true, // own process group so terminatePiSession can kill the full tree
+    env,
+    // POSIX: own process group so terminatePiSession can kill the full tree.
+    // win32: taskkill /T walks the tree instead.
+    ...processGroupSpawnOptions(),
+    ...(target.windowsVerbatimArguments
+      ? { windowsVerbatimArguments: true }
+      : {}),
   });
 
   if (!child.stdout || !child.stdin) {
     throw new Error("Failed to create pi process stdio streams");
   }
+  // A write to a closed pipe (EPIPE, common at teardown on win32) also emits
+  // 'error' on stdin; sendPiCommand's write callback already rejects, so an
+  // unhandled 'error' must not crash the process.
+  child.stdin.on("error", () => {});
 
   const session: PiSession = {
     process: child,
@@ -301,6 +320,13 @@ export async function resetPiSession(session: PiSession): Promise<void> {
 export async function terminatePiSession(session: PiSession): Promise<void> {
   const child = session.process;
   if (!child.pid || child.killed) return;
+  if (child.exitCode !== null || child.signalCode !== null) {
+    // win32: the pid of an exited child may already belong to another
+    // process, so do nothing. POSIX: the pid stays reserved while it is the
+    // pgid of live group members (tool subprocesses); end them.
+    if (process.platform !== "win32") killProcessTree(child.pid, "SIGKILL");
+    return;
+  }
 
   // Abort any in-flight turn before killing
   abortPiTurn(session);
@@ -308,11 +334,7 @@ export async function terminatePiSession(session: PiSession): Promise<void> {
   // Kill the entire process tree — pi tool subprocesses run in the same
   // process group and won't die from just killing the parent.
   const pid = child.pid;
-  try {
-    process.kill(-pid, "SIGTERM");
-  } catch {
-    /* process group may not exist */
-  }
+  killProcessTree(pid, "SIGTERM");
   child.kill("SIGTERM");
 
   const exited = await Promise.race([
@@ -320,11 +342,7 @@ export async function terminatePiSession(session: PiSession): Promise<void> {
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
   ]);
   if (!exited && !child.killed) {
-    try {
-      process.kill(-pid, "SIGKILL");
-    } catch {
-      /* already dead */
-    }
+    killProcessTree(pid, "SIGKILL");
     child.kill("SIGKILL");
   }
 }

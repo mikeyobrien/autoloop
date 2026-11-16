@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { runClaudeSdkIteration } from "@mobrienv/autoloop-backends";
 import {
@@ -211,7 +211,7 @@ describe("initClaudeSdkSession", () => {
       cwd: "/tmp/project",
       environmentPolicy: "hardened",
       env: {
-        PATH: "/usr/bin:/tmp/project/bin",
+        PATH: ["/usr/bin", "/tmp/project/bin"].join(delimiter),
         NORMAL_PROJECT_FLAG: "enabled",
         GIT_CONFIG_COUNT: "1",
       },

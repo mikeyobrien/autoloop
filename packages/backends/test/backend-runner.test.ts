@@ -1,7 +1,11 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildBackendShellCommand,
   normalizeProviderKind,
   runAcpIteration,
+  runBackendCommandAsync,
   runKiroIteration,
 } from "@mobrienv/autoloop-backends";
 import { runShellCommand } from "@mobrienv/autoloop-backends/run-command";
@@ -95,5 +99,29 @@ describe("backend runner", () => {
     );
     expect(result.timedOut).toBe(true);
     expect(result.errorCategory).toBe("timeout");
+  });
+
+  it("runs the process wrapper with a native temp-dir prompt path", async () => {
+    // win32: the state dir is a `C:\...` path with a space; the wrapper runs
+    // in Git for Windows sh and must still write and read the prompt file.
+    const stateDir = mkdtempSync(join(tmpdir(), "autoloop state "));
+    const prompt = `it's a "prompt" with $vars`;
+    try {
+      const command = buildBackendShellCommand({
+        paths: { stateDir, piAdapterPath: join(stateDir, "pi-adapter") },
+        spec: { kind: "command", command: "cat", args: [], promptMode: "file" },
+        prompt,
+        runtimeEnv: "",
+      });
+      const result = await runBackendCommandAsync("command", command, 10000);
+      expect(result.exitCode).toBe(0);
+      expect(result.errorCategory).toBe("none");
+      expect(result.output).toBe(prompt);
+      expect(readFileSync(join(stateDir, "active-prompt.md"), "utf-8")).toBe(
+        prompt,
+      );
+    } finally {
+      rmSync(stateDir, { recursive: true, force: true });
+    }
   });
 });

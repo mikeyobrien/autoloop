@@ -90,6 +90,7 @@ const PROXY_KEYS = new Set(["ALL_PROXY", "HTTP_PROXY", "HTTPS_PROXY"]);
 export function sanitizeBackendEnvironment(
   source: NodeJS.ProcessEnv,
   options: BackendEnvironmentOptions,
+  platform: NodeJS.Platform = process.platform,
 ): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(source)) {
@@ -98,8 +99,14 @@ export function sanitizeBackendEnvironment(
     env[key] = value;
   }
 
-  if (env.PATH !== undefined) {
-    env.PATH = sanitizePath(env.PATH, options.projectDir);
+  // win32 env names are case-insensitive and process.env spells it `Path`.
+  for (const key of Object.keys(env)) {
+    if (
+      key === "PATH" ||
+      (platform === "win32" && key.toUpperCase() === "PATH")
+    ) {
+      env[key] = sanitizePath(env[key], options.projectDir);
+    }
   }
   return env;
 }
@@ -134,7 +141,12 @@ function canonical(path: string): string {
 
 function isWithin(candidate: string, root: string): boolean {
   const rel = relative(root, candidate);
-  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== "..");
+  // win32: a path on another drive has no relative form; relative() returns
+  // it absolute, and it is not inside the project.
+  return (
+    rel === "" ||
+    (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel))
+  );
 }
 
 function validateProxy(key: string, value: string): void {

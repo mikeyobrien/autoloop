@@ -1,5 +1,9 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import * as acp from "@agentclientprotocol/sdk";
+import {
+  killProcessTree,
+  processGroupSpawnOptions,
+} from "@mobrienv/autoloop-core";
 import type { AcpProvider } from "./acp-providers.js";
 import { resolveAcpProvider } from "./acp-providers.js";
 import {
@@ -10,6 +14,7 @@ import {
   type BackendEnvironmentPolicy,
   resolveBackendEnvironment,
 } from "./environment.js";
+import { resolveSpawnTarget } from "./spawn-target.js";
 
 export interface AcpClientOptions {
   provider?: string;
@@ -80,14 +85,24 @@ export async function initAcpSession(
     provider: opts.provider,
     command: opts.command,
   });
-  const child = spawn(opts.command, opts.args, {
+  const env = resolveBackendEnvironment(opts.env ?? process.env, {
+    projectDir: opts.cwd,
+    policy: opts.environmentPolicy,
+  });
+  const target = resolveSpawnTarget(opts.command, opts.args, {
+    env,
+    cwd: opts.cwd,
+  });
+  const child = spawn(target.command, target.args, {
     stdio: ["pipe", "pipe", "pipe"],
     cwd: opts.cwd,
-    env: resolveBackendEnvironment(opts.env ?? process.env, {
-      projectDir: opts.cwd,
-      policy: opts.environmentPolicy,
-    }),
-    detached: true, // create own process group so process.kill(-pid) in terminateAcpSession kills the full tree
+    env,
+    // POSIX: own process group so killProcessTree in terminateAcpSession
+    // kills the full tree. win32: taskkill /T walks the tree instead.
+    ...processGroupSpawnOptions(),
+    ...(target.windowsVerbatimArguments
+      ? { windowsVerbatimArguments: true }
+      : {}),
   });
 
   if (!child.stdout || !child.stdin) {
@@ -123,6 +138,10 @@ export async function initAcpSession(
   // Build transport: manual NDJSON parsing on stdout (more reliable), SDK serialization on stdin
   const stdin = child.stdin;
   const stdout = child.stdout;
+  // A write to a closed pipe (EPIPE, common at teardown on win32) also emits
+  // 'error' on stdin; the write callback below already rejects, so an
+  // unhandled 'error' must not crash the process.
+  stdin.on("error", () => {});
 
   const writable = new WritableStream<Uint8Array>({
     async write(chunk) {
@@ -398,6 +417,14 @@ function rejectAfter(ms: number, message: string): Promise<never> {
 export async function terminateAcpSession(session: AcpSession): Promise<void> {
   const child = session.process;
   if (!child.pid || child.killed) return;
+  if (child.exitCode !== null || child.signalCode !== null) {
+    // win32: the pid of an exited child may already belong to another
+    // process (a tree kill from the operator interrupt leaves `killed`
+    // false), so do nothing. POSIX: the pid stays reserved while it is the
+    // pgid of live group members (MCP servers, tools); end them.
+    if (process.platform !== "win32") killProcessTree(child.pid, "SIGKILL");
+    return;
+  }
 
   // Cancel any in-flight turn before killing
   try {
@@ -409,11 +436,7 @@ export async function terminateAcpSession(session: AcpSession): Promise<void> {
   // Kill the entire process tree — MCP servers run in their own process groups
   // and won't die from just killing the parent.
   const pid = child.pid;
-  try {
-    process.kill(-pid, "SIGTERM");
-  } catch {
-    /* process group may not exist */
-  }
+  killProcessTree(pid, "SIGTERM");
   child.kill("SIGTERM");
 
   const exited = await Promise.race([
@@ -421,11 +444,7 @@ export async function terminateAcpSession(session: AcpSession): Promise<void> {
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
   ]);
   if (!exited && !child.killed) {
-    try {
-      process.kill(-pid, "SIGKILL");
-    } catch {
-      /* already dead */
-    }
+    killProcessTree(pid, "SIGKILL");
     child.kill("SIGKILL");
   }
 }

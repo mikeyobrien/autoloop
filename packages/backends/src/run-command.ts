@@ -1,5 +1,20 @@
-import { type ChildProcess, execSync, spawn } from "node:child_process";
-import { shellQuote, shellWords } from "@mobrienv/autoloop-core";
+import {
+  type ChildProcess,
+  execFileSync,
+  execSync,
+  spawn,
+} from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  killProcessTree,
+  processGroupSpawnOptions,
+  resolvePosixShell,
+  shellQuote,
+  shellWords,
+} from "@mobrienv/autoloop-core";
 import {
   type BackendEnvironmentPolicy,
   resolveBackendEnvironment,
@@ -31,6 +46,88 @@ export function buildCommandInvocation(
   return `${argv} ${shellQuote(prompt)}`;
 }
 
+/**
+ * How the shell gets the backend script: argv after the shell path, plus the
+ * temporary script file to delete when the shell ends (win32 only).
+ */
+export interface ShellScript {
+  args: string[];
+  scriptPath?: string;
+}
+
+/**
+ * POSIX: `-c <command>`. win32: the command goes to a temporary UTF-8 script
+ * file (written as is, so LF stays LF) and the shell runs that file. A long
+ * `sh.exe -c` argument fails on win32: the command line holds at most 32,767
+ * characters (`ENAMETOOLONG`), and the MSYS parser of Git for Windows breaks
+ * long scripts with quotes or non-ASCII text.
+ */
+export function prepareShellScript(
+  command: string,
+  platform: NodeJS.Platform = process.platform,
+): ShellScript {
+  if (platform !== "win32") return { args: ["-c", command] };
+  const scriptPath = join(
+    tmpdir(),
+    `autoloop-backend-script-${process.pid}-${randomUUID()}.sh`,
+  );
+  writeFileSync(scriptPath, command, { encoding: "utf-8", flag: "wx" });
+  return { args: [scriptPath], scriptPath };
+}
+
+/** Delete the temporary script file of `prepareShellScript`, if any. */
+export function removeShellScript(script: ShellScript): void {
+  if (script.scriptPath === undefined) return;
+  try {
+    rmSync(script.scriptPath, { force: true });
+  } catch {
+    /* a leftover file in the temp directory is not a backend failure */
+  }
+}
+
+/**
+ * Resolve the POSIX shell that runs backend commands and prepare the script
+ * argv. On win32 a missing Git for Windows `sh.exe` throws
+ * `PosixShellNotFoundError`, and the temp script file can fail to write;
+ * report either as a backend failure (same shape as a spawn error) instead of
+ * crashing the caller.
+ */
+function prepareCommandShell(
+  providerKind: string,
+  command: string,
+  env: NodeJS.ProcessEnv,
+): { shell: string; script: ShellScript } | { failure: BackendRunResult } {
+  try {
+    const shell = resolvePosixShell(env);
+    return { shell, script: prepareShellScript(command) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      failure: {
+        output: `command spawn error: ${message}`,
+        exitCode: 1,
+        timedOut: false,
+        providerKind,
+        errorCategory: "non_zero_exit",
+      },
+    };
+  }
+}
+
+/**
+ * Whether the follow-up kill 5s after a timeout kill runs. POSIX always
+ * escalates SIGTERM to SIGKILL. win32 retries `taskkill /T /F` once, only
+ * while the child has not settled: the first taskkill can fail (access
+ * denied, or its own spawnSync timeout). Node holds the child's process handle
+ * until it exits, so its pid cannot be reused while it is unsettled.
+ */
+export function escalatesTimeoutKill(
+  settled: boolean,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return platform !== "win32" || !settled;
+}
+
 export function runShellCommand(
   providerKind: string,
   command: string,
@@ -42,16 +139,22 @@ export function runShellCommand(
     projectDir: options.projectDir ?? options.cwd ?? process.cwd(),
     policy: options.environmentPolicy,
   });
+  const prepared = prepareCommandShell(providerKind, command, env);
+  if ("failure" in prepared) return prepared.failure;
+  const { shell, script } = prepared;
+  const execOptions = {
+    encoding: "utf-8" as const,
+    timeout: timeoutMs,
+    stdio: ["pipe", "pipe", "inherit"] as ["pipe", "pipe", "inherit"],
+    maxBuffer: 100 * 1024 * 1024,
+    cwd: options.cwd,
+    env,
+  };
   try {
-    const output = execSync(command, {
-      encoding: "utf-8",
-      timeout: timeoutMs,
-      stdio: ["pipe", "pipe", "inherit"],
-      shell: "/bin/sh",
-      maxBuffer: 100 * 1024 * 1024,
-      cwd: options.cwd,
-      env,
-    });
+    const output =
+      script.scriptPath === undefined
+        ? execSync(command, { ...execOptions, shell })
+        : execFileSync(shell, script.args, execOptions);
     return {
       output: output ?? "",
       exitCode: 0,
@@ -89,6 +192,8 @@ export function runShellCommand(
       providerKind,
       errorCategory: "non_zero_exit",
     };
+  } finally {
+    removeShellScript(script);
   }
 }
 
@@ -114,21 +219,33 @@ export function spawnShellCommand(
     projectDir: options.projectDir ?? options.cwd ?? process.cwd(),
     policy: options.environmentPolicy,
   });
+  const prepared = prepareCommandShell(providerKind, command, env);
+  if ("failure" in prepared) return Promise.resolve(prepared.failure);
+  const { shell, script } = prepared;
   return new Promise((resolve) => {
-    // `detached: true` makes the child a process-group leader, so a timeout
-    // kill can target the whole group (`-pid`) rather than only the `/bin/sh`
-    // process itself — dash (this repo's `/bin/sh`) forks rather than
-    // exec-replacing for anything but a single tail-call command, so a plain
-    // `child.kill()` can otherwise leave the real work (e.g. `sleep 30`)
-    // running as an orphaned grandchild. `onSpawn`'s pid is unaffected: the
-    // group leader's pid is the same pid callers already signal directly
-    // (e.g. the harness's SIGUSR1 interrupt path targets this same pid).
-    const child = spawn("/bin/sh", ["-c", command], {
-      stdio: ["pipe", "pipe", "inherit"],
-      detached: true,
-      cwd: options.cwd,
-      env,
-    });
+    // POSIX: `detached: true` makes the child a process-group leader, so a
+    // timeout kill can target the whole group (`-pid`) rather than only the
+    // `/bin/sh` process itself — dash (this repo's `/bin/sh`) forks rather
+    // than exec-replacing for anything but a single tail-call command, so a
+    // plain `child.kill()` can otherwise leave the real work (e.g.
+    // `sleep 30`) running as an orphaned grandchild. `onSpawn`'s pid is
+    // unaffected: the group leader's pid is the same pid callers already
+    // signal directly (e.g. the harness's SIGUSR1 interrupt path targets this
+    // same pid). win32: no process group; `killProcessTree` runs
+    // `taskkill /T /F` against the shell's pid instead.
+    let child: ChildProcess;
+    try {
+      child = spawn(shell, script.args, {
+        stdio: ["pipe", "pipe", "inherit"],
+        ...processGroupSpawnOptions(),
+        cwd: options.cwd,
+        env,
+      });
+    } catch (err) {
+      // A synchronous spawn throw rejects the promise, as before.
+      removeShellScript(script);
+      throw err;
+    }
     if (child.pid) onSpawn?.(child.pid, child);
 
     let stdout = "";
@@ -141,6 +258,7 @@ export function spawnShellCommand(
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
+      removeShellScript(script);
       resolve(result);
     };
 
@@ -152,7 +270,7 @@ export function spawnShellCommand(
 
     const killGroup = (signal: NodeJS.Signals) => {
       try {
-        if (child.pid) process.kill(-child.pid, signal);
+        if (child.pid) killProcessTree(child.pid, signal);
         else child.kill(signal);
       } catch {
         /* already exited */
@@ -163,8 +281,11 @@ export function spawnShellCommand(
       timer = setTimeout(() => {
         timedOut = true;
         killGroup("SIGTERM");
-        // Escalate to SIGKILL if it doesn't exit promptly.
-        setTimeout(() => killGroup("SIGKILL"), 5000);
+        // Escalate to SIGKILL (win32: retry taskkill) if it doesn't exit
+        // promptly.
+        setTimeout(() => {
+          if (escalatesTimeoutKill(settled)) killGroup("SIGKILL");
+        }, 5000);
       }, timeoutMs);
     }
 
