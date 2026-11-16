@@ -135,6 +135,11 @@ export default defineConfig({
       threads: {
         maxThreads: 4,
       },
+      // win32: the default pool is forks, and the threads cap above does not
+      // apply to it. About 15 forks on a 16-core machine push the CLI spawn
+      // tests (about 1.7 s per `node dist/main.js` on Windows) past their 10 s
+      // spawnSync timeout. Linux and macOS keep the vitest default.
+      ...(process.platform === "win32" ? { forks: { maxForks: 4 } } : {}),
     },
     coverage: {
       provider: "v8",
