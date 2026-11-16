@@ -2,22 +2,31 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { put } from "@mobrienv/autoloop-core/config";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
 import {
   buildLoopContext,
   injectClaudePermissions,
+  installRuntimeTools,
   processIntOverride,
   readOptionalProjectFile,
   reloadLoop,
   resolveProcessKind,
 } from "@mobrienv/autoloop-harness/config-helpers";
+import {
+  promptToolPath,
+  windowsCmdShim,
+} from "@mobrienv/autoloop-harness/tools";
 import { describe, expect, it } from "vitest";
+
+/** `<sep>runs<sep>` in a native path (backslashes on win32). */
+const RUNS = `${sep}runs${sep}`;
 
 function makeProject(
   configToml: string,
@@ -170,18 +179,22 @@ describe("readOptionalProjectFile", () => {
     );
   });
 
-  it("rejects symlinks outside the project", () => {
-    const parent = mkdtempSync(join(tmpdir(), "autoloop-ts-file-link-"));
-    const projectDir = join(parent, "project");
-    mkdirSync(projectDir);
-    const outside = join(parent, "outside.md");
-    writeFileSync(outside, "host-only instructions\n");
-    symlinkSync(outside, join(projectDir, "prompt.md"));
+  // win32: creating symlinks needs admin or Developer Mode (EPERM otherwise)
+  it.skipIf(process.platform === "win32")(
+    "rejects symlinks outside the project",
+    () => {
+      const parent = mkdtempSync(join(tmpdir(), "autoloop-ts-file-link-"));
+      const projectDir = join(parent, "project");
+      mkdirSync(projectDir);
+      const outside = join(parent, "outside.md");
+      writeFileSync(outside, "host-only instructions\n");
+      symlinkSync(outside, join(projectDir, "prompt.md"));
 
-    expect(() => readOptionalProjectFile(projectDir, "prompt.md")).toThrow(
-      /must stay within the project directory/i,
-    );
-  });
+      expect(() => readOptionalProjectFile(projectDir, "prompt.md")).toThrow(
+        /must stay within the project directory/i,
+      );
+    },
+  );
 });
 
 describe("buildLoopContext", () => {
@@ -566,9 +579,9 @@ describe("buildLoopContext", () => {
     });
 
     expect(loop.runtime.isolationMode).toBe("run-scoped");
-    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(RUNS);
     expect(loop.paths.stateDir).toContain(loop.runtime.runId);
-    expect(loop.paths.baseStateDir).not.toContain("/runs/");
+    expect(loop.paths.baseStateDir).not.toContain(RUNS);
     expect(loop.paths.mainProjectDir).toBe(loop.paths.projectDir);
   });
 
@@ -710,9 +723,9 @@ describe("buildLoopContext run-scoped isolation", () => {
       workDir: projectDir,
     });
 
-    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(RUNS);
     expect(loop.paths.stateDir).toContain(loop.runtime.runId);
-    expect(loop.paths.baseStateDir).not.toContain("/runs/");
+    expect(loop.paths.baseStateDir).not.toContain(RUNS);
     expect(loop.paths.stateDir).not.toBe(loop.paths.baseStateDir);
   });
 
@@ -722,7 +735,7 @@ describe("buildLoopContext run-scoped isolation", () => {
       workDir: projectDir,
     });
 
-    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).not.toContain(RUNS);
     expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
     expect(loop.paths.journalFile).toContain(".autoloop");
   });
@@ -733,7 +746,7 @@ describe("buildLoopContext run-scoped isolation", () => {
       workDir: projectDir,
     });
 
-    expect(loop.paths.registryFile).not.toContain("/runs/");
+    expect(loop.paths.registryFile).not.toContain(RUNS);
     expect(loop.paths.registryFile).toContain(".autoloop");
     expect(loop.paths.registryFile).toMatch(/registry\.jsonl$/);
   });
@@ -744,9 +757,9 @@ describe("buildLoopContext run-scoped isolation", () => {
       workDir: projectDir,
     });
 
-    expect(loop.paths.toolPath).toContain("/runs/");
+    expect(loop.paths.toolPath).toContain(RUNS);
     expect(loop.paths.toolPath).toContain(loop.runtime.runId);
-    expect(loop.paths.piAdapterPath).toContain("/runs/");
+    expect(loop.paths.piAdapterPath).toContain(RUNS);
     expect(loop.paths.piAdapterPath).toContain(loop.runtime.runId);
   });
 
@@ -848,20 +861,21 @@ describe("buildLoopContext run-scoped isolation", () => {
     });
 
     // Harness instructions should have expanded placeholders
+    const tool = promptToolPath(loop.paths.toolPath);
     expect(loop.harness.instructions).toContain(loop.paths.stateDir);
-    expect(loop.harness.instructions).toContain(loop.paths.toolPath);
+    expect(loop.harness.instructions).toContain(tool);
     expect(loop.harness.instructions).not.toContain("{{STATE_DIR}}");
     expect(loop.harness.instructions).not.toContain("{{TOOL_PATH}}");
 
     // Review/metareview prompt
     expect(loop.review.prompt).toContain(loop.paths.stateDir);
-    expect(loop.review.prompt).toContain(loop.paths.toolPath);
+    expect(loop.review.prompt).toContain(tool);
     expect(loop.review.prompt).not.toContain("{{STATE_DIR}}");
     expect(loop.review.prompt).not.toContain("{{TOOL_PATH}}");
 
     // Role prompts
     expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.stateDir);
-    expect(loop.topology.roles[0]?.prompt).toContain(loop.paths.toolPath);
+    expect(loop.topology.roles[0]?.prompt).toContain(tool);
     expect(loop.topology.roles[0]?.prompt).not.toContain("{{STATE_DIR}}");
     expect(loop.topology.roles[0]?.prompt).not.toContain("{{TOOL_PATH}}");
   });
@@ -944,9 +958,9 @@ describe("solo-run default run-scoping", () => {
       workDir: projectDir,
     });
 
-    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(RUNS);
     expect(loop.paths.stateDir).toContain(loop.runtime.runId);
-    expect(loop.paths.baseStateDir).not.toContain("/runs/");
+    expect(loop.paths.baseStateDir).not.toContain(RUNS);
   });
 
   it("solo run journalFile stays at global .autoloop/journal.jsonl", () => {
@@ -955,8 +969,10 @@ describe("solo-run default run-scoping", () => {
       workDir: projectDir,
     });
 
-    expect(loop.paths.journalFile).not.toContain("/runs/");
-    expect(loop.paths.journalFile).toMatch(/\.autoloop\/journal\.jsonl$/);
+    expect(loop.paths.journalFile).not.toContain(RUNS);
+    expect(
+      loop.paths.journalFile.endsWith(join(".autoloop", "journal.jsonl")),
+    ).toBe(true);
   });
 
   it("solo run registryFile stays global", () => {
@@ -965,7 +981,7 @@ describe("solo-run default run-scoping", () => {
       workDir: projectDir,
     });
 
-    expect(loop.paths.registryFile).not.toContain("/runs/");
+    expect(loop.paths.registryFile).not.toContain(RUNS);
     expect(loop.paths.registryFile).toMatch(/registry\.jsonl$/);
   });
 
@@ -977,7 +993,7 @@ describe("solo-run default run-scoping", () => {
     });
 
     expect(loop.runtime.isolationMode).toBe("run-scoped");
-    expect(loop.paths.stateDir).toContain("/runs/");
+    expect(loop.paths.stateDir).toContain(RUNS);
   });
 });
 
@@ -1025,7 +1041,7 @@ describe("global journal behavior", () => {
     });
 
     expect(loop.runtime.isolationMode).toBe("run-scoped");
-    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).not.toContain(RUNS);
     expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
   });
 
@@ -1039,7 +1055,7 @@ describe("global journal behavior", () => {
     });
 
     expect(loop.runtime.isolationMode).toBe("run-scoped");
-    expect(loop.paths.journalFile).not.toContain("/runs/");
+    expect(loop.paths.journalFile).not.toContain(RUNS);
     expect(loop.paths.journalFile).toMatch(/journal\.jsonl$/);
   });
 });
@@ -1226,4 +1242,52 @@ it("loads a single-file preset's Jev catalog from beside the preset", () => {
     { workDir, presetFile: join(presetDir, "autoloops.toml") },
   );
   expect(loop.jevRouting?.routes[0].id).toBe("fix");
+});
+
+describe("installRuntimeTools", () => {
+  function toolLoop() {
+    const projectDir = makeProject("event_loop.max_iterations = 1\n");
+    return buildLoopContext(projectDir, "test", "node dist/main.js", {
+      workDir: projectDir,
+    });
+  }
+  const fakeShell = () => "C:\\Git\\bin\\sh.exe";
+
+  it("writes only the #!/bin/sh scripts on POSIX", () => {
+    const loop = toolLoop();
+    installRuntimeTools(loop, "linux", () => {
+      throw new Error("POSIX must not resolve a Windows shell");
+    });
+    expect(readFileSync(loop.paths.toolPath, "utf-8")).toMatch(
+      /^#!\/bin\/sh\n/,
+    );
+    expect(readFileSync(loop.paths.piAdapterPath, "utf-8")).toMatch(
+      /^#!\/bin\/sh\n/,
+    );
+    expect(existsSync(`${loop.paths.toolPath}.cmd`)).toBe(false);
+    expect(existsSync(`${loop.paths.piAdapterPath}.cmd`)).toBe(false);
+  });
+
+  it("also writes .cmd siblings that run each script through the shell on win32", () => {
+    const loop = toolLoop();
+    installRuntimeTools(loop, "win32", fakeShell);
+    expect(readFileSync(loop.paths.toolPath, "utf-8")).toMatch(
+      /^#!\/bin\/sh\n/,
+    );
+    expect(readFileSync(`${loop.paths.toolPath}.cmd`, "utf-8")).toBe(
+      windowsCmdShim(fakeShell(), loop.paths.toolPath),
+    );
+    expect(readFileSync(`${loop.paths.piAdapterPath}.cmd`, "utf-8")).toBe(
+      windowsCmdShim(fakeShell(), loop.paths.piAdapterPath),
+    );
+  });
+
+  it("skips the pi-adapter (and its .cmd) for a host run", () => {
+    const loop = toolLoop();
+    loop.host = { label: "host:test" } as NonNullable<typeof loop.host>;
+    installRuntimeTools(loop, "win32", fakeShell);
+    expect(existsSync(`${loop.paths.toolPath}.cmd`)).toBe(true);
+    expect(existsSync(loop.paths.piAdapterPath)).toBe(false);
+    expect(existsSync(`${loop.paths.piAdapterPath}.cmd`)).toBe(false);
+  });
 });

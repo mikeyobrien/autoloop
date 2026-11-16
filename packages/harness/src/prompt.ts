@@ -33,6 +33,7 @@ import {
 import { activeRoles } from "./host.js";
 import type { LoopContext } from "./index.js";
 import { renderRunScratchpadPrompt } from "./scratchpad.js";
+import { promptToolPath } from "./tools.js";
 
 export interface IterationContext {
   iteration: number;
@@ -378,6 +379,7 @@ export function renderIterationPromptText(
     lastRejected,
   } = derived;
   const { allowedRoles, allowedEvents, recentEvent } = routing;
+  const tool = promptToolPath(loop.paths.toolPath);
   return (
     "You are inside a bare-minimal autoloops harness.\n\n" +
     harnessInstructionsText(loop) +
@@ -408,28 +410,32 @@ export function renderIterationPromptText(
     `Suggested next roles now: ${listText(allowedRoles)}\n` +
     `Allowed next events now: ${listText(allowedEvents)}\n` +
     "Event tool: " +
-    (loop.host ? loop.host.eventToolHint : loop.paths.toolPath) +
-    "\n\n" +
+    (loop.host ? loop.host.eventToolHint : tool) +
+    "\n" +
+    windowsToolNote(loop.paths.toolPath) +
+    "\n" +
     "Current scratchpad:\n" +
     (scratchpadText || "(empty)") +
     "\n\n" +
     "Use the event tool to publish your allowed handoff or completion event.\n" +
-    (loop.host ? "Memory and task commands:\n" : shellEmitExamples(loop)) +
-    loop.paths.toolPath +
+    (loop.host
+      ? "Memory and task commands:\n"
+      : shellEmitExamples(loop, tool)) +
+    tool +
     ' memory add learning "durable lesson"\n' +
-    loop.paths.toolPath +
+    tool +
     ' memory add preference Workflow "short preference note"\n' +
-    loop.paths.toolPath +
+    tool +
     ' task add "description of work item"\n' +
-    loop.paths.toolPath +
+    tool +
     " task complete task-1\n\n" +
     "Backpressure rule: if you emit an event outside the allowed next-event set, the loop will reject that handoff and ask you to re-route.\n" +
     "Prompt/output/scratchpad/memory are projections or stores you can inspect with `" +
-    loop.paths.toolPath +
+    tool +
     ` inspect prompt ${iteration} --format md\`, \`` +
-    loop.paths.toolPath +
+    tool +
     " inspect scratchpad --format md`, and `" +
-    loop.paths.toolPath +
+    tool +
     " inspect memory --format md`.\n" +
     "Plain text alone does not publish an event. Prefer the event tool over the stdout completion promise.\n" +
     (loop.host
@@ -438,16 +444,29 @@ export function renderIterationPromptText(
   );
 }
 
-function shellEmitExamples(loop: LoopContext): string {
+/**
+ * On win32 the harness also writes `<toolPath>.cmd` (see
+ * `installRuntimeTools`); agents in cmd or PowerShell must call that file.
+ */
+export function windowsToolNote(
+  toolPath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== "win32") return "";
+  const tool = promptToolPath(toolPath, platform);
+  return `On Windows cmd or PowerShell, call ${tool}.cmd in place of ${tool}.\n`;
+}
+
+function shellEmitExamples(loop: LoopContext, tool: string): string {
   return (
     "Examples:\n" +
-    loop.paths.toolPath +
+    tool +
     ' emit <allowed-topic> "brief handoff summary"\n' +
-    loop.paths.toolPath +
+    tool +
     " emit " +
     loop.completion.event +
     ' "brief completion summary"\n' +
-    loop.paths.toolPath +
+    tool +
     ' emit wait.request "reason=nap; duration=300s"\n'
   );
 }
@@ -481,6 +500,7 @@ export function renderReviewPromptText(
     lastRejected,
   } = derived;
   const latestIteration = String(maxReviewPromptIteration(runLines));
+  const tool = promptToolPath(loop.paths.toolPath);
 
   const adversarialPreamble =
     iteration === 1 && loop.review.adversarialFirst
@@ -519,7 +539,7 @@ export function renderReviewPromptText(
     "You may make bounded hygiene edits to runtime-facing loop files when that will improve the next iterations.\n" +
     `Safe edit targets include \`autoloops.toml\`, \`topology.toml\`, \`harness.md\`, \`metareview.md\`, \`roles/*.md\`, \`${loop.paths.stateDir}/context.md\`, \`${loop.paths.stateDir}/plan.md\`, \`${loop.paths.stateDir}/progress.md\`, \`${loop.paths.stateDir}/logs/\`, and \`${loop.paths.stateDir}/docs/*.md\`.\n` +
     `Keep loop-owned artifacts under \`${loop.paths.stateDir}/\`; do not leave loop-owned working files at the repo root.\n` +
-    `Use \`${loop.paths.toolPath} memory add ...\` for short durable lessons or operator notes that should persist across turns.\n` +
+    `Use \`${tool} memory add ...\` for short durable lessons or operator notes that should persist across turns.\n` +
     `Do not edit app/product source code, tests, package manifests, generated state under \`${loop.paths.stateDir}/\`, or journal history during review.\n` +
     "The scratchpad is projected from journal history, so do not try to edit it directly; instead tighten prompts, working files, or archived context so future iterations stay concise.\n" +
     "Do not emit normal loop events during review.\n\n" +
@@ -544,15 +564,15 @@ export function renderReviewPromptText(
     (scratchpadText || "(empty)") +
     "\n\n" +
     "Useful commands:\n" +
-    loop.paths.toolPath +
+    tool +
     " inspect scratchpad --format md\n" +
-    loop.paths.toolPath +
+    tool +
     " inspect memory --format md\n" +
-    loop.paths.toolPath +
+    tool +
     " inspect prompt " +
     latestIteration +
     " --format md\n" +
-    loop.paths.toolPath +
+    tool +
     " inspect output " +
     latestIteration +
     " --format text\n\n" +

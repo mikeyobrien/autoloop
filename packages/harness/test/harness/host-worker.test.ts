@@ -7,7 +7,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import { resolvePosixShell, shellQuote } from "@mobrienv/autoloop-core";
 import { getRun } from "@mobrienv/autoloop-core/registry/read";
 import { resume, run } from "@mobrienv/autoloop-harness";
 import { buildLoopContext } from "@mobrienv/autoloop-harness/config-helpers";
@@ -18,7 +19,12 @@ import {
   type HostWorker,
   runHostIteration,
 } from "@mobrienv/autoloop-harness/host";
-import { buildIterationContext } from "@mobrienv/autoloop-harness/prompt";
+import {
+  buildIterationContext,
+  renderReviewPromptText,
+  windowsToolNote,
+} from "@mobrienv/autoloop-harness/prompt";
+import { promptToolPath } from "@mobrienv/autoloop-harness/tools";
 import { describe, expect, it, vi } from "vitest";
 
 const PLANNER_PROMPT =
@@ -319,18 +325,30 @@ mutate = "event"
     let shell: ReturnType<typeof spawnSync> | undefined;
     const host = scriptedHost([
       () => {
-        shell = spawnSync(
-          join(dir, ".autoloop", "runs", host.turns[0].runId, "autoloops"),
-          ["emit", "wait.request", "reason=nap"],
-          { encoding: "utf-8" },
+        // Linux/macOS run the generated #!/bin/sh tool directly (exec bit and
+        // shebang); win32 cannot exec a shebang script, so it goes through
+        // the resolved sh.exe.
+        const tool = join(
+          dir,
+          ".autoloop",
+          "runs",
+          host.turns[0].runId,
+          "autoloops",
         );
+        const args = ["emit", "wait.request", "reason=nap"];
+        shell =
+          process.platform === "win32"
+            ? spawnSync(resolvePosixShell(), [tool, ...args], {
+                encoding: "utf-8",
+              })
+            : spawnSync(tool, args, { encoding: "utf-8" });
         return { status: "completed", output: "" };
       },
       emitting("plan.ready"),
       emitting("task.complete"),
     ]);
 
-    const summary = await run(dir, "Ship", `node ${cli}`, {
+    const summary = await run(dir, "Ship", `node ${shellQuote(cli)}`, {
       workDir: dir,
       host,
     });
@@ -644,7 +662,7 @@ branches = 2
     const host = scriptedHost([]);
 
     await expect(runHost(dir, host)).rejects.toThrow(
-      `host worker cannot run preset \`${dir.split("/").pop()}\`: ${problem}`,
+      `host worker cannot run preset \`${basename(dir)}\`: ${problem}`,
     );
     expect(topics(dir)).not.toContain("loop.start");
     expect(host.turns).toEqual([]);
@@ -719,6 +737,40 @@ describe("runHostIteration", () => {
 });
 
 describe("iteration prompt tail", () => {
+  /** Render with `process.platform` reported as win32. */
+  function asWin32<T>(render: () => T): T {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      return render();
+    } finally {
+      if (platform) Object.defineProperty(process, "platform", platform);
+    }
+  }
+
+  it("shows the tool path with forward slashes on win32", () => {
+    const dir = makePreset();
+    const loop = buildLoopContext(dir, "Ship", "autoloop", { workDir: dir });
+    loop.paths.toolPath = "C:\\Users\\me\\proj\\.autoloop\\autoloops";
+    const tool = "C:/Users/me/proj/.autoloop/autoloops";
+    const prompt = asWin32(() => buildIterationContext(loop, 1).prompt);
+    const tail = prompt.slice(prompt.indexOf("Event tool: "));
+    expect(tail).not.toContain("\\");
+    expect(tail).toContain(
+      `Event tool: ${tool}\nOn Windows cmd or PowerShell, call ${tool}.cmd in place of ${tool}.\n`,
+    );
+    expect(tail).toContain(
+      `${tool} emit task.complete "brief completion summary"\n`,
+    );
+    expect(tail).toContain(`${tool} task complete task-1\n`);
+    expect(tail).toContain(`\`${tool} inspect memory --format md\``);
+
+    const review = asWin32(() => renderReviewPromptText(loop, 1, []));
+    expect(review).toContain(`Use \`${tool} memory add ...\``);
+    expect(review).toContain(`${tool} inspect output 1 --format text\n`);
+    expect(review).not.toContain(loop.paths.toolPath);
+  });
+
   function promptTail(host?: HostWorker): { prompt: string; tool: string } {
     const dir = makePreset();
     const loop = buildLoopContext(dir, "Ship", "autoloop", { workDir: dir });
@@ -726,14 +778,14 @@ describe("iteration prompt tail", () => {
     const prompt = buildIterationContext(loop, 1).prompt;
     return {
       prompt: prompt.slice(prompt.indexOf("Event tool: ")),
-      tool: loop.paths.toolPath,
+      tool: promptToolPath(loop.paths.toolPath),
     };
   }
 
   it("keeps the shell emit instructions byte-identical without a host", () => {
     const { prompt, tool } = promptTail();
     expect(prompt).toBe(
-      `Event tool: ${tool}\n\n` +
+      `Event tool: ${tool}\n${windowsToolNote(tool)}\n` +
         "Current scratchpad:\n(empty)\n\n" +
         "Use the event tool to publish your allowed handoff or completion event.\n" +
         "Examples:\n" +
@@ -754,7 +806,7 @@ describe("iteration prompt tail", () => {
   it("swaps in the host tool hint and drops shell emit and park lines", () => {
     const { prompt, tool } = promptTail(scriptedHost([]));
     expect(prompt).toBe(
-      `Event tool: ${HINT}\n\n` +
+      `Event tool: ${HINT}\n${windowsToolNote(tool)}\n` +
         "Current scratchpad:\n(empty)\n\n" +
         "Use the event tool to publish your allowed handoff or completion event.\n" +
         "Memory and task commands:\n" +

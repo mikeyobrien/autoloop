@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolvePosixShell } from "@mobrienv/autoloop-core";
 import { parseCriterion } from "./intent.js";
 
 export type Reconcile = "confirmed" | "false_done" | "unverifiable";
@@ -63,7 +64,7 @@ export function verifyPostFire(
   const failures: PostFireFailure[] = [];
   for (const command of cmds) {
     const res = spawnSync(command, {
-      shell: "/bin/sh",
+      shell: resolvePosixShell(),
       cwd: workDir,
       encoding: "utf-8",
       timeout: timeoutMs,

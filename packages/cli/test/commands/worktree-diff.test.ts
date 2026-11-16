@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,13 +14,14 @@ const GIT_ENV = {
   GIT_COMMITTER_EMAIL: "t@t",
 };
 
+function git(dir: string, ...args: string[]): void {
+  execFileSync("git", args, { cwd: dir, stdio: "pipe", env: GIT_ENV });
+}
+
 function makeGitRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-ts-wt-diff-cmd-"));
-  execSync("git init && git commit --allow-empty -m init", {
-    cwd: dir,
-    stdio: "pipe",
-    env: GIT_ENV,
-  });
+  git(dir, "init");
+  git(dir, "commit", "--allow-empty", "-m", "init");
   return dir;
 }
 
@@ -31,11 +32,8 @@ function addFileAndCommit(
   message: string,
 ): void {
   writeFileSync(join(dir, name), content);
-  execSync(`git add ${name} && git commit -m '${message}'`, {
-    cwd: dir,
-    stdio: "pipe",
-    env: GIT_ENV,
-  });
+  git(dir, "add", name);
+  git(dir, "commit", "-m", message);
 }
 
 function setupRepoWithWorktree(runId: string): string {

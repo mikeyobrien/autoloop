@@ -10,7 +10,7 @@
 // Everything here is best-effort: this module never throws.
 
 import { spawnSync } from "node:child_process";
-import { jsonField } from "@mobrienv/autoloop-core";
+import { jsonField, resolvePosixShell } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { appendEvent } from "@mobrienv/autoloop-core/journal";
 import type { StopReason } from "./types.js";
@@ -79,7 +79,7 @@ export function runFinishNotification(
     });
 
     const result = spawnSync(command, {
-      shell: true,
+      shell: resolvePosixShell(),
       input: payload,
       timeout: timeoutMs,
       env: {

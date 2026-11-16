@@ -6,7 +6,7 @@ import { cliPrintEvent } from "../cli/event-printer.js";
 import { teeEvents } from "../cli/events-sink.js";
 import { EXIT_ENV, EXIT_USAGE, fail } from "../cli/fail.js";
 import { herdrEventSink } from "../cli/herdr-sink.js";
-import { backendOverrideSpec } from "./run.js";
+import { backendOverrideSpec, posixShellError } from "./run.js";
 
 interface ResumeArgs {
   runId: string | null;
@@ -71,6 +71,14 @@ export async function dispatchResume(
   const validation = validateResumable(record, parsed);
   if (validation) {
     fail([validation.message], validation.code);
+    return;
+  }
+
+  // Same preflight as `autoloop run`: no iteration can run without a POSIX
+  // shell (Git for Windows sh.exe on win32).
+  const shellError = posixShellError();
+  if (shellError) {
+    fail(shellError, EXIT_ENV);
     return;
   }
 

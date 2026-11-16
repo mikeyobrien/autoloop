@@ -63,6 +63,33 @@ export function emitToolScript(loop: LoopContext): string {
   );
 }
 
+/**
+ * The tool path as agent prompts show it. win32: forward slashes, because
+ * Git Bash drops the backslashes of an unquoted `C:\...` path; cmd and
+ * PowerShell also accept `C:/.../autoloops.cmd`.
+ */
+export function promptToolPath(
+  toolPath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  return platform === "win32" ? toolPath.replaceAll("\\", "/") : toolPath;
+}
+
+/**
+ * Windows `.cmd` sibling of a generated `#!/bin/sh` script, so cmd- and
+ * PowerShell-based agents can call it: runs the script through the resolved
+ * POSIX shell and forwards every argument. `%` is doubled because cmd expands
+ * it even inside double quotes.
+ */
+export function windowsCmdShim(shellPath: string, scriptPath: string): string {
+  const quote = (path: string) => `"${path.replace(/%/g, "%%")}"`;
+  return (
+    "@echo off\r\n" +
+    `${quote(shellPath)} ${quote(scriptPath)} %*\r\n` +
+    "exit /b %ERRORLEVEL%\r\n"
+  );
+}
+
 export function piAdapterScript(loop: LoopContext): string {
   return (
     "#!/bin/sh\n" +

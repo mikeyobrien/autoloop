@@ -12,6 +12,11 @@ import {
   steerPiTurn,
   terminatePiSession,
 } from "@mobrienv/autoloop-backends/pi-rpc-client";
+import {
+  canSignalUsr1,
+  type KillTreeDeps,
+  killProcessTree,
+} from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import {
   quarantineJournal,
@@ -24,6 +29,7 @@ import {
   readMeta,
   updateStatus as updateWorktreeStatus,
 } from "@mobrienv/autoloop-core/worktree";
+import { terminateCommandChild } from "./command-teardown.js";
 import {
   applyRuntimeModeOverrides,
   buildLoopContext,
@@ -41,6 +47,7 @@ import {
   drainControlRequests,
   publishCapabilities,
 } from "./control/dispatch.js";
+import { installControlDrainTrigger } from "./control/drain-trigger.js";
 import { piControlAdapter } from "./control/pi-adapter.js";
 import { log, runCostUsd } from "./display.js";
 import { emit as emitCmd } from "./emit.js";
@@ -207,11 +214,7 @@ export async function driveLoop(
     if (loop.commandSession.current) {
       const session = loop.commandSession.current;
       loop.commandSession.current = undefined;
-      try {
-        process.kill(session.pid, "SIGTERM");
-      } catch {
-        /* best-effort */
-      }
+      terminateCommandChild(session.pid);
     }
     try {
       registryStop(loop, currentIteration, "interrupted");
@@ -245,7 +248,7 @@ export async function driveLoop(
   runOptions.signal?.addEventListener("abort", onAbort);
   if (runOptions.signal?.aborted) teardown();
 
-  const onSigusr1 = (): void => {
+  const onControlPoke = (): void => {
     if (!loop.controlAdapter) return;
     try {
       drainControlRequests(loop.paths.stateDir, loop.controlAdapter);
@@ -253,7 +256,6 @@ export async function driveLoop(
       /* best-effort */
     }
   };
-  process.on("SIGUSR1", onSigusr1);
 
   log(
     loop,
@@ -297,6 +299,9 @@ export async function driveLoop(
     });
     return iterateWith(ctx, iter, trackedIterate);
   };
+  // Installed right before the try whose finally stops it, so a throw from
+  // an earlier caller hook (onEvent) cannot leave the win32 poll timer running.
+  const stopControlDrain = installControlDrainTrigger(onControlPoke);
   try {
     summary = await trackedIterate(loop, startIteration);
   } catch (err: unknown) {
@@ -340,13 +345,10 @@ export async function driveLoop(
       loop.claudeSdkSession.current = undefined;
     }
     if (loop.commandSession.current) {
-      try {
-        process.kill(loop.commandSession.current.pid, "SIGTERM");
-      } catch {
-        /* best-effort */
-      }
+      terminateCommandChild(loop.commandSession.current.pid);
       loop.commandSession.current = undefined;
     }
+    stopControlDrain();
     runOptions.signal?.removeEventListener("abort", onAbort);
   }
 
@@ -547,11 +549,7 @@ export async function runParallelBranchCli(
       seeded.claudeSdkSession.current = undefined;
     }
     if (seeded.commandSession.current) {
-      try {
-        process.kill(seeded.commandSession.current.pid, "SIGTERM");
-      } catch {
-        /* best-effort */
-      }
+      terminateCommandChild(seeded.commandSession.current.pid);
       seeded.commandSession.current = undefined;
     }
   }
@@ -709,6 +707,7 @@ function iterate(loop: LoopContext, iteration: number): Promise<RunSummary> {
 
 export function buildControlAdapter(
   loop: LoopContext,
+  killDeps?: KillTreeDeps,
 ): LiveControlAdapter | undefined {
   // The host owns its own turn control; the configured backend never runs.
   if (loop.host) return undefined;
@@ -723,9 +722,11 @@ export function buildControlAdapter(
           // operator interrupt actually took effect.
           const previous = holder.operatorInterrupted;
           holder.operatorInterrupted = true;
-          try {
-            process.kill(-holder.current.process.pid, "SIGINT");
-          } catch {
+          // POSIX: SIGINT to the session's process group. win32: no group
+          // signals, so the session's process tree is terminated.
+          if (
+            !killProcessTree(holder.current.process.pid, "SIGINT", killDeps)
+          ) {
             holder.operatorInterrupted = previous;
           }
         }
@@ -761,9 +762,13 @@ export function buildControlAdapter(
     });
   }
   if (loop.backend.kind === "command") {
-    return commandControlAdapter(loop.runtime.runId, {
-      triggerInterrupt: () => escalateCommandInterrupt(loop),
-    });
+    return commandControlAdapter(
+      loop.runtime.runId,
+      {
+        triggerInterrupt: () => escalateCommandInterrupt(loop, 5000, killDeps),
+      },
+      killDeps?.platform,
+    );
   }
   return undefined;
 }
@@ -774,10 +779,20 @@ export function buildControlAdapter(
  * it never stalls the harness's own control-drain or iteration loop. No-op if
  * no `command` iteration is currently running, or if the process has already
  * exited (each `kill` call below is best-effort and independently guarded).
+ * win32 cannot deliver SIGUSR1, so it skips straight to terminating the
+ * child's process tree.
  */
-function escalateCommandInterrupt(loop: LoopContext, graceMs = 5000): void {
+function escalateCommandInterrupt(
+  loop: LoopContext,
+  graceMs = 5000,
+  killDeps?: KillTreeDeps,
+): void {
   const session = loop.commandSession.current;
   if (!session?.pid) return;
+  if (!canSignalUsr1(killDeps?.platform)) {
+    killProcessTree(session.pid, "SIGTERM", killDeps);
+    return;
+  }
   const stillRunning = () => loop.commandSession.current?.pid === session.pid;
   try {
     process.kill(session.pid, "SIGUSR1");

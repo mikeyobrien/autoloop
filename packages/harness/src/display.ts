@@ -1,5 +1,10 @@
 import { execSync } from "node:child_process";
-import { collectUsage, lineSep, listText } from "@mobrienv/autoloop-core";
+import {
+  collectUsage,
+  lineSep,
+  listText,
+  resolvePosixShell,
+} from "@mobrienv/autoloop-core";
 import { readRunLines } from "@mobrienv/autoloop-core/journal";
 import type { StepBackend } from "./events.js";
 import type { IterationContext } from "./prompt.js";
@@ -232,6 +237,7 @@ export function terminalWidth(): number {
   if (cols > 0) return cols;
   try {
     const tputResult = execSync("tput cols 2>/dev/null || true", {
+      shell: resolvePosixShell(),
       encoding: "utf-8",
       timeout: 1000,
     }).trim();

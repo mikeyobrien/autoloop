@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolvePosixShell } from "@mobrienv/autoloop-core";
 import type { HookPhase } from "@mobrienv/autoloop-core/hooks-schema";
 import { appendEvent } from "@mobrienv/autoloop-core/journal";
 import { log, printHookOutput } from "./display.js";
@@ -82,7 +83,7 @@ function spawnHook(
   }
 
   const result = spawnSync(cmd, {
-    shell: true,
+    shell: resolvePosixShell(),
     cwd: loop.paths.workDir,
     encoding: "utf-8",
     env,

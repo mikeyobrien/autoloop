@@ -117,12 +117,14 @@ export function runPostconditionGuards(
     // The harness writes its own journal/state during this very guard, so a
     // tracked `.autoloop/` would make the guard trip on its own bookkeeping.
     // clean_tree asserts the agent left the *project* clean — exclude the
-    // autoloop state dir from the assessment.
-    const stateRel = relative(workDir, dirname(loop.paths.journalFile));
+    // autoloop state dir from the assessment. Porcelain paths always use `/`.
+    const stateRel = relative(workDir, dirname(loop.paths.journalFile))
+      .split(sep)
+      .join("/");
     const dirty = porcelainStatus(workDir).filter((line) => {
       if (!stateRel || stateRel.startsWith("..")) return true;
       const path = line.slice(3); // strip the `XY ` porcelain status prefix
-      return path !== stateRel && !path.startsWith(`${stateRel}${sep}`);
+      return path !== stateRel && !path.startsWith(`${stateRel}/`);
     });
     if (dirty.length)
       violations.push({

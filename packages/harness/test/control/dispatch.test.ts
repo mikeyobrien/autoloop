@@ -90,4 +90,45 @@ describe("drainControlRequests", () => {
     expect(onRequest).toHaveBeenCalledTimes(1);
     expect(readStatuses(runStateDir)).toHaveLength(1);
   });
+
+  it("acks a stray respond as ignored on POSIX without calling the adapter", () => {
+    const onRequest = vi.fn().mockReturnValue({ state: "applied" });
+    const respond = buildRequest("run-1", "respond", {
+      questionId: "q1",
+      answer: "yes",
+    });
+    appendRequest(runStateDir, respond);
+    const drained = drainControlRequests(
+      runStateDir,
+      makeAdapter(onRequest),
+      "linux",
+    );
+    expect(drained.map((r) => r.id)).toEqual([respond.id]);
+    expect(onRequest).not.toHaveBeenCalled();
+    expect(readStatuses(runStateDir)).toMatchObject([
+      { id: respond.id, verb: "respond", state: "ignored" },
+    ]);
+  });
+
+  it("leaves respond requests to the human-ask poll on win32", () => {
+    const onRequest = vi.fn().mockReturnValue({ state: "applied" });
+    const respond = buildRequest("run-1", "respond", {
+      questionId: "q1",
+      answer: "yes",
+    });
+    const interrupt = buildRequest("run-1", "interrupt", {});
+    appendRequest(runStateDir, respond);
+    appendRequest(runStateDir, interrupt);
+    const drained = drainControlRequests(
+      runStateDir,
+      makeAdapter(onRequest),
+      "win32",
+    );
+    expect(drained.map((r) => r.id)).toEqual([interrupt.id]);
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    expect(readStatuses(runStateDir)).toMatchObject([
+      { id: interrupt.id, state: "applied" },
+    ]);
+    expect(pendingRequests(runStateDir).map((r) => r.id)).toEqual([respond.id]);
+  });
 });

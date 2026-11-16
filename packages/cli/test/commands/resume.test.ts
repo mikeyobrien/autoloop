@@ -31,6 +31,13 @@ vi.mock("../../src/cli/herdr-sink.js", () => ({
   herdrEventSink: () => herdrEventSink(),
 }));
 
+// Shell preflight stand-in: resolves by default; one test makes it fail.
+const posixShellError = vi.hoisted(() => vi.fn((): string | null => null));
+vi.mock("../../src/commands/run.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/commands/run.js")>()),
+  posixShellError: () => posixShellError(),
+}));
+
 import { dispatchResume } from "../../src/commands/resume.js";
 
 let projectDir: string;
@@ -93,6 +100,23 @@ afterEach(() => {
 });
 
 describe("dispatchResume", () => {
+  it("fails with the shell error before resuming when no POSIX shell resolves", async () => {
+    writeRegistry([baseRecord()]);
+    posixShellError.mockReturnValueOnce(
+      "autoloop needs a POSIX shell (sh.exe)",
+    );
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    await dispatchResume(["run-aaaa"]);
+    expect(resumeSpy).not.toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(
+      expect.stringContaining("autoloop needs a POSIX shell (sh.exe)"),
+    );
+    expect(process.exitCode).toBe(2);
+    stderr.mockRestore();
+  });
+
   it("resumes a terminated run, forwarding add-iterations and baseStateDir", async () => {
     writeRegistry([baseRecord()]);
     await dispatchResume(["run-aaaa", "--add-iterations", "2"]);

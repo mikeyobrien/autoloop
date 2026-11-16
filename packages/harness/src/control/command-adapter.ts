@@ -1,3 +1,4 @@
+import { canSignalUsr1 } from "@mobrienv/autoloop-core";
 import type { LiveControlAdapter } from "./adapter.js";
 import { defaultCapabilities } from "./capabilities.js";
 import type {
@@ -11,7 +12,8 @@ export interface CommandAdapterHooks {
   /**
    * Signal the in-flight `command` child: SIGUSR1 first (cooperating tools
    * can trap it and cancel gracefully), escalating internally to SIGTERM then
-   * SIGKILL if the process doesn't exit. No-op if no `command` iteration is
+   * SIGKILL if the process doesn't exit. On win32 (no SIGUSR1) it terminates
+   * the child's process tree directly. No-op if no `command` iteration is
    * currently in flight.
    */
   triggerInterrupt: () => void;
@@ -28,8 +30,9 @@ export interface CommandAdapterHooks {
 export function commandControlAdapter(
   runId: string,
   hooks: CommandAdapterHooks,
+  platform: NodeJS.Platform = process.platform,
 ): LiveControlAdapter {
-  const caps = buildCapabilities(runId);
+  const caps = buildCapabilities(runId, platform);
 
   return {
     backend: "command",
@@ -52,11 +55,16 @@ export function commandControlAdapter(
   };
 }
 
-function buildCapabilities(runId: string): ControlCapabilities {
+function buildCapabilities(
+  runId: string,
+  platform: NodeJS.Platform,
+): ControlCapabilities {
   const base = defaultCapabilities("command", runId);
   base.interrupt = {
     supported: true,
-    detail: "SIGUSR1 to child, escalating to SIGTERM/SIGKILL",
+    detail: canSignalUsr1(platform)
+      ? "SIGUSR1 to child, escalating to SIGTERM/SIGKILL"
+      : "terminates the child process tree (cooperative SIGUSR1 interrupt is not available on Windows)",
   };
   base.guidance = {
     supported: true,

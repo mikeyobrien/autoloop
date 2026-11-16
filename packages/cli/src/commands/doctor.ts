@@ -6,8 +6,13 @@
 // one command before or after a run. `--json` emits machine-readable results.
 
 import { accessSync, constants, existsSync, readFileSync } from "node:fs";
-import { delimiter, join } from "node:path";
-import { MAX_TIMER_MS, parseDurationMs } from "@mobrienv/autoloop-core";
+import { delimiter, join, win32 } from "node:path";
+import {
+  findOnWindowsPath,
+  MAX_TIMER_MS,
+  parseDurationMs,
+  resolvePosixShell,
+} from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
 import { readRegistry } from "@mobrienv/autoloop-core/registry/read";
 import { listWorktreeMetas } from "@mobrienv/autoloop-core/worktree";
@@ -46,6 +51,7 @@ export function runDoctorChecks(projectDir: string): DoctorCheck[] {
   const stateDir = join(projectDir, ".autoloop");
   const checks: DoctorCheck[] = [];
   checks.push(checkNode());
+  checks.push(checkPosixShell());
   checks.push(checkGit(projectDir));
   checks.push(checkBackendCommand(projectDir));
   checks.push(checkRuntimeLimits(projectDir));
@@ -92,6 +98,25 @@ function checkNode(): DoctorCheck {
     status: "fail",
     detail: `v${process.versions.node} is below the required Node 18`,
   };
+}
+
+/**
+ * The POSIX shell that runs backend wrappers, hooks, and the agent tool:
+ * `/bin/sh` on POSIX, Git for Windows `sh.exe` on win32. A missing shell on
+ * win32 is a failure because no loop can run without it.
+ */
+export function checkPosixShell(
+  resolveShell: () => string = resolvePosixShell,
+): DoctorCheck {
+  try {
+    return { name: "shell", status: "ok", detail: resolveShell() };
+  } catch (err) {
+    return {
+      name: "shell",
+      status: "fail",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 function checkGit(projectDir: string): DoctorCheck {
@@ -365,10 +390,26 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-function commandOnPath(executable: string): boolean {
+/**
+ * True when `executable` resolves the way the OS would run it. On win32 this
+ * is `findOnWindowsPath`, the lookup the provider spawns use: absolute PATH
+ * entries only, and a name without an extension gets each PATHEXT entry.
+ */
+export function commandOnPath(
+  executable: string,
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+  exists: (path: string) => boolean = existsSync,
+): boolean {
   if (!executable) return false;
-  if (executable.includes("/")) return existsSync(executable);
-  const pathEnv = process.env.PATH ?? "";
+  if (platform === "win32") {
+    const name = /[\\/]/.test(executable)
+      ? win32.resolve(executable)
+      : executable;
+    return findOnWindowsPath(name, env, exists) !== undefined;
+  }
+  if (executable.includes("/")) return exists(executable);
+  const pathEnv = env.PATH ?? "";
   for (const dir of pathEnv.split(delimiter)) {
     if (!dir) continue;
     try {

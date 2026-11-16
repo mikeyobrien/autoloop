@@ -17,6 +17,7 @@ import {
   printRunUsage,
   unknownPresetError,
 } from "../usage.js";
+import { checkPosixShell } from "./doctor.js";
 
 interface RunOptions {
   projectDir: string;
@@ -78,28 +79,20 @@ export async function dispatchRun(
   if (options.usageError) {
     // Parsing stops at the first invalid token, so only an --events flag parsed
     // before the error can receive the machine-readable terminal records.
-    if (options.eventsPath) {
-      let usageErrorSink: EventSink | null = null;
-      try {
-        usageErrorSink = ndjsonEventSink(options.eventsPath);
-        usageErrorSink.onEvent({
-          type: "log",
-          level: "error",
-          message: options.usageErrorMessage ?? "usage error",
-        });
-        usageErrorSink.onEvent({
-          type: "loop.finish",
-          iterations: 0,
-          stopReason: "error",
-          runId: "",
-          costUsd: 0,
-        });
-      } catch {
-        // Best-effort only: the stderr diagnostic and usage exit code remain.
-      } finally {
-        usageErrorSink?.close();
-      }
-    }
+    writeStartupErrorEvents(
+      options.eventsPath,
+      options.usageErrorMessage ?? "usage error",
+    );
+    return true;
+  }
+
+  // Every backend wrapper, hook, and agent tool script runs in a POSIX shell.
+  // On win32 that is Git for Windows sh.exe; without it no iteration can run,
+  // so fail before any run state is written.
+  const shellError = posixShellError();
+  if (shellError) {
+    fail(shellError, EXIT_ENV);
+    writeStartupErrorEvents(options.eventsPath, shellError);
     return true;
   }
 
@@ -205,6 +198,39 @@ export async function dispatchRun(
     eventSink?.close();
     herdr?.close();
   }
+}
+
+/**
+ * Write the terminal `log` + `loop.finish` records for a run that failed
+ * before starting, so an --events consumer always learns the run ended.
+ */
+function writeStartupErrorEvents(
+  eventsPath: string | undefined,
+  message: string,
+): void {
+  if (!eventsPath) return;
+  let errorSink: EventSink | null = null;
+  try {
+    errorSink = ndjsonEventSink(eventsPath);
+    errorSink.onEvent({ type: "log", level: "error", message });
+    errorSink.onEvent({
+      type: "loop.finish",
+      iterations: 0,
+      stopReason: "error",
+      runId: "",
+      costUsd: 0,
+    });
+  } catch {
+    // Best-effort only: the stderr diagnostic and exit code remain.
+  } finally {
+    errorSink?.close();
+  }
+}
+
+/** The `PosixShellNotFoundError` message, or null when a shell resolves. */
+export function posixShellError(): string | null {
+  const shell = checkPosixShell();
+  return shell.status === "ok" ? null : shell.detail;
 }
 
 /**

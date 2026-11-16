@@ -15,7 +15,7 @@ import type {
   AggregateConfig,
   BranchSpec,
 } from "@mobrienv/autoloop-harness/wave/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 function makeLoop(name: string): LoopContext {
   const workDir = mkdtempSync(join(tmpdir(), `autoloop-wave-agg-${name}-`));
@@ -233,6 +233,33 @@ describe("joinParallelBranches aggregate modes", () => {
     expect(aggregateOutcome.aggregateTimedOut).toBe(true);
     for (const r of results) {
       expect(r.stopReason).toBe("wave_aggregate_timeout");
+    }
+  });
+
+  it("waits 100 ms between polls with Atomics.wait, not a sleep process", () => {
+    const loop = makeLoop("poll-wait");
+    const iter = buildIterationContext(loop, 1);
+    const waveDir = waveScratch(loop);
+    const specs = [makeBranchSpec(waveDir, 1)];
+    const aggregate: AggregateConfig = { mode: "timeout", timeoutMs: 250 };
+    const wait = vi.spyOn(Atomics, "wait");
+    try {
+      const started = Date.now();
+      const { results } = joinParallelBranches(
+        loop,
+        iter,
+        "wave-test",
+        specs,
+        aggregate,
+        started,
+      );
+      expect(results[0]?.stopReason).toBe("wave_aggregate_timeout");
+      expect(Date.now() - started).toBeGreaterThanOrEqual(240);
+      expect(wait).toHaveBeenCalledWith(expect.any(Int32Array), 0, 0, 100);
+      expect(wait.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(wait.mock.calls.length).toBeLessThanOrEqual(4);
+    } finally {
+      wait.mockRestore();
     }
   });
 });

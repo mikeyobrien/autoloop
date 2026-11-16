@@ -1,5 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
+import {
+  jsonField,
+  jsonFieldRaw,
+  resolvePosixShell,
+} from "@mobrienv/autoloop-core";
 import {
   appendEvent,
   extractField,
@@ -37,7 +41,7 @@ export function runProgressMetric(
   const cmd = loop.progress?.metricCmd?.trim();
   if (!cmd) return null;
   const res = spawnSync(cmd, {
-    shell: "/bin/sh",
+    shell: resolvePosixShell(),
     cwd: loop.paths.workDir,
     encoding: "utf-8",
     timeout: loop.progress?.timeoutMs ?? 60000,

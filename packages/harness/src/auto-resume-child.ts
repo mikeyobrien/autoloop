@@ -18,6 +18,7 @@
 import { spawn } from "node:child_process";
 import { appendFileSync, closeSync, openSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { resolvePosixShell } from "@mobrienv/autoloop-core";
 import { openWaitFromLines } from "@mobrienv/autoloop-harness/wait";
 
 interface SleepSpec {
@@ -128,9 +129,10 @@ setTimeout(() => {
       `duration_ms=${spec.durationMs}`,
   );
   const resumeCmd = `${spec.selfCommand || "autoloop"} resume ${spec.runId}`;
-  const child = spawn("/bin/sh", ["-c", resumeCmd], {
+  const child = spawn(resolvePosixShell(), ["-c", resumeCmd], {
     cwd: spec.projectRoot,
     detached: true,
+    windowsHide: true,
     stdio: ["ignore", logFd, logFd],
     env: { ...process.env, AUTOLOOP_PROJECT_DIR: spec.projectRoot },
   });

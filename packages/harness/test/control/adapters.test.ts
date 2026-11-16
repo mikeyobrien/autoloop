@@ -287,14 +287,26 @@ describe("commandControlAdapter", () => {
   }
 
   it("reports interrupt supported and no live-steering guidance", () => {
-    const adapter = commandControlAdapter("run-1", makeHooks());
+    const adapter = commandControlAdapter("run-1", makeHooks(), "linux");
     const caps = adapter.capabilities();
     expect(caps.backend).toBe("command");
     expect(caps.interrupt.supported).toBe(true);
-    expect(caps.interrupt.detail).toContain("SIGUSR1");
+    expect(caps.interrupt.detail).toBe(
+      "SIGUSR1 to child, escalating to SIGTERM/SIGKILL",
+    );
     expect(caps.guidance.supported).toBe(true);
     expect(caps.guidance.detail).toContain("journal-durable");
     expect(caps.inspect.supported).toBe(true);
+  });
+
+  it("reports that cooperative interrupt is not available on win32", () => {
+    const adapter = commandControlAdapter("run-1", makeHooks(), "win32");
+    const caps = adapter.capabilities();
+    expect(caps.interrupt.supported).toBe(true);
+    expect(caps.interrupt.detail).toContain(
+      "terminates the child process tree",
+    );
+    expect(caps.interrupt.detail).toContain("not available on Windows");
   });
 
   it("invokes triggerInterrupt on interrupt verb", () => {

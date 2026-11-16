@@ -1,5 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { jsonBool, jsonField, jsonFieldRaw } from "@mobrienv/autoloop-core";
+import {
+  jsonBool,
+  jsonField,
+  jsonFieldRaw,
+  resolvePosixShell,
+} from "@mobrienv/autoloop-core";
 import {
   appendEvent,
   appendOperatorEvent,
@@ -123,7 +128,7 @@ export function runIntentCriteria(
   for (const c of checked) {
     const check = c.check as string;
     const res = spawnSync(check, {
-      shell: "/bin/sh",
+      shell: resolvePosixShell(),
       cwd: loop.paths.workDir,
       encoding: "utf-8",
       timeout: loop.acceptance.timeoutMs,

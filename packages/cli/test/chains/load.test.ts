@@ -220,7 +220,9 @@ describe("listKnownPresets — symlinks in user presets dir", () => {
       import.meta.dirname,
       "../../../presets/presets/autocode",
     );
-    symlinkSync(target, join(userPresets, "linked-preset"), "dir");
+    // "junction": a directory link Windows creates without admin rights;
+    // the type is ignored on POSIX.
+    symlinkSync(target, join(userPresets, "linked-preset"), "junction");
 
     const prev = process.env.XDG_CONFIG_HOME;
     process.env.XDG_CONFIG_HOME = tmp;
