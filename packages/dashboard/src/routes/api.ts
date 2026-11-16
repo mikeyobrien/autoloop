@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 import {
   appendOperatorEvent,
   latestIterationForRun,
@@ -27,6 +27,19 @@ function enrichWithWorktreeMeta(stateDir: string, record: RunRecord): void {
 
 function enrichRecords(stateDir: string, records: RunRecord[]): void {
   for (const r of records) enrichWithWorktreeMeta(stateDir, r);
+}
+
+/**
+ * Spawn options for a dashboard-launched run, which must outlive the
+ * dashboard. On win32 a non-detached child is killed when the parent exits,
+ * so it stays detached (no console of its own) and hides any window.
+ */
+export function dashboardRunSpawnOptions(
+  platform: NodeJS.Platform = process.platform,
+): { detached: true; windowsHide?: true } {
+  return platform === "win32"
+    ? { detached: true, windowsHide: true }
+    : { detached: true };
 }
 
 /** Categorized + enriched run list — shared by /runs and /stream. */
@@ -170,7 +183,7 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     if (filePath.includes("..")) {
       return c.json({ error: "path traversal not allowed" }, 400);
     }
-    if (filePath.startsWith("/")) {
+    if (filePath.startsWith("/") || isAbsolute(filePath)) {
       return c.json({ error: "absolute paths not allowed" }, 400);
     }
     if (!filePath.endsWith(".md")) {
@@ -193,7 +206,7 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     try {
       const realPath = realpathSync(fullPath);
       const realWorkDir = realpathSync(resolve(workDir));
-      if (!realPath.startsWith(realWorkDir + "/")) {
+      if (!realPath.startsWith(realWorkDir + sep)) {
         return c.json({ error: "path traversal not allowed" }, 400);
       }
     } catch {
@@ -271,7 +284,7 @@ export function apiRoutes(ctx: DashboardContext): Hono {
     const [command, ...commandArgs] = splitSelfCommand(ctx.selfCmd);
     const child = spawn(command, [...commandArgs, ...args], {
       cwd: ctx.projectDir,
-      detached: true,
+      ...dashboardRunSpawnOptions(),
       stdio: "ignore",
     });
     child.once("error", (error) => {

@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { canSignalUsr1 } from "@mobrienv/autoloop-core";
 import { appendOperatorEvent } from "@mobrienv/autoloop-core/journal";
 import { mergedFindRunByPrefix } from "@mobrienv/autoloop-core/registry/discover";
 import type { RunRecord } from "@mobrienv/autoloop-core/registry/types";
@@ -308,9 +309,18 @@ function describeInterrupt(caps: ReturnType<typeof readCapabilities>): string {
   return caps.interrupt.detail || "not supported";
 }
 
-function pokeParent(run: RunRecord): void {
+/**
+ * Nudge the running harness to drain its control queue (SIGUSR1). On win32
+ * SIGUSR1 cannot be delivered; the harness polls the queue on a timer, so the
+ * file-backed request alone is enough.
+ */
+export function pokeParent(
+  run: RunRecord,
+  platform: NodeJS.Platform = process.platform,
+): void {
   if (!run.pid) return;
   if (run.status !== "running") return;
+  if (!canSignalUsr1(platform)) return;
   try {
     process.kill(run.pid, "SIGUSR1");
   } catch {

@@ -8,6 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AcpSession } from "@mobrienv/autoloop-backends/acp-client";
+import type { KillTreeDeps } from "@mobrienv/autoloop-core";
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LoopContext } from "../../src/types.js";
@@ -39,6 +40,16 @@ import {
   readStatuses,
 } from "../../src/control/queue.js";
 import { buildControlAdapter } from "../../src/index.js";
+
+// Model the POSIX process-group kill on every platform (the process.kill spy
+// stands in for the kernel); taskkill must never run against the fake pid.
+const posixKillDeps: KillTreeDeps = {
+  platform: "linux",
+  killGroup: (pid, signal) => process.kill(-pid, signal),
+  taskkill: () => {
+    throw new Error("taskkill must not run in POSIX mode");
+  },
+};
 
 function makeAcpLoop(): LoopContext {
   const workDir = mkdtempSync(join(tmpdir(), "autoloop-iteration-acp-"));
@@ -223,7 +234,7 @@ describe("runIteration ACP operator guide interrupt", () => {
 
     // Wire the control adapter exactly as the harness does: the hook is
     // invoked by drainControlRequests while the prompt is pending.
-    const adapter = buildControlAdapter(loop);
+    const adapter = buildControlAdapter(loop, posixKillDeps);
 
     // Queue the operator guide request before the iteration starts.
     const request = buildRequest(
@@ -320,7 +331,7 @@ describe("runIteration ACP operator guide interrupt", () => {
       throw new Error("kill failed");
     });
 
-    const adapter = buildControlAdapter(loop);
+    const adapter = buildControlAdapter(loop, posixKillDeps);
     const request = buildRequest(
       loop.runtime.runId,
       "guide",
@@ -398,6 +409,111 @@ describe("runIteration ACP operator guide interrupt", () => {
       const summary = await iterationPromise;
       expect(summary.stopReason).toBe("backend_failed");
     } finally {
+      rmSync(loop.paths.workDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("buildControlAdapter interrupt on win32", () => {
+  function win32KillDeps(taskkillStatus: number | null) {
+    const taskkill = vi.fn((_pid: number) => taskkillStatus);
+    const killGroup = vi.fn();
+    const deps: KillTreeDeps = { platform: "win32", killGroup, taskkill };
+    return { deps, taskkill, killGroup };
+  }
+
+  let killSpy: MockInstance<typeof process.kill>;
+  beforeEach(() => {
+    killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+  });
+  afterEach(() => {
+    killSpy.mockRestore();
+  });
+
+  it("terminates the ACP session process tree instead of a group SIGINT", () => {
+    const loop = makeAcpLoop();
+    loop.acpSession.current = {
+      process: { pid: 4321 },
+    } as unknown as AcpSession;
+    const { deps, taskkill, killGroup } = win32KillDeps(0);
+    try {
+      const adapter = buildControlAdapter(loop, deps);
+      const ack = adapter?.onRequest(
+        buildRequest(loop.runtime.runId, "interrupt", {}),
+      );
+      expect(ack?.state).toBe("applied");
+      expect(taskkill).toHaveBeenCalledWith(4321);
+      expect(killGroup).not.toHaveBeenCalled();
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(loop.acpSession.operatorInterrupted).toBe(true);
+    } finally {
+      rmSync(loop.paths.workDir, { recursive: true, force: true });
+    }
+  });
+
+  it("restores the operator flag when the ACP process tree is already gone", () => {
+    const loop = makeAcpLoop();
+    loop.acpSession.current = {
+      process: { pid: 4321 },
+    } as unknown as AcpSession;
+    const { deps } = win32KillDeps(128);
+    try {
+      buildControlAdapter(loop, deps)?.onRequest(
+        buildRequest(loop.runtime.runId, "interrupt", {}),
+      );
+      expect(loop.acpSession.operatorInterrupted).toBeUndefined();
+    } finally {
+      rmSync(loop.paths.workDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips SIGUSR1 and terminates the command child tree directly", () => {
+    const loop = makeAcpLoop();
+    loop.backend.kind = "command";
+    loop.commandSession.current = { pid: 5678 } as NonNullable<
+      LoopContext["commandSession"]["current"]
+    >;
+    const { deps, taskkill } = win32KillDeps(0);
+    vi.useFakeTimers();
+    try {
+      const adapter = buildControlAdapter(loop, deps);
+      expect(adapter?.capabilities().interrupt.detail).toContain(
+        "not available on Windows",
+      );
+      const ack = adapter?.onRequest(
+        buildRequest(loop.runtime.runId, "interrupt", {}),
+      );
+      expect(ack?.state).toBe("applied");
+      expect(taskkill).toHaveBeenCalledWith(5678);
+      expect(killSpy).not.toHaveBeenCalled();
+      // No grace-period escalation is scheduled after the tree kill.
+      vi.advanceTimersByTime(20_000);
+      expect(taskkill).toHaveBeenCalledTimes(1);
+      expect(killSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      rmSync(loop.paths.workDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the POSIX SIGUSR1 then SIGTERM then SIGKILL escalation", () => {
+    const loop = makeAcpLoop();
+    loop.backend.kind = "command";
+    loop.commandSession.current = { pid: 5678 } as NonNullable<
+      LoopContext["commandSession"]["current"]
+    >;
+    vi.useFakeTimers();
+    try {
+      buildControlAdapter(loop, posixKillDeps)?.onRequest(
+        buildRequest(loop.runtime.runId, "interrupt", {}),
+      );
+      expect(killSpy).toHaveBeenCalledWith(5678, "SIGUSR1");
+      vi.advanceTimersByTime(5000);
+      expect(killSpy).toHaveBeenCalledWith(5678, "SIGTERM");
+      vi.advanceTimersByTime(5000);
+      expect(killSpy).toHaveBeenCalledWith(5678, "SIGKILL");
+    } finally {
+      vi.useRealTimers();
       rmSync(loop.paths.workDir, { recursive: true, force: true });
     }
   });

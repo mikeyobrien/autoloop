@@ -1,13 +1,19 @@
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decodeEvent } from "@mobrienv/autoloop-core";
+import { decodeEvent, shellQuote } from "@mobrienv/autoloop-core";
 import { describe, expect, it } from "vitest";
 import {
   classifyStopReason,
   type FinishNotificationOptions,
   runFinishNotification,
 } from "../../src/notify.js";
+
+/** `[notify]` TOML with a shell command (a TOML basic string, so Windows
+ * path backslashes survive). */
+function notifyToml(command: string, extra = ""): string {
+  return `[notify]\ncommand = ${JSON.stringify(command)}\n${extra}`;
+}
 
 function makeProject(notifyToml: string): { dir: string; journal: string } {
   const dir = mkdtempSync(join(tmpdir(), "autoloop-notify-test-"));
@@ -72,7 +78,10 @@ describe("runFinishNotification", () => {
 
   it("skips when the stop-reason class is not in notify.on", () => {
     const { dir, journal } = makeProject(
-      `[notify]\ncommand = "touch ${join(tmpdir(), "should-not-exist")}"\non = "completed"\n`,
+      notifyToml(
+        `touch ${shellQuote(join(tmpdir(), "should-not-exist"))}`,
+        'on = "completed"\n',
+      ),
     );
     const result = runFinishNotification(
       baseOpts(dir, journal, { stopReason: "backend_failed" }),
@@ -88,7 +97,9 @@ describe("runFinishNotification", () => {
     const stdinOut = join(dir, "stdin.out");
     writeFileSync(
       join(dir, "autoloops.toml"),
-      `[notify]\ncommand = "env | grep ^AUTOLOOP_ > ${envOut}; cat > ${stdinOut}"\n`,
+      notifyToml(
+        `env | grep ^AUTOLOOP_ > ${shellQuote(envOut)}; cat > ${shellQuote(stdinOut)}`,
+      ),
     );
 
     const result = runFinishNotification(
@@ -146,33 +157,37 @@ describe("runFinishNotification", () => {
     }
   });
 
-  it("enforces notify.timeout_ms and journals notify.failed", () => {
-    const { dir, journal } = makeProject(
-      '[notify]\ncommand = "sleep 5"\ntimeout_ms = 200\n',
-    );
-    const started = Date.now();
-    const result = runFinishNotification(baseOpts(dir, journal));
-    const elapsed = Date.now() - started;
+  // win32: spawnSync timeout cannot kill the Git sh.exe launcher's process tree
+  it.skipIf(process.platform === "win32")(
+    "enforces notify.timeout_ms and journals notify.failed",
+    () => {
+      const { dir, journal } = makeProject(
+        notifyToml("sleep 5", "timeout_ms = 200\n"),
+      );
+      const started = Date.now();
+      const result = runFinishNotification(baseOpts(dir, journal));
+      const elapsed = Date.now() - started;
 
-    expect(result.status).toBe("failed");
-    expect(elapsed).toBeLessThan(4000);
+      expect(result.status).toBe("failed");
+      expect(elapsed).toBeLessThan(4000);
 
-    const events = journalEvents(journal);
-    expect(events).toHaveLength(1);
-    expect(events[0]?.topic).toBe("notify.failed");
-    if (events[0]?.shape === "fields") {
-      expect(events[0].fields.error).toContain("ETIMEDOUT");
-    } else {
-      throw new Error("expected fields event");
-    }
-  });
+      const events = journalEvents(journal);
+      expect(events).toHaveLength(1);
+      expect(events[0]?.topic).toBe("notify.failed");
+      if (events[0]?.shape === "fields") {
+        expect(events[0].fields.error).toContain("ETIMEDOUT");
+      } else {
+        throw new Error("expected fields event");
+      }
+    },
+  );
 
   it("respects notify.on=stopped for non-terminal-class reasons", () => {
     const { dir, journal } = makeProject("");
     const marker = join(dir, "stopped.marker");
     writeFileSync(
       join(dir, "autoloops.toml"),
-      `[notify]\ncommand = "touch ${marker}"\non = "stopped"\n`,
+      notifyToml(`touch ${shellQuote(marker)}`, 'on = "stopped"\n'),
     );
     const result = runFinishNotification(
       baseOpts(dir, journal, { stopReason: "max_iterations" }),

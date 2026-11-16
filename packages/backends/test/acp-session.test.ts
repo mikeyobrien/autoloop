@@ -1,10 +1,37 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { delimiter } from "node:path";
 import {
   initAcpSession,
   sendAcpPrompt,
   terminateAcpSession,
 } from "@mobrienv/autoloop-backends/acp-client";
+import {
+  killProcessTree,
+  processGroupSpawnOptions,
+} from "@mobrienv/autoloop-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveSpawnTarget } from "../src/spawn-target.js";
+
+// win32: killProcessTree runs `taskkill /T /F`; never aim it at the fake pid.
+vi.mock("@mobrienv/autoloop-core", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@mobrienv/autoloop-core")>();
+  return {
+    ...actual,
+    killProcessTree: vi.fn((pid: number, signal?: NodeJS.Signals) =>
+      process.platform === "win32" ? true : actual.killProcessTree(pid, signal),
+    ),
+  };
+});
+
+// Keep the spawn assertions independent of provider shims installed on the
+// host PATH (e.g. a real `kiro-cli.cmd` on win32).
+vi.mock("../src/spawn-target.js", () => ({
+  resolveSpawnTarget: vi.fn((command: string, args: string[]) => ({
+    command,
+    args,
+  })),
+}));
 
 vi.mock("node:child_process", () => {
   const EventEmitter = require("node:events");
@@ -21,6 +48,9 @@ vi.mock("node:child_process", () => {
     child.stderr = new Readable({ read() {} });
     child.pid = 12345;
     child.killed = false;
+    // A live ChildProcess starts with both null.
+    (child as any).exitCode = null;
+    (child as any).signalCode = null;
     child.kill = vi.fn(() => {
       child.killed = true;
       process.nextTick(() => {
@@ -56,7 +86,7 @@ vi.mock("@agentclientprotocol/sdk", () => ({
 }));
 
 describe("initAcpSession", () => {
-  it("spawns child with detached: true for process group cleanup", async () => {
+  it("spawns child with the process-group options for tree cleanup", async () => {
     const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
     const session = await initAcpSession({
       command: "kiro-cli",
@@ -65,12 +95,55 @@ describe("initAcpSession", () => {
       trustAllTools: true,
     });
 
+    // POSIX: { detached: true }; win32: { detached: false, windowsHide: true }.
     expect(spawnFn).toHaveBeenCalledWith(
       "kiro-cli",
       ["--acp"],
-      expect.objectContaining({ detached: true }),
+      expect.objectContaining(processGroupSpawnOptions()),
+    );
+    expect(spawnFn.mock.calls.at(-1)?.[2]).not.toHaveProperty(
+      "windowsVerbatimArguments",
     );
     expect(session.sessionId).toBe("test-session");
+  });
+
+  it("ignores a stdin pipe error so teardown does not crash", async () => {
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    await initAcpSession({
+      command: "kiro-cli",
+      args: ["--acp"],
+      cwd: "/tmp",
+      trustAllTools: true,
+    });
+    const child = spawnFn.mock.results.at(-1)?.value as ChildProcess;
+    const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE" });
+    expect(() => child.stdin?.emit("error", epipe)).not.toThrow();
+  });
+
+  it("spawns a win32 cmd shim through the resolved cmd.exe target", async () => {
+    const spawnFn = spawn as unknown as ReturnType<typeof vi.fn>;
+    vi.mocked(resolveSpawnTarget).mockReturnValueOnce({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      args: ["/d", "/s", "/c", '"C:\\npm\\npx.cmd ^"-y^""'],
+      windowsVerbatimArguments: true,
+    });
+    await initAcpSession({
+      command: "npx",
+      args: ["-y"],
+      cwd: "/tmp",
+      trustAllTools: true,
+      env: { PATH: "C:\\npm" },
+    });
+
+    expect(resolveSpawnTarget).toHaveBeenLastCalledWith("npx", ["-y"], {
+      env: { PATH: "C:\\npm" },
+      cwd: "/tmp",
+    });
+    expect(spawnFn).toHaveBeenLastCalledWith(
+      "C:\\Windows\\System32\\cmd.exe",
+      ["/d", "/s", "/c", '"C:\\npm\\npx.cmd ^"-y^""'],
+      expect.objectContaining({ windowsVerbatimArguments: true }),
+    );
   });
 
   it("times out a wedged handshake and reaps the child", async () => {
@@ -151,7 +224,7 @@ describe("initAcpSession", () => {
       trustAllTools: true,
       environmentPolicy: "hardened",
       env: {
-        PATH: "/usr/bin:/tmp/project/bin",
+        PATH: ["/usr/bin", "/tmp/project/bin"].join(delimiter),
         NORMAL_PROJECT_FLAG: "enabled",
         NODE_OPTIONS: "--require ./owned.js",
       },
@@ -258,8 +331,11 @@ describe("terminateAcpSession", () => {
 
     await terminateAcpSession(session);
 
-    // process.kill(-pid) targets the process group — requires detached: true
-    expect(killSpy).toHaveBeenCalledWith(-12345, "SIGTERM");
+    expect(killProcessTree).toHaveBeenCalledWith(12345, "SIGTERM");
+    if (process.platform !== "win32") {
+      // process.kill(-pid) targets the process group — requires detached: true
+      expect(killSpy).toHaveBeenCalledWith(-12345, "SIGTERM");
+    }
   });
 
   it("falls back to child.kill if process group kill fails", async () => {
@@ -278,5 +354,39 @@ describe("terminateAcpSession", () => {
     await terminateAcpSession(session);
 
     expect(session.process.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it.each([
+    ["win32", "exitCode", 0],
+    ["win32", "signalCode", "SIGINT"],
+    ["linux", "exitCode", 0],
+    ["linux", "signalCode", "SIGINT"],
+  ])("handles a child that already exited on %s (%s set)", async (platform, field, value) => {
+    const session = await initAcpSession({
+      command: "kiro-cli",
+      args: ["--acp"],
+      cwd: "/tmp",
+      trustAllTools: true,
+    });
+    // win32: an operator interrupt's taskkill ends the child outside Node,
+    // so `killed` stays false; the pid may already be reused -> no kill.
+    // POSIX: the pgid stays reserved while group members live -> group kill.
+    (session.process as any)[field] = value;
+    vi.mocked(killProcessTree).mockClear();
+    const real = process.platform;
+    Object.defineProperty(process, "platform", { value: platform });
+    try {
+      await terminateAcpSession(session);
+    } finally {
+      Object.defineProperty(process, "platform", { value: real });
+    }
+
+    if (platform === "win32") {
+      expect(killProcessTree).not.toHaveBeenCalled();
+    } else {
+      expect(killProcessTree).toHaveBeenCalledWith(12345, "SIGKILL");
+      expect(killProcessTree).toHaveBeenCalledTimes(1);
+    }
+    expect(session.process.kill).not.toHaveBeenCalled();
   });
 });

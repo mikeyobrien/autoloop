@@ -8,6 +8,10 @@ export {
 export { claudeSdkControlAdapter } from "./claude-sdk-adapter.js";
 export { drainControlRequests, publishCapabilities } from "./dispatch.js";
 export {
+  CONTROL_POLL_INTERVAL_MS,
+  installControlDrainTrigger,
+} from "./drain-trigger.js";
+export {
   baseStateDirFromRunState,
   controlCapabilitiesFile,
   controlDir,

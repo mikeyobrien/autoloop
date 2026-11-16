@@ -26,12 +26,20 @@ export function autoResumeChildPath(): string {
  * registry lives in. The resume CLI resolves the registry from
  * `AUTOLOOP_PROJECT_DIR` + `.autoloop/registry.jsonl`, so the child must be
  * re-anchored here — it does not inherit the engine's environment.
+ * On win32 the registry path is built with `join`, so it has `\` separators.
  */
-export function registryProjectRoot(registryFile: string): string {
-  const firstSep = registryFile.lastIndexOf("/");
+export function registryProjectRoot(
+  registryFile: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const lastSep = (path: string): number =>
+    platform === "win32"
+      ? Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"))
+      : path.lastIndexOf("/");
+  const firstSep = lastSep(registryFile);
   const stateParent =
     firstSep > 0 ? registryFile.slice(0, firstSep) : registryFile;
-  const secondSep = stateParent.lastIndexOf("/");
+  const secondSep = lastSep(stateParent);
   return secondSep > 0 ? stateParent.slice(0, secondSep) : stateParent;
 }
 
@@ -67,6 +75,9 @@ export function armAutoResume(
     [autoResumeChildPath(), JSON.stringify(spec)],
     {
       detached: true,
+      // win32: without this the detached sleeper opens its own console
+      // window, and closing it cancels the auto-resume. Ignored on POSIX.
+      windowsHide: true,
       stdio: "ignore",
       env: childEnv,
     },

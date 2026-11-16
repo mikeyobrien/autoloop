@@ -7,6 +7,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach } from "vitest";
 
 // Pin the timezone (some renderers format timestamps in local time).
 process.env.TZ = "UTC";
@@ -45,3 +46,10 @@ if (!process.env.GIT_CONFIG_COUNT) {
   process.env.GIT_CONFIG_KEY_1 = "core.fsmonitor";
   process.env.GIT_CONFIG_VALUE_1 = "false";
 }
+
+// Give the worker one event-loop turn after each test. Integration tests block
+// the worker with synchronous CLI spawns; back to back they leave vitest's
+// queued `onTaskUpdate` reply unread, and after 60 s of blocked time its RPC
+// timer fires first ("[vitest-worker]: Timeout calling onTaskUpdate"). Seen on
+// Windows, where test/integration/run-loop.test.ts blocks for about 90 s.
+afterEach(() => new Promise<void>((resolve) => setImmediate(resolve)));

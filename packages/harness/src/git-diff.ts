@@ -1,6 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync, type Stats, statSync } from "node:fs";
+import { readdirSync, readFileSync, type Stats, statSync } from "node:fs";
 import { join } from "node:path";
+
+/** Untracked files above this size are skipped (the old `cat` maxBuffer). */
+const UNTRACKED_READ_LIMIT_BYTES = 20 * 1024 * 1024;
 
 export interface AddedLine {
   file: string;
@@ -41,15 +44,21 @@ export function collectAddedLines(workDir: string): AddedLine[] {
     }
   }
   for (const file of untrackedFiles(workDir)) {
-    const content = spawnSync("cat", [file], {
-      cwd: workDir,
-      encoding: "utf-8",
-      maxBuffer: 20 * 1024 * 1024,
-    });
-    if (content.status === 0) {
-      for (const text of (content.stdout ?? "").split("\n")) {
-        lines.push({ file, text });
-      }
+    // Read in-process: `cat` is not on PATH in a default Git for Windows
+    // install, which would silently skip untracked content.
+    let content: string;
+    try {
+      const path = join(workDir, file);
+      // Regular files only: a device or FIFO (also through a symlink) can
+      // report size 0 and never reach EOF.
+      const st = statSync(path);
+      if (!st.isFile() || st.size > UNTRACKED_READ_LIMIT_BYTES) continue;
+      content = readFileSync(path, "utf-8");
+    } catch {
+      continue;
+    }
+    for (const text of content.split("\n")) {
+      lines.push({ file, text });
     }
   }
   return lines;

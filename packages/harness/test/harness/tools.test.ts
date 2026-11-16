@@ -1,6 +1,9 @@
+import { windowsToolNote } from "@mobrienv/autoloop-harness/prompt";
 import {
   emitToolScript,
   piAdapterScript,
+  promptToolPath,
+  windowsCmdShim,
 } from "@mobrienv/autoloop-harness/tools";
 import type { LoopContext } from "@mobrienv/autoloop-harness/types";
 import { describe, expect, it } from "vitest";
@@ -133,5 +136,51 @@ describe("piAdapterScript", () => {
     } as any);
     const script = piAdapterScript(loop);
     expect(script).toContain('exec node dist/main.js pi-adapter "$@"');
+  });
+});
+
+describe("windowsCmdShim", () => {
+  it("runs the script through the shell and forwards every argument", () => {
+    const shim = windowsCmdShim(
+      "C:\\Program Files\\Git\\bin\\sh.exe",
+      "C:\\My Project\\.autoloop\\autoloops",
+    );
+    expect(shim).toBe(
+      "@echo off\r\n" +
+        '"C:\\Program Files\\Git\\bin\\sh.exe" "C:\\My Project\\.autoloop\\autoloops" %*\r\n' +
+        "exit /b %ERRORLEVEL%\r\n",
+    );
+  });
+
+  it("doubles percent signs so cmd does not expand them", () => {
+    const shim = windowsCmdShim("C:\\sh.exe", "C:\\100%\\autoloops");
+    expect(shim).toContain('"C:\\100%%\\autoloops" %*');
+  });
+});
+
+describe("windowsToolNote", () => {
+  it("points cmd and PowerShell agents at the .cmd sibling on win32", () => {
+    expect(windowsToolNote("C:\\s\\autoloops", "win32")).toBe(
+      "On Windows cmd or PowerShell, call C:/s/autoloops.cmd in place of C:/s/autoloops.\n",
+    );
+  });
+
+  it("adds nothing on POSIX", () => {
+    expect(windowsToolNote("/s/autoloops", "linux")).toBe("");
+  });
+});
+
+describe("promptToolPath", () => {
+  it("shows the tool path with forward slashes on win32", () => {
+    expect(promptToolPath("C:\\Users\\me\\.autoloop\\autoloops", "win32")).toBe(
+      "C:/Users/me/.autoloop/autoloops",
+    );
+  });
+
+  it("keeps the tool path unchanged on POSIX", () => {
+    expect(promptToolPath("/s/a\\b/autoloops", "linux")).toBe(
+      "/s/a\\b/autoloops",
+    );
+    expect(promptToolPath("/s/autoloops")).toBe("/s/autoloops");
   });
 });

@@ -151,9 +151,10 @@ describe("memory plugin registry", () => {
       "fixtures",
       "external-memory-plugin.cjs",
     );
+    // TOML literal string: Windows paths contain backslashes.
     writeFileSync(
       join(tmpDir, "autoloops.toml"),
-      `[memory]\nkind = "honcho"\nmodule = "${fixture}"\n`,
+      `[memory]\nkind = "honcho"\nmodule = '${fixture}'\n`,
     );
     const plugin = resolveMemoryPluginForProject(tmpDir);
     expect(plugin.kind).toBe("honcho");

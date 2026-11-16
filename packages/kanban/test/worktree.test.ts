@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -56,7 +56,7 @@ describe("createTaskWorktree", () => {
   it("throws when worktreeDir already exists", () => {
     const repo = makeGitRepo();
     const wt = join(repo, "..", `wt-existing-${Date.now()}`);
-    execSync(`mkdir -p "${wt}"`, { stdio: "pipe" });
+    mkdirSync(wt, { recursive: true });
     expect(() =>
       createTaskWorktree({
         repoRoot: repo,

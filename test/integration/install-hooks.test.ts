@@ -54,7 +54,8 @@ afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-describe("bin/install-hooks", () => {
+// win32: install-hooks links hooks with `ln -s` and the test checks POSIX exec bits; neither exists on native Windows.
+describe.skipIf(process.platform === "win32")("bin/install-hooks", () => {
   it("creates symlinks for pre-commit and pre-push", () => {
     const out = runInstaller(tempDir);
 

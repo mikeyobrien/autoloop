@@ -120,7 +120,9 @@ describe("resolveBackendEnvironment", () => {
   it("sanitizes only when hardened is explicit", () => {
     const env = resolveBackendEnvironment(
       {
-        PATH: "/workspace/project/node_modules/.bin:/usr/bin",
+        PATH: ["/workspace/project/node_modules/.bin", "/usr/bin"].join(
+          delimiter,
+        ),
         NODE_OPTIONS: "--require ./project-hook.js",
       },
       { projectDir: "/workspace/project", policy: "hardened" },
@@ -128,4 +130,45 @@ describe("resolveBackendEnvironment", () => {
     expect(env.PATH).toBe("/usr/bin");
     expect(env.NODE_OPTIONS).toBeUndefined();
   });
+});
+
+describe("sanitizeBackendEnvironment PATH key casing", () => {
+  const source = {
+    Path: ["/workspace/project/node_modules/.bin", "/usr/bin"].join(delimiter),
+  };
+
+  it("sanitizes a win32 `Path` key (env names are case-insensitive there)", () => {
+    const env = sanitizeBackendEnvironment(
+      source,
+      { projectDir: "/workspace/project" },
+      "win32",
+    );
+    expect(env.Path).toBe("/usr/bin");
+  });
+
+  it("leaves a non-PATH `Path` variable alone on POSIX", () => {
+    const env = sanitizeBackendEnvironment(
+      source,
+      { projectDir: "/workspace/project" },
+      "linux",
+    );
+    expect(env.Path).toBe(source.Path);
+  });
+
+  // win32: only Windows paths have drive letters.
+  it.runIf(process.platform === "win32")(
+    "keeps PATH entries on another drive than the project",
+    () => {
+      const projectDir = "C:\\workspace\\project";
+      const env = sanitizeBackendEnvironment(
+        {
+          PATH: ["Z:\\tools\\bin", `${projectDir}\\node_modules\\.bin`].join(
+            delimiter,
+          ),
+        },
+        { projectDir },
+      );
+      expect(env.PATH).toBe("Z:\\tools\\bin");
+    },
+  );
 });

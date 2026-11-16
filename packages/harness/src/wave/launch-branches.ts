@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as md from "@mobrienv/autoloop-core";
@@ -208,11 +207,8 @@ export function joinParallelBranches(
     }
 
     if (remaining.length > 0 && ready.length === 0) {
-      try {
-        execSync("sleep 0.1");
-      } catch {
-        /* */
-      }
+      // Block 100 ms between polls without spawning a `sleep` process.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
     }
   }
   return { results, aggregateOutcome };

@@ -1,12 +1,26 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
+import { PosixShellNotFoundError } from "@mobrienv/autoloop-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  checkPosixShell,
+  commandOnPath,
   dispatchDoctor,
   renderDoctorReport,
   runDoctorChecks,
 } from "../../src/commands/doctor.js";
+
+function fakeFs(...files: string[]): (path: string) => boolean {
+  const lower = new Set(files.map((f) => f.toLowerCase()));
+  return (path) => lower.has(path.toLowerCase());
+}
 
 function registryLine(overrides: Record<string, unknown>): string {
   return JSON.stringify({
@@ -211,5 +225,113 @@ describe("doctor", () => {
     const limits = check("runtime limits");
     expect(limits.status).toBe("warn");
     expect(limits.detail).toContain("Node timer limit");
+  });
+
+  it("reports the resolved POSIX shell", () => {
+    const shell = check("shell");
+    expect(shell.status).toBe("ok");
+    if (process.platform !== "win32") expect(shell.detail).toBe("/bin/sh");
+  });
+});
+
+describe("checkPosixShell", () => {
+  it("is ok with the resolved shell path", () => {
+    expect(checkPosixShell(() => "C:\\Git\\bin\\sh.exe")).toEqual({
+      name: "shell",
+      status: "ok",
+      detail: "C:\\Git\\bin\\sh.exe",
+    });
+  });
+
+  it("fails with the PosixShellNotFoundError message", () => {
+    const error = new PosixShellNotFoundError(["AUTOLOOP_SHELL=C:\\nope.exe"]);
+    const result = checkPosixShell(() => {
+      throw error;
+    });
+    expect(result.status).toBe("fail");
+    expect(result.detail).toBe(error.message);
+    expect(result.detail).toContain("Git for Windows");
+    expect(result.detail).toContain("AUTOLOOP_SHELL");
+  });
+
+  it("stringifies a non-Error throw", () => {
+    const result = checkPosixShell(() => {
+      throw "no shell";
+    });
+    expect(result).toEqual({
+      name: "shell",
+      status: "fail",
+      detail: "no shell",
+    });
+  });
+});
+
+describe("commandOnPath", () => {
+  let binDir: string;
+  beforeEach(() => {
+    binDir = mkdtempSync(join(tmpdir(), "autoloop-doctor-bin-"));
+  });
+  afterEach(() => {
+    rmSync(binDir, { recursive: true, force: true });
+  });
+
+  function touch(name: string): string {
+    const path = join(binDir, name);
+    writeFileSync(path, "");
+    chmodSync(path, 0o755);
+    return path;
+  }
+
+  it("finds an executable on POSIX PATH", () => {
+    touch("claude");
+    const env = { PATH: `${binDir}${delimiter}` };
+    expect(commandOnPath("claude", env, "linux")).toBe(true);
+    expect(commandOnPath("codex", env, "linux")).toBe(false);
+    expect(commandOnPath("", env, "linux")).toBe(false);
+    expect(commandOnPath("claude", {}, "linux")).toBe(false);
+  });
+
+  it("honors PATHEXT on win32", () => {
+    const exists = fakeFs("C:\\bin\\claude.cmd", "C:\\bin\\node.exe");
+    const env = { PATH: ";C:\\bin", PATHEXT: ".EXE;.CMD" };
+    expect(commandOnPath("claude", env, "win32", exists)).toBe(true);
+    expect(commandOnPath("node", env, "win32", exists)).toBe(true);
+    expect(commandOnPath("claude.cmd", env, "win32", exists)).toBe(true);
+    expect(commandOnPath("claude.exe", env, "win32", exists)).toBe(false);
+    expect(commandOnPath("codex", env, "win32", exists)).toBe(false);
+  });
+
+  it("uses the default PATHEXT and a case-insensitive Path on win32", () => {
+    const exists = fakeFs("C:\\bin\\pi.bat");
+    expect(commandOnPath("pi", { Path: "C:\\bin" }, "win32", exists)).toBe(
+      true,
+    );
+  });
+
+  it("does not match an extensionless file on win32", () => {
+    const exists = fakeFs("C:\\bin\\claude");
+    expect(commandOnPath("claude", { PATH: "C:\\bin" }, "win32", exists)).toBe(
+      false,
+    );
+  });
+
+  it("skips relative and quoted-relative PATH entries on win32", () => {
+    // Spawns never search these (a planted claude.exe in the cwd must not
+    // count), so doctor does not either.
+    const exists = (path: string) => /claude\.exe$/i.test(path);
+    const env = { PATH: '.;"node_modules\\.bin"', PATHEXT: ".EXE" };
+    expect(commandOnPath("claude", env, "win32", exists)).toBe(false);
+    const quoted = { PATH: '"C:\\Program Files\\x"', PATHEXT: ".EXE" };
+    expect(commandOnPath("claude", quoted, "win32", exists)).toBe(true);
+  });
+
+  it("checks a path-qualified command directly", () => {
+    // A `/`-qualified path on POSIX (Windows join() would use backslashes).
+    const sh = touch("sh").replace(/\\/g, "/");
+    expect(commandOnPath(sh, {}, "linux")).toBe(true);
+    const exists = fakeFs("C:\\bin\\tool.cmd");
+    expect(commandOnPath("C:\\bin\\tool", {}, "win32", exists)).toBe(true);
+    expect(commandOnPath("C:/bin/tool", {}, "win32", exists)).toBe(true);
+    expect(commandOnPath("C:\\bin\\missing", {}, "win32", exists)).toBe(false);
   });
 });

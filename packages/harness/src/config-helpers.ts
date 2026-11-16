@@ -17,6 +17,7 @@ import {
   generateReadableId,
   readContainedFileIfExists,
   readOptionalContainedFile,
+  resolvePosixShell,
   splitCsv,
   uniqueGeneratedId,
 } from "@mobrienv/autoloop-core";
@@ -47,7 +48,12 @@ import {
   tryResolveGitRoot,
 } from "@mobrienv/autoloop-core/worktree";
 import { readJevRoutingConfig } from "./jev-routing.js";
-import { emitToolScript, piAdapterScript } from "./tools.js";
+import {
+  emitToolScript,
+  piAdapterScript,
+  promptToolPath,
+  windowsCmdShim,
+} from "./tools.js";
 import type { LoopContext, ReviewOnError, RunOptions } from "./types.js";
 
 const DEFAULT_PROMPT =
@@ -140,12 +146,24 @@ export function ensureLayout(stateDir: string): void {
   mkdirSync(stateDir, { recursive: true });
 }
 
-export function installRuntimeTools(loop: LoopContext): void {
-  writeFileSync(loop.paths.toolPath, emitToolScript(loop));
-  chmodSync(loop.paths.toolPath, 0o755);
+/**
+ * Write the agent tool and pi-adapter `#!/bin/sh` scripts. On win32 also
+ * write a `<script>.cmd` sibling for each (see `windowsCmdShim`).
+ */
+export function installRuntimeTools(
+  loop: LoopContext,
+  platform: NodeJS.Platform = process.platform,
+  resolveShell: () => string = resolvePosixShell,
+): void {
+  const shell = platform === "win32" ? resolveShell() : undefined;
+  const install = (path: string, script: string) => {
+    writeFileSync(path, script);
+    chmodSync(path, 0o755);
+    if (shell) writeFileSync(`${path}.cmd`, windowsCmdShim(shell, path));
+  };
+  install(loop.paths.toolPath, emitToolScript(loop));
   if (loop.host) return;
-  writeFileSync(loop.paths.piAdapterPath, piAdapterScript(loop));
-  chmodSync(loop.paths.piAdapterPath, 0o755);
+  install(loop.paths.piAdapterPath, piAdapterScript(loop));
 }
 
 export function resolveProcessKind(
@@ -184,12 +202,28 @@ export function resolveProcessKind(
 }
 
 function piBinary(command: string): boolean {
-  return command === "pi" || command.endsWith("/pi");
+  return binaryNamed(command, "pi");
 }
 
 function hermesBinary(command: string): boolean {
-  const base = command.split("/").pop() ?? "";
-  return base === "hermes";
+  return binaryNamed(command, "hermes");
+}
+
+/**
+ * True when `command` names the `name` binary. POSIX: the bare name or a path
+ * that ends in `/name`. win32 also accepts `\` separators, any letter case, and
+ * a `.exe`/`.cmd`/`.bat` ending (for example `C:\npm\claude.cmd`).
+ */
+export function binaryNamed(
+  command: string,
+  name: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  if (platform !== "win32") {
+    return command === name || command.endsWith(`/${name}`);
+  }
+  const base = (command.split(/[\\/]/).pop() ?? "").toLowerCase();
+  return base.replace(/\.(exe|cmd|bat)$/, "") === name;
 }
 
 export function normalizePromptMode(value: string): string {
@@ -273,7 +307,7 @@ export function processBoolOverride(
 }
 
 export function claudeBackend(command: string): boolean {
-  return command === "claude" || command.endsWith("/claude");
+  return binaryNamed(command, "claude");
 }
 
 export function nextRunId(path: string, cfg: config.Config): string {
@@ -565,7 +599,7 @@ export function reloadLoop(loop: LoopContext): LoopContext {
 
   const templateVars: Record<string, string> = {
     STATE_DIR: loop.paths.stateDir,
-    TOOL_PATH: loop.paths.toolPath,
+    TOOL_PATH: promptToolPath(loop.paths.toolPath),
     // Absolute path to the preset/config dir (holds roles, scripts, hooks). Lets a
     // role reference preset-bundled scripts by path — e.g. a bootstrap script the
     // loop runs before any copied-in scripts exist in the work dir.

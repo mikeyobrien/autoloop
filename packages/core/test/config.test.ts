@@ -254,11 +254,14 @@ describe("loadProject integration", () => {
 describe("userConfigPath", () => {
   const origAutoloop = process.env.AUTOLOOP_CONFIG;
   const origXdg = process.env.XDG_CONFIG_HOME;
+  const origAppData = process.env.APPDATA;
   afterEach(() => {
     if (origAutoloop === undefined) delete process.env.AUTOLOOP_CONFIG;
     else process.env.AUTOLOOP_CONFIG = origAutoloop;
     if (origXdg === undefined) delete process.env.XDG_CONFIG_HOME;
     else process.env.XDG_CONFIG_HOME = origXdg;
+    if (origAppData === undefined) delete process.env.APPDATA;
+    else process.env.APPDATA = origAppData;
   });
 
   it("returns AUTOLOOP_CONFIG env when set", () => {
@@ -268,6 +271,8 @@ describe("userConfigPath", () => {
 
   it("honors XDG_CONFIG_HOME when set", () => {
     delete process.env.AUTOLOOP_CONFIG;
+    // win32 prefers APPDATA; unset it so the XDG branch is exercised.
+    delete process.env.APPDATA;
     process.env.XDG_CONFIG_HOME = "/tmp/xdg-test";
     const path = userConfigPath();
     expect(path).toBe(join("/tmp/xdg-test", "autoloop", "config.toml"));
@@ -275,9 +280,10 @@ describe("userConfigPath", () => {
 
   it("falls back to ~/.config when XDG_CONFIG_HOME not set", () => {
     delete process.env.AUTOLOOP_CONFIG;
+    delete process.env.APPDATA;
     delete process.env.XDG_CONFIG_HOME;
     const path = userConfigPath();
-    expect(path).toContain(".config/autoloop/config.toml");
+    expect(path).toContain(join(".config", "autoloop", "config.toml"));
   });
 });
 

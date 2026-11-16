@@ -1,0 +1,7 @@
+# Keep LF in working files on every platform. Windows clones with
+# core.autocrlf=true otherwise get CRLF, which breaks Biome format checks and
+# #!/bin/sh scripts run by sh.exe. See docs/rfcs/windows-support.md.
+* text=auto eol=lf
+
+# Stored with CRLF in the index; keep it byte-identical.
+/.pi/agents/supervisor.md -text

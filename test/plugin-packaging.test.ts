@@ -24,21 +24,25 @@ describe("memory plugin packaging", () => {
     );
   });
 
-  it("keeps plugin skills as symlinks to .agents/skills", () => {
-    const links = [
-      ["autoloop", "autoloop"],
-      ["autoloop", "autoloop-acp"],
-      ["autoloop-memory", "autoloop-memory"],
-    ] as const;
-    for (const [plugin, skill] of links) {
-      const link = skillLink(plugin, skill);
-      expect(lstatSync(link).isSymbolicLink()).toBe(true);
-      expect(readlinkSync(link)).toBe(`../../../.agents/skills/${skill}`);
-      expect(realpathSync(join(link, "SKILL.md"))).toBe(
-        join(ROOT, ".agents", "skills", skill, "SKILL.md"),
-      );
-    }
-  });
+  // win32: a checkout without symlink privilege (core.symlinks=false) has plain files in place of these links.
+  it.skipIf(process.platform === "win32")(
+    "keeps plugin skills as symlinks to .agents/skills",
+    () => {
+      const links = [
+        ["autoloop", "autoloop"],
+        ["autoloop", "autoloop-acp"],
+        ["autoloop-memory", "autoloop-memory"],
+      ] as const;
+      for (const [plugin, skill] of links) {
+        const link = skillLink(plugin, skill);
+        expect(lstatSync(link).isSymbolicLink()).toBe(true);
+        expect(readlinkSync(link)).toBe(`../../../.agents/skills/${skill}`);
+        expect(realpathSync(join(link, "SKILL.md"))).toBe(
+          join(ROOT, ".agents", "skills", skill, "SKILL.md"),
+        );
+      }
+    },
+  );
 
   it("exposes add/list/find/render in the canonical memory skill", () => {
     const skill = readFileSync(

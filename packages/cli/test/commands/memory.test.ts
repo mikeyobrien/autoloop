@@ -152,7 +152,7 @@ describe("registered memory plugin", () => {
     );
     writeFileSync(
       join(projectDir, "autoloops.toml"),
-      `[memory]\nkind = "supermemory"\nmodule = "${fixture}"\n`,
+      `[memory]\nkind = "supermemory"\nmodule = ${JSON.stringify(fixture)}\n`,
     );
     dispatchMemory(["add", "learning", "remember this"]);
     dispatchMemory(["list", projectDir]);

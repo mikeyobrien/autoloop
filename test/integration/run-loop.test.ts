@@ -190,7 +190,7 @@ describe("integration: run loop with mock backend", () => {
     const project = makeTempProject("backend-timeout-progress");
     const configPath = join(project, "autoloops.toml");
     const config = readFileSync(configPath, "utf-8").replace(
-      "backend.timeout_ms = 10000",
+      /backend\.timeout_ms = \d+/,
       "backend.timeout_ms = 50",
     );
     writeFileSync(configPath, config, "utf-8");

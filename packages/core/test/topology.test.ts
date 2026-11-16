@@ -657,18 +657,22 @@ describe("prompt_file support", () => {
     expect(() => loadTopology(dir)).toThrow(/prompt_file.*within/i);
   });
 
-  it("rejects prompt files that escape through a symlink", () => {
-    const dir = tmpDir("prompt-symlink-escape");
-    const outside = join(TMP_BASE, "outside-symlink.md");
-    writeFileSync(outside, "host-only instructions");
-    symlinkSync(outside, join(dir, "linked-prompt.md"));
-    writeFileSync(
-      join(dir, "topology.toml"),
-      '[[role]]\nid = "worker"\nprompt_file = "linked-prompt.md"\nemits = ["done"]\n',
-    );
+  // win32: file symlinks need admin or Developer Mode (EPERM otherwise)
+  it.skipIf(process.platform === "win32")(
+    "rejects prompt files that escape through a symlink",
+    () => {
+      const dir = tmpDir("prompt-symlink-escape");
+      const outside = join(TMP_BASE, "outside-symlink.md");
+      writeFileSync(outside, "host-only instructions");
+      symlinkSync(outside, join(dir, "linked-prompt.md"));
+      writeFileSync(
+        join(dir, "topology.toml"),
+        '[[role]]\nid = "worker"\nprompt_file = "linked-prompt.md"\nemits = ["done"]\n',
+      );
 
-    expect(() => loadTopology(dir)).toThrow(/prompt_file.*within/i);
-  });
+      expect(() => loadTopology(dir)).toThrow(/prompt_file.*within/i);
+    },
+  );
 });
 
 describe("role backend override fields", () => {

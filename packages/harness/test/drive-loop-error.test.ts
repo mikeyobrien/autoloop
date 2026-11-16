@@ -32,6 +32,17 @@ vi.mock("../src/metareview.js", () => ({
 const runIteration = vi.hoisted(() => vi.fn());
 vi.mock("../src/iteration.js", () => ({ runIteration }));
 
+const terminateCommandChild = vi.hoisted(() => vi.fn());
+vi.mock("../src/command-teardown.js", () => ({ terminateCommandChild }));
+
+const stopControlDrain = vi.hoisted(() => vi.fn());
+const installControlDrainTrigger = vi.hoisted(() =>
+  vi.fn(() => stopControlDrain),
+);
+vi.mock("../src/control/drain-trigger.js", () => ({
+  installControlDrainTrigger,
+}));
+
 interface TerminalJournalRecord {
   v: number;
   run: string;
@@ -114,6 +125,9 @@ function makeLoopContext(): LoopContext {
 
 beforeEach(() => {
   runIteration.mockReset();
+  terminateCommandChild.mockClear();
+  stopControlDrain.mockClear();
+  installControlDrainTrigger.mockClear();
 });
 
 afterEach(() => {
@@ -290,5 +304,56 @@ describe("driveLoop unexpected errors", () => {
       status: "stopped",
       stop_reason: "error",
     });
+  });
+});
+
+describe("driveLoop command child teardown and control drain", () => {
+  it("terminates the in-flight command child when the run throws", async () => {
+    const loop = makeLoopContext();
+    const originalError = new Error("boom-teardown");
+    runIteration.mockImplementationOnce(async (ctx: LoopContext) => {
+      ctx.commandSession.current = { pid: 9876 } as never;
+      throw originalError;
+    });
+    registryStart(loop);
+
+    await expect(driveLoop(loop, {}, 1)).rejects.toBe(originalError);
+
+    expect(terminateCommandChild).toHaveBeenCalledTimes(1);
+    expect(terminateCommandChild).toHaveBeenCalledWith(9876);
+    expect(loop.commandSession.current).toBeUndefined();
+    expect(stopControlDrain).toHaveBeenCalledTimes(1);
+  });
+
+  it("terminates the in-flight command child once on abort", async () => {
+    const loop = makeLoopContext();
+    loop.hooks = { specs: [] } as unknown as LoopContext["hooks"];
+    const controller = new AbortController();
+    runIteration.mockImplementationOnce(async (ctx: LoopContext) => {
+      ctx.commandSession.current = { pid: 5432 } as never;
+      controller.abort();
+      return { iterations: 1, stopReason: "interrupted", runId: "x" };
+    });
+    registryStart(loop);
+
+    await driveLoop(loop, { signal: controller.signal }, 1);
+
+    expect(terminateCommandChild).toHaveBeenCalledTimes(1);
+    expect(terminateCommandChild).toHaveBeenCalledWith(5432);
+    expect(loop.commandSession.current).toBeUndefined();
+  });
+
+  it("does not start the control drain when a loop.start handler throws", async () => {
+    const loop = makeLoopContext();
+    const handlerError = new Error("on-event-failed");
+    loop.onEvent = (event) => {
+      if (event.type === "loop.start") throw handlerError;
+    };
+    registryStart(loop);
+
+    await expect(driveLoop(loop, {}, 1)).rejects.toBe(handlerError);
+
+    expect(installControlDrainTrigger).not.toHaveBeenCalled();
+    expect(runIteration).not.toHaveBeenCalled();
   });
 });

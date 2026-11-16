@@ -1,6 +1,8 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { shellWords } from "@mobrienv/autoloop-core";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { resolvePosixShell, shellWords } from "@mobrienv/autoloop-core";
 
 const BRIDGE_SCRIPT = `
 import json
@@ -150,7 +152,7 @@ export function run(args: string[]): void {
     const output = execSync(command, {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
-      shell: "/bin/sh",
+      shell: resolvePosixShell(),
       maxBuffer: 100 * 1024 * 1024,
     });
     finishSuccess(output || "");
@@ -178,7 +180,7 @@ function projectedPrompt(): string {
   try {
     const output = execSync(
       shellWords([bin, "inspect", "prompt", iteration, "--format", "md"]),
-      { encoding: "utf-8", shell: "/bin/sh", timeout: 30000 },
+      { encoding: "utf-8", shell: resolvePosixShell(), timeout: 30000 },
     );
     return output || "";
   } catch {
@@ -216,7 +218,7 @@ function materializePromptPath(prompt: string): string {
 
 function promptStoragePath(): string {
   const configured = process.env.AUTOLOOP_PROMPT_PATH || "";
-  return configured || "/tmp/autoloop-pi-adapter-prompt.md";
+  return configured || join(tmpdir(), "autoloop-pi-adapter-prompt.md");
 }
 
 function defaultPiArgs(): string[] {

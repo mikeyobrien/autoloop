@@ -5,6 +5,7 @@ import {
   joinCsv,
   jsonField,
   listText,
+  resolvePosixShell,
   splitCsv,
 } from "@mobrienv/autoloop-core";
 import * as config from "@mobrienv/autoloop-core/config";
@@ -181,7 +182,7 @@ function runEmitPhaseHooks(
       AUTOLOOP_EMIT_PAYLOAD: outcome.mutatedPayload ?? payload,
     };
     const result = spawnSync(spec.command, {
-      shell: true,
+      shell: resolvePosixShell(),
       cwd: projectDir,
       encoding: "utf-8",
       env,

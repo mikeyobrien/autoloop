@@ -1,3 +1,4 @@
+import { canSignalUsr1 } from "@mobrienv/autoloop-core";
 import type { LiveControlAdapter } from "./adapter.js";
 import { appendStatus, pendingRequests, writeCapabilities } from "./queue.js";
 import type { ControlAck, ControlRequest, ControlStatus } from "./types.js";
@@ -22,8 +23,15 @@ export function publishCapabilities(
 export function drainControlRequests(
   runStateDir: string,
   adapter: LiveControlAdapter,
+  platform: NodeJS.Platform = process.platform,
 ): ControlRequest[] {
-  const requests = pendingRequests(runStateDir);
+  // win32 drains on a timer that also runs while awaitHumanResponse polls, so
+  // acking `respond` here would race it and record the same request twice.
+  // There the drain leaves `respond` requests to the human-ask poll.
+  const leaveRespond = !canSignalUsr1(platform);
+  const requests = pendingRequests(runStateDir).filter(
+    (request) => !(leaveRespond && request.verb === "respond"),
+  );
   for (const request of requests) {
     if (request.verb === "respond") {
       // `respond` is consumed by the human-ask poll (awaitHumanResponse), not

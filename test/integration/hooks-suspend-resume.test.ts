@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { shellQuote } from "@mobrienv/autoloop-core";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   ensureBuild,
@@ -107,13 +108,13 @@ describe("integration: hooks suspend/resume durability", () => {
     // Fails (and suspends) on its first invocation only — a sentinel file
     // makes the retry after resume succeed, so we can observe the loop
     // actually completing on the resumed attempt.
-    const sentinel = join(project, "hook-ran-once");
+    const sentinel = shellQuote(join(project, "hook-ran-once"));
     appendConfig(
       project,
       [
         "[[hook]]",
         'phase = "pre_iteration"',
-        `command = "test -f ${sentinel} || (touch ${sentinel} && exit 1)"`,
+        `command = ${JSON.stringify(`test -f ${sentinel} || (touch ${sentinel} && exit 1)`)}`,
         'on_error = "suspend"',
       ].join("\n"),
     );
